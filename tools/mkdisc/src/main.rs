@@ -78,6 +78,8 @@ struct Args {
     /// `(borrower, lender)` display names: the borrower plays the lender's
     /// CD-DA tracks instead of shipping its own copy.
     shared_cdda: Vec<(String, String)>,
+    /// `(name, english, italian)` blurbs shown under the carousel.
+    descriptions: Vec<(String, String, String)>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -86,6 +88,7 @@ fn parse_args() -> Result<Args, String> {
     let mut volume = String::from("PSXDEMO");
     let mut programs = Vec::new();
     let mut shared_cdda = Vec::new();
+    let mut descriptions = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -129,6 +132,20 @@ fn parse_args() -> Result<Args, String> {
                 )?;
                 shared_cdda.push((borrower, lender.to_string_lossy().into_owned()));
             }
+            "--describe" => {
+                let spec = it.next().ok_or("--describe takes NAME=ENGLISH|ITALIAN")?;
+                let (name, text) = spec
+                    .split_once('=')
+                    .ok_or_else(|| format!("--describe wants NAME=ENGLISH|ITALIAN, got {spec:?}"))?;
+                let (english, italian) = text.split_once('|').ok_or_else(|| {
+                    format!("--describe wants the two languages split by '|', got {text:?}")
+                })?;
+                descriptions.push((
+                    name.to_string(),
+                    english.trim().to_string(),
+                    italian.trim().to_string(),
+                ));
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -143,6 +160,7 @@ fn parse_args() -> Result<Args, String> {
         volume,
         programs,
         shared_cdda,
+        descriptions,
     })
 }
 
@@ -154,7 +172,8 @@ fn print_usage() {
          --game        embeds a bare PSX-EXE (programs that never read the disc)\n\
          --image       places a whole game disc image, data track and CD-DA alike\n\
          --share-cdda  points one program at another's CD-DA tracks, so a song\n\
-        \x20             two programs both use is only burned once"
+        \x20             two programs both use is only burned once\n\
+         --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel"
     );
 }
 
@@ -334,6 +353,22 @@ fn apply_shared_cdda(
     Ok(())
 }
 
+/// Attach each blurb to its program.
+fn apply_descriptions(
+    entries: &mut [Entry],
+    names: &[&str],
+    descriptions: &[(String, String, String)],
+) -> Result<(), String> {
+    for (name, english, italian) in descriptions {
+        let at = names
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| format!("--describe names {name:?}, which is not on this disc"))?;
+        entries[at] = entries[at].described(english, italian);
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args = parse_args()?;
 
@@ -452,6 +487,7 @@ fn run() -> Result<(), String> {
 
     let names: Vec<&str> = args.programs.iter().map(|p| p.name.as_str()).collect();
     apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
+    apply_descriptions(&mut entries, &names, &args.descriptions)?;
     let toc = disc_toc::encode(&entries).ok_or_else(|| {
         format!(
             "{} programs is more than the {} that fit in the table sector",
@@ -638,6 +674,32 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("GH-PSX"), "{err}");
+    }
+
+    #[test]
+    fn descriptions_land_on_the_named_program() {
+        let mut entries = [Entry::new("PONG", 0, 0, 0), Entry::new("VOXIDE", 0, 0, 0)];
+        apply_descriptions(
+            &mut entries,
+            &["PONG", "VOXIDE"],
+            &[("VOXIDE".into(), "Voxel sandbox".into(), "Sandbox a voxel".into())],
+        )
+        .expect("the name exists");
+        assert_eq!(entries[1].desc_en_str(), "Voxel sandbox");
+        assert_eq!(entries[1].desc_it_str(), "Sandbox a voxel");
+        assert_eq!(entries[0].desc_en_str(), "", "others untouched");
+    }
+
+    #[test]
+    fn describing_a_program_that_is_not_on_the_disc_is_an_error() {
+        let mut entries = [Entry::new("PONG", 0, 0, 0)];
+        let err = apply_descriptions(
+            &mut entries,
+            &["PONG"],
+            &[("VOXIDE".into(), "a".into(), "b".into())],
+        )
+        .unwrap_err();
+        assert!(err.contains("VOXIDE"), "{err}");
     }
 
     #[test]

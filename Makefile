@@ -4,8 +4,10 @@
 # them out into the PSoXide game library as one disc. `make check` runs the
 # host tests.
 #
-# Not yet wired up: Cortex Ignition (needs the editor cook) and Half-Life
-# (needs the Half-Life game data and a full asset cook). See PLAN.md.
+# Two of the nine cannot be rebuilt from a fresh clone: Cortex Ignition's
+# project lives under editor/projects/, which PSoXide gitignores, and hl-psx
+# keeps its cooked assets and music outside git too. Both are staged from the
+# sibling working trees. See PLAN.md.
 
 .PHONY: help disc programs loader launcher examples mkdisc check relocation-check clean
 
@@ -33,6 +35,8 @@ VOXIDE   := $(GAMES)/voxide/game/target/$(PSX_TARGET)/release/voxide.exe
 PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
+HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
+CORTEX   := $(PSOXIDE)/editor/projects/cortex_v1/baked/cortex_v1.cue
 
 help:
 	@echo "make disc             - build everything into \"$(DIST)\""
@@ -64,6 +68,8 @@ programs: examples
 	$(MAKE) -C $(GAMES)/psxcel build
 	$(MAKE) -C $(GAMES)/pico8-psx collection
 	$(MAKE) -C $(GAMES)/gh-psx disc
+	$(MAKE) -C $(PSOXIDE) cortex-ignition-v1-project-disc
+	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
@@ -71,6 +77,8 @@ mkdisc:
 disc: launcher programs mkdisc
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
+		--image "CORTEX IGNITION=$(CORTEX)" \
+		--image "HALF-LIFE=$(HLPSX)" \
 		--game "VOXIDE=$(VOXIDE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--game "PSXCEL=$(PSXCEL)" \
@@ -78,9 +86,19 @@ disc: launcher programs mkdisc
 		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
-		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO"
+		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO" \
+		--describe "CORTEX IGNITION=Original 3D action game|Gioco d'azione 3D originale" \
+		--describe "HALF-LIFE=Half-Life, rebuilt for the PS1|Half-Life, ricostruito per PS1" \
+		--describe "VOXIDE=Block-building voxel sandbox|Sandbox a voxel con blocchi" \
+		--describe "CELESTE COLLECTION=Celeste Classic 1 and 2|Celeste Classic 1 e 2" \
+		--describe "PSXCEL=A spreadsheet run from a gamepad|Un foglio di calcolo col controller" \
+		--describe "GUITAR HERO=3D rhythm game, CD audio|Gioco ritmico 3D, audio da CD" \
+		--describe "BREAKOUT=Break every brick|Rompi tutti i mattoni" \
+		--describe "SPACE INVADERS=Hold the line, wave after wave|Resisti, ondata dopo ondata" \
+		--describe "MAGIKAAAAARP PONG=Two-player pong|Pong per due giocatori"
 
 check:
+	cd carousel && cargo test
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
 

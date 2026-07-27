@@ -32,6 +32,7 @@ reach `0x801F0000`, so that constraint fails the build rather than the console.
 | --- | --- |
 | `loader/` | the chain-load blob, its own linker script, no `psx-rt` |
 | `launcher/` | the menu, a normal PSoXide program |
+| `carousel/` | where the ring and the ball of balls land on screen, host-testable |
 | `disc-toc/` | the on-disc table format, shared by `mkdisc` and the launcher |
 | `tools/mkdisc/` | host disc builder, on top of PSoXide's `psx-iso` |
 | `games/` | the source repos, as submodules |
@@ -51,10 +52,13 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-Seven of the nine, all verified booting from the built disc:
+All nine, each verified booting from the built disc. 517 MiB, 51 minutes, 29
+CD-DA tracks, comfortably inside an 80-minute CD-R.
 
 | Program | How it ships |
 | --- | --- |
+| Cortex Ignition | whole image, 1 CD-DA track |
+| Half-Life | whole image, 27 CD-DA tracks |
 | Voxide | bare EXE |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
@@ -67,13 +71,17 @@ Voxide, Celeste and PSXcel never read the disc after boot, so they ride as
 bare EXEs and do not care which SDK built them: a `_start` that ignores the
 loader's arguments is still a correct `_start`.
 
-Two still to wire up:
+## The menu
 
-- **Cortex Ignition** needs the editor's cook run against a project
-- **Half-Life** needs the Half-Life game data and a full asset cook
+A carousel of glossy blue pills under a slowly turning ball of balls, over a
+starfield: the PlayStation demo discs, as closely as flat and gouraud
+triangles get you. Left and right spin the ring, X runs the pill at the front.
+Each entry carries a one-line description in English and Italian, both shown
+at once.
 
-Neither needs a source change, only a rebuild against the SDK on PSoXide's
-`demo-disc-lba-base` branch.
+No textures and no floating point. Ellipses are twelve-segment triangle fans
+shaded top to bottom; the ring and the sphere are one perspective divide each,
+depth-sorted back to front.
 
 ## Status
 

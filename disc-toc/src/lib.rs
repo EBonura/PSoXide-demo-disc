@@ -18,6 +18,8 @@
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
 //!         0x20  u32 CD-DA tracks belonging to programs ahead of this one
+//!         0x24  English one-liner, NUL-padded ASCII
+//!         0x4C  Italian one-liner, NUL-padded ASCII
 //! ```
 
 #![no_std]
@@ -39,10 +41,14 @@ pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
 pub const TOC_BYTES: usize = 2048;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 40;
+pub const ENTRY_BYTES: usize = 116;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
+
+/// Bytes reserved for each of an entry's two descriptions. At the 8-pixel
+/// font this is about as much as fits across a 320-pixel screen.
+pub const DESC_BYTES: usize = 40;
 
 const HEADER_BYTES: usize = 0x10;
 
@@ -62,34 +68,61 @@ pub struct Entry {
     pub lba_offset: u32,
     /// CD-DA tracks belonging to programs placed ahead of this one.
     pub cdda_track_base: u32,
+    /// One-line description, English.
+    pub desc_en: [u8; DESC_BYTES],
+    /// One-line description, Italian.
+    pub desc_it: [u8; DESC_BYTES],
+}
+
+fn fixed<const N: usize>(text: &str) -> [u8; N] {
+    let mut out = [0u8; N];
+    let src = text.as_bytes();
+    let n = if src.len() > N { N } else { src.len() };
+    out[..n].copy_from_slice(&src[..n]);
+    out
+}
+
+fn trimmed(bytes: &[u8]) -> &str {
+    let end = match bytes.iter().position(|&b| b == 0) {
+        Some(i) => i,
+        None => bytes.len(),
+    };
+    core::str::from_utf8(&bytes[..end]).unwrap_or("")
 }
 
 impl Entry {
     /// Build an entry, truncating `name` to [`NAME_BYTES`].
     pub fn new(name: &str, exe_lba: u32, lba_offset: u32, cdda_track_base: u32) -> Self {
-        let mut bytes = [0u8; NAME_BYTES];
-        let src = name.as_bytes();
-        let n = if src.len() > NAME_BYTES {
-            NAME_BYTES
-        } else {
-            src.len()
-        };
-        bytes[..n].copy_from_slice(&src[..n]);
         Entry {
-            name: bytes,
+            name: fixed(name),
             exe_lba,
             lba_offset,
             cdda_track_base,
+            desc_en: [0; DESC_BYTES],
+            desc_it: [0; DESC_BYTES],
         }
+    }
+
+    /// Attach the two descriptions, each truncated to [`DESC_BYTES`].
+    pub fn described(mut self, english: &str, italian: &str) -> Self {
+        self.desc_en = fixed(english);
+        self.desc_it = fixed(italian);
+        self
     }
 
     /// The name as a `str`, NUL padding stripped. Empty if not valid ASCII.
     pub fn name_str(&self) -> &str {
-        let end = match self.name.iter().position(|&b| b == 0) {
-            Some(i) => i,
-            None => NAME_BYTES,
-        };
-        core::str::from_utf8(&self.name[..end]).unwrap_or("")
+        trimmed(&self.name)
+    }
+
+    /// The English description, NUL padding stripped.
+    pub fn desc_en_str(&self) -> &str {
+        trimmed(&self.desc_en)
+    }
+
+    /// The Italian description, NUL padding stripped.
+    pub fn desc_it_str(&self) -> &str {
+        trimmed(&self.desc_it)
     }
 }
 
@@ -110,6 +143,9 @@ pub fn encode(entries: &[Entry]) -> Option<[u8; TOC_BYTES]> {
         out[n..n + 4].copy_from_slice(&entry.exe_lba.to_le_bytes());
         out[n + 4..n + 8].copy_from_slice(&entry.lba_offset.to_le_bytes());
         out[n + 8..n + 12].copy_from_slice(&entry.cdda_track_base.to_le_bytes());
+        let d = n + 12;
+        out[d..d + DESC_BYTES].copy_from_slice(&entry.desc_en);
+        out[d + DESC_BYTES..d + 2 * DESC_BYTES].copy_from_slice(&entry.desc_it);
     }
     Some(out)
 }
@@ -138,6 +174,9 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         slot.exe_lba = word(n);
         slot.lba_offset = word(n + 4);
         slot.cdda_track_base = word(n + 8);
+        let d = n + 12;
+        slot.desc_en.copy_from_slice(&sector[d..d + DESC_BYTES]);
+        slot.desc_it.copy_from_slice(&sector[d + DESC_BYTES..d + 2 * DESC_BYTES]);
     }
     Some(count)
 }
@@ -153,7 +192,8 @@ mod tests {
     #[test]
     fn round_trips_entries() {
         let entries = [
-            Entry::new("CORTEX IGNITION", 4096, 4074, 0),
+            Entry::new("CORTEX IGNITION", 4096, 4074, 0)
+                .described("Original 3D action game", "Gioco d'azione 3D originale"),
             Entry::new("HALF-LIFE", 40960, 40938, 1),
         ];
         let sector = encode(&entries).expect("fits");
@@ -164,6 +204,9 @@ mod tests {
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
         assert_eq!(out[1].lba_offset, 40938);
         assert_eq!(out[1].cdda_track_base, 1);
+        assert_eq!(out[0].desc_en_str(), "Original 3D action game");
+        assert_eq!(out[0].desc_it_str(), "Gioco d'azione 3D originale");
+        assert_eq!(out[1].desc_en_str(), "", "an entry may have no description");
     }
 
     #[test]
@@ -177,6 +220,13 @@ mod tests {
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
         assert!(encode(&too_many).is_none());
+    }
+
+    #[test]
+    fn truncates_an_overlong_description() {
+        let entry = Entry::new("X", 0, 0, 0).described(&"e".repeat(80), &"i".repeat(80));
+        assert_eq!(entry.desc_en_str().len(), DESC_BYTES);
+        assert_eq!(entry.desc_it_str().len(), DESC_BYTES);
     }
 
     #[test]
