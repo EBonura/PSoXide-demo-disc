@@ -62,10 +62,10 @@ CD-DA tracks, comfortably inside an 80-minute CD-R.
 | Voxide | bare EXE |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
-| Guitar Hero (gh-psx) | whole image, 1 CD-DA track |
+| GH-PSX | whole image, 1 CD-DA track |
 | Breakout | bare EXE |
 | Space Invaders | bare EXE |
-| Magikaaaaarp Pong | bare EXE, plays Guitar Hero's track |
+| Magikaaaaarp Pong | bare EXE, plays GH-PSX's track |
 | Hardware Tests | whole image, 1 CD-DA track |
 
 Voxide, Celeste and PSXcel never read the disc after boot, so they ride as

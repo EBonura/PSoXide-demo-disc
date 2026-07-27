@@ -95,7 +95,7 @@ disc: launcher programs mkdisc
 		--game "VOXIDE=$(VOXIDE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--game "PSXCEL=$(PSXCEL)" \
-		--image "GUITAR HERO=$(GHPSX)" \
+		--image "GH-PSX=$(GHPSX)" \
 		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
@@ -104,13 +104,13 @@ disc: launcher programs mkdisc
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		$(foreach t,$(MENU_TITLES),--menu-title $(t)) \
 		--credit "$(MENU_CREDIT)" \
-		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO" \
-		--describe "CORTEX IGNITION=Explore a derelict complex in this original 3D action game|Esplora un complesso abbandonato in un gioco d'azione 3D" \
-		--describe "HALF-LIFE=Half-Life rebuilt for the PlayStation, streamed off this disc|Half-Life ricostruito per PlayStation, caricato da questo disco" \
-		--describe "VOXIDE=Mine blocks and build in a world generated as you walk|Scava blocchi e costruisci in un mondo generato mentre cammini" \
-		--describe "CELESTE COLLECTION=Both Celeste Classic games, climbed one screen at a time|I due Celeste Classic, scalati uno schermo alla volta" \
-		--describe "PSXCEL=A working spreadsheet you drive entirely with a gamepad|Un vero foglio di calcolo che usi solo col controller" \
-		--describe "GUITAR HERO=Hit the notes as the fretboard rushes at you, in CD time|Colpisci le note sul manico che scorre, a tempo col CD" \
+		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
+		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, tech demo|Souls-like originale creato da zero per PS1, demo tecnica" \
+		--describe "HALF-LIFE=Half-Life rebuilt from the ground up for PS1, semi-playable|Half-Life ricostruito da zero per PS1, semi-giocabile" \
+		--describe "VOXIDE=A Minecraft clone, early tech-demo|Un clone di Minecraft, demo tecnica iniziale" \
+		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games on PS1, fully playable|Entrambi i Celeste Classic PICO-8 su PS1, giocabili" \
+		--describe "PSXCEL=An Excel clone because why not?|Un clone di Excel, solo per il gusto di farlo" \
+		--describe "GH-PSX=Guitar Hero clone, early tech-demo|Clone di Guitar Hero, demo tecnica iniziale" \
 		--describe "BREAKOUT=Clear every brick without losing the ball off the bottom|Elimina tutti i mattoni senza perdere la palla in fondo" \
 		--describe "SPACE INVADERS=Hold the line as the wave drops lower with every pass|Resisti mentre l'ondata scende a ogni passaggio" \
 		--describe "MAGIKAAAAARP PONG=Pong for two players, with a fish where the ball should be|Pong per due giocatori, con un pesce al posto della palla" \
