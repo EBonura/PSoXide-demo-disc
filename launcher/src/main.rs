@@ -43,6 +43,15 @@ const LOADER_LIMIT: usize = 32 * 1024;
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
+/// The banner sits in its own 4bpp page, clear of both framebuffers and of
+/// the font. Tpage X must be a multiple of 64.
+const BANNER_TPAGE: Tpage = Tpage::new(384, 0, TexDepth::Bit4);
+const BANNER_CLUT: Clut = Clut::new(400, 256);
+const BANNER_W: i16 = 140;
+const BANNER_H: i16 = 26;
+static BANNER_TEX: &[u8] = include_bytes!("../assets/banner.tex");
+static BANNER_CLUT_DATA: &[u8] = include_bytes!("../assets/banner.clut");
+
 const TITLE: (u8, u8, u8) = (255, 84, 62);
 const HINT: (u8, u8, u8) = (168, 44, 40);
 const NOW_PLAYING: (u8, u8, u8) = (172, 40, 34);
@@ -78,6 +87,9 @@ const SPHERE_DECAY_SHIFT: i32 = 4;
 /// Widest line the 8-pixel font fits on screen with a margin either side.
 const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// Top of the description block, and the gap between its lines.
+/// The music panel starts below the banner rather than beside it: at 140
+/// pixels wide the mark reaches too far left to share the row.
+const MUSIC_TOP: i16 = 38;
 const DESC_TOP: i16 = 92;
 const DESC_LEADING: i16 = 9;
 
@@ -112,6 +124,14 @@ fn main() {
     gpu::set_draw_area(0, 0, 319, 239);
     gpu::set_draw_offset(0, 0);
     let font = FontAtlas::upload(&BASIC, FONT_TPAGE, FONT_CLUT);
+    let banner = paint::Banner::upload(
+        BANNER_TEX,
+        BANNER_CLUT_DATA,
+        BANNER_W,
+        BANNER_H,
+        BANNER_TPAGE,
+        BANNER_CLUT,
+    );
 
     let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
     // Read the table before a note of music plays: a data read while the
@@ -270,7 +290,8 @@ fn main() {
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
-        centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
+        banner.draw(160 - BANNER_W / 2, 1);
+        centred(&font, BANNER_H + 3, "DEMO DISC", TITLE);
         if let Some(header) = header {
             draw_music_panel(
                 &font,
@@ -381,12 +402,12 @@ fn draw_music_panel(
     if title.is_empty() {
         return;
     }
-    let label = |text: &str| font.draw_text(6, 48, text, HINT);
+    let label = |text: &str| font.draw_text(6, MUSIC_TOP + 42, text, HINT);
     // The drive takes a moment to pick a track up, and a menu that just goes
     // quiet reads as broken. Say what it is doing.
     if loading {
-        font.draw_text(6, 6, "LOADING", NOW_PLAYING);
-        font.draw_text(6, 17, title, TRACK_NAME);
+        font.draw_text(6, MUSIC_TOP, "LOADING", NOW_PLAYING);
+        font.draw_text(6, MUSIC_TOP + 11, title, TRACK_NAME);
         if skippable {
             label("L1/R1");
         }
@@ -394,7 +415,7 @@ fn draw_music_panel(
     }
     // "NOW PLAYING" is wide enough to touch the centred header. "PLAYING"
     // says the same thing with the level meter beside it.
-    font.draw_text(6, 6, "PLAYING", NOW_PLAYING);
+    font.draw_text(6, MUSIC_TOP, "PLAYING", NOW_PLAYING);
     // The title brightens on the beat, so the words themselves keep time.
     let lift = beat.pulse / 4;
     let tint = (
@@ -402,12 +423,12 @@ fn draw_music_panel(
         TRACK_NAME.1.saturating_add(lift),
         TRACK_NAME.2.saturating_add(lift),
     );
-    font.draw_text(6, 17, title, tint);
+    font.draw_text(6, MUSIC_TOP + 11, title, tint);
     match levels {
-        Some(levels) => paint::level_meter(6, 44, levels),
+        Some(levels) => paint::level_meter(6, MUSIC_TOP + 38, levels),
         // No analysis for this track: keep time off the beat instead of
         // leaving a dead space where the meter should be.
-        None => paint::level_meter_beat(6, 44, beat.pulse),
+        None => paint::level_meter_beat(6, MUSIC_TOP + 38, beat.pulse),
     }
     if skippable {
         font.draw_text(6, 48, "L1/R1", HINT);
@@ -428,6 +449,11 @@ fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     } else {
         entry.desc_en_str()
     };
+    // A panel first, so the text does not have to compete with the ball and
+    // the starfield behind it.
+    let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
+    paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
+
     // Greedy wrap, a line at a time. mkdisc has already checked the text fits
     // in DESC_LINES of them, so nothing is dropped here.
     let mut rest = text;
