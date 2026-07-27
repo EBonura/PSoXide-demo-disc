@@ -106,19 +106,10 @@ pub fn pill(item: &Placed, pulse: u8) {
     );
 }
 
-/// How far the reflection is pushed below its mirrored position. Twice the
-/// apparent hover height, since a reflection travels the gap twice.
-const HOVER_GAP: i16 = 10;
-
 /// The carousel mirrored in the floor it sits on: same pill, flipped about
 /// `floor_y`, squashed and dimmed. Reflections of the far pills fall off the
 /// bottom of the screen and clip away, which is the cheap half of the trick.
-pub fn pill_reflection(item: &Placed, floor_y: i16) {
-    // Mirrored, then pushed down by the hover gap. Mirroring alone put the
-    // reflection's first row directly under the pill's last, which reads as
-    // the ring resting on the floor; a gap is the whole difference between
-    // sitting on a surface and floating over one.
-    let y = 2 * floor_y - item.y + HOVER_GAP;
+pub fn pill_reflection(item: &Placed, y: i16) {
     let ry = (item.ry * 2) / 5;
     if y - ry > 239 || ry <= 0 {
         return;

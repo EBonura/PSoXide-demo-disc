@@ -25,10 +25,33 @@ const CAMERA_Z: i32 = 520;
 const FOCAL: i32 = 300;
 /// Ring radius.
 const RING_R: i32 = 205;
-/// Screen row the carousel is mirrored about. Three rows higher than the
-/// geometry wants: mirroring exactly about the front pill's lower edge put
-/// the bottom of its reflection two rows past the last scanline.
-pub const FLOOR_Y: i16 = 200;
+/// How far below the ring its reflection is drawn.
+///
+/// A translation, not a mirror. The ring lies in a horizontal plane and so
+/// does its reflection, and this projection maps a plane's depth to a linear
+/// vertical offset; reflecting one horizontal plane in another therefore just
+/// slides the whole thing down the screen. Mirroring each pill about a line
+/// instead flipped the ring's near and far sides, putting the closest pills'
+/// reflections at the top of the reflected ring.
+///
+/// Big enough that the reflected ring's far side clears the real ring's near
+/// side, which is what sets the floor low enough for the carousel to look
+/// like it is floating over it.
+pub const REFLECT_DROP: i16 = 46;
+
+/// How much the reflected ring's own near-to-far spread is flattened, in
+/// 256ths. A reflection seen at this grazing an angle is compressed, and
+/// without it the reflected ring is as tall as the real one and cannot fit
+/// between the carousel and the last scanline.
+const REFLECT_SQUASH: i32 = 100;
+
+/// Where a pill's reflection sits, given where the pill is.
+///
+/// The whole ring slides down and flattens; it does not turn over. Each
+/// pill's own shading still flips, which is the part that really is a mirror.
+pub fn reflect_y(y: i16) -> i16 {
+    RING_Y + REFLECT_DROP + (((y - RING_Y) as i32 * REFLECT_SQUASH) / 256) as i16
+}
 /// Screen row the ring's centre projects to.
 const RING_Y: i16 = 174;
 /// How far the ring's far side rides up the screen: the tilt that turns a
@@ -408,6 +431,30 @@ mod tests {
     }
 
     #[test]
+    fn a_reflection_keeps_the_rings_near_and_far_the_way_round_they_were() {
+        // Front of the ring sits lower on screen than the back; its
+        // reflection has to as well, or the ring reads as turned over.
+        // `place` offsets by half a turn, so angle zero is the front.
+        let front = place(0);
+        let back = place(TURN / 2);
+        assert!(front.y > back.y, "front is lower to begin with");
+        assert!(
+            reflect_y(front.y) > reflect_y(back.y),
+            "and lower still in the reflection"
+        );
+    }
+
+    #[test]
+    fn a_reflection_is_flatter_than_the_ring_and_sits_below_it() {
+        let front = place(0);
+        let back = place(TURN / 2);
+        let real_spread = front.y - back.y;
+        let reflected_spread = reflect_y(front.y) - reflect_y(back.y);
+        assert!(reflected_spread < real_spread, "flattened");
+        assert!(reflect_y(back.y) > front.y, "clear of the ring above it");
+    }
+
+    #[test]
     fn depth_sort_puts_the_far_ones_first() {
         let mut items = [3i32, 1, 4, 1, 5, 9, 2, 6];
         sort_by_depth(&mut items, |v| *v);
@@ -424,3 +471,4 @@ mod tests {
         assert!(bottom > top);
     }
 }
+

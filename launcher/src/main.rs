@@ -559,7 +559,8 @@ fn draw_ring(
     // Reflections first, all of them, so a nearer pill's reflection cannot
     // draw over a nearer pill.
     for &slot in &order[..count] {
-        paint::pill_reflection(&placed(slot), carousel::FLOOR_Y);
+        let item = placed(slot);
+        paint::pill_reflection(&item, carousel::reflect_y(item.y));
     }
 
     // Only the downbeat flashes the pills. Lifting them every beat left
