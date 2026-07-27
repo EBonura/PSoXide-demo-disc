@@ -73,7 +73,7 @@ const ERROR: (u8, u8, u8) = (255, 214, 90);
 /// The carousel entry that shows the credits instead of running something.
 const CREDITS_NAME: &str = "CREDITS";
 
-const STARS: u32 = 90;
+const STARS: u32 = 120;
 
 /// Turns per frame the ring eases toward its target, as a fraction: the gap
 /// closes by an eighth each frame, which settles in about half a second.
@@ -112,7 +112,7 @@ const TRACK_TOP: i16 = 13;
 const METER_BASE: i16 = 38;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
-const BANNER_Y: i16 = 2;
+const BANNER_Y: i16 = 7;
 const DESC_TOP: i16 = 106;
 const DESC_LEADING: i16 = 9;
 
@@ -505,8 +505,14 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
         let b = star.bright.saturating_add(lift);
         let size = star.size + u16::from(twinkler && offbeat > 190);
-        // Warm white going to ember red as they fade into the distance.
-        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 3) / 8, (b * 4) / 16);
+        // Widen before scaling: `b` is a byte, and `b * 13` overflows one
+        // for any brightness above 19. That wrapped silently in release and
+        // collapsed green and blue to almost nothing, which is why the field
+        // was a scatter of near-black red rather than stars.
+        let shade = |numerator: u16| ((b as u16 * numerator) / 16) as u8;
+        // Barely tinted rather than deeply red: against a red field a red
+        // star disappears, and these are meant to read as flying past.
+        gpu::draw_rect_flat(star.x, star.y, size, size, b, shade(13), shade(11));
     }
 }
 

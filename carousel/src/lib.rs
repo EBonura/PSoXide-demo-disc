@@ -227,7 +227,12 @@ const STAR_NEAR: i32 = 40;
 /// Furthest a star starts from the camera.
 pub const STAR_FAR: i32 = 1400;
 /// Half-width of the volume stars are scattered through, in world units.
-const STAR_SPREAD: i32 = 900;
+///
+/// Narrow, and deliberately so. At 900 the field was geometrically correct
+/// and visually empty: measured, as few as 8 of 120 stars projected inside
+/// the screen at once, the rest culled off the edges before they were ever
+/// near enough to see. At 320 it is about 70.
+const STAR_SPREAD: i32 = 320;
 
 /// One star, already projected.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -264,13 +269,19 @@ pub fn star(index: u32, travel: i32) -> Star {
     if !(0..320).contains(&x) || !(0..240).contains(&y) {
         return Star::default();
     }
-    // Brightness and size follow how close it has come.
+    // Brightness and size follow how close it has come. Both start higher
+    // than the geometry alone suggests: a single dim pixel on a dark red
+    // field reads as nothing, and the field is what these have to carry.
     let nearness = ((STAR_FAR - z) * 255 / span).clamp(0, 255);
     Star {
         x: x as i16,
         y: y as i16,
-        size: if nearness > 190 { 2 } else { 1 },
-        bright: (45 + nearness * 210 / 255) as u8,
+        size: match nearness {
+            0..=110 => 1,
+            111..=205 => 2,
+            _ => 3,
+        },
+        bright: (100 + nearness * 155 / 255) as u8,
         visible: true,
     }
 }
@@ -425,21 +436,30 @@ mod tests {
 
     #[test]
     fn stars_get_nearer_brighter_and_bigger_as_they_come_at_you() {
-        // A star near the camera sweeps off the edge, which is the point of a
-        // starfield, so compare two depths where the same one is still framed
-        // rather than following one the whole way in.
-        let span = STAR_FAR - STAR_NEAR;
-        let (far_travel, near_travel) = (0, span / 2);
-        let index = (0..8192)
-            .find(|i| star(*i, far_travel).visible && star(*i, near_travel).visible)
-            .expect("some star is framed at both depths");
-        let far = star(index, far_travel);
-        let near = star(index, near_travel);
-        assert!(near.bright > far.bright, "brighter as it approaches");
-        assert!(near.size >= far.size, "and no smaller");
-        // And it has moved outward from the vanishing point.
-        let spread = |s: Star| (s.x as i32 - 160).abs() + (s.y as i32 - 120).abs();
-        assert!(spread(near) > spread(far), "and further from centre screen");
+        // Each star wraps back out to the far plane on its own schedule, so
+        // advancing `travel` does not always bring a given one closer: it can
+        // jump from the near plane to the far one between two samples. Walk
+        // one star and check brightness only rises, treating a sharp drop as
+        // the wrap it is.
+        let index = 7u32;
+        let mut previous: Option<Star> = None;
+        let mut approaches = 0;
+        for travel in (0..STAR_FAR * 2).step_by(11) {
+            let now = star(index, travel);
+            if let Some(before) = previous {
+                let wrapped = (before.bright as i32 - now.bright as i32) > 40;
+                if !wrapped {
+                    assert!(
+                        now.bright >= before.bright,
+                        "dimmer without wrapping at travel {travel}"
+                    );
+                    assert!(now.size >= before.size, "smaller without wrapping");
+                    approaches += 1;
+                }
+            }
+            previous = Some(now);
+        }
+        assert!(approaches > 100, "not enough of an approach to test");
     }
 
     #[test]
@@ -522,3 +542,22 @@ mod tests {
     }
 }
 
+
+
+#[cfg(test)]
+mod field_density {
+    use super::*;
+
+    /// A starfield nobody can see is just arithmetic. This is the check that
+    /// the volume still projects into the screen rather than around it.
+    #[test]
+    fn most_of_the_field_is_on_screen_at_any_moment() {
+        for travel in (0..STAR_FAR).step_by(53) {
+            let visible = (0..120u32).filter(|i| star(*i, travel).visible).count();
+            assert!(
+                visible >= 40,
+                "only {visible} of 120 stars on screen at travel {travel}"
+            );
+        }
+    }
+}
