@@ -49,16 +49,52 @@ disc. Both default to zero, so the same binary boots standalone unchanged.
 Relocated sectors get their BCD MSF header rewritten so the drive's seeks land.
 That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
+## What is on it
+
+Seven of the nine, all verified booting from the built disc:
+
+| Program | How it ships |
+| --- | --- |
+| Voxide | bare EXE |
+| Celeste Classic Collection | bare EXE |
+| PSXcel | bare EXE |
+| Guitar Hero (gh-psx) | whole image, 1 CD-DA track |
+| Breakout | bare EXE |
+| Space Invaders | bare EXE |
+| Magikaaaaarp Pong | bare EXE, plays Guitar Hero's track |
+
+Voxide, Celeste and PSXcel never read the disc after boot, so they ride as
+bare EXEs and do not care which SDK built them: a `_start` that ignores the
+loader's arguments is still a correct `_start`.
+
+Two still to wire up:
+
+- **Cortex Ignition** needs the editor's cook run against a project
+- **Half-Life** needs the Half-Life game data and a full asset cook
+
+Neither needs a source change, only a rebuild against the SDK on PSoXide's
+`demo-disc-lba-base` branch.
+
 ## Status
 
 Verified headless against a real BIOS, booting the built `.cue`:
 
-- the menu reads the disc table, navigates, and chain-loads the selection
+- the menu reads the disc table, navigates, and chain-loads all seven entries
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
+- Magikaaaaarp Pong plays audio off Guitar Hero's track, one copy on the disc
 
-Wired up so far: Breakout, Space Invaders, Magikaaaaarp Pong. The full games
-are next; they need no source changes, only a rebuild against the SDK on
-PSoXide's `demo-disc-lba-base` branch. See [PLAN.md](PLAN.md).
+## Building
+
+`make disc` writes into PSoXide's game library, so the disc shows up in the
+emulator next to everything else:
+
+```
+~/Downloads/ps1 games/PSoXide Demo Disc/PSoXide Demo Disc.{bin,cue}
+```
+
+Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
+different library. gh-psx keeps its audio in a gitignored `data/audio/`, so a
+fresh clone needs that dropped in before `make disc` will get past it.

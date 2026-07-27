@@ -93,6 +93,8 @@ psx-demo-disc/
 `add_playtest_files` is just one canonical layout built on top of it. A second
 layout function alongside it is the small change.
 
-## Open decisions
+## Progress
 
-See the questions asked alongside this plan.
+Done: chain-loading, whole-image relocation, the CD-DA track base, and seven
+of the nine programs (see README). Left: Cortex Ignition and Half-Life, both
+of which need their asset cooks run rather than any new mechanism.
