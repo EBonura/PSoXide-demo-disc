@@ -60,18 +60,14 @@ const BANNER_H: i16 = 22;
 static BANNER_TEX: &[u8] = include_bytes!("../assets/banner.tex");
 static BANNER_CLUT_DATA: &[u8] = include_bytes!("../assets/banner.clut");
 
-use paint::palette::*;
-
-const TITLE: (u8, u8, u8) = GOLD;
-const HINT: (u8, u8, u8) = RED_ORANGE;
-const NOW_PLAYING: (u8, u8, u8) = RED_ORANGE;
-const TRACK_NAME: (u8, u8, u8) = LIGHT_ORANGE;
-const BLURB: (u8, u8, u8) = AMBER;
-const LABEL: (u8, u8, u8) = GOLD;
-const FAR_LABEL: (u8, u8, u8) = RED_ORANGE;
-/// The only thing on screen that must not be missed, so the brightest the
-/// palette has.
-const ERROR: (u8, u8, u8) = GOLD;
+const TITLE: (u8, u8, u8) = (255, 84, 62);
+const HINT: (u8, u8, u8) = (168, 44, 40);
+const NOW_PLAYING: (u8, u8, u8) = (172, 40, 34);
+const TRACK_NAME: (u8, u8, u8) = (255, 88, 64);
+const BLURB: (u8, u8, u8) = (255, 206, 196);
+const LABEL: (u8, u8, u8) = (255, 255, 255);
+const FAR_LABEL: (u8, u8, u8) = (215, 78, 62);
+const ERROR: (u8, u8, u8) = (255, 214, 90);
 
 const STARS: u32 = 90;
 
@@ -314,7 +310,7 @@ fn main() {
         // with the ball.
         travel = travel.wrapping_add(spin_rate.max(1));
 
-        fb.clear(INK.0, INK.1, INK.2);
+        fb.clear(26, 0, 4);
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
@@ -400,20 +396,8 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
         let b = star.bright.saturating_add(lift);
         let size = star.size + u16::from(twinkler && offbeat > 190);
-        // Along the palette as they come at you: dark red far off, gold near.
-        let t = b as u32;
-        let along = |far: u8, near: u8| {
-            (far as u32 + (near as u32 - far as u32) * t / 255) as u8
-        };
-        gpu::draw_rect_flat(
-            star.x,
-            star.y,
-            size,
-            size,
-            along(DARK_RED.0, GOLD.0),
-            along(DARK_RED.1, GOLD.1),
-            along(DARK_RED.2, GOLD.2),
-        );
+        // Warm white going to ember red as they fade into the distance.
+        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 3) / 8, (b * 4) / 16);
     }
 }
 

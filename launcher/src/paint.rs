@@ -26,27 +26,10 @@ fn segments_for(rx: i16, ry: i16) -> usize {
     size.clamp(MIN_SEGMENTS, MAX_SEGMENTS)
 }
 
-/// The disc's palette, darkest to hottest. Everything on screen comes from
-/// these ten; nothing mixes its own colour.
-pub mod palette {
-    pub const INK: (u8, u8, u8) = (0x03, 0x07, 0x1E);
-    pub const DEEP: (u8, u8, u8) = (0x37, 0x06, 0x17);
-    pub const DARK_RED: (u8, u8, u8) = (0x6A, 0x04, 0x0F);
-    pub const RED: (u8, u8, u8) = (0x9D, 0x02, 0x08);
-    pub const BRIGHT_RED: (u8, u8, u8) = (0xD0, 0x00, 0x00);
-    pub const RED_ORANGE: (u8, u8, u8) = (0xDC, 0x2F, 0x02);
-    pub const ORANGE: (u8, u8, u8) = (0xE8, 0x5D, 0x04);
-    pub const LIGHT_ORANGE: (u8, u8, u8) = (0xF4, 0x8C, 0x06);
-    pub const AMBER: (u8, u8, u8) = (0xFA, 0xA3, 0x07);
-    pub const GOLD: (u8, u8, u8) = (0xFF, 0xBA, 0x08);
-}
-
-use palette::*;
-
-const GLOSS_TOP: (u8, u8, u8) = ORANGE;
-const GLOSS_BOTTOM: (u8, u8, u8) = DEEP;
-const GLOSS_EDGE: (u8, u8, u8) = RED;
-const SPECULAR: (u8, u8, u8) = GOLD;
+const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
+const GLOSS_BOTTOM: (u8, u8, u8) = (58, 0, 2);
+const GLOSS_EDGE: (u8, u8, u8) = (178, 10, 12);
+const SPECULAR: (u8, u8, u8) = (255, 196, 170);
 
 fn lerp(a: u8, b: u8, t: u8) -> u8 {
     let a = a as i32;
@@ -178,17 +161,17 @@ const METER_TALLEST: i16 = 16;
 fn meter_bar(x: i16, base_y: i16, level: u8) {
     let h = 1 + (level as i16 * (METER_TALLEST - 1)) / 255;
     // Tall bars run hot, short ones stay in the dark blue.
-    // Along the palette as it rises: dark red at rest, gold at the top.
-    let mix = |a: (u8, u8, u8), b: (u8, u8, u8)| {
-        let t = level as u32;
-        (
-            (a.0 as u32 + (b.0 as u32 - a.0 as u32) * t / 255) as u8,
-            (a.1 as u32 + (b.1 as u32 - a.1 as u32) * t / 255) as u8,
-            (a.2 as u32 + (b.2 as u32 - a.2 as u32) * t / 255) as u8,
-        )
-    };
-    let c = mix(RED, GOLD);
-    gpu::draw_rect_flat(x, base_y - h, METER_WIDTH, h as u16, c.0, c.1, c.2);
+    // Tall bars run hot toward orange, short ones stay in the deep red.
+    let heat = level / 2;
+    gpu::draw_rect_flat(
+        x,
+        base_y - h,
+        METER_WIDTH,
+        h as u16,
+        180u8.saturating_add(level / 4),
+        20u8.saturating_add(heat),
+        16u8.saturating_add(heat / 3),
+    );
 }
 
 /// The level meter, one bar per band of the track's pre-analysed spectrum,
@@ -262,8 +245,9 @@ impl Banner {
 /// The solid black band the mark and the title sit in, with the same border
 /// the text panel uses so the two read as one system.
 pub fn header_strip(h: i16) {
-    gpu::draw_rect_flat(0, 0, 320, h as u16, INK.0, INK.1, INK.2);
-    gpu::draw_rect_flat(0, h - 1, 320, 1, BRIGHT_RED.0, BRIGHT_RED.1, BRIGHT_RED.2);
+    const BORDER: (u8, u8, u8) = (150, 30, 34);
+    gpu::draw_rect_flat(0, 0, 320, h as u16, 0, 0, 0);
+    gpu::draw_rect_flat(0, h - 1, 320, 1, BORDER.0, BORDER.1, BORDER.2);
 }
 
 /// A dark panel to lay text over, with a thin border.
@@ -272,7 +256,7 @@ pub fn header_strip(h: i16) {
 /// whatever it covers rather than hiding it: the ball and the starfield stay
 /// visible underneath, just far enough back for white text to sit on them.
 pub fn text_panel(x: i16, y: i16, w: i16, h: i16) {
-    const BORDER: (u8, u8, u8) = BRIGHT_RED;
+    const BORDER: (u8, u8, u8) = (150, 30, 34);
     // Two triangles, since the SDK blends triangles and not rectangles.
     for tri in [
         [(x, y), (x + w, y), (x, y + h)],
