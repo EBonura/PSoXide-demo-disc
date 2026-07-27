@@ -233,8 +233,13 @@ fn main() {
 
     let mut selected: i32 = 0;
     let mut ring = 0i32;
-    let mut spin = 0i32;
-    let mut spin_rate = SPHERE_IDLE_SPIN;
+    // Two axes. A browse shoves it in some direction, and whatever tumble
+    // that leaves is what it keeps until the damping bleeds it off.
+    let mut yaw = 0i32;
+    let mut pitch = 0i32;
+    let mut yaw_rate = SPHERE_IDLE_SPIN;
+    let mut pitch_rate = 0i32;
+    let mut shoves: u32 = 0;
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
@@ -312,14 +317,16 @@ fn main() {
             }
         }
         if count > 0 {
-            if pressed(button::LEFT) {
-                selected -= 1;
-                spin_rate -= SPHERE_KICK;
-                Voice::key_on(VOICE_BROWSE.mask());
-            }
-            if pressed(button::RIGHT) {
-                selected += 1;
-                spin_rate += SPHERE_KICK;
+            let browse = pressed(button::LEFT) as i32 - pressed(button::RIGHT) as i32;
+            if browse != 0 {
+                selected -= browse;
+                // The shove points somewhere unpredictable rather than along
+                // one axis, so the ball tumbles instead of spinning on the
+                // spot. Which way the carousel went only sets the sign.
+                shoves = shoves.wrapping_add(1);
+                let (dx, dy) = carousel::impulse(shoves);
+                yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
+                pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
                 Voice::key_on(VOICE_BROWSE.mask());
             }
             if pressed(button::CROSS) || pressed(button::START) {
@@ -372,22 +379,27 @@ fn main() {
                     / 255
             }
         };
-        let scatter = ((spin_rate.abs() - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
+        let shake = yaw_rate.abs().max(pitch_rate.abs());
+        let scatter = ((shake - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
             .min(SCATTER_MAX);
         let swell = swell_beat + scatter;
 
         // Coast the ball back to its idle drift, which is itself riding the
         // bar: quickest just after the downbeat, slowest going into the next.
+        // Yaw settles back to the drift that rides the bar; pitch settles
+        // back to nothing, so the ball ends level however it was shoved.
         let idle = SPHERE_IDLE_SPIN + (beat.bar as i32 * SPHERE_BAR_SWING) / 255;
-        spin_rate = carousel::ease_spin(spin_rate, idle, SPHERE_DECAY_SHIFT);
-        spin = (spin + spin_rate) & (TURN - 1);
+        yaw_rate = carousel::ease_spin(yaw_rate, idle, SPHERE_DECAY_SHIFT);
+        pitch_rate = carousel::ease_spin(pitch_rate, 0, SPHERE_DECAY_SHIFT);
+        yaw = (yaw + yaw_rate) & (TURN - 1);
+        pitch = (pitch + pitch_rate) & (TURN - 1);
         // Flying forward the whole time, and a browse shoves the camera along
         // with the ball.
-        travel = travel.wrapping_add(spin_rate.max(1));
+        travel = travel.wrapping_add(yaw_rate.abs().max(1));
 
         fb.clear(26, 0, 4);
         draw_starfield(travel, beat.offbeat);
-        draw_sphere(spin, swell, &mut beads);
+        draw_sphere(yaw, pitch, swell, &mut beads);
 
         paint::header_strip(HEADER_H);
         banner.draw(160 - BANNER_W / 2, BANNER_Y);
@@ -500,8 +512,8 @@ fn draw_starfield(travel: i32, offbeat: u8) {
 
 /// `swell` pushes the beads outward from the centre, so the ball itself grows
 /// and snaps back rather than each bead getting fatter in place.
-fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
-    let n = carousel::sphere(spin, swell, beads);
+fn draw_sphere(yaw: i32, pitch: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
+    let n = carousel::sphere(yaw, pitch, swell, beads);
     carousel::sort_by_depth(&mut beads[..n], |b| b.z);
     let lift = (swell.clamp(0, 255) / 3) as u8;
     for bead in &beads[..n] {
