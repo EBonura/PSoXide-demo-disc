@@ -65,7 +65,7 @@ const PILL_RY: i32 = 19;
 
 /// The ball of balls hangs centred above the ring.
 const SPHERE_CENTRE_X: i16 = 160;
-const SPHERE_CENTRE_Y: i16 = 84;
+const SPHERE_CENTRE_Y: i16 = 94;
 const SPHERE_R: i32 = 68;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
@@ -129,16 +129,22 @@ pub struct Bead {
 /// Project the ball of balls, spun by `angle` and blown outward by `swell`
 /// (in 256ths of the resting radius, so 0 is at rest and 128 is half again as
 /// wide). Fills `out` and returns how many beads it wrote.
-pub fn sphere(angle: i32, swell: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
-    let a = (angle & (TURN - 1)) as u16;
+pub fn sphere(yaw: i32, pitch: i32, swell: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
+    let a = (yaw & (TURN - 1)) as u16;
+    let p = (pitch & (TURN - 1)) as u16;
     let (sin_a, cos_a) = (sin_q12(a), cos_q12(a));
+    let (sin_p, cos_p) = (sin_q12(p), cos_q12(p));
     let radius = SPHERE_R + (SPHERE_R * swell) / 256;
     let mut n = 0;
 
     let mut emit = |x: i32, y: i32, z: i32| {
-        // Spin about the vertical axis.
+        // Yaw about the vertical axis, then pitch about the horizontal one.
+        // Two axes rather than one so a shove can tumble it rather than only
+        // spin it on the spot.
         let rx = ((x * cos_a) + (z * sin_a)) >> 12;
-        let rz = ((z * cos_a) - (x * sin_a)) >> 12;
+        let zy = ((z * cos_a) - (x * sin_a)) >> 12;
+        let ry = ((y * cos_p) - (zy * sin_p)) >> 12;
+        let rz = ((y * sin_p) + (zy * cos_p)) >> 12;
         let depth = CAMERA_Z + rz;
         let k = perspective(depth);
         // Front beads are bigger and brighter, back ones sink into the dark.
@@ -147,7 +153,7 @@ pub fn sphere(angle: i32, swell: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize 
         let lit = (24 + ((SPHERE_R - rz).clamp(0, 2 * SPHERE_R) * 231) / (2 * SPHERE_R)) as u8;
         out[n] = Bead {
             x: (SPHERE_CENTRE_X as i32 + ((rx * k) >> 8)) as i16,
-            y: (SPHERE_CENTRE_Y as i32 + ((y * k) >> 8)) as i16,
+            y: (SPHERE_CENTRE_Y as i32 + ((ry * k) >> 8)) as i16,
             r: (((SPHERE_R / 7) * k) >> 8) as i16,
             z: depth,
             lit,
@@ -186,6 +192,20 @@ pub fn sort_by_depth<T: Copy, F: Fn(&T) -> i32>(items: &mut [T], depth: F) {
             j -= 1;
         }
     }
+}
+
+/// A shove in some direction nobody can predict, as a unit vector in Q12.
+///
+/// No RNG on the guest, and none wanted: a hash of the browse count gives a
+/// different direction every time while staying identical between runs, which
+/// is what makes a bug in this reproducible.
+pub fn impulse(seed: u32) -> (i32, i32) {
+    let mut h = seed.wrapping_mul(2_654_435_761);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x85EB_CA6B);
+    h ^= h >> 13;
+    let a = (h % TURN as u32) as u16;
+    (cos_q12(a), sin_q12(a))
 }
 
 /// Bleed a browse-kick off the ball's spin rate, one frame's worth.
@@ -348,11 +368,41 @@ mod tests {
     }
 
     #[test]
+    fn an_impulse_points_somewhere_different_each_time_and_is_a_unit_vector() {
+        let mut seen = [(0i32, 0i32); 8];
+        for (i, slot) in seen.iter_mut().enumerate() {
+            *slot = impulse(i as u32);
+            // Q12 unit vector, so the squares sum to about 4096 squared.
+            let len2 = slot.0 * slot.0 + slot.1 * slot.1;
+            let unit = 4096i32 * 4096;
+            assert!(
+                (len2 - unit).abs() < unit / 20,
+                "impulse {i} is not unit length: {len2}"
+            );
+        }
+        // Different seeds, different directions. Not a proof of uniformity,
+        // just that it is not stuck.
+        assert!(seen.iter().any(|d| *d != seen[0]));
+    }
+
+    #[test]
+    fn pitching_the_ball_moves_its_beads_off_the_yaw_only_positions() {
+        let mut flat = [Bead::default(); SPHERE_POINTS];
+        let mut tipped = [Bead::default(); SPHERE_POINTS];
+        sphere(0, 0, 0, &mut flat);
+        sphere(0, TURN / 8, 0, &mut tipped);
+        assert!(
+            flat.iter().zip(tipped.iter()).any(|(a, b)| a.y != b.y),
+            "a pitch has to move something"
+        );
+    }
+
+    #[test]
     fn a_swelling_ball_pushes_its_beads_apart() {
         let mut resting = [Bead::default(); SPHERE_POINTS];
         let mut swollen = [Bead::default(); SPHERE_POINTS];
-        sphere(0, 0, &mut resting);
-        sphere(0, 128, &mut swollen);
+        sphere(0, 0, 0, &mut resting);
+        sphere(0, 0, 128, &mut swollen);
         let spread = |b: &[Bead; SPHERE_POINTS]| {
             b.iter().map(|x| x.y).max().unwrap() - b.iter().map(|x| x.y).min().unwrap()
         };
@@ -464,7 +514,7 @@ mod tests {
     #[test]
     fn every_sphere_point_is_written() {
         let mut beads = [Bead::default(); SPHERE_POINTS];
-        assert_eq!(sphere(0, 0, &mut beads), SPHERE_POINTS);
+        assert_eq!(sphere(0, 0, 0, &mut beads), SPHERE_POINTS);
         // The poles are the extremes; nothing should be outside them.
         let top = beads.iter().map(|b| b.y).min().unwrap();
         let bottom = beads.iter().map(|b| b.y).max().unwrap();
