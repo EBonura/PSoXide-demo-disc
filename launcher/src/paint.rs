@@ -5,7 +5,6 @@
 //! at this size reads as a glossy lozenge without a single texture.
 
 use carousel::{Bead, Placed, TURN};
-use psx_gpu::material::BlendMode;
 use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
 
@@ -68,34 +67,6 @@ fn ellipse(cx: i16, cy: i16, rx: i16, ry: i16, top: (u8, u8, u8), bottom: (u8, u
         prev_p = p;
         prev_c = c;
     }
-}
-
-/// The shaft of light the demo-disc intros threw across the frame. Two
-/// additive wedges, so it brightens whatever is behind it instead of hiding
-/// it, and no texture is involved.
-///
-/// `pulse` swells it on the beat.
-pub fn light_streak(pulse: u8) {
-    let lift = 18 + (pulse as u16 * 26 / 255) as u8;
-    let core = (lift, lift + lift / 2, lift * 2);
-    let edge = (lift / 4, lift / 3, lift / 2);
-    // A long wedge from off the top-left corner to off the bottom-right,
-    // passing behind the ball.
-    let wide = 26 + (pulse as i16 * 10 / 255);
-    gpu::draw_tri_flat_blended(
-        [(-40, -20), (-40 + wide, -20), (300, 260)],
-        core.0,
-        core.1,
-        core.2,
-        BlendMode::Add,
-    );
-    gpu::draw_tri_flat_blended(
-        [(-40 + wide, -20), (300, 260), (300 + wide, 260)],
-        edge.0,
-        edge.1,
-        edge.2,
-        BlendMode::Add,
-    );
 }
 
 /// One carousel pill: the lozenge, a rim, and a specular blob up and left.
@@ -206,31 +177,61 @@ pub fn level_meter(x: i16, base_y: i16, pulse: u8) {
     }
 }
 
-/// The Union flag, 20x12. Not a texture: a blue field, then the white and red
-/// saltires as fans of parallel lines, then the cross on top.
-pub fn flag_uk(x: i16, y: i16) {
-    const W: i16 = 20;
-    const H: i16 = 12;
-    const BLUE: (u8, u8, u8) = (10, 32, 110);
-    const WHITE: (u8, u8, u8) = (240, 240, 245);
-    const RED: (u8, u8, u8) = (200, 24, 44);
 
-    gpu::draw_rect_flat(x, y, W as u16, H as u16, BLUE.0, BLUE.1, BLUE.2);
-    for offset in -2..=2i16 {
-        gpu::draw_line_mono(x + offset, y, x + W - 1 + offset, y + H - 1, WHITE.0, WHITE.1, WHITE.2);
-        gpu::draw_line_mono(x + W - 1 + offset, y, x + offset, y + H - 1, WHITE.0, WHITE.1, WHITE.2);
-    }
-    gpu::draw_line_mono(x, y, x + W - 1, y + H - 1, RED.0, RED.1, RED.2);
-    gpu::draw_line_mono(x + W - 1, y, x, y + H - 1, RED.0, RED.1, RED.2);
-    gpu::draw_rect_flat(x, y + 3, W as u16, 6, WHITE.0, WHITE.1, WHITE.2);
-    gpu::draw_rect_flat(x + 7, y, 6, H as u16, WHITE.0, WHITE.1, WHITE.2);
-    gpu::draw_rect_flat(x, y + 5, W as u16, 2, RED.0, RED.1, RED.2);
-    gpu::draw_rect_flat(x + 9, y, 2, H as u16, RED.0, RED.1, RED.2);
+/// Flags are drawn at this size in the top-right corner.
+pub const FLAG_W: i16 = 24;
+pub const FLAG_H: i16 = 16;
+
+/// The Union flag. The saltires are parallelograms rather than fans of
+/// parallel lines: at this size the line version came out as a smear.
+pub fn flag_uk(x: i16, y: i16) {
+    const BLUE: (u8, u8, u8) = (10, 30, 105);
+    const WHITE: (u8, u8, u8) = (238, 238, 242);
+    const RED: (u8, u8, u8) = (196, 22, 42);
+    let (w, h) = (FLAG_W, FLAG_H);
+
+    gpu::draw_rect_flat(x, y, w as u16, h as u16, BLUE.0, BLUE.1, BLUE.2);
+
+    // Saltire, white then a thinner red inside it.
+    let band = |thick: i16, c: (u8, u8, u8)| {
+        gpu::draw_quad_flat(
+            [
+                (x, y),
+                (x + thick, y),
+                (x + w - thick, y + h),
+                (x + w, y + h),
+            ],
+            c.0,
+            c.1,
+            c.2,
+        );
+        gpu::draw_quad_flat(
+            [
+                (x + w - thick, y),
+                (x + w, y),
+                (x, y + h),
+                (x + thick, y + h),
+            ],
+            c.0,
+            c.1,
+            c.2,
+        );
+    };
+    band(6, WHITE);
+    band(2, RED);
+
+    // Cross of St George over the top, white bordered.
+    gpu::draw_rect_flat(x, y + 5, w as u16, 6, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x + 9, y, 6, h as u16, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x, y + 6, w as u16, 4, RED.0, RED.1, RED.2);
+    gpu::draw_rect_flat(x + 10, y, 4, h as u16, RED.0, RED.1, RED.2);
 }
 
-/// The Italian tricolour, 20x12.
+/// The Italian tricolour.
 pub fn flag_it(x: i16, y: i16) {
-    gpu::draw_rect_flat(x, y, 7, 12, 0, 140, 69);
-    gpu::draw_rect_flat(x + 7, y, 6, 12, 240, 240, 240);
-    gpu::draw_rect_flat(x + 13, y, 7, 12, 205, 33, 42);
+    let third = (FLAG_W / 3) as u16;
+    let h = FLAG_H as u16;
+    gpu::draw_rect_flat(x, y, third, h, 0, 140, 69);
+    gpu::draw_rect_flat(x + third as i16, y, third, h, 240, 240, 240);
+    gpu::draw_rect_flat(x + 2 * third as i16, y, third, h, 205, 33, 42);
 }
