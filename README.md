@@ -80,9 +80,26 @@ triangles get you. Left and right spin the ring, X runs the pill at the front,
 up or down swaps the description between English and Italian under a drawn
 flag. Titles too long for a pill break across two lines.
 
-The ball is not just decoration: browsing shoves it, and it coasts back down
-to its idle drift over the next second or so, so the whole screen answers the
-d-pad rather than only the ring.
+The whole scene answers the music. `tools/beatgrid.py` fits a tempo and phase
+to each track's onset envelope offline and the numbers ship in the disc table,
+so the grid stays in step for the length of a track rather than drifting out of
+it. On that grid: the ball blows outward on every beat and snaps back, harder
+on the downbeat; the pills flash on the downbeat only; the starfield twinkles
+on the offbeat, in the gaps the other two leave; and the ball's idle spin rides
+the bar, quickest just after the downbeat.
+
+It answers the pad too. Browsing shoves the ball's spin, which coasts back down
+over the next second, and the same shove blows the beads apart and lets them
+re-form. The starfield drifts with it, brighter stars faster.
+
+A shaft of light crosses the frame behind everything, drawn additively so it
+brightens what it passes rather than covering it, and the carousel is mirrored
+in the floor below it.
+
+None of it uses a texture or a float. Ellipses are triangle fans whose segment
+count follows their size: at a flat twelve the ball alone put the frame over
+2000 triangles and the menu stopped holding 60 Hz, which stretched every
+time-driven effect with it.
 
 No textures and no floating point. Ellipses are twelve-segment triangle fans
 shaded top to bottom; the ring and the sphere are one perspective divide each,

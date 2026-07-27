@@ -55,8 +55,18 @@ const STARS: u32 = 90;
 /// Turns per frame the ring eases toward its target, as a fraction: the gap
 /// closes by an eighth each frame, which settles in about half a second.
 const EASE_SHIFT: i32 = 3;
-/// What the ball of balls drifts at when nobody is touching the pad.
+/// What the ball of balls drifts at when nobody is touching the pad, before
+/// the bar swings it.
 const SPHERE_IDLE_SPIN: i32 = 5;
+/// How much faster it turns at the top of a bar than at the end of one.
+const SPHERE_BAR_SWING: i32 = 6;
+/// How far the ball blows outward on a beat, in 256ths of its radius, on the
+/// downbeat and on the other three.
+const SWELL_DOWNBEAT: i32 = 44;
+const SWELL_BEAT: i32 = 22;
+/// How far a hard browse throws the beads apart, and the ceiling on it.
+const SCATTER_PER_KICK: i32 = 4;
+const SCATTER_MAX: i32 = 130;
 /// The shove browsing gives it. It spins up with the carousel and coasts back
 /// down to the idle drift, so the whole screen reacts rather than just the ring.
 const SPHERE_KICK: i32 = 110;
@@ -187,37 +197,52 @@ fn main() {
         // Everything visual answers the beat. The grid was measured off the
         // audio and shipped in the table, so this stays in step for the whole
         // length of a track rather than drifting out of it.
-        let pulse = match header.and_then(|h| h.beat(menu_track_index as usize)) {
+        let beat = match header.and_then(|h| h.beat(menu_track_index as usize)) {
             Some((beat_ms, phase_ms)) if clock.playing() => {
-                carousel::beat_pulse(clock.tick(tick), beat_ms, phase_ms)
+                carousel::beat_at(clock.tick(tick), beat_ms, phase_ms)
             }
-            _ => 0,
+            _ => carousel::Beat::default(),
         };
+        let pulse = beat.pulse;
+        // The downbeat gets the bigger shove. A hard browse adds to the same
+        // term, so the ball blows apart and re-forms as the kick decays.
+        let swell_beat = (beat.pulse as i32
+            * if beat.is_downbeat() {
+                SWELL_DOWNBEAT
+            } else {
+                SWELL_BEAT
+            })
+            / 255;
+        let scatter = ((spin_rate.abs() - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
+            .min(SCATTER_MAX);
+        let swell = swell_beat + scatter;
 
-        // Coast the ball back to its idle drift.
-        spin_rate = carousel::ease_spin(spin_rate, SPHERE_IDLE_SPIN, SPHERE_DECAY_SHIFT);
+        // Coast the ball back to its idle drift, which is itself riding the
+        // bar: quickest just after the downbeat, slowest going into the next.
+        let idle = SPHERE_IDLE_SPIN + (beat.bar as i32 * SPHERE_BAR_SWING) / 255;
+        spin_rate = carousel::ease_spin(spin_rate, idle, SPHERE_DECAY_SHIFT);
         spin = (spin + spin_rate) & (TURN - 1);
         // The sky drifts with the ball, so a browse pushes the whole scene.
         drift = drift.wrapping_add(spin_rate.max(1));
 
         fb.clear(4, 6, 18);
-        draw_starfield(drift, pulse);
+        draw_starfield(drift, beat.offbeat);
         paint::light_streak(pulse);
-        draw_sphere(spin, pulse, &mut beads);
+        draw_sphere(spin, swell, &mut beads);
 
         centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
 
         if count == 0 {
-            centred(&font, 126, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
+            centred(&font, 118, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
             draw_description(&font, &entries[index], italian);
-            draw_ring(&font, &entries[..count], ring, step, pulse, &mut order);
+            draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
         }
         // The music is used by permission, so the credit is not optional
         // decoration: it stays on screen the whole time the track plays.
         if let Some(header) = header {
-            centred(&font, 230, header.credit_str(), CREDIT);
+            centred(&font, 232, header.credit_str(), CREDIT);
         }
 
         gpu::draw_sync();
@@ -261,40 +286,41 @@ fn split_title(name: &str) -> (&str, &str) {
     }
 }
 
-fn draw_starfield(drift: i32, pulse: u8) {
+/// `offbeat` is 255 between two beats and 0 on them, so the sky twinkles in
+/// the gaps the ball and the pills leave.
+fn draw_starfield(drift: i32, offbeat: u8) {
     for i in 0..STARS {
         let (x, y, b) = carousel::star(i, drift);
-        // Every seventh star is bigger, and twinkles on the beat.
-        let beat_star = i % 7 == 0;
-        let size = if beat_star && pulse > 160 { 2 } else { 1 };
-        let lift = if beat_star { pulse / 3 } else { pulse / 8 };
+        let twinkler = i % 7 == 0;
+        let size = if twinkler && offbeat > 160 { 2 } else { 1 };
+        let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
         let b = b.saturating_add(lift);
         gpu::draw_rect_flat(x, y, size, size, b / 2, (b * 3) / 4, b);
     }
 }
 
-fn draw_sphere(spin: i32, pulse: u8, beads: &mut [Bead; SPHERE_POINTS]) {
-    let n = carousel::sphere(spin, beads);
+/// `swell` pushes the beads outward from the centre, so the ball itself grows
+/// and snaps back rather than each bead getting fatter in place.
+fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
+    let n = carousel::sphere(spin, swell, beads);
     carousel::sort_by_depth(&mut beads[..n], |b| b.z);
+    let lift = (swell.clamp(0, 255) / 3) as u8;
     for bead in &beads[..n] {
-        // The ball swells on the beat: each bead grows a little and brightens,
-        // which at this density reads as the whole sphere breathing.
-        let swollen = Bead {
-            r: bead.r + (pulse as i16 * 3 / 255),
-            lit: bead.lit.saturating_add(pulse / 4),
+        paint::bead(&Bead {
+            lit: bead.lit.saturating_add(lift),
             ..*bead
-        };
-        paint::bead(&swollen);
+        });
     }
 }
 
 /// The selected game's blurb in one language, under the flag of whichever
 /// one it is. Up or down swaps.
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
+    // Top-right, clear of the description band and the ball.
     if italian {
-        paint::flag_it(150, 112);
+        paint::flag_it(294, 5);
     } else {
-        paint::flag_uk(150, 112);
+        paint::flag_uk(294, 5);
     }
     let text = if italian {
         entry.desc_it_str()
@@ -313,7 +339,7 @@ fn draw_ring(
     entries: &[Entry],
     ring: i32,
     step: i32,
-    pulse: u8,
+    beat: &carousel::Beat,
     order: &mut [usize; MAX_ENTRIES],
 ) {
     let count = entries.len();
@@ -323,9 +349,18 @@ fn draw_ring(
     let placed = |slot: usize| -> Placed { carousel::place(ring + slot as i32 * step) };
     carousel::sort_by_depth(&mut order[..count], |slot| placed(*slot).z);
 
+    // Reflections first, all of them, so a nearer pill's reflection cannot
+    // draw over a nearer pill.
+    for &slot in &order[..count] {
+        paint::pill_reflection(&placed(slot), carousel::FLOOR_Y);
+    }
+
+    // Only the downbeat flashes the pills. Lifting them every beat left
+    // nothing for the downbeat to be.
+    let flash = if beat.is_downbeat() { beat.pulse } else { 0 };
     for &slot in &order[..count] {
         let item = placed(slot);
-        paint::pill(&item, pulse);
+        paint::pill(&item, flash);
 
         // Titles wider than their pill are left to overhang, the way the demo
         // discs did it. The ones round the back are dropped instead: at that
