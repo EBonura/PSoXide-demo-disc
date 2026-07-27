@@ -233,6 +233,16 @@ impl Banner {
     }
 }
 
+/// One step of a fade to black: halve whatever is in the buffer.
+pub fn fade_step() {
+    for tri in [
+        [(0, 0), (320, 0), (0, 240)],
+        [(320, 0), (0, 240), (320, 240)],
+    ] {
+        gpu::draw_tri_flat_blended(tri, 0, 0, 0, BlendMode::Average);
+    }
+}
+
 /// The solid black band the mark and the title sit in, with the same border
 /// the text panel uses so the two read as one system.
 pub fn header_strip(h: i16) {

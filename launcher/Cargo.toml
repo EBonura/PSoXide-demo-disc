@@ -27,4 +27,5 @@ psx-math = { path = "../games/PSoXide/sdk/crates/psx-math" }
 carousel = { path = "../carousel" }
 psx-io   = { path = "../games/PSoXide/sdk/crates/psx-io" }
 psx-spu  = { path = "../games/PSoXide/sdk/crates/psx-spu" }
+psx-asset = { path = "../games/PSoXide/sdk/crates/psx-asset" }
 disc-toc = { path = "../disc-toc" }

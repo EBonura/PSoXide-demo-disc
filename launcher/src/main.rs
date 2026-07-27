@@ -27,7 +27,8 @@ use psx_font::{
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaStarter};
 use psx_io::cdrom;
-use psx_spu::{self as spu, CdVolume, Volume};
+use psx_asset::Audio;
+use psx_spu::{self as spu, Adsr, CdVolume, SpuAddr, Voice, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_pad::{button, poll_port1, ButtonState};
 use psx_rt::tty;
@@ -126,6 +127,23 @@ const CDDA_SPINS: u32 = 0x10_0000;
 /// Display frames a second, which is what the CD clock counts in.
 const TICKS_HZ: u32 = 60;
 
+/// A blip when the carousel turns and a heavier one when a program is
+/// chosen. Two voices, well clear of the CD input.
+const VOICE_BROWSE: Voice = Voice::V0;
+const VOICE_SELECT: Voice = Voice::V1;
+const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
+static SFX_BROWSE: &[u8] =
+    include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/ui_beep.psau");
+static SFX_SELECT: &[u8] =
+    include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/pickup_coin.psau");
+
+/// Idle frames before the menu clears itself down to the ball turning over
+/// the carousel. A demo disc spends most of its life unattended.
+const ATTRACT_AFTER: u32 = 60 * 20;
+/// Frames the launch fade takes. Long enough to read as deliberate, short
+/// enough that nobody waits for it.
+const FADE_FRAMES: i32 = 14;
+
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
 static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
@@ -195,6 +213,23 @@ fn main() {
         spu::enable_cd_audio(true);
         music.begin(tick);
     }
+    // Independent of the music: the blips play whether or not the disc
+    // carries a menu track.
+    {
+        let mut at = SFX_BASE;
+        for (voice, bytes) in [(VOICE_BROWSE, SFX_BROWSE), (VOICE_SELECT, SFX_SELECT)] {
+            let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
+            let adpcm = audio.adpcm_bytes();
+            spu::upload_adpcm(at, adpcm);
+            voice.configure_sample(
+                at,
+                audio.sample_rate_hz(),
+                Volume::linear(1, 14),
+                Adsr::sample(),
+            );
+            at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
+        }
+    }
 
     let mut selected: i32 = 0;
     let mut ring = 0i32;
@@ -204,6 +239,8 @@ fn main() {
     let mut travel: i32 = 0;
     let mut italian = false;
     let mut prev_held = ButtonState::default();
+    /// Frames since the pad last did anything.
+    let mut idle: u32 = 0;
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
     let mut text_cache = paint::TextCache::new();
@@ -234,6 +271,20 @@ fn main() {
 
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
+        let touched = [
+            button::LEFT,
+            button::RIGHT,
+            button::UP,
+            button::DOWN,
+            button::L1,
+            button::R1,
+            button::CROSS,
+            button::START,
+        ]
+        .iter()
+        .any(|b| pressed(*b));
+        idle = if touched { 0 } else { idle.saturating_add(1) };
+        let attract = idle > ATTRACT_AFTER;
 
         if pressed(button::UP) || pressed(button::DOWN) {
             italian = !italian;
@@ -264,17 +315,20 @@ fn main() {
             if pressed(button::LEFT) {
                 selected -= 1;
                 spin_rate -= SPHERE_KICK;
+                Voice::key_on(VOICE_BROWSE.mask());
             }
             if pressed(button::RIGHT) {
                 selected += 1;
                 spin_rate += SPHERE_KICK;
+                Voice::key_on(VOICE_BROWSE.mask());
             }
             if pressed(button::CROSS) || pressed(button::START) {
                 let index = selected.rem_euclid(count as i32) as usize;
                 // Nothing behind the credits entry to chain-load.
                 if entries[index].exe_lba != 0 {
+                    Voice::key_on(VOICE_SELECT.mask());
                     // Never returns when the disc is readable.
-                    boot(&entries[index]);
+                    boot(&entries[index], &mut fb);
                 }
             }
         }
@@ -299,13 +353,25 @@ fn main() {
         };
         // The downbeat gets the bigger shove. A hard browse adds to the same
         // term, so the ball blows apart and re-forms as the kick decays.
-        let swell_beat = (beat.pulse as i32
-            * if beat.is_downbeat() {
-                SWELL_DOWNBEAT
-            } else {
-                SWELL_BEAT
-            })
-            / 255;
+        // The low bands drive the swell when the disc carries an analysis:
+        // the ball then answers what the track is actually doing rather than
+        // a grid laid over it. The beat envelope is the fallback.
+        let levels = header
+            .as_ref()
+            .and_then(|h| spectrum_frame(h, menu_track_index, song_ms, spectrum_frames));
+        let bass = levels.map(|l| (l[0] as i32 + l[1] as i32 + l[2] as i32) / 3);
+        let swell_beat = match bass {
+            Some(level) => level * SWELL_DOWNBEAT / 255,
+            None => {
+                (beat.pulse as i32
+                    * if beat.is_downbeat() {
+                        SWELL_DOWNBEAT
+                    } else {
+                        SWELL_BEAT
+                    })
+                    / 255
+            }
+        };
         let scatter = ((spin_rate.abs() - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
             .min(SCATTER_MAX);
         let swell = swell_beat + scatter;
@@ -346,7 +412,9 @@ fn main() {
             // so it is rendered off-screen on those frames and blitted on the
             // rest. A glyph at a time cost about a whole vblank.
             let key = (index as u32) << 1 | italian as u32;
-            if !text_cache.holds(key) {
+            if attract {
+                // Nothing but the ball turning over the carousel.
+            } else if !text_cache.holds(key) {
                 text_cache.begin(key);
                 if entries[index].exe_lba == 0 {
                     render_credits(&font, &header.expect("count came from it"));
@@ -355,7 +423,9 @@ fn main() {
                 }
                 text_cache.end(&fb);
             }
-            draw_text_block(&font, &text_cache, italian);
+            if !attract {
+                draw_text_block(&font, &text_cache, italian);
+            }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
         }
 
@@ -694,7 +764,17 @@ fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
 
 /// Copy the chain-load blob high and jump to it. Never returns while the disc
 /// is readable; the blob paints the screen red and stops if it is not.
-fn boot(entry: &Entry) -> ! {
+fn boot(entry: &Entry, fb: &mut FrameBuffer) -> ! {
+    // Fade rather than cut. Averaging black over a buffer halves it, and each
+    // buffer comes round every other frame, so seven passes each takes the
+    // picture to a hundred and twenty-eighth before the loader takes over.
+    for _ in 0..FADE_FRAMES {
+        paint::fade_step();
+        gpu::draw_sync();
+        psx_rt::interrupts::wait_vblank();
+        fb.swap();
+    }
+
     assert!(LOADER_BLOB.len() <= LOADER_LIMIT, "loader blob too large");
     tty::println("launcher: chain-loading");
 
