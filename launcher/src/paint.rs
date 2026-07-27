@@ -5,17 +5,18 @@
 //! at this size reads as a glossy lozenge without a single texture.
 
 use carousel::{Bead, Placed, TURN};
-use psx_gpu::material::BlendMode;
-use psx_vram::{Clut, Color555, Tpage};
+use psx_gpu::framebuf::FrameBuffer;
+use psx_gpu::material::{BlendMode, TextureMaterial};
+use psx_vram::{Clut, Color555, TexDepth, Tpage};
 use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
 
 /// Most segments an ellipse is drawn with. These are triangle fans, so this is
 /// the polygon count: at twelve the pills read as coarse dodecagons, and at
 /// 320x240 with no antialiasing every facet shows.
-const MAX_SEGMENTS: usize = 18;
+const MAX_SEGMENTS: usize = 9;
 /// Fewest. Below this a bead stops looking like a circle at all.
-const MIN_SEGMENTS: usize = 9;
+const MIN_SEGMENTS: usize = 6;
 
 /// Segments worth spending on an ellipse of this size. The ball is seventy-odd
 /// beads and most of them are a handful of pixels across, where twelve
@@ -23,7 +24,7 @@ const MIN_SEGMENTS: usize = 9;
 /// 60 Hz, which stretched every time-driven effect with it.
 fn segments_for(rx: i16, ry: i16) -> usize {
     let size = rx.max(ry) as usize;
-    size.clamp(MIN_SEGMENTS, MAX_SEGMENTS)
+    (size / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
 }
 
 const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
@@ -87,15 +88,6 @@ pub fn pill(item: &Placed, pulse: u8) {
         scale_rgb(GLOSS_TOP, dim),
         scale_rgb(GLOSS_BOTTOM, dim),
     );
-    // A slightly smaller inner ellipse lifts the middle away from the rim.
-    ellipse(
-        item.x,
-        item.y - item.ry / 6,
-        (item.rx * 7) / 8,
-        (item.ry * 5) / 8,
-        scale_rgb(mix(GLOSS_TOP, SPECULAR, 90), dim),
-        scale_rgb(GLOSS_EDGE, dim),
-    );
     ellipse(
         item.x - (item.rx * 5) / 12,
         item.y - (item.ry * 5) / 12,
@@ -141,7 +133,7 @@ pub fn bead(bead: &Bead) {
         scale_rgb(GLOSS_BOTTOM, bead.lit),
     );
     // Only the near beads are big enough for a highlight to land on.
-    if bead.r >= 5 {
+    if bead.r >= 7 {
         ellipse(
             bead.x - bead.r / 3,
             bead.y - bead.r / 3,
@@ -333,4 +325,94 @@ pub fn flag_it(x: i16, y: i16) {
     gpu::draw_rect_flat(x, y, third, h, 0, 140, 69);
     gpu::draw_rect_flat(x + third as i16, y, third, h, 240, 240, 240);
     gpu::draw_rect_flat(x + 2 * third as i16, y, third, h, 205, 33, 42);
+}
+
+/// A block of text rendered once into spare VRAM and then blitted.
+///
+/// Drawing a description a glyph at a time costs 216 textured quads a frame,
+/// which measured at roughly a whole vblank: as much as the entire carousel.
+/// The text only changes when the selection or the language does, so it is
+/// rendered into an off-screen rect on those frames and drawn as two quads on
+/// every other one.
+///
+/// Two rather than one because UVs are bytes: a page is 256 texels and the
+/// block is wider than that, so it straddles a page boundary.
+pub struct TextCache {
+    /// What is currently rendered, so a frame that would draw the same thing
+    /// again can skip it.
+    key: u32,
+}
+
+/// Spare VRAM, clear of both framebuffers and of every font page.
+const CACHE_X: u16 = 512;
+const CACHE_Y: u16 = 0;
+pub const CACHE_W: i16 = 288;
+pub const CACHE_H: i16 = 56;
+/// Where the block splits across the page boundary at VRAM x 768.
+const CACHE_SPLIT: i16 = 256;
+
+impl TextCache {
+    /// A cache holding nothing. Any key re-renders it.
+    pub const fn new() -> Self {
+        TextCache { key: u32::MAX }
+    }
+
+    /// Whether `key` is already rendered.
+    pub fn holds(&self, key: u32) -> bool {
+        self.key == key
+    }
+
+    /// Point the GPU at the off-screen rect and clear it to black. Black
+    /// because the block is drawn back with [`BlendMode::Add`], where black
+    /// contributes nothing and the panel behind shows through.
+    pub fn begin(&mut self, key: u32) {
+        self.key = key;
+        gpu::fill_rect(CACHE_X, CACHE_Y, CACHE_W as u16, CACHE_H as u16, 0, 0, 0);
+        gpu::set_draw_area(
+            CACHE_X,
+            CACHE_Y,
+            CACHE_X + CACHE_W as u16 - 1,
+            CACHE_Y + CACHE_H as u16 - 1,
+        );
+        gpu::set_draw_offset(CACHE_X as i16, CACHE_Y as i16);
+    }
+
+    /// Point it back at the buffer being drawn this frame.
+    pub fn end(&self, fb: &FrameBuffer) {
+        let y = fb.buffer_y(fb.drawing);
+        gpu::set_draw_area(0, y, fb.width - 1, y + fb.height - 1);
+        gpu::set_draw_offset(0, y as i16);
+    }
+
+    /// Blit the block with its top-left at `x, y`.
+    ///
+    /// Textured rectangles, not textured polygons. A rectangle takes its page
+    /// from the current draw mode, which is how the font draws every glyph;
+    /// the polygon path carries the page in a vertex instead and drew nothing
+    /// here, including when pointed at the framebuffer itself.
+    ///
+    /// Two of them because a page is 256 texels and the block is wider.
+    pub fn draw(&self, x: i16, y: i16) {
+        let halves = [
+            (0i16, CACHE_SPLIT, CACHE_X),
+            (CACHE_SPLIT, CACHE_W - CACHE_SPLIT, CACHE_X + CACHE_SPLIT as u16),
+        ];
+        for (offset, width, page_x) in halves {
+            if width <= 0 {
+                continue;
+            }
+            let tpage = Tpage::new(page_x, CACHE_Y, TexDepth::Bit15);
+            gpu::draw_sprite_material(
+                x + offset,
+                y,
+                width as u16,
+                CACHE_H as u16,
+                (0, 0),
+                // Neutral tint: 128 is "as the texture is". A texel of
+                // 0x0000 is transparent on this hardware, which is what
+                // lets the panel show through around the letterforms.
+                TextureMaterial::opaque(0, tpage.uv_tpage_word(0), (128, 128, 128)),
+            );
+        }
+    }
 }

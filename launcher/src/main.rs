@@ -206,6 +206,7 @@ fn main() {
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
+    let mut text_cache = paint::TextCache::new();
 
     loop {
         tick = tick.wrapping_add(1);
@@ -341,11 +342,20 @@ fn main() {
             centred(&font, DESC_TOP, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
-            if entries[index].exe_lba == 0 {
-                draw_credits(&font, &header.expect("count came from it"));
-            } else {
-                draw_description(&font, &entries[index], italian);
+            // The block only changes when the selection or the language does,
+            // so it is rendered off-screen on those frames and blitted on the
+            // rest. A glyph at a time cost about a whole vblank.
+            let key = (index as u32) << 1 | italian as u32;
+            if !text_cache.holds(key) {
+                text_cache.begin(key);
+                if entries[index].exe_lba == 0 {
+                    render_credits(&font, &header.expect("count came from it"));
+                } else {
+                    render_description(&font, &entries[index], italian);
+                }
+                text_cache.end(&fb);
             }
+            draw_text_block(&font, &text_cache, italian);
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
         }
 
@@ -353,6 +363,15 @@ fn main() {
         psx_rt::interrupts::wait_vblank();
         fb.swap();
     }
+}
+
+/// One line inside the text cache, centred on the cache's own width.
+fn cached_line(font: &FontAtlas, line: i16, text: &str, tint: (u8, u8, u8)) {
+    if text.is_empty() {
+        return;
+    }
+    let x = paint::CACHE_W / 2 - (font.text_width(text) as i16) / 2;
+    font.draw_text(x, line * DESC_LEADING + 2, text, tint);
 }
 
 fn centred(font: &FontAtlas, y: i16, text: &str, tint: (u8, u8, u8)) {
@@ -426,10 +445,22 @@ fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
 /// Who made what is on the disc. The music is here by permission, and an
 /// attribution that only exists in a README is not an attribution, so this is
 /// the page that discharges it: artist first, then every track by name.
-fn draw_credits(font: &FontAtlas, header: &Header) {
+/// The panel, the flag, and the cached block of text on top of them.
+fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
+    let _ = font;
     let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
     paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
+    // Top-right, inside the header.
+    if italian {
+        paint::flag_it(320 - paint::FLAG_W - 5, 4);
+    } else {
+        paint::flag_uk(320 - paint::FLAG_W - 5, 4);
+    }
+    cache.draw(160 - paint::CACHE_W / 2, DESC_TOP - 2);
+}
 
+/// Draw the credits into the cache. Coordinates are local to it.
+fn render_credits(font: &FontAtlas, header: &Header) {
     // The same font and the same wrap as a description, because this is one:
     // an entry on the carousel that happens to have no program behind it.
     // The artist takes two lines and the four tracks take the other four,
@@ -438,7 +469,7 @@ fn draw_credits(font: &FontAtlas, header: &Header) {
     let mut rest = header.credit_str();
     while !rest.is_empty() && line < 2 {
         let (head, tail) = wrap(rest, WRAP_CHARS);
-        centred(font, DESC_TOP + line * DESC_LEADING, head, BLURB);
+        cached_line(font, line, head, BLURB);
         line += 1;
         rest = tail;
     }
@@ -448,7 +479,7 @@ fn draw_credits(font: &FontAtlas, header: &Header) {
         }
         let title = header.title(track);
         if !title.is_empty() {
-            centred(font, DESC_TOP + line * DESC_LEADING, title, TRACK_NAME);
+            cached_line(font, line, title, TRACK_NAME);
             line += 1;
         }
     }
@@ -509,13 +540,8 @@ fn draw_music_panel(
 
 /// The selected game's blurb in one language, under the flag of whichever
 /// one it is. Up or down swaps.
-fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
-    // Top-right, clear of the description band and the ball.
-    if italian {
-        paint::flag_it(320 - paint::FLAG_W - 5, 4);
-    } else {
-        paint::flag_uk(320 - paint::FLAG_W - 5, 4);
-    }
+/// Draw a description into the cache. Coordinates are local to it.
+fn render_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     let text = if italian {
         entry.desc_it_str()
     } else {
@@ -523,15 +549,12 @@ fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     };
     // A panel first, so the text does not have to compete with the ball and
     // the starfield behind it.
-    let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
-    paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
-
     // Greedy wrap, a line at a time. mkdisc has already checked the text fits
     // in DESC_LINES of them, so nothing is dropped here.
     let mut rest = text;
     for line in 0..disc_toc::DESC_LINES as i16 {
         let (head, tail) = wrap(rest, WRAP_CHARS);
-        centred(font, DESC_TOP + line * DESC_LEADING, head, BLURB);
+        cached_line(font, line, head, BLURB);
         rest = tail;
         if rest.is_empty() {
             break;
