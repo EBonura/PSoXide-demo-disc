@@ -37,7 +37,7 @@ const RING_R: i32 = 205;
 /// Big enough that the reflected ring's far side clears the real ring's near
 /// side, which is what sets the floor low enough for the carousel to look
 /// like it is floating over it.
-pub const REFLECT_DROP: i16 = 46;
+pub const REFLECT_DROP: i16 = 39;
 
 /// How much the reflected ring's own near-to-far spread is flattened, in
 /// 256ths. A reflection seen at this grazing an angle is compressed, and
@@ -53,7 +53,7 @@ pub fn reflect_y(y: i16) -> i16 {
     RING_Y + REFLECT_DROP + (((y - RING_Y) as i32 * REFLECT_SQUASH) / 256) as i16
 }
 /// Screen row the ring's centre projects to.
-const RING_Y: i16 = 179;
+const RING_Y: i16 = 186;
 /// How far the ring's far side rides up the screen: the tilt that turns a
 /// circle into an ellipse.
 const RING_TILT: i32 = 20;
