@@ -5,12 +5,23 @@
 //! at this size reads as a glossy lozenge without a single texture.
 
 use carousel::{Bead, Placed, TURN};
-use psx_gpu as gpu;
+use psx_gpu::material::BlendMode;
+use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
 
-/// Segments per ellipse. Twelve is enough to read as round at this size and
-/// keeps the whole screen inside a few hundred triangles.
-const SEGMENTS: usize = 12;
+/// Most segments an ellipse is drawn with. Twelve reads as round at pill size.
+const MAX_SEGMENTS: usize = 12;
+/// Fewest. Below this a bead stops looking like a circle at all.
+const MIN_SEGMENTS: usize = 6;
+
+/// Segments worth spending on an ellipse of this size. The ball is seventy-odd
+/// beads and most of them are a handful of pixels across, where twelve
+/// segments buys nothing but triangles; at that count the menu was missing
+/// 60 Hz, which stretched every time-driven effect with it.
+fn segments_for(rx: i16, ry: i16) -> usize {
+    let size = rx.max(ry) as usize;
+    (size / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
+}
 
 const GLOSS_TOP: (u8, u8, u8) = (140, 205, 255);
 const GLOSS_BOTTOM: (u8, u8, u8) = (6, 24, 82);
@@ -39,9 +50,10 @@ fn ellipse(cx: i16, cy: i16, rx: i16, ry: i16, top: (u8, u8, u8), bottom: (u8, u
     if rx <= 0 || ry <= 0 {
         return;
     }
+    let segments = segments_for(rx, ry);
     let centre = mix(top, bottom, 128);
     let vertex = |seg: usize| -> ((i16, i16), (u8, u8, u8)) {
-        let a = ((seg as i32 * TURN) / SEGMENTS as i32) as u16;
+        let a = ((seg as i32 * TURN) / segments as i32) as u16;
         let sx = cx as i32 + ((rx as i32 * sin_q12(a)) >> 12);
         let sy = cy as i32 - ((ry as i32 * cos_q12(a)) >> 12);
         // cos is +1 at the top of the ellipse, -1 at the bottom.
@@ -50,7 +62,7 @@ fn ellipse(cx: i16, cy: i16, rx: i16, ry: i16, top: (u8, u8, u8), bottom: (u8, u
     };
 
     let (mut prev_p, mut prev_c) = vertex(0);
-    for seg in 1..=SEGMENTS {
+    for seg in 1..=segments {
         let (p, c) = vertex(seg);
         gpu::draw_tri_gouraud([(cx, cy), prev_p, p], [centre, prev_c, c]);
         prev_p = p;
@@ -58,9 +70,40 @@ fn ellipse(cx: i16, cy: i16, rx: i16, ry: i16, top: (u8, u8, u8), bottom: (u8, u
     }
 }
 
+/// The shaft of light the demo-disc intros threw across the frame. Two
+/// additive wedges, so it brightens whatever is behind it instead of hiding
+/// it, and no texture is involved.
+///
+/// `pulse` swells it on the beat.
+pub fn light_streak(pulse: u8) {
+    let lift = 18 + (pulse as u16 * 26 / 255) as u8;
+    let core = (lift, lift + lift / 2, lift * 2);
+    let edge = (lift / 4, lift / 3, lift / 2);
+    // A long wedge from off the top-left corner to off the bottom-right,
+    // passing behind the ball.
+    let wide = 26 + (pulse as i16 * 10 / 255);
+    gpu::draw_tri_flat_blended(
+        [(-40, -20), (-40 + wide, -20), (300, 260)],
+        core.0,
+        core.1,
+        core.2,
+        BlendMode::Add,
+    );
+    gpu::draw_tri_flat_blended(
+        [(-40 + wide, -20), (300, 260), (300 + wide, 260)],
+        edge.0,
+        edge.1,
+        edge.2,
+        BlendMode::Add,
+    );
+}
+
 /// One carousel pill: the lozenge, a rim, and a specular blob up and left.
-pub fn pill(item: &Placed) {
-    let dim = 90 + ((item.front as u32 * 165) >> 8) as u8;
+///
+/// `pulse` lifts the whole thing on the beat.
+pub fn pill(item: &Placed, pulse: u8) {
+    let lit = 90 + ((item.front as u32 * 165) >> 8) as u32;
+    let dim = (lit + (pulse as u32 * 40 / 255)).min(255) as u8;
     ellipse(
         item.x,
         item.y,
@@ -101,7 +144,8 @@ pub fn bead(bead: &Bead) {
         scale_rgb(GLOSS_TOP, bead.lit),
         scale_rgb(GLOSS_BOTTOM, bead.lit),
     );
-    if bead.r >= 3 {
+    // Only the near beads are big enough for a highlight to land on.
+    if bead.r >= 5 {
         ellipse(
             bead.x - bead.r / 3,
             bead.y - bead.r / 3,

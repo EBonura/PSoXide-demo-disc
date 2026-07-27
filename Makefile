@@ -23,6 +23,9 @@ MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 MENU_CDDA   := $(ROOT)/audio/knuckle-dust.cdda $(ROOT)/audio/rusted-hammer.cdda \
                $(ROOT)/audio/chainsaw-heart.cdda $(ROOT)/audio/night-crawler.cdda
 MENU_CREDIT := Music by Just Music, used by permission
+# Tempo and first-beat offset per track, in the same order, measured by
+# tools/beatgrid.py. The menu pulses on these; a guessed tempo drifts.
+MENU_BEATS  := 176000:34 175000:23 173980:46 174380:342
 
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
@@ -95,7 +98,9 @@ disc: launcher programs mkdisc
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
-		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") --credit "$(MENU_CREDIT)" \
+		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
+		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
+		--credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO" \
 		--describe "CORTEX IGNITION=Explore a derelict complex in this original 3D action game|Esplora un complesso abbandonato in un gioco d'azione 3D" \
 		--describe "HALF-LIFE=Half-Life rebuilt for the PlayStation, streamed off this disc|Half-Life ricostruito per PlayStation, caricato da questo disco" \
