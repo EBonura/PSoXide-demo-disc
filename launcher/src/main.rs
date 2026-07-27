@@ -91,12 +91,14 @@ const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// words under it. Full width rather than a box round the logo: centred is
 /// where the mark belongs, and anything narrower collides with the music
 /// panel, which is what pushed it off-centre before.
-const HEADER_H: i16 = 40;
-/// The music panel sits under the header. It is three rows now rather than
-/// four, since stacking a four-row panel under a header pushed its last line
-/// beneath the description.
-const MUSIC_TOP: i16 = HEADER_H + 4;
-const DESC_TOP: i16 = 92;
+const HEADER_H: i16 = 52;
+/// The whole music panel lives inside the header. The meter and the L1/R1
+/// label fit either side of the mark, but a track title runs to 112 pixels
+/// and the mark is centred, so the title gets its own row underneath.
+const METER_BASE: i16 = 28;
+const HINT_TOP: i16 = 30;
+const TRACK_TOP: i16 = 40;
+const DESC_TOP: i16 = 108;
 const DESC_LEADING: i16 = 9;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
@@ -300,7 +302,7 @@ fn main() {
         // The one control worth labelling, in the header where there is room
         // for it beside the mark.
         if menu_track_count > 1 {
-            font.draw_text(6, (HEADER_H - 8) / 2, "L1/R1", HINT);
+            font.draw_text(6, HINT_TOP, "L1/R1", HINT);
         }
         banner.draw(160 - BANNER_W / 2, 1);
         centred(&font, BANNER_H + 3, "DEMO DISC", TITLE);
@@ -412,13 +414,13 @@ fn draw_music_panel(
     if title.is_empty() {
         return;
     }
-    // Two rows: what is playing, and the meter under it. The L1/R1 label
-    // lives in the header, because a third row here reached the description
-    // panel. There is no "PLAYING" label either; the meter says that.
+    // All of it inside the header: the meter to the left of the mark, the
+    // title centred on its own row beneath. No "PLAYING" label; the meter
+    // says that.
     if loading {
         // The drive takes a moment to pick a track up, and a menu that just
         // goes quiet reads as broken. Say what it is doing, in the title's row.
-        font.draw_text(6, MUSIC_TOP, "LOADING", NOW_PLAYING);
+        centred(font, TRACK_TOP, "LOADING", NOW_PLAYING);
         return;
     }
     // The title brightens on the beat, so the words themselves keep time.
@@ -428,12 +430,12 @@ fn draw_music_panel(
         TRACK_NAME.1.saturating_add(lift),
         TRACK_NAME.2.saturating_add(lift),
     );
-    font.draw_text(6, MUSIC_TOP, title, tint);
+    centred(font, TRACK_TOP, title, tint);
     match levels {
-        Some(levels) => paint::level_meter(6, MUSIC_TOP + 32, levels),
+        Some(levels) => paint::level_meter(6, METER_BASE, levels),
         // No analysis for this track: keep time off the beat instead of
         // leaving a dead space where the meter should be.
-        None => paint::level_meter_beat(6, MUSIC_TOP + 32, beat.pulse),
+        None => paint::level_meter_beat(6, METER_BASE, beat.pulse),
     }
 }
 
@@ -442,9 +444,9 @@ fn draw_music_panel(
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
-        paint::flag_it(320 - paint::FLAG_W - 5, (HEADER_H - paint::FLAG_H) / 2);
+        paint::flag_it(320 - paint::FLAG_W - 5, 8);
     } else {
-        paint::flag_uk(320 - paint::FLAG_W - 5, (HEADER_H - paint::FLAG_H) / 2);
+        paint::flag_uk(320 - paint::FLAG_W - 5, 8);
     }
     let text = if italian {
         entry.desc_it_str()
