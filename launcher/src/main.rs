@@ -22,7 +22,7 @@ use carousel::{Bead, Placed, SPHERE_POINTS, TURN};
 use disc_toc::{Entry, Header, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
 use psx_font::{fonts::BASIC, FontAtlas};
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
-use psx_io::cdda::CddaStarter;
+use psx_io::cdda::{CddaClock, CddaStarter};
 use psx_io::cdrom;
 use psx_spu::{self as spu, CdVolume, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
@@ -74,6 +74,8 @@ const CDDA_POLL_TICKS: u32 = 30;
 const CDDA_PLAYING: u8 = 0x80;
 /// Spin budget per CD command. Silicon wants more than an emulator does.
 const CDDA_SPINS: u32 = 0x10_0000;
+/// Display frames a second, which is what the CD clock counts in.
+const TICKS_HZ: u32 = 60;
 
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
@@ -104,6 +106,7 @@ fn main() {
     // disc might sit on the menu for a whole presentation.
     let mut menu_track_index: u8 = 0;
     let mut music = CddaStarter::new().with_spins(CDDA_SPINS);
+    let mut clock = CddaClock::new(TICKS_HZ);
     let mut tick: u32 = 0;
     let mut next_music_poll = CDDA_POLL_TICKS;
     if menu_track != 0 {
@@ -121,6 +124,7 @@ fn main() {
     let mut ring = 0i32;
     let mut spin = 0i32;
     let mut spin_rate = SPHERE_IDLE_SPIN;
+    let mut drift: i32 = 0;
     let mut italian = false;
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
@@ -129,7 +133,9 @@ fn main() {
     loop {
         tick = tick.wrapping_add(1);
         if menu_track != 0 {
-            music.tick(tick, menu_track + menu_track_index);
+            if music.tick(tick, menu_track + menu_track_index) {
+                clock.start(tick);
+            }
             // The track is the last on the disc, so when it ends the drive
             // has nowhere to go. Notice and start it again.
             if music.started() && tick.wrapping_sub(next_music_poll) < u32::MAX / 2 {
@@ -178,13 +184,26 @@ fn main() {
         let target = -selected * step;
         ring += (target - ring) >> EASE_SHIFT;
 
+        // Everything visual answers the beat. The grid was measured off the
+        // audio and shipped in the table, so this stays in step for the whole
+        // length of a track rather than drifting out of it.
+        let pulse = match header.and_then(|h| h.beat(menu_track_index as usize)) {
+            Some((beat_ms, phase_ms)) if clock.playing() => {
+                carousel::beat_pulse(clock.tick(tick), beat_ms, phase_ms)
+            }
+            _ => 0,
+        };
+
         // Coast the ball back to its idle drift.
         spin_rate = carousel::ease_spin(spin_rate, SPHERE_IDLE_SPIN, SPHERE_DECAY_SHIFT);
         spin = (spin + spin_rate) & (TURN - 1);
+        // The sky drifts with the ball, so a browse pushes the whole scene.
+        drift = drift.wrapping_add(spin_rate.max(1));
 
         fb.clear(4, 6, 18);
-        draw_starfield();
-        draw_sphere(spin, &mut beads);
+        draw_starfield(drift, pulse);
+        paint::light_streak(pulse);
+        draw_sphere(spin, pulse, &mut beads);
 
         centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
 
@@ -193,7 +212,7 @@ fn main() {
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
             draw_description(&font, &entries[index], italian);
-            draw_ring(&font, &entries[..count], ring, step, &mut order);
+            draw_ring(&font, &entries[..count], ring, step, pulse, &mut order);
         }
         // The music is used by permission, so the credit is not optional
         // decoration: it stays on screen the whole time the track plays.
@@ -242,19 +261,30 @@ fn split_title(name: &str) -> (&str, &str) {
     }
 }
 
-fn draw_starfield() {
+fn draw_starfield(drift: i32, pulse: u8) {
     for i in 0..STARS {
-        let (x, y, b) = carousel::star(i);
-        let size = if i % 7 == 0 { 2 } else { 1 };
+        let (x, y, b) = carousel::star(i, drift);
+        // Every seventh star is bigger, and twinkles on the beat.
+        let beat_star = i % 7 == 0;
+        let size = if beat_star && pulse > 160 { 2 } else { 1 };
+        let lift = if beat_star { pulse / 3 } else { pulse / 8 };
+        let b = b.saturating_add(lift);
         gpu::draw_rect_flat(x, y, size, size, b / 2, (b * 3) / 4, b);
     }
 }
 
-fn draw_sphere(spin: i32, beads: &mut [Bead; SPHERE_POINTS]) {
+fn draw_sphere(spin: i32, pulse: u8, beads: &mut [Bead; SPHERE_POINTS]) {
     let n = carousel::sphere(spin, beads);
     carousel::sort_by_depth(&mut beads[..n], |b| b.z);
     for bead in &beads[..n] {
-        paint::bead(bead);
+        // The ball swells on the beat: each bead grows a little and brightens,
+        // which at this density reads as the whole sphere breathing.
+        let swollen = Bead {
+            r: bead.r + (pulse as i16 * 3 / 255),
+            lit: bead.lit.saturating_add(pulse / 4),
+            ..*bead
+        };
+        paint::bead(&swollen);
     }
 }
 
@@ -283,6 +313,7 @@ fn draw_ring(
     entries: &[Entry],
     ring: i32,
     step: i32,
+    pulse: u8,
     order: &mut [usize; MAX_ENTRIES],
 ) {
     let count = entries.len();
@@ -294,7 +325,7 @@ fn draw_ring(
 
     for &slot in &order[..count] {
         let item = placed(slot);
-        paint::pill(&item);
+        paint::pill(&item, pulse);
 
         // Titles wider than their pill are left to overhang, the way the demo
         // discs did it. The ones round the back are dropped instead: at that

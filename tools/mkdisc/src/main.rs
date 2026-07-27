@@ -85,6 +85,9 @@ struct Args {
     menu_cdda: Vec<PathBuf>,
     /// Attribution the menu prints for that track.
     credit: String,
+    /// Per menu track, in the same order: `(milli-BPM, first-beat ms)` from
+    /// `tools/beatgrid.py`.
+    menu_beats: Vec<(u32, u32)>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -96,6 +99,7 @@ fn parse_args() -> Result<Args, String> {
     let mut descriptions = Vec::new();
     let mut menu_cdda = Vec::new();
     let mut credit = String::new();
+    let mut menu_beats: Vec<(u32, u32)> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -157,6 +161,17 @@ fn parse_args() -> Result<Args, String> {
                 it.next().ok_or("--menu-cdda takes a path".to_string())?,
             )),
             "--credit" => credit = it.next().ok_or("--credit takes a string".to_string())?,
+            "--menu-beat" => {
+                let spec = it.next().ok_or("--menu-beat takes MILLIBPM:PHASEMS")?;
+                let (bpm, phase) = spec.split_once(':').ok_or_else(|| {
+                    format!("--menu-beat wants MILLIBPM:PHASEMS, got {spec:?}")
+                })?;
+                let parse = |v: &str, what: &str| {
+                    v.parse::<u32>()
+                        .map_err(|_| format!("--menu-beat {what} {v:?} is not a number"))
+                };
+                menu_beats.push((parse(bpm, "tempo")?, parse(phase, "phase")?));
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -174,6 +189,7 @@ fn parse_args() -> Result<Args, String> {
         descriptions,
         menu_cdda,
         credit,
+        menu_beats,
     })
 }
 
@@ -189,7 +205,9 @@ fn print_usage() {
          --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
          --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
         \x20             menu cycles through the tracks in order\n\
-         --credit      attribution the menu prints for that track"
+         --credit      attribution the menu prints for that track\n\
+         --menu-beat   MILLIBPM:PHASEMS for the matching --menu-cdda, from\n\
+        \x20             tools/beatgrid.py; drives the menu's beat pulse"
     );
 }
 
@@ -550,6 +568,14 @@ fn run() -> Result<(), String> {
             args.credit
         ));
     }
+    if !args.menu_beats.is_empty() && args.menu_beats.len() != menu_audio.len() {
+        return Err(format!(
+            "{} --menu-beat against {} --menu-cdda: they pair up in order, so give one \
+             per track or none at all",
+            args.menu_beats.len(),
+            menu_audio.len()
+        ));
+    }
     if !menu_audio.is_empty() && args.credit.is_empty() {
         return Err("--menu-cdda without --credit: the menu has nowhere to attribute the \
                     track, which is the one thing an attribution licence asks for"
@@ -561,6 +587,7 @@ fn run() -> Result<(), String> {
         menu_track,
         menu_audio.len() as u32,
         &args.credit,
+        &args.menu_beats,
     )
     .ok_or_else(|| {
         format!(

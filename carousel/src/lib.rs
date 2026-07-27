@@ -176,15 +176,33 @@ pub fn ease_spin(rate: i32, idle: i32, decay_shift: i32) -> i32 {
 
 /// Deterministic specks of starfield. No RNG on the guest: a cheap integer
 /// hash of the index gives a fixed, evenly scattered sky.
-pub fn star(index: u32) -> (i16, i16, u8) {
+///
+/// `drift` scrolls the field downward and wraps, so the same hash gives a
+/// moving sky without storing a position per star.
+pub fn star(index: u32, drift: i32) -> (i16, i16, u8) {
     let mut h = index.wrapping_mul(2_654_435_761);
     h ^= h >> 15;
     h = h.wrapping_mul(0x85EB_CA6B);
     h ^= h >> 13;
     let x = (h % 320) as i16;
-    let y = ((h >> 9) % 240) as i16;
+    // Nearer stars, the brighter ones, scroll faster. Parallax for free.
     let bright = 60 + ((h >> 20) % 150) as u8;
+    let speed = 1 + (bright as i32 / 90);
+    let y = (((h >> 9) % 240) as i32 + (drift * speed) / 64).rem_euclid(240) as i16;
     (x, y, bright)
+}
+
+/// How far into the current beat `now_ms` is, as 255 on the beat falling to 0
+/// just before the next one.
+///
+/// `beat_ms` and `phase_ms` come from the disc table, measured offline. A zero
+/// `beat_ms` means the track has no grid, and everything stays still.
+pub fn beat_pulse(now_ms: u32, beat_ms: u32, phase_ms: u32) -> u8 {
+    if beat_ms == 0 {
+        return 0;
+    }
+    let into = now_ms.saturating_sub(phase_ms) % beat_ms;
+    (255 - (into * 255 / beat_ms).min(255)) as u8
 }
 
 #[cfg(test)]
@@ -192,9 +210,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_pulse_peaks_on_the_beat_and_falls_away() {
+        // 340 ms a beat, grid starting 34 ms in.
+        assert_eq!(beat_pulse(34, 340, 34), 255, "on the beat");
+        assert!(beat_pulse(34 + 170, 340, 34) < 140, "half a beat later");
+        assert_eq!(beat_pulse(34 + 340, 340, 34), 255, "and again next beat");
+        assert!(beat_pulse(34 + 339, 340, 34) < 4, "just before it");
+    }
+
+    #[test]
+    fn a_track_with_no_measured_tempo_does_not_pulse() {
+        for ms in [0, 1, 500, 100_000] {
+            assert_eq!(beat_pulse(ms, 0, 0), 0);
+        }
+    }
+
+    #[test]
+    fn stars_drift_and_wrap_without_leaving_the_screen() {
+        for drift in [0, 63, 64, 5_000, 100_000] {
+            for i in 0..256 {
+                let (x, y, _) = star(i, drift);
+                assert!((0..320).contains(&x), "star {i} drift {drift} x={x}");
+                assert!((0..240).contains(&y), "star {i} drift {drift} y={y}");
+            }
+        }
+    }
+
+    #[test]
     fn stars_stay_on_screen() {
         for i in 0..512 {
-            let (x, y, b) = star(i);
+            let (x, y, b) = star(i, 0);
             assert!((0..320).contains(&x), "star {i} x={x}");
             assert!((0..240).contains(&y), "star {i} y={y}");
             assert!(b >= 60);

@@ -15,7 +15,8 @@
 //! 0x0C  u32 first CD-DA track the menu plays, 0 for none
 //! 0x10  u32 how many consecutive tracks it cycles through
 //! 0x14  music credit, NUL-padded ASCII
-//! 0x50  entries, ENTRY_BYTES each:
+//! 0x44  beat grid, MAX_MENU_TRACKS x (u32 milli-BPM, u32 first-beat ms)
+//! 0x90  entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
@@ -58,8 +59,12 @@ pub const DESC_BYTES: usize = 64;
 /// so it travels in the table beside the track number it refers to.
 pub const CREDIT_BYTES: usize = 48;
 
-const HEADER_BYTES: usize = 0x50;
+/// Menu tracks the beat grid has room for.
+pub const MAX_MENU_TRACKS: usize = 8;
+
+const HEADER_BYTES: usize = 0x90;
 const CREDIT_AT: usize = 0x14;
+const BEATS_AT: usize = 0x44;
 
 /// Entries that fit in one sector.
 pub const MAX_ENTRIES: usize = (TOC_BYTES - HEADER_BYTES) / ENTRY_BYTES;
@@ -146,12 +151,31 @@ pub struct Header {
     pub menu_track_count: u32,
     /// Music credit, NUL-padded.
     pub credit: [u8; CREDIT_BYTES],
+    /// Per menu track: tempo in thousandths of a BPM, and how far into the
+    /// track its first beat falls, in milliseconds. Measured rather than
+    /// assumed (see `tools/beatgrid.py`): a tempo out by 1 BPM drifts several
+    /// beats over a four-minute track, which looks like a bug rather than an
+    /// effect.
+    pub beats: [(u32, u32); MAX_MENU_TRACKS],
 }
 
 impl Header {
     /// The credit as a `str`, NUL padding stripped.
     pub fn credit_str(&self) -> &str {
         trimmed(&self.credit)
+    }
+
+    /// Milliseconds per beat for menu track `index`, and how far into the
+    /// track the grid starts. `None` when that track has no measured tempo,
+    /// which is the caller's cue to skip the beat-driven visuals rather than
+    /// pulse at a guess.
+    pub fn beat(&self, index: usize) -> Option<(u32, u32)> {
+        let (milli_bpm, phase_ms) = *self.beats.get(index)?;
+        if milli_bpm == 0 {
+            return None;
+        }
+        // 60 s per minute, in ms, over beats per minute in thousandths.
+        Some((60_000_000 / milli_bpm, phase_ms))
     }
 }
 
@@ -163,8 +187,9 @@ pub fn encode(
     menu_track: u32,
     menu_track_count: u32,
     credit: &str,
+    beats: &[(u32, u32)],
 ) -> Option<[u8; TOC_BYTES]> {
-    if entries.len() > MAX_ENTRIES {
+    if entries.len() > MAX_ENTRIES || beats.len() > MAX_MENU_TRACKS {
         return None;
     }
     let mut out = [0u8; TOC_BYTES];
@@ -173,6 +198,11 @@ pub fn encode(
     out[12..16].copy_from_slice(&menu_track.to_le_bytes());
     out[16..20].copy_from_slice(&menu_track_count.to_le_bytes());
     out[CREDIT_AT..CREDIT_AT + CREDIT_BYTES].copy_from_slice(&fixed::<CREDIT_BYTES>(credit));
+    for (i, (milli_bpm, phase_ms)) in beats.iter().enumerate() {
+        let at = BEATS_AT + i * 8;
+        out[at..at + 4].copy_from_slice(&milli_bpm.to_le_bytes());
+        out[at + 4..at + 8].copy_from_slice(&phase_ms.to_le_bytes());
+    }
     for (i, entry) in entries.iter().enumerate() {
         let at = HEADER_BYTES + i * ENTRY_BYTES;
         out[at..at + NAME_BYTES].copy_from_slice(&entry.name);
@@ -202,8 +232,15 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     }
     let mut credit = [0u8; CREDIT_BYTES];
     credit.copy_from_slice(&sector[CREDIT_AT..CREDIT_AT + CREDIT_BYTES]);
+    let mut beats = [(0u32, 0u32); MAX_MENU_TRACKS];
+    for (i, slot) in beats.iter_mut().enumerate() {
+        let at = BEATS_AT + i * 8;
+        let word = |a: usize| u32::from_le_bytes([sector[a], sector[a + 1], sector[a + 2], sector[a + 3]]);
+        *slot = (word(at), word(at + 4));
+    }
     let header = Header {
         count,
+        beats,
         menu_track: u32::from_le_bytes([sector[12], sector[13], sector[14], sector[15]]),
         menu_track_count: u32::from_le_bytes([sector[16], sector[17], sector[18], sector[19]]),
         credit,
@@ -242,13 +279,24 @@ mod tests {
                 .described("Original 3D action game", "Gioco d'azione 3D originale"),
             Entry::new("HALF-LIFE", 40960, 40938, 1),
         ];
-        let sector = encode(&entries, 30, 4, "Music by Just Music").expect("fits");
+        let sector = encode(
+            &entries,
+            30,
+            4,
+            "Music by Just Music",
+            &[(176_000, 34), (175_000, 23)],
+        )
+        .expect("fits");
         let mut out = blank();
         let header = decode(&sector, &mut out).expect("decodes");
         assert_eq!(header.count, 2);
         assert_eq!(header.menu_track, 30);
         assert_eq!(header.menu_track_count, 4);
         assert_eq!(header.credit_str(), "Music by Just Music");
+        // 176 BPM is 340 ms a beat, and the grid starts 34 ms in.
+        assert_eq!(header.beat(0), Some((340, 34)));
+        assert_eq!(header.beat(1), Some((342, 23)));
+        assert_eq!(header.beat(2), None, "no measured tempo, no pulse");
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
@@ -261,7 +309,7 @@ mod tests {
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "").expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[]).expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
@@ -269,7 +317,7 @@ mod tests {
     #[test]
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
-        assert!(encode(&too_many, 0, 0, "").is_none());
+        assert!(encode(&too_many, 0, 0, "", &[]).is_none());
     }
 
     #[test]
