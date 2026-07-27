@@ -242,6 +242,14 @@ impl Banner {
     }
 }
 
+/// The solid black band the mark and the title sit in, with the same border
+/// the text panel uses so the two read as one system.
+pub fn header_strip(h: i16) {
+    const BORDER: (u8, u8, u8) = (150, 30, 34);
+    gpu::draw_rect_flat(0, 0, 320, h as u16, 0, 0, 0);
+    gpu::draw_rect_flat(0, h - 1, 320, 1, BORDER.0, BORDER.1, BORDER.2);
+}
+
 /// A dark panel to lay text over, with a thin border.
 ///
 /// Black at [`BlendMode::Average`] is `(background + 0) / 2`, so it halves
