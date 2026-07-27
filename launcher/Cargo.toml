@@ -23,4 +23,6 @@ psx-pack = { path = "../games/PSoXide/sdk/crates/psx-pack" }
 psx-pad  = { path = "../games/PSoXide/sdk/crates/psx-pad" }
 psx-rt   = { path = "../games/PSoXide/sdk/crates/psx-rt" }
 psx-vram = { path = "../games/PSoXide/sdk/crates/psx-vram" }
+psx-math = { path = "../games/PSoXide/sdk/crates/psx-math" }
+carousel = { path = "../carousel" }
 disc-toc = { path = "../disc-toc" }

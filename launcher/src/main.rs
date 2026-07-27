@@ -1,7 +1,9 @@
 //! Demo disc boot menu.
 //!
-//! Reads the disc's table of contents ([`disc_toc`]), lists what is on the
-//! disc, and chain-loads the selection.
+//! Reads the disc's table of contents ([`disc_toc`]), spins its contents round
+//! a carousel, and chain-loads the selection. The look is a homage to the
+//! PlayStation demo discs: glossy blue pills on a tilted ring, a ball of balls
+//! turning above them, a starfield behind.
 //!
 //! The chain-load itself cannot happen here: every PSoXide program links to
 //! `0x80010000`, which is where this launcher is running, so streaming a game
@@ -14,6 +16,9 @@
 
 extern crate psx_rt;
 
+mod paint;
+
+use carousel::{Bead, Placed, SPHERE_POINTS, TURN};
 use disc_toc::{Entry, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
 use psx_font::{fonts::BASIC, FontAtlas};
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
@@ -35,13 +40,21 @@ const LOADER_LIMIT: usize = 32 * 1024;
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
-const WHITE: (u8, u8, u8) = (230, 230, 230);
-const DIM: (u8, u8, u8) = (120, 120, 130);
-const HILITE: (u8, u8, u8) = (255, 210, 90);
-const RED: (u8, u8, u8) = (230, 90, 90);
+const TITLE: (u8, u8, u8) = (170, 220, 255);
+const HINT: (u8, u8, u8) = (90, 120, 170);
+const ENGLISH: (u8, u8, u8) = (225, 240, 255);
+const ITALIAN: (u8, u8, u8) = (120, 175, 235);
+const LABEL: (u8, u8, u8) = (255, 255, 255);
+const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
+const ERROR: (u8, u8, u8) = (230, 90, 90);
 
-const ROW_HEIGHT: i16 = 14;
-const LIST_TOP: i16 = 62;
+const STARS: u32 = 90;
+
+/// Turns per frame the ring eases toward its target, as a fraction: the gap
+/// closes by 1/6 each frame, which settles in about half a second.
+const EASE_SHIFT: i32 = 3;
+/// The ball of balls turns this much per frame, slowly.
+const SPHERE_SPIN: i32 = 6;
 
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
@@ -63,44 +76,122 @@ fn main() {
         tty::println("launcher: no table of contents on this disc");
     }
 
-    let mut selected: usize = 0;
+    let mut selected: i32 = 0;
+    let mut ring = 0i32;
+    let mut spin = 0i32;
     let mut prev_held = ButtonState::default();
+    let mut order = [0usize; MAX_ENTRIES];
+    let mut beads = [Bead::default(); SPHERE_POINTS];
 
     loop {
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
 
         if count > 0 {
-            if pressed(button::UP) {
-                selected = if selected == 0 { count - 1 } else { selected - 1 };
+            // The carousel turns; up/left and down/right both make sense on a
+            // ring, so take either.
+            if pressed(button::LEFT) || pressed(button::UP) {
+                selected -= 1;
             }
-            if pressed(button::DOWN) {
-                selected = (selected + 1) % count;
+            if pressed(button::RIGHT) || pressed(button::DOWN) {
+                selected += 1;
             }
             if pressed(button::CROSS) || pressed(button::START) {
+                let index = selected.rem_euclid(count as i32) as usize;
                 // Never returns when the disc is readable.
-                boot(&entries[selected]);
+                boot(&entries[index]);
             }
         }
         prev_held = pad;
 
-        fb.clear(8, 10, 24);
-        font.draw_text(16, 20, "PSOXIDE DEMO DISC", WHITE);
-        font.draw_text(16, 34, "UP/DOWN to choose, X to run", DIM);
+        // Ease toward the selection instead of snapping. `target` is allowed
+        // to run past a full turn so the ring keeps spinning the short way
+        // rather than unwinding.
+        let step = TURN / count.max(1) as i32;
+        let target = -selected * step;
+        ring += (target - ring) >> EASE_SHIFT;
+        spin = (spin + SPHERE_SPIN) & (TURN - 1);
+
+        fb.clear(4, 6, 18);
+        draw_starfield();
+        draw_sphere(spin, &mut beads);
+
+        font.draw_text(10, 8, "PSOXIDE DEMO DISC", TITLE);
+        font.draw_text(10, 20, "LEFT/RIGHT to browse", HINT);
+        font.draw_text(10, 30, "X to run", HINT);
 
         if count == 0 {
-            font.draw_text(16, LIST_TOP, "DISC TABLE OF CONTENTS UNREADABLE", RED);
-        }
-        for (i, entry) in entries.iter().enumerate().take(count) {
-            let y = LIST_TOP + (i as i16) * ROW_HEIGHT;
-            let on = i == selected;
-            font.draw_text(16, y, if on { ">" } else { " " }, HILITE);
-            font.draw_text(32, y, entry.name_str(), if on { HILITE } else { WHITE });
+            font.draw_text(10, 122, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
+        } else {
+            let index = selected.rem_euclid(count as i32) as usize;
+            draw_description(&font, &entries[index]);
+            draw_ring(&font, &entries[..count], ring, step, &mut order);
         }
 
         gpu::draw_sync();
         psx_rt::interrupts::wait_vblank();
         fb.swap();
+    }
+}
+
+fn draw_starfield() {
+    for i in 0..STARS {
+        let (x, y, b) = carousel::star(i);
+        let size = if i % 7 == 0 { 2 } else { 1 };
+        gpu::draw_rect_flat(x, y, size, size, b / 2, (b * 3) / 4, b);
+    }
+}
+
+fn draw_sphere(spin: i32, beads: &mut [Bead; SPHERE_POINTS]) {
+    let n = carousel::sphere(spin, beads);
+    carousel::sort_by_depth(&mut beads[..n], |b| b.z);
+    for bead in &beads[..n] {
+        paint::bead(bead);
+    }
+}
+
+/// The selected game's blurb, English over Italian.
+fn draw_description(font: &FontAtlas, entry: &Entry) {
+    let centred = |y: i16, text: &str, tint: (u8, u8, u8)| {
+        if text.is_empty() {
+            return;
+        }
+        let x = 160 - (font.text_width(text) as i16) / 2;
+        font.draw_text(x, y, text, tint);
+    };
+    centred(122, entry.desc_en_str(), ENGLISH);
+    centred(134, entry.desc_it_str(), ITALIAN);
+}
+
+/// The carousel: place every entry on the ring, draw back to front, and label
+/// each pill.
+fn draw_ring(
+    font: &FontAtlas,
+    entries: &[Entry],
+    ring: i32,
+    step: i32,
+    order: &mut [usize; MAX_ENTRIES],
+) {
+    let count = entries.len();
+    for (slot, item) in order.iter_mut().enumerate().take(count) {
+        *item = slot;
+    }
+    let placed = |slot: usize| -> Placed { carousel::place(ring + slot as i32 * step) };
+    carousel::sort_by_depth(&mut order[..count], |slot| placed(*slot).z);
+
+    for &slot in &order[..count] {
+        let item = placed(slot);
+        paint::pill(&item);
+
+        // Titles wider than their pill are left to overhang, the way the demo
+        // discs did it. The ones round the back are dropped instead: at that
+        // size they are unreadable and only add clutter.
+        if item.front > 96 {
+            let name = entries[slot].name_str();
+            let width = font.text_width(name) as i16;
+            let tint = if item.front > 200 { LABEL } else { FAR_LABEL };
+            font.draw_text(item.x - width / 2, item.y - 4, name, tint);
+        }
     }
 }
 
@@ -129,8 +220,8 @@ fn boot(entry: &Entry) -> ! {
     assert!(LOADER_BLOB.len() <= LOADER_LIMIT, "loader blob too large");
     tty::println("launcher: chain-loading");
 
-    // Blank the display first: the game's own boot decides what to show, and
-    // the blob resets the GPU out from under whatever is on screen.
+    // Let the GPU finish before the blob resets it out from under whatever is
+    // still on screen.
     gpu::draw_sync();
 
     // SAFETY: `LOADER_BASE` is above every game's payload (mkdisc enforces
