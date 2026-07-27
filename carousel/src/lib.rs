@@ -177,22 +177,57 @@ pub fn ease_spin(rate: i32, idle: i32, decay_shift: i32) -> i32 {
     }
 }
 
-/// Deterministic specks of starfield. No RNG on the guest: a cheap integer
-/// hash of the index gives a fixed, evenly scattered sky.
-///
-/// `drift` scrolls the field downward and wraps, so the same hash gives a
-/// moving sky without storing a position per star.
-pub fn star(index: u32, drift: i32) -> (i16, i16, u8) {
+/// Nearest a star gets before it wraps back out to [`STAR_FAR`].
+const STAR_NEAR: i32 = 40;
+/// Furthest a star starts from the camera.
+pub const STAR_FAR: i32 = 1400;
+/// Half-width of the volume stars are scattered through, in world units.
+const STAR_SPREAD: i32 = 900;
+
+/// One star, already projected.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Star {
+    pub x: i16,
+    pub y: i16,
+    /// Side of the square drawn for it: distant stars are a single pixel.
+    pub size: u16,
+    pub bright: u8,
+    /// False when it projected off the screen and should be skipped.
+    pub visible: bool,
+}
+
+/// A star flying past the camera. No RNG and no per-star storage on the
+/// guest: a hash of the index fixes where it sits in the volume, and
+/// `travel` walks the whole field toward the viewer, wrapping each star back
+/// out to the far plane on its own schedule.
+pub fn star(index: u32, travel: i32) -> Star {
     let mut h = index.wrapping_mul(2_654_435_761);
     h ^= h >> 15;
     h = h.wrapping_mul(0x85EB_CA6B);
     h ^= h >> 13;
-    let x = (h % 320) as i16;
-    // Nearer stars, the brighter ones, scroll faster. Parallax for free.
-    let bright = 60 + ((h >> 20) % 150) as u8;
-    let speed = 1 + (bright as i32 / 90);
-    let y = (((h >> 9) % 240) as i32 + (drift * speed) / 64).rem_euclid(240) as i16;
-    (x, y, bright)
+
+    let world_x = (h % (2 * STAR_SPREAD) as u32) as i32 - STAR_SPREAD;
+    let world_y = ((h >> 11) % (2 * STAR_SPREAD) as u32) as i32 - STAR_SPREAD;
+    // Stagger the wrap so they do not all reappear together.
+    let span = STAR_FAR - STAR_NEAR;
+    let offset = ((h >> 22) as i32) % span;
+    let z = STAR_FAR - (travel + offset).rem_euclid(span);
+
+    let k = (FOCAL << 8) / z;
+    let x = 160 + ((world_x * k) >> 8);
+    let y = 120 + ((world_y * k) >> 8);
+    if !(0..320).contains(&x) || !(0..240).contains(&y) {
+        return Star::default();
+    }
+    // Brightness and size follow how close it has come.
+    let nearness = ((STAR_FAR - z) * 255 / span).clamp(0, 255);
+    Star {
+        x: x as i16,
+        y: y as i16,
+        size: if nearness > 190 { 2 } else { 1 },
+        bright: (45 + nearness * 210 / 255) as u8,
+        visible: true,
+    }
 }
 
 /// Beats in a bar. Drum and bass is four to the floor at this level, so the
@@ -300,24 +335,42 @@ mod tests {
     }
 
     #[test]
-    fn stars_drift_and_wrap_without_leaving_the_screen() {
-        for drift in [0, 63, 64, 5_000, 100_000] {
+    fn a_visible_star_is_always_on_screen() {
+        for travel in [0, 1, 700, 5_000, 100_000, -5_000] {
             for i in 0..256 {
-                let (x, y, _) = star(i, drift);
-                assert!((0..320).contains(&x), "star {i} drift {drift} x={x}");
-                assert!((0..240).contains(&y), "star {i} drift {drift} y={y}");
+                let s = star(i, travel);
+                if !s.visible {
+                    continue;
+                }
+                assert!((0..320).contains(&s.x), "star {i} travel {travel} x={}", s.x);
+                assert!((0..240).contains(&s.y), "star {i} travel {travel} y={}", s.y);
             }
         }
     }
 
     #[test]
-    fn stars_stay_on_screen() {
-        for i in 0..512 {
-            let (x, y, b) = star(i, 0);
-            assert!((0..320).contains(&x), "star {i} x={x}");
-            assert!((0..240).contains(&y), "star {i} y={y}");
-            assert!(b >= 60);
-        }
+    fn stars_get_nearer_brighter_and_bigger_as_they_come_at_you() {
+        // A star near the camera sweeps off the edge, which is the point of a
+        // starfield, so compare two depths where the same one is still framed
+        // rather than following one the whole way in.
+        let span = STAR_FAR - STAR_NEAR;
+        let (far_travel, near_travel) = (0, span / 2);
+        let index = (0..8192)
+            .find(|i| star(*i, far_travel).visible && star(*i, near_travel).visible)
+            .expect("some star is framed at both depths");
+        let far = star(index, far_travel);
+        let near = star(index, near_travel);
+        assert!(near.bright > far.bright, "brighter as it approaches");
+        assert!(near.size >= far.size, "and no smaller");
+        // And it has moved outward from the vanishing point.
+        let spread = |s: Star| (s.x as i32 - 160).abs() + (s.y as i32 - 120).abs();
+        assert!(spread(near) > spread(far), "and further from centre screen");
+    }
+
+    #[test]
+    fn the_field_wraps_rather_than_running_out() {
+        let span = STAR_FAR - STAR_NEAR;
+        assert_eq!(star(7, 0), star(7, span), "one lap round is where it began");
     }
 
     #[test]

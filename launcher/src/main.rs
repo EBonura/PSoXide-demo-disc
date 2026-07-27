@@ -44,7 +44,6 @@ const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
 const TITLE: (u8, u8, u8) = (170, 220, 255);
-const CREDIT: (u8, u8, u8) = (95, 125, 175);
 const HINT: (u8, u8, u8) = (80, 105, 150);
 const NOW_PLAYING: (u8, u8, u8) = (70, 100, 150);
 const TRACK_NAME: (u8, u8, u8) = (150, 200, 250);
@@ -138,7 +137,8 @@ fn main() {
     let mut ring = 0i32;
     let mut spin = 0i32;
     let mut spin_rate = SPHERE_IDLE_SPIN;
-    let mut drift: i32 = 0;
+    // How far the camera has flown into the starfield.
+    let mut travel: i32 = 0;
     let mut italian = false;
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
@@ -176,7 +176,11 @@ fn main() {
         }
         // Skipping tracks by hand. The drive is already playing, so this is
         // the same handshake the end of a track takes, just triggered early.
-        if menu_track != 0 && menu_track_count > 1 {
+        // The drive takes the better part of a second to pick up a new track.
+        // Ignore further presses until it has, or the handshake gets re-armed
+        // from the start each time and never finishes.
+        let loading = menu_track != 0 && !music.started();
+        if menu_track != 0 && menu_track_count > 1 && !loading {
             let skip = if pressed(button::R1) {
                 1
             } else if pressed(button::L1) {
@@ -186,6 +190,9 @@ fn main() {
             };
             if skip != 0 {
                 menu_track_index = (menu_track_index + skip) % menu_track_count;
+                // Silence first: the handshake re-issues Play, and leaving the
+                // old track running under it is how the drive got wedged.
+                let _ = cdrom::try_stop(CDDA_SPINS);
                 music.begin(tick);
             }
         }
@@ -241,17 +248,24 @@ fn main() {
         let idle = SPHERE_IDLE_SPIN + (beat.bar as i32 * SPHERE_BAR_SWING) / 255;
         spin_rate = carousel::ease_spin(spin_rate, idle, SPHERE_DECAY_SHIFT);
         spin = (spin + spin_rate) & (TURN - 1);
-        // The sky drifts with the ball, so a browse pushes the whole scene.
-        drift = drift.wrapping_add(spin_rate.max(1));
+        // Flying forward the whole time, and a browse shoves the camera along
+        // with the ball.
+        travel = travel.wrapping_add(spin_rate.max(1));
 
         fb.clear(4, 6, 18);
-        draw_starfield(drift, beat.offbeat);
-        paint::light_streak(pulse);
+        draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
         centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
         if let Some(header) = header {
-            draw_music_panel(&font, &header, menu_track_index, &beat, menu_track_count > 1);
+            draw_music_panel(
+                &font,
+                &header,
+                menu_track_index,
+                &beat,
+                menu_track_count > 1,
+                loading,
+            );
         }
 
         if count == 0 {
@@ -260,11 +274,6 @@ fn main() {
             let index = selected.rem_euclid(count as i32) as usize;
             draw_description(&font, &entries[index], italian);
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
-        }
-        // The music is used by permission, so the credit is not optional
-        // decoration: it stays on screen the whole time the track plays.
-        if let Some(header) = header {
-            centred(&font, 232, header.credit_str(), CREDIT);
         }
 
         gpu::draw_sync();
@@ -310,14 +319,19 @@ fn split_title(name: &str) -> (&str, &str) {
 
 /// `offbeat` is 255 between two beats and 0 on them, so the sky twinkles in
 /// the gaps the ball and the pills leave.
-fn draw_starfield(drift: i32, offbeat: u8) {
+/// Stars flying past the camera. `offbeat` is 255 between two beats and 0 on
+/// them, so the sky twinkles in the gaps the ball and the pills leave.
+fn draw_starfield(travel: i32, offbeat: u8) {
     for i in 0..STARS {
-        let (x, y, b) = carousel::star(i, drift);
+        let star = carousel::star(i, travel);
+        if !star.visible {
+            continue;
+        }
         let twinkler = i % 7 == 0;
-        let size = if twinkler && offbeat > 160 { 2 } else { 1 };
         let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
-        let b = b.saturating_add(lift);
-        gpu::draw_rect_flat(x, y, size, size, b / 2, (b * 3) / 4, b);
+        let b = star.bright.saturating_add(lift);
+        let size = star.size + u16::from(twinkler && offbeat > 190);
+        gpu::draw_rect_flat(star.x, star.y, size, size, b / 2, (b * 3) / 4, b);
     }
 }
 
@@ -344,9 +358,21 @@ fn draw_music_panel(
     track: u8,
     beat: &carousel::Beat,
     skippable: bool,
+    loading: bool,
 ) {
     let title = header.title(track as usize);
     if title.is_empty() {
+        return;
+    }
+    let label = |text: &str| font.draw_text(6, 48, text, HINT);
+    // The drive takes a moment to pick a track up, and a menu that just goes
+    // quiet reads as broken. Say what it is doing.
+    if loading {
+        font.draw_text(6, 6, "LOADING", NOW_PLAYING);
+        font.draw_text(6, 17, title, TRACK_NAME);
+        if skippable {
+            label("L1/R1");
+        }
         return;
     }
     // "NOW PLAYING" is wide enough to touch the centred header. "PLAYING"
@@ -371,9 +397,9 @@ fn draw_music_panel(
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
-        paint::flag_it(294, 5);
+        paint::flag_it(320 - paint::FLAG_W - 4, 4);
     } else {
-        paint::flag_uk(294, 5);
+        paint::flag_uk(320 - paint::FLAG_W - 4, 4);
     }
     let text = if italian {
         entry.desc_it_str()
