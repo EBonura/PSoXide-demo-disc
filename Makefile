@@ -105,12 +105,12 @@ disc: launcher programs mkdisc
 		$(foreach t,$(MENU_TITLES),--menu-title $(t)) \
 		--credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
-		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, tech demo|Souls-like originale creato da zero per PS1, demo tecnica" \
+		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, tech demo|Souls-like originale creato da zero per PS1, tech demo" \
 		--describe "HALF-LIFE=Half-Life rebuilt from the ground up for PS1, semi-playable|Half-Life ricostruito da zero per PS1, semi-giocabile" \
-		--describe "VOXIDE=A Minecraft clone, early tech-demo|Un clone di Minecraft, demo tecnica iniziale" \
+		--describe "VOXIDE=A Minecraft clone, early tech-demo|Un clone di Minecraft, tech-demo iniziale" \
 		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games on PS1, fully playable|Entrambi i Celeste Classic PICO-8 su PS1, giocabili" \
 		--describe "PSXCEL=An Excel clone because why not?|Un clone di Excel, solo per il gusto di farlo" \
-		--describe "GH-PSX=Guitar Hero clone, early tech-demo|Clone di Guitar Hero, demo tecnica iniziale" \
+		--describe "GH-PSX=Guitar Hero clone, early tech-demo|Clone di Guitar Hero, tech-demo iniziale" \
 		--describe "BREAKOUT=A simple Breakout clone|Un semplice clone di Breakout" \
 		--describe "SPACE INVADERS=A simple Space Invaders clone|Un semplice clone di Space Invaders" \
 		--describe "MAGIKAAAAARP PONG=Simple pong with Magikaaaaarp music, built to test CD audio|Pong con musica di Magikaaaaarp, per provare l'audio da CD" \
