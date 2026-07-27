@@ -37,6 +37,7 @@ CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/rel
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX   := $(PSOXIDE)/editor/projects/cortex_v1/baked/cortex_v1.cue
+HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
 help:
 	@echo "make disc             - build everything into \"$(DIST)\""
@@ -57,6 +58,7 @@ launcher: loader
 
 examples:
 	$(MAKE) -C $(PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
+	$(MAKE) -C $(PSOXIDE) hardware-tests-disc
 
 # voxide, PSXcel and the Celeste collection never read the disc after boot, so
 # they ride as bare EXEs and do not care which SDK they were built against.
@@ -86,16 +88,18 @@ disc: launcher programs mkdisc
 		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
+		--image "HARDWARE TESTS=$(HWTESTS)" \
 		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO" \
-		--describe "CORTEX IGNITION=Original 3D action game|Gioco d'azione 3D originale" \
-		--describe "HALF-LIFE=Half-Life, rebuilt for the PS1|Half-Life, ricostruito per PS1" \
-		--describe "VOXIDE=Block-building voxel sandbox|Sandbox a voxel con blocchi" \
-		--describe "CELESTE COLLECTION=Celeste Classic 1 and 2|Celeste Classic 1 e 2" \
-		--describe "PSXCEL=A spreadsheet run from a gamepad|Un foglio di calcolo col controller" \
-		--describe "GUITAR HERO=3D rhythm game, CD audio|Gioco ritmico 3D, audio da CD" \
-		--describe "BREAKOUT=Break every brick|Rompi tutti i mattoni" \
-		--describe "SPACE INVADERS=Hold the line, wave after wave|Resisti, ondata dopo ondata" \
-		--describe "MAGIKAAAAARP PONG=Two-player pong|Pong per due giocatori"
+		--describe "CORTEX IGNITION=Explore a derelict complex in this original 3D action game|Esplora un complesso abbandonato in un gioco d'azione 3D" \
+		--describe "HALF-LIFE=Half-Life rebuilt for the PlayStation, streamed off this disc|Half-Life ricostruito per PlayStation, caricato da questo disco" \
+		--describe "VOXIDE=Mine blocks and build in a world generated as you walk|Scava blocchi e costruisci in un mondo generato mentre cammini" \
+		--describe "CELESTE COLLECTION=Both Celeste Classic games, climbed one screen at a time|I due Celeste Classic, scalati uno schermo alla volta" \
+		--describe "PSXCEL=A working spreadsheet you drive entirely with a gamepad|Un vero foglio di calcolo che usi solo col controller" \
+		--describe "GUITAR HERO=Hit the notes as the fretboard rushes at you, in CD time|Colpisci le note sul manico che scorre, a tempo col CD" \
+		--describe "BREAKOUT=Clear every brick without losing the ball off the bottom|Elimina tutti i mattoni senza perdere la palla in fondo" \
+		--describe "SPACE INVADERS=Hold the line as the wave drops lower with every pass|Resisti mentre l'ondata scende a ogni passaggio" \
+		--describe "MAGIKAAAAARP PONG=Pong for two players, with a fish where the ball should be|Pong per due giocatori, con un pesce al posto della palla" \
+		--describe "HARDWARE TESTS=The suite that checks this console against the emulator|La suite che verifica questa console contro l'emulatore"
 
 check:
 	cd carousel && cargo test

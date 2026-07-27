@@ -112,3 +112,32 @@ pub fn bead(bead: &Bead) {
         );
     }
 }
+
+/// The Union flag, 20x12. Not a texture: a blue field, then the white and red
+/// saltires as fans of parallel lines, then the cross on top.
+pub fn flag_uk(x: i16, y: i16) {
+    const W: i16 = 20;
+    const H: i16 = 12;
+    const BLUE: (u8, u8, u8) = (10, 32, 110);
+    const WHITE: (u8, u8, u8) = (240, 240, 245);
+    const RED: (u8, u8, u8) = (200, 24, 44);
+
+    gpu::draw_rect_flat(x, y, W as u16, H as u16, BLUE.0, BLUE.1, BLUE.2);
+    for offset in -2..=2i16 {
+        gpu::draw_line_mono(x + offset, y, x + W - 1 + offset, y + H - 1, WHITE.0, WHITE.1, WHITE.2);
+        gpu::draw_line_mono(x + W - 1 + offset, y, x + offset, y + H - 1, WHITE.0, WHITE.1, WHITE.2);
+    }
+    gpu::draw_line_mono(x, y, x + W - 1, y + H - 1, RED.0, RED.1, RED.2);
+    gpu::draw_line_mono(x + W - 1, y, x, y + H - 1, RED.0, RED.1, RED.2);
+    gpu::draw_rect_flat(x, y + 3, W as u16, 6, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x + 7, y, 6, H as u16, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x, y + 5, W as u16, 2, RED.0, RED.1, RED.2);
+    gpu::draw_rect_flat(x + 9, y, 2, H as u16, RED.0, RED.1, RED.2);
+}
+
+/// The Italian tricolour, 20x12.
+pub fn flag_it(x: i16, y: i16) {
+    gpu::draw_rect_flat(x, y, 7, 12, 0, 140, 69);
+    gpu::draw_rect_flat(x + 7, y, 6, 12, 240, 240, 240);
+    gpu::draw_rect_flat(x + 13, y, 7, 12, 205, 33, 42);
+}

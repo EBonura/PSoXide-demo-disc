@@ -41,9 +41,7 @@ const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
 const TITLE: (u8, u8, u8) = (170, 220, 255);
-const HINT: (u8, u8, u8) = (90, 120, 170);
-const ENGLISH: (u8, u8, u8) = (225, 240, 255);
-const ITALIAN: (u8, u8, u8) = (120, 175, 235);
+const BLURB: (u8, u8, u8) = (215, 235, 255);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
 const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
 const ERROR: (u8, u8, u8) = (230, 90, 90);
@@ -51,10 +49,18 @@ const ERROR: (u8, u8, u8) = (230, 90, 90);
 const STARS: u32 = 90;
 
 /// Turns per frame the ring eases toward its target, as a fraction: the gap
-/// closes by 1/6 each frame, which settles in about half a second.
+/// closes by an eighth each frame, which settles in about half a second.
 const EASE_SHIFT: i32 = 3;
-/// The ball of balls turns this much per frame, slowly.
-const SPHERE_SPIN: i32 = 6;
+/// What the ball of balls drifts at when nobody is touching the pad.
+const SPHERE_IDLE_SPIN: i32 = 5;
+/// The shove browsing gives it. It spins up with the carousel and coasts back
+/// down to the idle drift, so the whole screen reacts rather than just the ring.
+const SPHERE_KICK: i32 = 110;
+/// How fast that shove bleeds off: a sixteenth of the excess per frame.
+const SPHERE_DECAY_SHIFT: i32 = 4;
+
+/// Widest line the 8-pixel font fits on screen with a margin either side.
+const WRAP_CHARS: usize = 36;
 
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
@@ -79,6 +85,8 @@ fn main() {
     let mut selected: i32 = 0;
     let mut ring = 0i32;
     let mut spin = 0i32;
+    let mut spin_rate = SPHERE_IDLE_SPIN;
+    let mut italian = false;
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
@@ -87,14 +95,17 @@ fn main() {
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
 
+        if pressed(button::UP) || pressed(button::DOWN) {
+            italian = !italian;
+        }
         if count > 0 {
-            // The carousel turns; up/left and down/right both make sense on a
-            // ring, so take either.
-            if pressed(button::LEFT) || pressed(button::UP) {
+            if pressed(button::LEFT) {
                 selected -= 1;
+                spin_rate -= SPHERE_KICK;
             }
-            if pressed(button::RIGHT) || pressed(button::DOWN) {
+            if pressed(button::RIGHT) {
                 selected += 1;
+                spin_rate += SPHERE_KICK;
             }
             if pressed(button::CROSS) || pressed(button::START) {
                 let index = selected.rem_euclid(count as i32) as usize;
@@ -110,27 +121,63 @@ fn main() {
         let step = TURN / count.max(1) as i32;
         let target = -selected * step;
         ring += (target - ring) >> EASE_SHIFT;
-        spin = (spin + SPHERE_SPIN) & (TURN - 1);
+
+        // Coast the ball back to its idle drift.
+        spin_rate = carousel::ease_spin(spin_rate, SPHERE_IDLE_SPIN, SPHERE_DECAY_SHIFT);
+        spin = (spin + spin_rate) & (TURN - 1);
 
         fb.clear(4, 6, 18);
         draw_starfield();
         draw_sphere(spin, &mut beads);
 
-        font.draw_text(10, 8, "PSOXIDE DEMO DISC", TITLE);
-        font.draw_text(10, 20, "LEFT/RIGHT to browse", HINT);
-        font.draw_text(10, 30, "X to run", HINT);
+        centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
 
         if count == 0 {
-            font.draw_text(10, 122, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
+            centred(&font, 126, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
-            draw_description(&font, &entries[index]);
+            draw_description(&font, &entries[index], italian);
             draw_ring(&font, &entries[..count], ring, step, &mut order);
         }
 
         gpu::draw_sync();
         psx_rt::interrupts::wait_vblank();
         fb.swap();
+    }
+}
+
+fn centred(font: &FontAtlas, y: i16, text: &str, tint: (u8, u8, u8)) {
+    if text.is_empty() {
+        return;
+    }
+    font.draw_text(160 - (font.text_width(text) as i16) / 2, y, text, tint);
+}
+
+/// Break `text` at the last space that fits, so a long blurb reads as two
+/// tidy lines rather than one cut mid-word.
+fn wrap(text: &str, max: usize) -> (&str, &str) {
+    if text.len() <= max {
+        return (text, "");
+    }
+    match text[..max].rfind(' ') {
+        Some(at) => (&text[..at], text[at + 1..].trim_start()),
+        None => (&text[..max], text[max..].trim_start()),
+    }
+}
+
+/// Split a title at the space nearest its middle, so the two lines on a pill
+/// come out roughly even. Titles with no space stay on one line.
+fn split_title(name: &str) -> (&str, &str) {
+    let middle = name.len() / 2;
+    let mut best: Option<usize> = None;
+    for (at, byte) in name.bytes().enumerate() {
+        if byte == b' ' && best.is_none_or(|b| at.abs_diff(middle) < b.abs_diff(middle)) {
+            best = Some(at);
+        }
+    }
+    match best {
+        Some(at) => (&name[..at], &name[at + 1..]),
+        None => (name, ""),
     }
 }
 
@@ -150,17 +197,22 @@ fn draw_sphere(spin: i32, beads: &mut [Bead; SPHERE_POINTS]) {
     }
 }
 
-/// The selected game's blurb, English over Italian.
-fn draw_description(font: &FontAtlas, entry: &Entry) {
-    let centred = |y: i16, text: &str, tint: (u8, u8, u8)| {
-        if text.is_empty() {
-            return;
-        }
-        let x = 160 - (font.text_width(text) as i16) / 2;
-        font.draw_text(x, y, text, tint);
+/// The selected game's blurb in one language, under the flag of whichever
+/// one it is. Up or down swaps.
+fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
+    if italian {
+        paint::flag_it(150, 112);
+    } else {
+        paint::flag_uk(150, 112);
+    }
+    let text = if italian {
+        entry.desc_it_str()
+    } else {
+        entry.desc_en_str()
     };
-    centred(122, entry.desc_en_str(), ENGLISH);
-    centred(134, entry.desc_it_str(), ITALIAN);
+    let (first, second) = wrap(text, WRAP_CHARS);
+    centred(font, 130, first, BLURB);
+    centred(font, 140, second, BLURB);
 }
 
 /// The carousel: place every entry on the ring, draw back to front, and label
@@ -187,10 +239,20 @@ fn draw_ring(
         // discs did it. The ones round the back are dropped instead: at that
         // size they are unreadable and only add clutter.
         if item.front > 96 {
-            let name = entries[slot].name_str();
-            let width = font.text_width(name) as i16;
             let tint = if item.front > 200 { LABEL } else { FAR_LABEL };
-            font.draw_text(item.x - width / 2, item.y - 4, name, tint);
+            let (top, bottom) = split_title(entries[slot].name_str());
+            let line = |y: i16, text: &str| {
+                if !text.is_empty() {
+                    let width = font.text_width(text) as i16;
+                    font.draw_text(item.x - width / 2, y, text, tint);
+                }
+            };
+            if bottom.is_empty() {
+                line(item.y - 4, top);
+            } else {
+                line(item.y - 9, top);
+                line(item.y + 1, bottom);
+            }
         }
     }
 }

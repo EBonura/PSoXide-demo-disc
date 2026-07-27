@@ -364,6 +364,19 @@ fn apply_descriptions(
             .iter()
             .position(|n| n == name)
             .ok_or_else(|| format!("--describe names {name:?}, which is not on this disc"))?;
+        // The table pads to a fixed width, so an overlong blurb would be
+        // quietly cut mid-word on screen. Say so instead.
+        for (language, text) in [("English", english), ("Italian", italian)] {
+            if text.len() > disc_toc::DESC_BYTES {
+                return Err(format!(
+                    "{name}: the {language} description is {} characters, {} over the {} the \
+                     table holds:\n  {text}",
+                    text.len(),
+                    text.len() - disc_toc::DESC_BYTES,
+                    disc_toc::DESC_BYTES
+                ));
+            }
+        }
         entries[at] = entries[at].described(english, italian);
     }
     Ok(())
@@ -688,6 +701,20 @@ mod tests {
         assert_eq!(entries[1].desc_en_str(), "Voxel sandbox");
         assert_eq!(entries[1].desc_it_str(), "Sandbox a voxel");
         assert_eq!(entries[0].desc_en_str(), "", "others untouched");
+    }
+
+    #[test]
+    fn an_overlong_description_is_an_error_rather_than_a_silent_trim() {
+        let mut entries = [Entry::new("PONG", 0, 0, 0)];
+        let long = "x".repeat(disc_toc::DESC_BYTES + 1);
+        let err = apply_descriptions(
+            &mut entries,
+            &["PONG"],
+            &[("PONG".into(), long, "ok".into())],
+        )
+        .unwrap_err();
+        assert!(err.contains("English"), "{err}");
+        assert!(err.contains("1 over"), "{err}");
     }
 
     #[test]
