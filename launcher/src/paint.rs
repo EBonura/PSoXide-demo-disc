@@ -150,30 +150,39 @@ pub fn bead(bead: &Bead) {
     }
 }
 
-/// A little level meter under the track name. Six bars, each lagging the one
-/// before it, so a beat runs across them as a wave rather than flashing them
-/// all at once.
-pub fn level_meter(x: i16, base_y: i16, pulse: u8) {
-    const BARS: i16 = 6;
-    const WIDTH: u16 = 3;
-    const PITCH: i16 = 5;
-    const TALLEST: i16 = 17;
-    for bar in 0..BARS {
-        // Each bar is a fraction of a beat behind its neighbour.
-        let lag = (bar as u16 * 34) as u8;
-        let level = pulse.saturating_sub(lag);
-        let h = 2 + (level as i16 * (TALLEST - 2)) / 255;
-        // Tall bars run hot, short ones stay in the dark blue.
-        let heat = (level / 2) as u8;
-        gpu::draw_rect_flat(
-            x + bar * PITCH,
-            base_y - h,
-            WIDTH,
-            h as u16,
-            40u8.saturating_add(heat),
-            90u8.saturating_add(heat),
-            150u8.saturating_add(level / 3),
-        );
+const METER_WIDTH: u16 = 3;
+const METER_PITCH: i16 = 4;
+const METER_TALLEST: i16 = 20;
+
+fn meter_bar(x: i16, base_y: i16, level: u8) {
+    let h = 1 + (level as i16 * (METER_TALLEST - 1)) / 255;
+    // Tall bars run hot, short ones stay in the dark blue.
+    let heat = level / 2;
+    gpu::draw_rect_flat(
+        x,
+        base_y - h,
+        METER_WIDTH,
+        h as u16,
+        40u8.saturating_add(heat),
+        90u8.saturating_add(heat),
+        150u8.saturating_add(level / 3),
+    );
+}
+
+/// The level meter, one bar per band of the track's pre-analysed spectrum,
+/// low frequencies on the left.
+pub fn level_meter(x: i16, base_y: i16, levels: &[u8]) {
+    for (band, level) in levels.iter().enumerate() {
+        meter_bar(x + band as i16 * METER_PITCH, base_y, *level);
+    }
+}
+
+/// Fallback for a track the disc carries no analysis for: bars lagging each
+/// other off the beat, which keeps time without listening.
+pub fn level_meter_beat(x: i16, base_y: i16, pulse: u8) {
+    for bar in 0..6i16 {
+        let level = pulse.saturating_sub((bar as u16 * 34) as u8);
+        meter_bar(x + bar * METER_PITCH, base_y, level);
     }
 }
 

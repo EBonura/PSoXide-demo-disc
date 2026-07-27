@@ -31,6 +31,7 @@
 //! or play CD-DA. `NAME` is what the menu shows; `=` splits it from the path.
 
 mod cue;
+mod spectrum;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -57,6 +58,9 @@ const IMAGE_BOOT_EXE_LBA: u32 = psx_iso::PLAYTEST_BOOT_EXE_START_LBA;
 const PREGAP_FRAMES: u32 = 150;
 
 const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
+
+/// Pre-analysed level-meter data for every menu track, end to end.
+const SPECTRUM_FILE_NAME: &str = "SPECTRUM.BIN";
 
 enum Source {
     /// A bare PSX-EXE, embedded as an ISO file.
@@ -445,7 +449,35 @@ fn run() -> Result<(), String> {
     // Bare EXEs ride inside the launcher's own ISO, so their LBAs follow from
     // the file order. Whole images are appended after the ISO ends, which the
     // ISO's own length decides -- so build the ISO first, then place them.
-    let mut next_lba = toc_lba + disc_toc::TOC_SECTORS + sectors_for(launcher.len());
+    let mut menu_audio = Vec::new();
+    for path in &args.menu_cdda {
+        let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        if bytes.len() % SECTOR_BYTES != 0 {
+            return Err(format!(
+                "{}: {} bytes is not a whole number of {SECTOR_BYTES}-byte CD-DA sectors. \
+                 Pad it, or the last sector will be a click.",
+                path.display(),
+                bytes.len()
+            ));
+        }
+        menu_audio.push(bytes);
+    }
+    // Analysed here rather than by a separate tool: mkdisc already has the
+    // PCM in hand, and a meter that disagrees with the track on the disc is
+    // exactly the kind of drift a build step prevents.
+    let mut spectrum_data = Vec::new();
+    let mut spectrum_frames = Vec::new();
+    for bytes in &menu_audio {
+        let data = spectrum::analyse(bytes);
+        spectrum_frames.push((data.len() / spectrum::BANDS) as u32);
+        spectrum_data.extend_from_slice(&data);
+    }
+
+
+    let spectrum_lba = toc_lba + disc_toc::TOC_SECTORS;
+    let spectrum_sectors = sectors_for(spectrum_data.len());
+    let mut next_lba =
+        spectrum_lba + spectrum_sectors + sectors_for(launcher.len());
     let mut entries: Vec<Option<Entry>> = vec![None; args.programs.len()];
     let mut iso_files = Vec::new();
     let mut map = Vec::new();
@@ -498,6 +530,9 @@ fn run() -> Result<(), String> {
             .system_id("PLAYSTATION");
         builder.add_file("SYSTEM.CNF", system_cnf.clone());
         builder.add_file(disc_toc::TOC_FILE_NAME, toc);
+        if !spectrum_data.is_empty() {
+            builder.add_file(SPECTRUM_FILE_NAME, spectrum_data.clone());
+        }
         builder.add_file("PSX.EXE", launcher.clone());
         for (name, bytes) in &iso_files {
             builder.add_file(name, bytes.clone());
@@ -546,19 +581,6 @@ fn run() -> Result<(), String> {
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
     // The menu's own track goes last, after every game's, so adding or
     // removing it cannot shift a game's CD-DA base.
-    let mut menu_audio = Vec::new();
-    for path in &args.menu_cdda {
-        let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
-        if bytes.len() % SECTOR_BYTES != 0 {
-            return Err(format!(
-                "{}: {} bytes is not a whole number of {SECTOR_BYTES}-byte CD-DA sectors. \
-                 Pad it, or the last sector will be a click.",
-                path.display(),
-                bytes.len()
-            ));
-        }
-        menu_audio.push(bytes);
-    }
     let menu_track = if menu_audio.is_empty() {
         0
     } else {
@@ -616,6 +638,8 @@ fn run() -> Result<(), String> {
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>(),
+        if spectrum_data.is_empty() { 0 } else { spectrum_lba },
+        &spectrum_frames,
     )
     .ok_or_else(|| {
         format!(
@@ -674,6 +698,14 @@ fn run() -> Result<(), String> {
         disc.len() as f64 / (1024.0 * 1024.0),
     );
     println!("wrote {}", cue_path.display());
+    if !spectrum_data.is_empty() {
+        println!(
+            "level meter: {} frames over {} track(s) at LBA {spectrum_lba} ({} KiB)",
+            spectrum_frames.iter().sum::<u32>(),
+            spectrum_frames.len(),
+            spectrum_data.len() / 1024
+        );
+    }
     if menu_track != 0 {
         println!(
             "menu music on CD-DA track{} {menu_track}{}, credited as {:?}",

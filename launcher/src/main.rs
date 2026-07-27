@@ -94,6 +94,12 @@ static mut READER: SectorReader = SectorReader::new();
 static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
     [0; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize];
 
+/// Room for every menu track's level-meter data. Read once at boot rather
+/// than per track, so skipping stays as quick as the drive allows.
+const SPECTRUM_MAX_SECTORS: usize = 192;
+static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
+    [0; SECTOR_WORDS * SPECTRUM_MAX_SECTORS];
+
 #[no_mangle]
 fn main() {
     tty::println("launcher: booted");
@@ -112,6 +118,10 @@ fn main() {
     if count == 0 {
         tty::println("launcher: no table of contents on this disc");
     }
+
+    // Before the music starts, for the same reason the table is: reading the
+    // disc while it plays CD-DA is what this hardware is worst at.
+    let spectrum_frames = read_spectrum(header.as_ref());
 
     let menu_track = header.map_or(0, |h| h.menu_track) as u8;
     let menu_track_count = header.map_or(0, |h| h.menu_track_count).max(1) as u8;
@@ -223,9 +233,10 @@ fn main() {
         // Everything visual answers the beat. The grid was measured off the
         // audio and shipped in the table, so this stays in step for the whole
         // length of a track rather than drifting out of it.
+        let song_ms = if clock.playing() { clock.tick(tick) } else { 0 };
         let beat = match header.and_then(|h| h.beat(menu_track_index as usize)) {
             Some((beat_ms, phase_ms)) if clock.playing() => {
-                carousel::beat_at(clock.tick(tick), beat_ms, phase_ms)
+                carousel::beat_at(song_ms, beat_ms, phase_ms)
             }
             _ => carousel::Beat::default(),
         };
@@ -265,6 +276,7 @@ fn main() {
                 &beat,
                 menu_track_count > 1,
                 loading,
+                spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
             );
         }
 
@@ -359,6 +371,7 @@ fn draw_music_panel(
     beat: &carousel::Beat,
     skippable: bool,
     loading: bool,
+    levels: Option<&[u8]>,
 ) {
     let title = header.title(track as usize);
     if title.is_empty() {
@@ -386,7 +399,12 @@ fn draw_music_panel(
         TRACK_NAME.2.saturating_add(lift),
     );
     font.draw_text(6, 17, title, tint);
-    paint::level_meter(6, 44, beat.pulse);
+    match levels {
+        Some(levels) => paint::level_meter(6, 44, levels),
+        // No analysis for this track: keep time off the beat instead of
+        // leaving a dead space where the meter should be.
+        None => paint::level_meter_beat(6, 44, beat.pulse),
+    }
     if skippable {
         font.draw_text(6, 48, "L1/R1", HINT);
     }
@@ -461,6 +479,58 @@ fn draw_ring(
             }
         }
     }
+}
+
+/// Read the level-meter data for every menu track. Returns how many frames
+/// landed in the buffer, which is 0 when the disc carries none or when it
+/// carries more than there is room for.
+fn read_spectrum(header: Option<&Header>) -> u32 {
+    let Some(header) = header else { return 0 };
+    if header.spectrum_lba == 0 {
+        return 0;
+    }
+    let total: u32 = header.spectrum_frames.iter().sum();
+    let bytes = total as usize * disc_toc::SPECTRUM_BANDS;
+    let sectors = bytes.div_ceil(SECTOR_WORDS * 4);
+    if sectors > SPECTRUM_MAX_SECTORS {
+        tty::println("launcher: spectrum too large for the buffer, meter off");
+        return 0;
+    }
+    // SAFETY: single-threaded, polled; only `main` reaches these statics.
+    let reader = unsafe { &mut *core::ptr::addr_of_mut!(READER) };
+    let buffer = unsafe { &mut *core::ptr::addr_of_mut!(SPECTRUM) };
+
+    let mut ok = unsafe { reader.prepare() && reader.start_read(header.spectrum_lba) };
+    for chunk in buffer.chunks_exact_mut(SECTOR_WORDS).take(sectors) {
+        let slot: &mut [u32; SECTOR_WORDS] = chunk.try_into().expect("exact chunks");
+        ok = ok && unsafe { reader.read_sector(slot) };
+    }
+    unsafe { reader.stop() };
+    if ok {
+        total
+    } else {
+        0
+    }
+}
+
+/// The band levels to draw right now, or `None` when this track has no
+/// analysis on the disc.
+fn spectrum_frame(header: &Header, track: u8, song_ms: u32, loaded_frames: u32) -> Option<&[u8]> {
+    if loaded_frames == 0 {
+        return None;
+    }
+    let (offset, frames) = header.spectrum_span(track as usize)?;
+    let frame = song_ms * disc_toc::SPECTRUM_FRAME_RATE / 1000;
+    // Hold the last frame rather than wrapping: the clock can run a little
+    // past the end of a track while the drive notices it has finished.
+    let at = (offset + frame.min(frames.saturating_sub(1))) as usize;
+    let start = at * disc_toc::SPECTRUM_BANDS;
+    // SAFETY: as `read_spectrum`; read-only here.
+    let buffer = unsafe { &*core::ptr::addr_of!(SPECTRUM) };
+    let bytes = unsafe {
+        core::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 4)
+    };
+    bytes.get(start..start + disc_toc::SPECTRUM_BANDS)
 }
 
 /// Read the table of contents. `None` if the disc has none.

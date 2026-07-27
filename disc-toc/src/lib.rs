@@ -17,7 +17,9 @@
 //! 0x14  music credit, NUL-padded ASCII
 //! 0x44  beat grid, MAX_MENU_TRACKS x (u32 milli-BPM, u32 first-beat ms)
 //! 0x84  menu track titles, MAX_MENU_TRACKS x MENU_TITLE_BYTES
-//! 0x144 entries, ENTRY_BYTES each:
+//! 0x144 u32 LBA of the spectrum region, 0 when the disc has none
+//! 0x148 spectrum frame count per menu track, MAX_MENU_TRACKS x u32
+//! 0x168 entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
@@ -70,7 +72,14 @@ pub const MAX_MENU_TRACKS: usize = 8;
 /// Bytes reserved for each menu track's title, shown as "now playing".
 pub const MENU_TITLE_BYTES: usize = 24;
 
-const HEADER_BYTES: usize = 0x144;
+/// Bands in one spectrum frame, and frames a second. Must match
+/// `mkdisc`'s analyser.
+pub const SPECTRUM_BANDS: usize = 16;
+pub const SPECTRUM_FRAME_RATE: u32 = 30;
+
+const HEADER_BYTES: usize = 0x168;
+const SPECTRUM_LBA_AT: usize = 0x144;
+const SPECTRUM_FRAMES_AT: usize = 0x148;
 const CREDIT_AT: usize = 0x14;
 const BEATS_AT: usize = 0x44;
 const TITLES_AT: usize = 0x84;
@@ -169,12 +178,31 @@ pub struct Header {
     /// Title of each menu track, NUL-padded, for the menu to name what is
     /// playing. The permission was given per track, so the disc says which.
     pub titles: [[u8; MENU_TITLE_BYTES]; MAX_MENU_TRACKS],
+    /// Where the pre-analysed level-meter data starts, or 0 if the disc has
+    /// none and the meter should stay still.
+    pub spectrum_lba: u32,
+    /// Frames of spectrum per menu track, in track order. They sit end to end
+    /// from `spectrum_lba`, so a track's offset is the sum of the ones before.
+    pub spectrum_frames: [u32; MAX_MENU_TRACKS],
 }
 
 impl Header {
     /// The credit as a `str`, NUL padding stripped.
     pub fn credit_str(&self) -> &str {
         trimmed(&self.credit)
+    }
+
+    /// Where menu track `index`'s spectrum starts, counted in frames from
+    /// the beginning of the region, and how many frames it runs for.
+    pub fn spectrum_span(&self, index: usize) -> Option<(u32, u32)> {
+        if self.spectrum_lba == 0 || index >= MAX_MENU_TRACKS {
+            return None;
+        }
+        let frames = self.spectrum_frames[index];
+        if frames == 0 {
+            return None;
+        }
+        Some((self.spectrum_frames[..index].iter().sum(), frames))
     }
 
     /// Title of menu track `index`, NUL padding stripped. Empty when the
@@ -207,10 +235,13 @@ pub fn encode(
     credit: &str,
     beats: &[(u32, u32)],
     titles: &[&str],
+    spectrum_lba: u32,
+    spectrum_frames: &[u32],
 ) -> Option<[u8; TOC_BYTES]> {
     if entries.len() > MAX_ENTRIES
         || beats.len() > MAX_MENU_TRACKS
         || titles.len() > MAX_MENU_TRACKS
+        || spectrum_frames.len() > MAX_MENU_TRACKS
     {
         return None;
     }
@@ -220,6 +251,11 @@ pub fn encode(
     out[12..16].copy_from_slice(&menu_track.to_le_bytes());
     out[16..20].copy_from_slice(&menu_track_count.to_le_bytes());
     out[CREDIT_AT..CREDIT_AT + CREDIT_BYTES].copy_from_slice(&fixed::<CREDIT_BYTES>(credit));
+    out[SPECTRUM_LBA_AT..SPECTRUM_LBA_AT + 4].copy_from_slice(&spectrum_lba.to_le_bytes());
+    for (i, frames) in spectrum_frames.iter().enumerate() {
+        let at = SPECTRUM_FRAMES_AT + i * 4;
+        out[at..at + 4].copy_from_slice(&frames.to_le_bytes());
+    }
     for (i, title) in titles.iter().enumerate() {
         let at = TITLES_AT + i * MENU_TITLE_BYTES;
         out[at..at + MENU_TITLE_BYTES].copy_from_slice(&fixed::<MENU_TITLE_BYTES>(title));
@@ -258,6 +294,11 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     }
     let mut credit = [0u8; CREDIT_BYTES];
     credit.copy_from_slice(&sector[CREDIT_AT..CREDIT_AT + CREDIT_BYTES]);
+    let word = |a: usize| u32::from_le_bytes([sector[a], sector[a + 1], sector[a + 2], sector[a + 3]]);
+    let mut spectrum_frames = [0u32; MAX_MENU_TRACKS];
+    for (i, slot) in spectrum_frames.iter_mut().enumerate() {
+        *slot = word(SPECTRUM_FRAMES_AT + i * 4);
+    }
     let mut titles = [[0u8; MENU_TITLE_BYTES]; MAX_MENU_TRACKS];
     for (i, slot) in titles.iter_mut().enumerate() {
         let at = TITLES_AT + i * MENU_TITLE_BYTES;
@@ -266,13 +307,14 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     let mut beats = [(0u32, 0u32); MAX_MENU_TRACKS];
     for (i, slot) in beats.iter_mut().enumerate() {
         let at = BEATS_AT + i * 8;
-        let word = |a: usize| u32::from_le_bytes([sector[a], sector[a + 1], sector[a + 2], sector[a + 3]]);
         *slot = (word(at), word(at + 4));
     }
     let header = Header {
         count,
         beats,
         titles,
+        spectrum_lba: word(SPECTRUM_LBA_AT),
+        spectrum_frames,
         menu_track: u32::from_le_bytes([sector[12], sector[13], sector[14], sector[15]]),
         menu_track_count: u32::from_le_bytes([sector[16], sector[17], sector[18], sector[19]]),
         credit,
@@ -318,6 +360,8 @@ mod tests {
             "Music by Just Music",
             &[(176_000, 34), (175_000, 23)],
             &["KNUCKLE DUST", "RUSTED HAMMER"],
+            700,
+            &[4590, 7260],
         )
         .expect("fits");
         let mut out = blank();
@@ -333,6 +377,14 @@ mod tests {
         assert_eq!(header.title(0), "KNUCKLE DUST");
         assert_eq!(header.title(1), "RUSTED HAMMER");
         assert_eq!(header.title(2), "", "unnamed track");
+        assert_eq!(header.spectrum_lba, 700);
+        assert_eq!(header.spectrum_span(0), Some((0, 4590)), "first is at the start");
+        assert_eq!(
+            header.spectrum_span(1),
+            Some((4590, 7260)),
+            "the next follows it"
+        );
+        assert_eq!(header.spectrum_span(2), None, "no data, no meter");
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
@@ -345,7 +397,7 @@ mod tests {
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[], &[]).expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[], &[], 0, &[]).expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
@@ -353,7 +405,7 @@ mod tests {
     #[test]
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
-        assert!(encode(&too_many, 0, 0, "", &[], &[]).is_none());
+        assert!(encode(&too_many, 0, 0, "", &[], &[], 0, &[]).is_none());
     }
 
     #[test]

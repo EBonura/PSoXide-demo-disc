@@ -80,9 +80,13 @@ triangles get you. Left and right spin the ring, X runs the pill at the front, u
 the description between English and Italian under a drawn flag, and L1 or R1
 skips the music. Titles too long for a pill break across two lines.
 
-Top left is a music panel: what is playing, a six-bar level meter where each
-bar lags the one before it so a beat runs across as a wave, and the L1/R1
-label. Only that control is labelled on screen. The rest a PlayStation owner
+Top left is a music panel: what is playing, a sixteen-band level meter, and the L1/R1
+label. The meter is not keeping time, it is listening: `mkdisc` runs an FFT
+over each track at disc-build time and ships the result in a `SPECTRUM.BIN`
+region the launcher reads at boot. Bands are normalised per band rather than
+globally, because a drum and bass track has so much more energy at 60 Hz than
+at 12 kHz that a single scale leaves the top half of the meter permanently
+flat. Only that control is labelled on screen. The rest a PlayStation owner
 tries without being told; nothing about the screen suggests the shoulder
 buttons do anything at all.
 
