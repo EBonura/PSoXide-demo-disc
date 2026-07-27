@@ -70,8 +70,8 @@ const SPHERE_R: i32 = 68;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
 /// cluster reading as scattered confetti.
-const SPHERE_LAT: usize = 7;
-const SPHERE_LON: usize = 10;
+const SPHERE_LAT: usize = 4;
+const SPHERE_LON: usize = 6;
 pub const SPHERE_POINTS: usize = SPHERE_LAT * SPHERE_LON + 2;
 
 /// Where one carousel item landed after projection.
