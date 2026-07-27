@@ -65,7 +65,7 @@ const PILL_RY: i32 = 19;
 
 /// The ball of balls hangs centred above the ring.
 const SPHERE_CENTRE_X: i16 = 160;
-const SPHERE_CENTRE_Y: i16 = 77;
+const SPHERE_CENTRE_Y: i16 = 84;
 const SPHERE_R: i32 = 68;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
