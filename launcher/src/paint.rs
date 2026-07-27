@@ -5,13 +5,17 @@
 //! at this size reads as a glossy lozenge without a single texture.
 
 use carousel::{Bead, Placed, TURN};
+use psx_gpu::material::BlendMode;
+use psx_vram::{Clut, Color555, Tpage};
 use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
 
-/// Most segments an ellipse is drawn with. Twelve reads as round at pill size.
-const MAX_SEGMENTS: usize = 12;
+/// Most segments an ellipse is drawn with. These are triangle fans, so this is
+/// the polygon count: at twelve the pills read as coarse dodecagons, and at
+/// 320x240 with no antialiasing every facet shows.
+const MAX_SEGMENTS: usize = 18;
 /// Fewest. Below this a bead stops looking like a circle at all.
-const MIN_SEGMENTS: usize = 6;
+const MIN_SEGMENTS: usize = 9;
 
 /// Segments worth spending on an ellipse of this size. The ball is seventy-odd
 /// beads and most of them are a handful of pixels across, where twelve
@@ -19,7 +23,7 @@ const MIN_SEGMENTS: usize = 6;
 /// 60 Hz, which stretched every time-driven effect with it.
 fn segments_for(rx: i16, ry: i16) -> usize {
     let size = rx.max(ry) as usize;
-    (size / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
+    size.clamp(MIN_SEGMENTS, MAX_SEGMENTS)
 }
 
 const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
@@ -192,6 +196,73 @@ pub fn level_meter_beat(x: i16, base_y: i16, pulse: u8) {
 /// the Union flag's own ratio; at three to two it read as squat.
 pub const FLAG_W: i16 = 24;
 pub const FLAG_H: i16 = 12;
+
+/// The PSoXide mark, as the one texture on the screen.
+///
+/// 4bpp with a sixteen-colour palette, and palette entry zero left at
+/// `0x0000`, which the PlayStation treats as transparent: the starfield shows
+/// through the letterforms rather than the logo sitting in a black box.
+pub struct Banner {
+    tpage: Tpage,
+    clut: Clut,
+    w: i16,
+    h: i16,
+}
+
+impl Banner {
+    /// Push the texture and its palette into VRAM. `tpage` must be 4bpp and
+    /// clear of the framebuffer; the whole thing has to fit one page, since
+    /// UVs are bytes.
+    pub fn upload(pixels: &[u8], palette: &[u8], w: i16, h: i16, tpage: Tpage, clut: Clut) -> Self {
+        // Four texels a halfword, so a row is a quarter as wide in VRAM.
+        let halfwords_per_row = (w as u16).div_ceil(4);
+        psx_vram::upload_bytes(
+            psx_vram::VramRect::new(tpage.x(), tpage.y(), halfwords_per_row, h as u16),
+            pixels,
+        );
+        let entries: [Color555; 16] = core::array::from_fn(|i| {
+            Color555::raw(u16::from_le_bytes([palette[i * 2], palette[i * 2 + 1]]))
+        });
+        psx_vram::upload_clut(clut, &entries);
+        Banner { tpage, clut, w, h }
+    }
+
+    /// Draw it with its top-left at `x, y`, one texel to one pixel.
+    pub fn draw(&self, x: i16, y: i16) {
+        let (w, h) = (self.w, self.h);
+        let (u1, v1) = ((w - 1) as u8, (h - 1) as u8);
+        gpu::draw_quad_textured(
+            [(x, y), (x + w, y), (x, y + h), (x + w, y + h)],
+            [(0, 0), (u1, 0), (0, v1), (u1, v1)],
+            self.clut.uv_clut_word(),
+            self.tpage.uv_tpage_word(0),
+            // Neutral tint: 128 is "as the texture is" on this hardware.
+            (128, 128, 128),
+        );
+    }
+}
+
+/// A dark panel to lay text over, with a thin border.
+///
+/// Black at [`BlendMode::Average`] is `(background + 0) / 2`, so it halves
+/// whatever it covers rather than hiding it: the ball and the starfield stay
+/// visible underneath, just far enough back for white text to sit on them.
+pub fn text_panel(x: i16, y: i16, w: i16, h: i16) {
+    const BORDER: (u8, u8, u8) = (150, 30, 34);
+    // Two triangles, since the SDK blends triangles and not rectangles.
+    for tri in [
+        [(x, y), (x + w, y), (x, y + h)],
+        [(x + w, y), (x, y + h), (x + w, y + h)],
+    ] {
+        gpu::draw_tri_flat_blended(tri, 0, 0, 0, BlendMode::Average);
+    }
+    // Border solid rather than blended, so the edge stays crisp against
+    // whatever is behind it.
+    gpu::draw_rect_flat(x, y, w as u16, 1, BORDER.0, BORDER.1, BORDER.2);
+    gpu::draw_rect_flat(x, y + h - 1, w as u16, 1, BORDER.0, BORDER.1, BORDER.2);
+    gpu::draw_rect_flat(x, y, 1, h as u16, BORDER.0, BORDER.1, BORDER.2);
+    gpu::draw_rect_flat(x + w - 1, y, 1, h as u16, BORDER.0, BORDER.1, BORDER.2);
+}
 
 /// The Union flag.
 ///
