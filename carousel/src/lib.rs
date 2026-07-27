@@ -25,8 +25,10 @@ const CAMERA_Z: i32 = 520;
 const FOCAL: i32 = 300;
 /// Ring radius.
 const RING_R: i32 = 205;
-/// Screen row the carousel is mirrored about.
-pub const FLOOR_Y: i16 = 222;
+/// Screen row the carousel is mirrored about. Three rows higher than the
+/// geometry wants: mirroring exactly about the front pill's lower edge put
+/// the bottom of its reflection two rows past the last scanline.
+pub const FLOOR_Y: i16 = 219;
 /// Screen row the ring's centre projects to.
 const RING_Y: i16 = 196;
 /// How far the ring's far side rides up the screen: the tilt that turns a
@@ -40,7 +42,7 @@ const PILL_RY: i32 = 19;
 
 /// The ball of balls hangs centred above the ring.
 const SPHERE_CENTRE_X: i16 = 160;
-const SPHERE_CENTRE_Y: i16 = 88;
+const SPHERE_CENTRE_Y: i16 = 98;
 const SPHERE_R: i32 = 68;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
