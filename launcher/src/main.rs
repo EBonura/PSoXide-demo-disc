@@ -603,10 +603,13 @@ fn draw_music_panel(
     font.draw_text(
         4,
         MUSIC_TOP,
+        // Fifteen characters, so it stops at x=79 and leaves the centred
+        // mark alone. At nineteen it ran to 97 against a banner starting at
+        // 100, which is a gap nobody would call deliberate.
         if skippable {
-            "NOW PLAYING | L1/R1"
+            "PLAYING | L1/R1"
         } else {
-            "NOW PLAYING"
+            "PLAYING"
         },
         NOW_PLAYING,
     );
