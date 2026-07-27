@@ -80,9 +80,16 @@ triangles get you. Left and right spin the ring, X runs the pill at the front, u
 the description between English and Italian under a drawn flag, and L1 or R1
 skips the music. Titles too long for a pill break across two lines.
 
-Only the music skip is labelled on screen. The rest a PlayStation owner tries
-without being told; nothing about the screen suggests the shoulder buttons do
-anything at all.
+Top left is a music panel: what is playing, a six-bar level meter where each
+bar lags the one before it so a beat runs across as a wave, and the L1/R1
+label. Only that control is labelled on screen. The rest a PlayStation owner
+tries without being told; nothing about the screen suggests the shoulder
+buttons do anything at all.
+
+Track titles come off the disc like everything else the menu shows, so the
+launcher still knows nothing about what it is playing until it reads the
+table. That table now spans two sectors, since the titles and two
+descriptions per program stopped fitting in one.
 
 The whole scene answers the music. `tools/beatgrid.py` fits a tempo and phase
 to each track's onset envelope offline and the numbers ship in the disc table,

@@ -12,8 +12,10 @@ menu in this order:
 
 Source: <https://www.youtube.com/watch?v=v-lBPoVexEc>
 
-The credit shown on screen is short enough to fit one line of the menu's font;
-this file is the long form. The `.cdda` files here are the source MP3s decoded
+The menu names the playing track from the disc table and shows the artist
+credit along the bottom, so both halves of the attribution are on screen at
+once. The credit line is short enough to fit the menu's font; this file is the
+long form. The `.cdda` files here are the source MP3s decoded
 to raw 44.1 kHz 16-bit stereo PCM and padded to a whole number of 2352-byte
 sectors, which is what `mkdisc --menu-cdda` expects:
 
