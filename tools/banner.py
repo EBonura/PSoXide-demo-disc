@@ -97,6 +97,35 @@ def read_png(path):
     return w, h, rows
 
 
+def trim_to_first_band(rows, w, h):
+    """Crop to the topmost run of non-empty rows, and to its ink horizontally.
+
+    Doing this on the bitmap rather than by hand-picking a viewBox is the
+    difference between guessing and measuring: a rasteriser letterboxes to
+    preserve aspect, so a viewBox chosen to frame the mark still comes back
+    with blank rows and, worse, a sliver of whatever sits below it. Keeping
+    only the first band drops the tagline whatever the crop did."""
+    inked = [
+        y for y in range(h) if any(rows[y][x][3] > 2 for x in range(w))
+    ]
+    if not inked:
+        return rows, w, h
+    top = inked[0]
+    bottom = top
+    for y in inked[1:]:
+        if y != bottom + 1:
+            break
+        bottom = y
+    cols = [
+        x
+        for x in range(w)
+        if any(rows[y][x][3] > 2 for y in range(top, bottom + 1))
+    ]
+    left, right = cols[0], cols[-1]
+    cropped = [line[left : right + 1] for line in rows[top : bottom + 1]]
+    return cropped, right - left + 1, bottom - top + 1
+
+
 def to_linear(v):
     """sRGB byte to linear light."""
     c = v / 255.0
@@ -215,6 +244,7 @@ def main(argv):
     if crop_rows:
         rows = rows[:crop_rows]
         src_h = crop_rows
+    rows, src_w, src_h = trim_to_first_band(rows, src_w, src_h)
     if (src_w, src_h) == (width, height):
         # Already at the target size, so it was rendered there rather than
         # reduced. A vector rasterised at final size computes its coverage
