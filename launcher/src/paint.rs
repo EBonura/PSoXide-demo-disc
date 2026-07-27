@@ -188,28 +188,36 @@ pub fn level_meter_beat(x: i16, base_y: i16, pulse: u8) {
 }
 
 
-/// Flags are drawn at this size in the top-right corner.
+/// Flags are drawn at this size in the top-right corner. Two to one, which is
+/// the Union flag's own ratio; at three to two it read as squat.
 pub const FLAG_W: i16 = 24;
-pub const FLAG_H: i16 = 16;
+pub const FLAG_H: i16 = 12;
 
-/// The Union flag. The saltires are parallelograms rather than fans of
-/// parallel lines: at this size the line version came out as a smear.
+/// The Union flag.
+///
+/// Proportions matter more than detail at this size. The cross of St George is
+/// about a fifth of the height with a thin white border either side, not the
+/// third of the height an eyeballed version ends up with, and the red saltire
+/// sits off-centre inside the white one rather than down its middle. Getting
+/// the counterchange truly right needs more pixels than the corner has, so
+/// this offsets by one and leaves it there.
 pub fn flag_uk(x: i16, y: i16) {
-    const BLUE: (u8, u8, u8) = (10, 30, 105);
+    const BLUE: (u8, u8, u8) = (8, 24, 92);
     const WHITE: (u8, u8, u8) = (238, 238, 242);
-    const RED: (u8, u8, u8) = (196, 22, 42);
+    const RED: (u8, u8, u8) = (184, 16, 36);
     let (w, h) = (FLAG_W, FLAG_H);
 
     gpu::draw_rect_flat(x, y, w as u16, h as u16, BLUE.0, BLUE.1, BLUE.2);
 
-    // Saltire, white then a thinner red inside it.
-    let band = |thick: i16, c: (u8, u8, u8)| {
+    // Saltire. `shift` slides the band along the top edge, which is how the
+    // red one ends up on one side of the white rather than centred in it.
+    let band = |thick: i16, shift: i16, c: (u8, u8, u8)| {
         gpu::draw_quad_flat(
             [
-                (x, y),
-                (x + thick, y),
-                (x + w - thick, y + h),
-                (x + w, y + h),
+                (x + shift, y),
+                (x + shift + thick, y),
+                (x + w - thick - shift, y + h),
+                (x + w - shift, y + h),
             ],
             c.0,
             c.1,
@@ -217,24 +225,25 @@ pub fn flag_uk(x: i16, y: i16) {
         );
         gpu::draw_quad_flat(
             [
-                (x + w - thick, y),
-                (x + w, y),
-                (x, y + h),
-                (x + thick, y + h),
+                (x + w - shift - thick, y),
+                (x + w - shift, y),
+                (x + shift, y + h),
+                (x + shift + thick, y + h),
             ],
             c.0,
             c.1,
             c.2,
         );
     };
-    band(6, WHITE);
-    band(2, RED);
+    band(5, 0, WHITE);
+    band(2, 1, RED);
 
-    // Cross of St George over the top, white bordered.
-    gpu::draw_rect_flat(x, y + 5, w as u16, 6, WHITE.0, WHITE.1, WHITE.2);
-    gpu::draw_rect_flat(x + 9, y, 6, h as u16, WHITE.0, WHITE.1, WHITE.2);
-    gpu::draw_rect_flat(x, y + 6, w as u16, 4, RED.0, RED.1, RED.2);
-    gpu::draw_rect_flat(x + 10, y, 4, h as u16, RED.0, RED.1, RED.2);
+    // Cross of St George, white-bordered. A fifth of the height in red, with
+    // one pixel of white showing either side.
+    gpu::draw_rect_flat(x, y + 4, w as u16, 4, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x + 10, y, 4, h as u16, WHITE.0, WHITE.1, WHITE.2);
+    gpu::draw_rect_flat(x, y + 5, w as u16, 2, RED.0, RED.1, RED.2);
+    gpu::draw_rect_flat(x + 11, y, 2, h as u16, RED.0, RED.1, RED.2);
 }
 
 /// The Italian tricolour.
