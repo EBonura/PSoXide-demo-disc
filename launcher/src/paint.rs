@@ -22,10 +22,10 @@ fn segments_for(rx: i16, ry: i16) -> usize {
     (size / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
 }
 
-const GLOSS_TOP: (u8, u8, u8) = (255, 138, 116);
-const GLOSS_BOTTOM: (u8, u8, u8) = (74, 6, 14);
-const GLOSS_EDGE: (u8, u8, u8) = (158, 28, 34);
-const SPECULAR: (u8, u8, u8) = (255, 240, 232);
+const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
+const GLOSS_BOTTOM: (u8, u8, u8) = (58, 0, 2);
+const GLOSS_EDGE: (u8, u8, u8) = (178, 10, 12);
+const SPECULAR: (u8, u8, u8) = (255, 196, 170);
 
 fn lerp(a: u8, b: u8, t: u8) -> u8 {
     let a = a as i32;
@@ -164,9 +164,9 @@ fn meter_bar(x: i16, base_y: i16, level: u8) {
         base_y - h,
         METER_WIDTH,
         h as u16,
-        150u8.saturating_add(level / 3),
-        50u8.saturating_add(heat),
-        40u8.saturating_add(heat / 2),
+        180u8.saturating_add(level / 4),
+        20u8.saturating_add(heat),
+        16u8.saturating_add(heat / 3),
     );
 }
 

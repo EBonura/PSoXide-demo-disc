@@ -43,13 +43,13 @@ const LOADER_LIMIT: usize = 32 * 1024;
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
-const TITLE: (u8, u8, u8) = (255, 170, 150);
-const HINT: (u8, u8, u8) = (150, 80, 78);
-const NOW_PLAYING: (u8, u8, u8) = (150, 72, 70);
-const TRACK_NAME: (u8, u8, u8) = (255, 160, 140);
-const BLURB: (u8, u8, u8) = (255, 232, 226);
+const TITLE: (u8, u8, u8) = (255, 84, 62);
+const HINT: (u8, u8, u8) = (168, 44, 40);
+const NOW_PLAYING: (u8, u8, u8) = (172, 40, 34);
+const TRACK_NAME: (u8, u8, u8) = (255, 88, 64);
+const BLURB: (u8, u8, u8) = (255, 206, 196);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
-const FAR_LABEL: (u8, u8, u8) = (190, 120, 110);
+const FAR_LABEL: (u8, u8, u8) = (215, 78, 62);
 const ERROR: (u8, u8, u8) = (255, 214, 90);
 
 const STARS: u32 = 90;
@@ -266,7 +266,7 @@ fn main() {
         // with the ball.
         travel = travel.wrapping_add(spin_rate.max(1));
 
-        fb.clear(18, 3, 8);
+        fb.clear(26, 0, 4);
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
@@ -347,7 +347,7 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         let b = star.bright.saturating_add(lift);
         let size = star.size + u16::from(twinkler && offbeat > 190);
         // Warm white going to ember red as they fade into the distance.
-        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 5) / 8, (b * 7) / 16);
+        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 3) / 8, (b * 4) / 16);
     }
 }
 
