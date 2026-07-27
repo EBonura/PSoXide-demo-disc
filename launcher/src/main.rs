@@ -43,14 +43,14 @@ const LOADER_LIMIT: usize = 32 * 1024;
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
-const TITLE: (u8, u8, u8) = (170, 220, 255);
-const HINT: (u8, u8, u8) = (80, 105, 150);
-const NOW_PLAYING: (u8, u8, u8) = (70, 100, 150);
-const TRACK_NAME: (u8, u8, u8) = (150, 200, 250);
-const BLURB: (u8, u8, u8) = (215, 235, 255);
+const TITLE: (u8, u8, u8) = (255, 170, 150);
+const HINT: (u8, u8, u8) = (150, 80, 78);
+const NOW_PLAYING: (u8, u8, u8) = (150, 72, 70);
+const TRACK_NAME: (u8, u8, u8) = (255, 160, 140);
+const BLURB: (u8, u8, u8) = (255, 232, 226);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
-const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
-const ERROR: (u8, u8, u8) = (230, 90, 90);
+const FAR_LABEL: (u8, u8, u8) = (190, 120, 110);
+const ERROR: (u8, u8, u8) = (255, 214, 90);
 
 const STARS: u32 = 90;
 
@@ -76,7 +76,10 @@ const SPHERE_KICK: i32 = 110;
 const SPHERE_DECAY_SHIFT: i32 = 4;
 
 /// Widest line the 8-pixel font fits on screen with a margin either side.
-const WRAP_CHARS: usize = 36;
+const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
+/// Top of the description block, and the gap between its lines.
+const DESC_TOP: i16 = 112;
+const DESC_LEADING: i16 = 11;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -263,7 +266,7 @@ fn main() {
         // with the ball.
         travel = travel.wrapping_add(spin_rate.max(1));
 
-        fb.clear(4, 6, 18);
+        fb.clear(18, 3, 8);
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
@@ -281,7 +284,7 @@ fn main() {
         }
 
         if count == 0 {
-            centred(&font, 118, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
+            centred(&font, DESC_TOP, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
             draw_description(&font, &entries[index], italian);
@@ -343,7 +346,8 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
         let b = star.bright.saturating_add(lift);
         let size = star.size + u16::from(twinkler && offbeat > 190);
-        gpu::draw_rect_flat(star.x, star.y, size, size, b / 2, (b * 3) / 4, b);
+        // Warm white going to ember red as they fade into the distance.
+        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 5) / 8, (b * 7) / 16);
     }
 }
 
@@ -424,9 +428,17 @@ fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     } else {
         entry.desc_en_str()
     };
-    let (first, second) = wrap(text, WRAP_CHARS);
-    centred(font, 130, first, BLURB);
-    centred(font, 140, second, BLURB);
+    // Greedy wrap, a line at a time. mkdisc has already checked the text fits
+    // in DESC_LINES of them, so nothing is dropped here.
+    let mut rest = text;
+    for line in 0..disc_toc::DESC_LINES as i16 {
+        let (head, tail) = wrap(rest, WRAP_CHARS);
+        centred(font, DESC_TOP + line * DESC_LEADING, head, BLURB);
+        rest = tail;
+        if rest.is_empty() {
+            break;
+        }
+    }
 }
 
 /// The carousel: place every entry on the ring, draw back to front, and label

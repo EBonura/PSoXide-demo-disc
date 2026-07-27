@@ -22,10 +22,10 @@ fn segments_for(rx: i16, ry: i16) -> usize {
     (size / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
 }
 
-const GLOSS_TOP: (u8, u8, u8) = (140, 205, 255);
-const GLOSS_BOTTOM: (u8, u8, u8) = (6, 24, 82);
-const GLOSS_EDGE: (u8, u8, u8) = (18, 66, 160);
-const SPECULAR: (u8, u8, u8) = (235, 250, 255);
+const GLOSS_TOP: (u8, u8, u8) = (255, 138, 116);
+const GLOSS_BOTTOM: (u8, u8, u8) = (74, 6, 14);
+const GLOSS_EDGE: (u8, u8, u8) = (158, 28, 34);
+const SPECULAR: (u8, u8, u8) = (255, 240, 232);
 
 fn lerp(a: u8, b: u8, t: u8) -> u8 {
     let a = a as i32;
@@ -157,15 +157,16 @@ const METER_TALLEST: i16 = 20;
 fn meter_bar(x: i16, base_y: i16, level: u8) {
     let h = 1 + (level as i16 * (METER_TALLEST - 1)) / 255;
     // Tall bars run hot, short ones stay in the dark blue.
+    // Tall bars run hot toward orange, short ones stay in the deep red.
     let heat = level / 2;
     gpu::draw_rect_flat(
         x,
         base_y - h,
         METER_WIDTH,
         h as u16,
-        40u8.saturating_add(heat),
-        90u8.saturating_add(heat),
         150u8.saturating_add(level / 3),
+        50u8.saturating_add(heat),
+        40u8.saturating_add(heat / 2),
     );
 }
 
