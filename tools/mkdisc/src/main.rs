@@ -75,6 +75,9 @@ struct Args {
     out: PathBuf,
     volume: String,
     programs: Vec<Program>,
+    /// `(borrower, lender)` display names: the borrower plays the lender's
+    /// CD-DA tracks instead of shipping its own copy.
+    shared_cdda: Vec<(String, String)>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -82,6 +85,7 @@ fn parse_args() -> Result<Args, String> {
     let mut out = None;
     let mut volume = String::from("PSXDEMO");
     let mut programs = Vec::new();
+    let mut shared_cdda = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -118,6 +122,13 @@ fn parse_args() -> Result<Args, String> {
                     source: Source::Image(path),
                 });
             }
+            "--share-cdda" => {
+                let (borrower, lender) = split(
+                    &it.next().ok_or("--share-cdda takes BORROWER=LENDER")?,
+                    "--share-cdda",
+                )?;
+                shared_cdda.push((borrower, lender.to_string_lossy().into_owned()));
+            }
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -131,15 +142,19 @@ fn parse_args() -> Result<Args, String> {
         out: out.ok_or("--out is required".to_string())?,
         volume,
         programs,
+        shared_cdda,
     })
 }
 
 fn print_usage() {
     println!(
         "mkdisc --launcher <exe> --out <bin> [--volume ID]\n\
-        \x20      [--game NAME=<exe>] [--image NAME=<cue>] ...\n\n\
-         --game  embeds a bare PSX-EXE (programs that never read the disc)\n\
-         --image places a whole game disc image, data track and CD-DA alike"
+        \x20      [--game NAME=<exe>] [--image NAME=<cue>]\n\
+        \x20      [--share-cdda BORROWER=LENDER] ...\n\n\
+         --game        embeds a bare PSX-EXE (programs that never read the disc)\n\
+         --image       places a whole game disc image, data track and CD-DA alike\n\
+         --share-cdda  points one program at another's CD-DA tracks, so a song\n\
+        \x20             two programs both use is only burned once"
     );
 }
 
@@ -296,6 +311,29 @@ fn load_image(path: &Path) -> Result<LoadedImage, String> {
     })
 }
 
+/// Point each borrower at its lender's CD-DA tracks.
+///
+/// Two programs built around the same song only need one copy of it burned:
+/// they both ask for their own track 2, and the same base sends them to the
+/// same place.
+fn apply_shared_cdda(
+    entries: &mut [Entry],
+    names: &[&str],
+    shared: &[(String, String)],
+) -> Result<(), String> {
+    for (borrower, lender) in shared {
+        let find = |name: &str| {
+            names
+                .iter()
+                .position(|n| *n == name)
+                .ok_or_else(|| format!("--share-cdda names {name:?}, which is not on this disc"))
+        };
+        let (borrower, lender) = (find(borrower)?, find(lender)?);
+        entries[borrower].cdda_track_base = entries[lender].cdda_track_base;
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args = parse_args()?;
 
@@ -407,10 +445,13 @@ fn run() -> Result<(), String> {
         cdda_track_base += image.audio.len() as u32;
     }
 
-    let entries: Vec<Entry> = entries
+    let mut entries: Vec<Entry> = entries
         .into_iter()
         .map(|e| e.expect("every program is either an exe or an image"))
         .collect();
+
+    let names: Vec<&str> = args.programs.iter().map(|p| p.name.as_str()).collect();
+    apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
     let toc = disc_toc::encode(&entries).ok_or_else(|| {
         format!(
             "{} programs is more than the {} that fit in the table sector",
@@ -566,6 +607,37 @@ mod tests {
     fn rejects_a_track_that_is_not_whole_sectors() {
         let mut image = Vec::new();
         assert!(place_data_track(&mut image, &vec![0u8; 100], 0).is_err());
+    }
+
+    #[test]
+    fn a_borrower_plays_the_lenders_tracks() {
+        let mut entries = [
+            Entry::new("GH-PSX", 0, 0, 0),
+            Entry::new("CORTEX", 0, 0, 1),
+            Entry::new("PONG", 0, 0, 0),
+        ];
+        let names = ["GH-PSX", "CORTEX", "PONG"];
+        // Pong ships no audio of its own and asks for track 2, same as GH-PSX.
+        apply_shared_cdda(
+            &mut entries,
+            &names,
+            &[("PONG".into(), "GH-PSX".into())],
+        )
+        .expect("both names exist");
+        assert_eq!(entries[2].cdda_track_base, entries[0].cdda_track_base);
+        assert_eq!(entries[1].cdda_track_base, 1, "others untouched");
+    }
+
+    #[test]
+    fn sharing_with_a_program_that_is_not_on_the_disc_is_an_error() {
+        let mut entries = [Entry::new("PONG", 0, 0, 0)];
+        let err = apply_shared_cdda(
+            &mut entries,
+            &["PONG"],
+            &[("PONG".into(), "GH-PSX".into())],
+        )
+        .unwrap_err();
+        assert!(err.contains("GH-PSX"), "{err}");
     }
 
     #[test]
