@@ -25,11 +25,13 @@ const CAMERA_Z: i32 = 520;
 const FOCAL: i32 = 300;
 /// Ring radius.
 const RING_R: i32 = 205;
+/// Screen row the carousel is mirrored about.
+pub const FLOOR_Y: i16 = 206;
 /// Screen row the ring's centre projects to.
-const RING_Y: i16 = 180;
+const RING_Y: i16 = 170;
 /// How far the ring's far side rides up the screen: the tilt that turns a
 /// circle into an ellipse.
-const RING_TILT: i32 = 30;
+const RING_TILT: i32 = 20;
 
 /// Pill size at the front of the ring, before perspective. Wide and deep
 /// enough to carry a two-line title without the words hanging off the ends.
@@ -39,7 +41,7 @@ const PILL_RY: i32 = 19;
 /// The ball of balls hangs centred above the ring.
 const SPHERE_CENTRE_X: i16 = 160;
 const SPHERE_CENTRE_Y: i16 = 66;
-const SPHERE_R: i32 = 84;
+const SPHERE_R: i32 = 74;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
 /// cluster reading as scattered confetti.
@@ -99,12 +101,13 @@ pub struct Bead {
     pub lit: u8,
 }
 
-/// Project the ball of balls, spun by `angle`. Fills `out` and returns how
-/// many beads it wrote (always [`SPHERE_POINTS`], but the caller sorts a
-/// slice so the count is worth being explicit about).
-pub fn sphere(angle: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
+/// Project the ball of balls, spun by `angle` and blown outward by `swell`
+/// (in 256ths of the resting radius, so 0 is at rest and 128 is half again as
+/// wide). Fills `out` and returns how many beads it wrote.
+pub fn sphere(angle: i32, swell: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
     let a = (angle & (TURN - 1)) as u16;
     let (sin_a, cos_a) = (sin_q12(a), cos_q12(a));
+    let radius = SPHERE_R + (SPHERE_R * swell) / 256;
     let mut n = 0;
 
     let mut emit = |x: i32, y: i32, z: i32| {
@@ -127,12 +130,12 @@ pub fn sphere(angle: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
         n += 1;
     };
 
-    emit(0, -SPHERE_R, 0);
+    emit(0, -radius, 0);
     for lat in 0..SPHERE_LAT {
         // Latitudes spread between the poles, exclusive of both.
         let phi = (((lat as i32 + 1) * TURN) / (2 * (SPHERE_LAT as i32 + 1))) as u16;
-        let y = -((SPHERE_R * cos_q12(phi)) >> 12);
-        let ring = (SPHERE_R * sin_q12(phi)) >> 12;
+        let y = -((radius * cos_q12(phi)) >> 12);
+        let ring = (radius * sin_q12(phi)) >> 12;
         for lon in 0..SPHERE_LON {
             // Offset alternate rings so the beads sit in each other's gaps.
             let theta = (((lon as i32 * 2 + (lat & 1) as i32) * TURN)
@@ -144,7 +147,7 @@ pub fn sphere(angle: i32, out: &mut [Bead; SPHERE_POINTS]) -> usize {
             );
         }
     }
-    emit(0, SPHERE_R, 0);
+    emit(0, radius, 0);
     n
 }
 
@@ -192,37 +195,108 @@ pub fn star(index: u32, drift: i32) -> (i16, i16, u8) {
     (x, y, bright)
 }
 
-/// How far into the current beat `now_ms` is, as 255 on the beat falling to 0
-/// just before the next one.
-///
-/// `beat_ms` and `phase_ms` come from the disc table, measured offline. A zero
-/// `beat_ms` means the track has no grid, and everything stays still.
-pub fn beat_pulse(now_ms: u32, beat_ms: u32, phase_ms: u32) -> u8 {
-    if beat_ms == 0 {
-        return 0;
+/// Beats in a bar. Drum and bass is four to the floor at this level, so the
+/// downbeat is every fourth.
+pub const BEATS_PER_BAR: u32 = 4;
+
+/// Where `now_ms` sits on the beat grid.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Beat {
+    /// Which beat since the grid started.
+    pub index: u32,
+    /// 255 on the beat, falling to 0 just before the next one.
+    pub pulse: u8,
+    /// 255 exactly between two beats, falling to 0 on them. The other half of
+    /// the bar from [`Beat::pulse`].
+    pub offbeat: u8,
+    /// 255 on the downbeat, falling across the whole bar.
+    pub bar: u8,
+}
+
+impl Beat {
+    /// Whether this is the first beat of a bar.
+    pub fn is_downbeat(&self) -> bool {
+        self.index % BEATS_PER_BAR == 0
     }
-    let into = now_ms.saturating_sub(phase_ms) % beat_ms;
-    (255 - (into * 255 / beat_ms).min(255)) as u8
+}
+
+/// Place `now_ms` on the grid. `beat_ms` and `phase_ms` come from the disc
+/// table, measured offline. A zero `beat_ms` means the track has no grid, and
+/// everything stays still.
+pub fn beat_at(now_ms: u32, beat_ms: u32, phase_ms: u32) -> Beat {
+    if beat_ms == 0 {
+        return Beat::default();
+    }
+    let since = now_ms.saturating_sub(phase_ms);
+    let into = since % beat_ms;
+    let pulse = (255 - (into * 255 / beat_ms).min(255)) as u8;
+    // Furthest from either neighbouring beat is the middle.
+    let offbeat = 255 - (pulse as i32 * 2 - 255).unsigned_abs().min(255) as u8;
+    let index = since / beat_ms;
+    let bar_ms = beat_ms * BEATS_PER_BAR;
+    let into_bar = since % bar_ms;
+    let bar = (255 - (into_bar * 255 / bar_ms).min(255)) as u8;
+    Beat {
+        index,
+        pulse,
+        offbeat,
+        bar,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // 340 ms a beat, grid starting 34 ms in.
+    fn at(ms: u32) -> Beat {
+        beat_at(ms, 340, 34)
+    }
+
     #[test]
     fn a_pulse_peaks_on_the_beat_and_falls_away() {
-        // 340 ms a beat, grid starting 34 ms in.
-        assert_eq!(beat_pulse(34, 340, 34), 255, "on the beat");
-        assert!(beat_pulse(34 + 170, 340, 34) < 140, "half a beat later");
-        assert_eq!(beat_pulse(34 + 340, 340, 34), 255, "and again next beat");
-        assert!(beat_pulse(34 + 339, 340, 34) < 4, "just before it");
+        assert_eq!(at(34).pulse, 255, "on the beat");
+        assert!(at(34 + 170).pulse < 140, "half a beat later");
+        assert_eq!(at(34 + 340).pulse, 255, "and again next beat");
+        assert!(at(34 + 339).pulse < 4, "just before it");
+    }
+
+    #[test]
+    fn the_offbeat_peaks_between_two_beats() {
+        assert!(at(34).offbeat < 4, "on the beat, nothing");
+        assert!(at(34 + 170).offbeat > 250, "halfway, everything");
+        assert!(at(34 + 339).offbeat < 8, "just before the next beat");
+    }
+
+    #[test]
+    fn the_bar_runs_four_beats_and_the_downbeat_is_the_first() {
+        assert!(at(34).is_downbeat());
+        assert_eq!(at(34).bar, 255);
+        for beat in 1..BEATS_PER_BAR {
+            assert!(!at(34 + beat * 340).is_downbeat(), "beat {beat}");
+        }
+        assert!(at(34 + BEATS_PER_BAR * 340).is_downbeat(), "next bar");
+        // The bar envelope falls the whole way across, not per beat.
+        assert!(at(34 + 2 * 340).bar < 140);
     }
 
     #[test]
     fn a_track_with_no_measured_tempo_does_not_pulse() {
         for ms in [0, 1, 500, 100_000] {
-            assert_eq!(beat_pulse(ms, 0, 0), 0);
+            assert_eq!(beat_at(ms, 0, 0), Beat::default());
         }
+    }
+
+    #[test]
+    fn a_swelling_ball_pushes_its_beads_apart() {
+        let mut resting = [Bead::default(); SPHERE_POINTS];
+        let mut swollen = [Bead::default(); SPHERE_POINTS];
+        sphere(0, 0, &mut resting);
+        sphere(0, 128, &mut swollen);
+        let spread = |b: &[Bead; SPHERE_POINTS]| {
+            b.iter().map(|x| x.y).max().unwrap() - b.iter().map(|x| x.y).min().unwrap()
+        };
+        assert!(spread(&swollen) > spread(&resting), "the ball itself grows");
     }
 
     #[test]
@@ -288,7 +362,7 @@ mod tests {
     #[test]
     fn every_sphere_point_is_written() {
         let mut beads = [Bead::default(); SPHERE_POINTS];
-        assert_eq!(sphere(0, &mut beads), SPHERE_POINTS);
+        assert_eq!(sphere(0, 0, &mut beads), SPHERE_POINTS);
         // The poles are the extremes; nothing should be outside them.
         let top = beads.iter().map(|b| b.y).min().unwrap();
         let bottom = beads.iter().map(|b| b.y).max().unwrap();

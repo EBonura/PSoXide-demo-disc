@@ -131,6 +131,28 @@ pub fn pill(item: &Placed, pulse: u8) {
     );
 }
 
+/// The carousel mirrored in the floor it sits on: same pill, flipped about
+/// `floor_y`, squashed and dimmed. Reflections of the far pills fall off the
+/// bottom of the screen and clip away, which is the cheap half of the trick.
+pub fn pill_reflection(item: &Placed, floor_y: i16) {
+    let y = 2 * floor_y - item.y;
+    let ry = (item.ry * 2) / 5;
+    if y - ry > 239 || ry <= 0 {
+        return;
+    }
+    // Dim, and darker at the top where it meets the real pill, so the two do
+    // not read as one object.
+    let lit = 40 + ((item.front as u32 * 55) >> 8) as u8;
+    ellipse(
+        item.x,
+        y,
+        item.rx,
+        ry,
+        scale_rgb(GLOSS_BOTTOM, lit),
+        scale_rgb(GLOSS_TOP, lit),
+    );
+}
+
 /// One of the small spheres in the cluster.
 pub fn bead(bead: &Bead) {
     if bead.r <= 0 {
