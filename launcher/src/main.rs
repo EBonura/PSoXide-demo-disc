@@ -87,12 +87,15 @@ const SPHERE_DECAY_SHIFT: i32 = 4;
 /// Widest line the 8-pixel font fits on screen with a margin either side.
 const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// Top of the description block, and the gap between its lines.
-/// The music panel sits in the top-left corner, where it reads best. The
-/// banner shifts right of it rather than the panel dropping below: stacking
-/// them pushed the L1/R1 label under the description panel.
-const MUSIC_TOP: i16 = 6;
-/// Left edge of the banner, clear of the widest track title the panel draws.
-const BANNER_X: i16 = 120;
+/// A black header strip across the whole screen, holding the mark and the
+/// words under it. Full width rather than a box round the logo: centred is
+/// where the mark belongs, and anything narrower collides with the music
+/// panel, which is what pushed it off-centre before.
+const HEADER_H: i16 = 40;
+/// The music panel sits under the header. It is three rows now rather than
+/// four, since stacking a four-row panel under a header pushed its last line
+/// beneath the description.
+const MUSIC_TOP: i16 = HEADER_H + 4;
 const DESC_TOP: i16 = 92;
 const DESC_LEADING: i16 = 9;
 
@@ -293,22 +296,20 @@ fn main() {
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
-        banner.draw(BANNER_X, 1);
-        let under_banner = BANNER_X + BANNER_W / 2;
-        let demo = "DEMO DISC";
-        font.draw_text(
-            under_banner - (font.text_width(demo) as i16) / 2,
-            BANNER_H + 3,
-            demo,
-            TITLE,
-        );
+        paint::header_strip(HEADER_H);
+        // The one control worth labelling, in the header where there is room
+        // for it beside the mark.
+        if menu_track_count > 1 {
+            font.draw_text(6, (HEADER_H - 8) / 2, "L1/R1", HINT);
+        }
+        banner.draw(160 - BANNER_W / 2, 1);
+        centred(&font, BANNER_H + 3, "DEMO DISC", TITLE);
         if let Some(header) = header {
             draw_music_panel(
                 &font,
                 &header,
                 menu_track_index,
                 &beat,
-                menu_track_count > 1,
                 loading,
                 spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
             );
@@ -404,7 +405,6 @@ fn draw_music_panel(
     header: &Header,
     track: u8,
     beat: &carousel::Beat,
-    skippable: bool,
     loading: bool,
     levels: Option<&[u8]>,
 ) {
@@ -412,20 +412,15 @@ fn draw_music_panel(
     if title.is_empty() {
         return;
     }
-    let label = |text: &str| font.draw_text(6, MUSIC_TOP + 42, text, HINT);
-    // The drive takes a moment to pick a track up, and a menu that just goes
-    // quiet reads as broken. Say what it is doing.
+    // Two rows: what is playing, and the meter under it. The L1/R1 label
+    // lives in the header, because a third row here reached the description
+    // panel. There is no "PLAYING" label either; the meter says that.
     if loading {
+        // The drive takes a moment to pick a track up, and a menu that just
+        // goes quiet reads as broken. Say what it is doing, in the title's row.
         font.draw_text(6, MUSIC_TOP, "LOADING", NOW_PLAYING);
-        font.draw_text(6, MUSIC_TOP + 11, title, TRACK_NAME);
-        if skippable {
-            label("L1/R1");
-        }
         return;
     }
-    // "NOW PLAYING" is wide enough to touch the centred header. "PLAYING"
-    // says the same thing with the level meter beside it.
-    font.draw_text(6, MUSIC_TOP, "PLAYING", NOW_PLAYING);
     // The title brightens on the beat, so the words themselves keep time.
     let lift = beat.pulse / 4;
     let tint = (
@@ -433,15 +428,12 @@ fn draw_music_panel(
         TRACK_NAME.1.saturating_add(lift),
         TRACK_NAME.2.saturating_add(lift),
     );
-    font.draw_text(6, MUSIC_TOP + 11, title, tint);
+    font.draw_text(6, MUSIC_TOP, title, tint);
     match levels {
-        Some(levels) => paint::level_meter(6, MUSIC_TOP + 38, levels),
+        Some(levels) => paint::level_meter(6, MUSIC_TOP + 32, levels),
         // No analysis for this track: keep time off the beat instead of
         // leaving a dead space where the meter should be.
-        None => paint::level_meter_beat(6, MUSIC_TOP + 38, beat.pulse),
-    }
-    if skippable {
-        font.draw_text(6, 48, "L1/R1", HINT);
+        None => paint::level_meter_beat(6, MUSIC_TOP + 32, beat.pulse),
     }
 }
 
@@ -450,9 +442,9 @@ fn draw_music_panel(
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
-        paint::flag_it(320 - paint::FLAG_W - 4, 4);
+        paint::flag_it(320 - paint::FLAG_W - 5, (HEADER_H - paint::FLAG_H) / 2);
     } else {
-        paint::flag_uk(320 - paint::FLAG_W - 4, 4);
+        paint::flag_uk(320 - paint::FLAG_W - 5, (HEADER_H - paint::FLAG_H) / 2);
     }
     let text = if italian {
         entry.desc_it_str()
