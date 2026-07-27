@@ -156,7 +156,7 @@ pub fn bead(bead: &Bead) {
 
 const METER_WIDTH: u16 = 3;
 const METER_PITCH: i16 = 4;
-const METER_TALLEST: i16 = 20;
+const METER_TALLEST: i16 = 16;
 
 fn meter_bar(x: i16, base_y: i16, level: u8) {
     let h = 1 + (level as i16 * (METER_TALLEST - 1)) / 255;

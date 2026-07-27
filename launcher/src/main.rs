@@ -20,7 +20,10 @@ mod paint;
 
 use carousel::{Bead, Placed, SPHERE_POINTS, TURN};
 use disc_toc::{Entry, Header, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
-use psx_font::{fonts::BASIC, FontAtlas};
+use psx_font::{
+    fonts::{BASIC, SPLEEN_5X8},
+    FontAtlas,
+};
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaStarter};
 use psx_io::cdrom;
@@ -42,6 +45,11 @@ const LOADER_LIMIT: usize = 32 * 1024;
 
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
+
+/// The header's own font: same eight-pixel height as BASIC but five wide, so
+/// the music column fits beside a centred mark instead of running under it.
+const SMALL_TPAGE: Tpage = Tpage::new(448, 0, TexDepth::Bit4);
+const SMALL_CLUT: Clut = Clut::new(416, 256);
 
 /// The banner sits in its own 4bpp page, clear of both framebuffers and of
 /// the font. Tpage X must be a multiple of 64.
@@ -91,17 +99,17 @@ const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// words under it. Full width rather than a box round the logo: centred is
 /// where the mark belongs, and anything narrower collides with the music
 /// panel, which is what pushed it off-centre before.
-const HEADER_H: i16 = 62;
+const HEADER_H: i16 = 50;
 /// The music panel stacks down the header's left edge: label, title, meter,
 /// hint. The mark sits below the title row rather than beside it, because a
 /// title runs to 112 pixels and a centred mark starts at 90.
 const MUSIC_TOP: i16 = 4;
-const TRACK_TOP: i16 = 14;
-const METER_BASE: i16 = 46;
-const HINT_TOP: i16 = 48;
-/// The mark clears the title row above it; the meter and hint are narrow
-/// enough to sit either side.
-const BANNER_Y: i16 = 24;
+const TRACK_TOP: i16 = 13;
+const METER_BASE: i16 = 38;
+const HINT_TOP: i16 = 40;
+/// The mark sits beside the column now rather than under it: at five pixels a
+/// character the widest track title stops well short of a centred mark.
+const BANNER_Y: i16 = 2;
 const DESC_TOP: i16 = 108;
 const DESC_LEADING: i16 = 9;
 
@@ -136,6 +144,7 @@ fn main() {
     gpu::set_draw_area(0, 0, 319, 239);
     gpu::set_draw_offset(0, 0);
     let font = FontAtlas::upload(&BASIC, FONT_TPAGE, FONT_CLUT);
+    let small = FontAtlas::upload(&SPLEEN_5X8, SMALL_TPAGE, SMALL_CLUT);
     let banner = paint::Banner::upload(
         BANNER_TEX,
         BANNER_CLUT_DATA,
@@ -306,13 +315,13 @@ fn main() {
         // The one control worth labelling, in the header where there is room
         // for it beside the mark.
         if menu_track_count > 1 {
-            font.draw_text(6, HINT_TOP, "L1/R1", HINT);
+            small.draw_text(6, HINT_TOP, "L1/R1", HINT);
         }
         banner.draw(160 - BANNER_W / 2, BANNER_Y);
         centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
         if let Some(header) = header {
             draw_music_panel(
-                &font,
+                &small,
                 &header,
                 menu_track_index,
                 &beat,
@@ -449,9 +458,9 @@ fn draw_music_panel(
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
-        paint::flag_it(320 - paint::FLAG_W - 5, 6);
+        paint::flag_it(320 - paint::FLAG_W - 5, 4);
     } else {
-        paint::flag_uk(320 - paint::FLAG_W - 5, 6);
+        paint::flag_uk(320 - paint::FLAG_W - 5, 4);
     }
     let text = if italian {
         entry.desc_it_str()
