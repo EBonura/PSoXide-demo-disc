@@ -111,10 +111,10 @@ disc: launcher programs mkdisc
 		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games on PS1, fully playable|Entrambi i Celeste Classic PICO-8 su PS1, giocabili" \
 		--describe "PSXCEL=An Excel clone because why not?|Un clone di Excel, solo per il gusto di farlo" \
 		--describe "GH-PSX=Guitar Hero clone, early tech-demo|Clone di Guitar Hero, demo tecnica iniziale" \
-		--describe "BREAKOUT=Clear every brick without losing the ball off the bottom|Elimina tutti i mattoni senza perdere la palla in fondo" \
-		--describe "SPACE INVADERS=Hold the line as the wave drops lower with every pass|Resisti mentre l'ondata scende a ogni passaggio" \
-		--describe "MAGIKAAAAARP PONG=Pong for two players, with a fish where the ball should be|Pong per due giocatori, con un pesce al posto della palla" \
-		--describe "HARDWARE TESTS=The suite that checks this console against the emulator|La suite che verifica questa console contro l'emulatore"
+		--describe "BREAKOUT=A simple Breakout clone|Un semplice clone di Breakout" \
+		--describe "SPACE INVADERS=A simple Space Invaders clone|Un semplice clone di Space Invaders" \
+		--describe "MAGIKAAAAARP PONG=Simple pong with Magikaaaaarp music, built to test CD audio|Pong con musica di Magikaaaaarp, per provare l'audio da CD" \
+		--describe "HARDWARE TESTS=Collection of tests used to extract metrics from real hardware|Raccolta di test per misurare l'hardware reale"
 
 check:
 	cd carousel && cargo test
