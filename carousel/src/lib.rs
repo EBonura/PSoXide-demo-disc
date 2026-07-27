@@ -28,7 +28,7 @@ const RING_R: i32 = 205;
 /// Screen row the carousel is mirrored about.
 pub const FLOOR_Y: i16 = 206;
 /// Screen row the ring's centre projects to.
-const RING_Y: i16 = 170;
+const RING_Y: i16 = 176;
 /// How far the ring's far side rides up the screen: the tilt that turns a
 /// circle into an ellipse.
 const RING_TILT: i32 = 20;
@@ -40,8 +40,8 @@ const PILL_RY: i32 = 19;
 
 /// The ball of balls hangs centred above the ring.
 const SPHERE_CENTRE_X: i16 = 160;
-const SPHERE_CENTRE_Y: i16 = 66;
-const SPHERE_R: i32 = 74;
+const SPHERE_CENTRE_Y: i16 = 48;
+const SPHERE_R: i32 = 52;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
 /// cluster reading as scattered confetti.

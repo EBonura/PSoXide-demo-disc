@@ -43,27 +43,27 @@ pub const TOC_FILE_NAME: &str = "DEMOTOC.BIN";
 /// Identifies a demo-disc table of contents.
 pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
 
-/// Sectors the table occupies. Two, since the per-track titles and the two
-/// descriptions per program stopped fitting in one.
-pub const TOC_SECTORS: u32 = 2;
+/// Sectors the table occupies. Four: two descriptions of [`DESC_BYTES`] per
+/// program is most of an entry, and there are ten of them.
+pub const TOC_SECTORS: u32 = 4;
 
 /// The whole table.
 pub const TOC_BYTES: usize = 2048 * TOC_SECTORS as usize;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 260;
+pub const ENTRY_BYTES: usize = 484;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
 
 /// Bytes reserved for each of an entry's two descriptions. The launcher wraps
 /// them to [`DESC_LINES`] lines of [`DESC_COLUMNS`] at the 8-pixel font.
-pub const DESC_BYTES: usize = 112;
+pub const DESC_BYTES: usize = 224;
 
 /// Widest line the menu draws a description at, in characters.
 pub const DESC_COLUMNS: usize = 36;
 /// Lines it has room for, between the ball above and the carousel below.
-pub const DESC_LINES: usize = 3;
+pub const DESC_LINES: usize = 6;
 
 /// Bytes reserved for the music credit the menu prints. A licence that asks
 /// for attribution is only satisfied if the attribution ships with the disc,

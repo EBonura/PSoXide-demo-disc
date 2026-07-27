@@ -78,8 +78,8 @@ const SPHERE_DECAY_SHIFT: i32 = 4;
 /// Widest line the 8-pixel font fits on screen with a margin either side.
 const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// Top of the description block, and the gap between its lines.
-const DESC_TOP: i16 = 112;
-const DESC_LEADING: i16 = 11;
+const DESC_TOP: i16 = 86;
+const DESC_LEADING: i16 = 10;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
