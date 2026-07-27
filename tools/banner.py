@@ -29,6 +29,9 @@ from pathlib import Path
 
 BLACK = 0
 COLOURS = 16
+# How hard the unsharp mask pulls: enough to define the letterforms, short
+# of the bright halo that over-sharpening leaves.
+SHARPEN = 0.9
 # Black with the mask bit set. 0x0000 would be transparent.
 OPAQUE_BLACK = 0x8000
 
@@ -94,9 +97,52 @@ def read_png(path):
     return w, h, rows
 
 
+def to_linear(v):
+    """sRGB byte to linear light."""
+    c = v / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def to_srgb(v):
+    """Linear light back to an sRGB byte."""
+    c = max(0.0, min(1.0, v))
+    c = c * 12.92 if c <= 0.0031308 else 1.055 * (c ** (1 / 2.4)) - 0.055
+    return int(c * 255 + 0.5)
+
+
+def sharpen(rows, w, h, amount):
+    """Unsharp mask. An eight-to-one downscale is soft however carefully it is
+    averaged, and the logo is a hard-edged mark; putting some of the edge back
+    is the difference between a wordmark and a smudge."""
+    out = []
+    for y in range(h):
+        line = []
+        for x in range(w):
+            here = rows[y][x]
+            # Mean of the four neighbours, clamped at the edges.
+            near = [
+                rows[max(0, y - 1)][x],
+                rows[min(h - 1, y + 1)][x],
+                rows[y][max(0, x - 1)],
+                rows[y][min(w - 1, x + 1)],
+            ]
+            blurred = [sum(n[c] for n in near) / 4.0 for c in range(3)]
+            line.append(
+                tuple(
+                    max(0.0, here[c] + (here[c] - blurred[c]) * amount)
+                    for c in range(3)
+                )
+            )
+        out.append(line)
+    return out
+
+
 def resample(rows, src_w, src_h, dst_w, dst_h):
-    """Box filter down to the target size. Averaging beats nearest here: the
-    logo's edges are its whole character, and point sampling shreds them."""
+    """Box filter down to the target size, averaging in linear light.
+
+    Averaging sRGB bytes directly is the usual way to get a muddy downscale:
+    the values are perceptual, not physical, so the mean of black and white
+    lands well below the midpoint and every edge loses contrast."""
     out = []
     for y in range(dst_h):
         y0, y1 = y * src_h // dst_h, max(y * src_h // dst_h + 1, (y + 1) * src_h // dst_h)
@@ -109,19 +155,18 @@ def resample(rows, src_w, src_h, dst_w, dst_h):
                     pr, pg, pb, pa = rows[sy][sx]
                     # Weight colour by coverage so transparent pixels do not
                     # drag the edges toward black.
-                    r += pr * pa
-                    g += pg * pa
-                    b += pb * pa
+                    r += to_linear(pr) * pa
+                    g += to_linear(pg) * pa
+                    b += to_linear(pb) * pa
                     a += pa
                     n += 1
-            # Composited onto black: coverage scales the colour toward it.
-            coverage = a // n
+            # Composited onto black: coverage scales the colour toward it,
+            # in linear light where that scaling is physically meaningful.
+            coverage = (a / n) / 255.0
             if a:
-                line.append(
-                    ((r // a) * coverage // 255, (g // a) * coverage // 255, (b // a) * coverage // 255)
-                )
+                line.append((r / a * coverage, g / a * coverage, b / a * coverage))
             else:
-                line.append((0, 0, 0))
+                line.append((0.0, 0.0, 0.0))
         out.append(line)
     return out
 
@@ -171,6 +216,8 @@ def main(argv):
         rows = rows[:crop_rows]
         src_h = crop_rows
     small = resample(rows, src_w, src_h, width, height)
+    small = sharpen(small, width, height, SHARPEN)
+    small = [[tuple(to_srgb(c) for c in px) for px in line] for line in small]
     flat = [p for line in small for p in line]
     palette = build_palette(flat)
     palette += [0x0000] * (COLOURS - len(palette))
