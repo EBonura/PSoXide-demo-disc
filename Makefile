@@ -9,7 +9,7 @@
 # keeps its cooked assets and music outside git too. Both are staged from the
 # sibling working trees. See PLAN.md.
 
-.PHONY: help disc programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    := $(ROOT)/games/PSoXide
@@ -26,8 +26,9 @@ MENU_CREDIT := Music by Just Music, used by permission
 # Tempo and first-beat offset per track, in the same order, measured by
 # tools/beatgrid.py. The menu pulses on these; a guessed tempo drifts.
 MENU_BEATS  := 176000:34 175000:23 173980:46 174380:342
-# Shown as "now playing", in the same order.
-MENU_TITLES := "KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER"
+# Shown as "now playing", in the same order as MENU_CDDA. Written out rather
+# than looped: make's foreach splits on whitespace, which takes the titles
+# apart at their spaces.
 
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
@@ -52,6 +53,7 @@ HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
 help:
 	@echo "make disc             - build everything into \"$(DIST)\""
+	@echo "make disc-only        - relay out the disc without rebuilding the programs"
 	@echo "make check            - host tests (disc-toc, mkdisc)"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
@@ -88,6 +90,12 @@ mkdisc:
 	cd tools/mkdisc && cargo build --release
 
 disc: launcher programs mkdisc
+	$(MAKE) disc-only
+
+# Just the layout, for when nothing but the text or the audio changed. Also
+# the one place the mkdisc invocation lives, so it cannot drift from what
+# `make disc` builds.
+disc-only: mkdisc
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX)" \
@@ -102,19 +110,20 @@ disc: launcher programs mkdisc
 		--image "HARDWARE TESTS=$(HWTESTS)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
-		$(foreach t,$(MENU_TITLES),--menu-title $(t)) \
+		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
+		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
-		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, tech demo|Souls-like originale creato da zero per PS1, tech demo" \
-		--describe "HALF-LIFE=Half-Life rebuilt from the ground up for PS1, semi-playable|Half-Life ricostruito da zero per PS1, semi-giocabile" \
-		--describe "VOXIDE=A Minecraft clone, early tech-demo|Un clone di Minecraft, tech-demo iniziale" \
-		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games on PS1, fully playable|Entrambi i Celeste Classic PICO-8 su PS1, giocabili" \
-		--describe "PSXCEL=An Excel clone because why not?|Un clone di Excel, solo per il gusto di farlo" \
-		--describe "GH-PSX=Guitar Hero clone, early tech-demo|Clone di Guitar Hero, tech-demo iniziale" \
-		--describe "BREAKOUT=A simple Breakout clone|Un semplice clone di Breakout" \
-		--describe "SPACE INVADERS=A simple Space Invaders clone|Un semplice clone di Space Invaders" \
-		--describe "MAGIKAAAAARP PONG=Simple pong with Magikaaaaarp music, built to test CD audio|Pong con musica di Magikaaaaarp, per provare l'audio da CD" \
-		--describe "HARDWARE TESTS=Collection of tests used to extract metrics from real hardware|Raccolta di test per misurare l'hardware reale"
+		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, streaming its world off this disc. Tech demo.|Souls-like originale creato da zero per PS1, con il mondo caricato da questo disco. Tech demo." \
+		--describe "HALF-LIFE=Half-Life rebuilt from the ground up for PS1. Real maps and models streamed from disc. Semi-playable.|Half-Life ricostruito da zero per PS1 in Rust. Mappe e modelli veri, caricati dal disco. Semi-giocabile." \
+		--describe "VOXIDE=A Minecraft clone: mine blocks and build in a world generated as you walk. Early tech-demo.|Clone di Minecraft: scava e costruisci in un mondo generato mentre cammini. Tech-demo iniziale." \
+		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games ported to PS1, one screen at a time. Fully playable.|Entrambi i Celeste Classic PICO-8 portati su PS1, uno schermo alla volta. Giocabili per intero." \
+		--describe "PSXCEL=An Excel clone because why not? Formulas, charts and memory-card saves, all driven with a gamepad.|Un clone di Excel, per il gusto di farlo. Formule, grafici e salvataggi su memory card." \
+		--describe "GH-PSX=Guitar Hero clone: hit the notes as the fretboard rushes at you, in time with CD audio. Early tech-demo.|Clone di Guitar Hero: colpisci le note a tempo con l'audio del CD. Tech-demo iniziale." \
+		--describe "BREAKOUT=A simple Breakout clone. Clear every brick without losing the ball off the bottom of the screen.|Un semplice clone di Breakout. Elimina i mattoni senza perdere la palla in fondo." \
+		--describe "SPACE INVADERS=A simple Space Invaders clone. Hold the line as the wave drops lower with every pass.|Un semplice clone di Space Invaders. Resisti mentre l'ondata scende a ogni passaggio." \
+		--describe "MAGIKAAAAARP PONG=Simple pong with Magikaaaaarp music, built to test streaming CD audio while the game runs.|Pong con musica di Magikaaaaarp, per provare l'audio da CD mentre il gioco gira." \
+		--describe "HARDWARE TESTS=Collection of tests used to extract metrics from real hardware, and to check the emulator against it.|Raccolta di test per misurare l'hardware reale e confrontarlo con l'emulatore."
 
 check:
 	cd carousel && cargo test

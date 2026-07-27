@@ -400,6 +400,26 @@ fn apply_shared_cdda(
     Ok(())
 }
 
+/// How many lines `text` takes at `columns`, wrapping on spaces the same way
+/// the launcher does. Fitting the byte budget is not enough on its own: a
+/// description can be short and still wrap to one line more than there is
+/// room for, and the tail would silently vanish.
+fn wrapped_lines(text: &str, columns: usize) -> usize {
+    let mut rest = text;
+    let mut lines = 0;
+    while !rest.is_empty() {
+        lines += 1;
+        if rest.len() <= columns {
+            break;
+        }
+        rest = match rest[..columns].rfind(' ') {
+            Some(at) => rest[at + 1..].trim_start(),
+            None => rest[columns..].trim_start(),
+        };
+    }
+    lines
+}
+
 /// Attach each blurb to its program.
 fn apply_descriptions(
     entries: &mut [Entry],
@@ -421,6 +441,15 @@ fn apply_descriptions(
                     text.len(),
                     text.len() - disc_toc::DESC_BYTES,
                     disc_toc::DESC_BYTES
+                ));
+            }
+            let lines = wrapped_lines(text, disc_toc::DESC_COLUMNS);
+            if lines > disc_toc::DESC_LINES {
+                return Err(format!(
+                    "{name}: the {language} description wraps to {lines} lines of {}, and the \
+                     menu has room for {}. The tail would simply not be drawn:\n  {text}",
+                    disc_toc::DESC_COLUMNS,
+                    disc_toc::DESC_LINES
                 ));
             }
         }
@@ -862,6 +891,16 @@ mod tests {
         // The credit check lives in `run` against the CLI argument, so this
         // only pins the width the menu can actually draw. 320 pixels, 8 wide.
         assert_eq!(320 / 8, 40);
+    }
+
+    #[test]
+    fn counting_wrapped_lines_matches_a_greedy_wrap() {
+        assert_eq!(wrapped_lines("", 10), 0);
+        assert_eq!(wrapped_lines("short", 10), 1);
+        assert_eq!(wrapped_lines("exactly ten", 11), 1);
+        assert_eq!(wrapped_lines("one two three four", 10), 2);
+        // A word longer than the line still has to go somewhere.
+        assert_eq!(wrapped_lines("supercalifragilistic", 10), 2);
     }
 
     #[test]

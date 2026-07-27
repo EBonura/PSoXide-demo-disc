@@ -51,15 +51,19 @@ pub const TOC_SECTORS: u32 = 2;
 pub const TOC_BYTES: usize = 2048 * TOC_SECTORS as usize;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 164;
+pub const ENTRY_BYTES: usize = 260;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
 
 /// Bytes reserved for each of an entry's two descriptions. The launcher wraps
-/// them to two lines, so this is two screen-widths of the 8-pixel font less a
-/// little slack.
-pub const DESC_BYTES: usize = 64;
+/// them to [`DESC_LINES`] lines of [`DESC_COLUMNS`] at the 8-pixel font.
+pub const DESC_BYTES: usize = 112;
+
+/// Widest line the menu draws a description at, in characters.
+pub const DESC_COLUMNS: usize = 36;
+/// Lines it has room for, between the ball above and the carousel below.
+pub const DESC_LINES: usize = 3;
 
 /// Bytes reserved for the music credit the menu prints. A licence that asks
 /// for attribution is only satisfied if the attribution ships with the disc,
@@ -410,7 +414,10 @@ mod tests {
 
     #[test]
     fn truncates_an_overlong_description() {
-        let entry = Entry::new("X", 0, 0, 0).described(&"e".repeat(80), &"i".repeat(80));
+        // Relative to the budget, so widening the field does not quietly stop
+        // this testing anything.
+        let over = DESC_BYTES + 16;
+        let entry = Entry::new("X", 0, 0, 0).described(&"e".repeat(over), &"i".repeat(over));
         assert_eq!(entry.desc_en_str().len(), DESC_BYTES);
         assert_eq!(entry.desc_it_str().len(), DESC_BYTES);
     }
