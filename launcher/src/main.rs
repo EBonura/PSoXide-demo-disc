@@ -57,7 +57,7 @@ fn main() {
     gpu::set_draw_offset(0, 0);
     let font = FontAtlas::upload(&BASIC, FONT_TPAGE, FONT_CLUT);
 
-    let mut entries = [Entry::new("", 0); MAX_ENTRIES];
+    let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
     let count = read_toc(&mut entries);
     if count == 0 {
         tty::println("launcher: no table of contents on this disc");
@@ -79,7 +79,7 @@ fn main() {
             }
             if pressed(button::CROSS) || pressed(button::START) {
                 // Never returns when the disc is readable.
-                boot(entries[selected].exe_lba);
+                boot(&entries[selected]);
             }
         }
         prev_held = pad;
@@ -125,7 +125,7 @@ fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> usize {
 
 /// Copy the chain-load blob high and jump to it. Never returns while the disc
 /// is readable; the blob paints the screen red and stops if it is not.
-fn boot(exe_lba: u32) -> ! {
+fn boot(entry: &Entry) -> ! {
     assert!(LOADER_BLOB.len() <= LOADER_LIMIT, "loader blob too large");
     tty::println("launcher: chain-loading");
 
@@ -143,7 +143,8 @@ fn boot(exe_lba: u32) -> ! {
             LOADER_BLOB.len(),
         );
         psx_rt::bios::flush_cache();
-        let entry: unsafe extern "C" fn(u32) -> ! = core::mem::transmute(LOADER_BASE as usize);
-        entry(exe_lba)
+        let blob: unsafe extern "C" fn(u32, u32, u32) -> ! =
+            core::mem::transmute(LOADER_BASE as usize);
+        blob(entry.exe_lba, entry.lba_offset, entry.cdda_track_base)
     }
 }

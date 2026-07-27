@@ -16,7 +16,8 @@
 //! 0x10  entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
-//!         0x1C  u32 reserved
+//!         0x1C  u32 sectors between disc LBA 0 and the program's image
+//!         0x20  u32 CD-DA tracks belonging to programs ahead of this one
 //! ```
 
 #![no_std]
@@ -38,7 +39,7 @@ pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
 pub const TOC_BYTES: usize = 2048;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 32;
+pub const ENTRY_BYTES: usize = 40;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
@@ -53,13 +54,19 @@ pub const MAX_ENTRIES: usize = (TOC_BYTES - HEADER_BYTES) / ENTRY_BYTES;
 pub struct Entry {
     /// Display name, ASCII, truncated to [`NAME_BYTES`].
     pub name: [u8; NAME_BYTES],
-    /// LBA of the program's PSX-EXE header sector.
+    /// LBA of the program's PSX-EXE header sector, absolute on this disc.
     pub exe_lba: u32,
+    /// Sectors between this disc's LBA 0 and the start of the program's own
+    /// disc image. Every LBA the program was built to know is relative to
+    /// that image, so this one number relocates all of them.
+    pub lba_offset: u32,
+    /// CD-DA tracks belonging to programs placed ahead of this one.
+    pub cdda_track_base: u32,
 }
 
 impl Entry {
     /// Build an entry, truncating `name` to [`NAME_BYTES`].
-    pub fn new(name: &str, exe_lba: u32) -> Self {
+    pub fn new(name: &str, exe_lba: u32, lba_offset: u32, cdda_track_base: u32) -> Self {
         let mut bytes = [0u8; NAME_BYTES];
         let src = name.as_bytes();
         let n = if src.len() > NAME_BYTES {
@@ -71,6 +78,8 @@ impl Entry {
         Entry {
             name: bytes,
             exe_lba,
+            lba_offset,
+            cdda_track_base,
         }
     }
 
@@ -97,7 +106,10 @@ pub fn encode(entries: &[Entry]) -> Option<[u8; TOC_BYTES]> {
     for (i, entry) in entries.iter().enumerate() {
         let at = HEADER_BYTES + i * ENTRY_BYTES;
         out[at..at + NAME_BYTES].copy_from_slice(&entry.name);
-        out[at + NAME_BYTES..at + NAME_BYTES + 4].copy_from_slice(&entry.exe_lba.to_le_bytes());
+        let n = at + NAME_BYTES;
+        out[n..n + 4].copy_from_slice(&entry.exe_lba.to_le_bytes());
+        out[n + 4..n + 8].copy_from_slice(&entry.lba_offset.to_le_bytes());
+        out[n + 8..n + 12].copy_from_slice(&entry.cdda_track_base.to_le_bytes());
     }
     Some(out)
 }
@@ -118,14 +130,14 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         let at = HEADER_BYTES + i * ENTRY_BYTES;
         let mut name = [0u8; NAME_BYTES];
         name.copy_from_slice(&sector[at..at + NAME_BYTES]);
-        let lba_at = at + NAME_BYTES;
+        let n = at + NAME_BYTES;
+        let word = |at: usize| {
+            u32::from_le_bytes([sector[at], sector[at + 1], sector[at + 2], sector[at + 3]])
+        };
         slot.name = name;
-        slot.exe_lba = u32::from_le_bytes([
-            sector[lba_at],
-            sector[lba_at + 1],
-            sector[lba_at + 2],
-            sector[lba_at + 3],
-        ]);
+        slot.exe_lba = word(n);
+        slot.lba_offset = word(n + 4);
+        slot.cdda_track_base = word(n + 8);
     }
     Some(count)
 }
@@ -135,14 +147,14 @@ mod tests {
     use super::*;
 
     fn blank() -> [Entry; MAX_ENTRIES] {
-        [Entry::new("", 0); MAX_ENTRIES]
+        [Entry::new("", 0, 0, 0); MAX_ENTRIES]
     }
 
     #[test]
     fn round_trips_entries() {
         let entries = [
-            Entry::new("CORTEX IGNITION", 4096),
-            Entry::new("HALF-LIFE", 40960),
+            Entry::new("CORTEX IGNITION", 4096, 4074, 0),
+            Entry::new("HALF-LIFE", 40960, 40938, 1),
         ];
         let sector = encode(&entries).expect("fits");
         let mut out = blank();
@@ -150,24 +162,26 @@ mod tests {
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
+        assert_eq!(out[1].lba_offset, 40938);
+        assert_eq!(out[1].cdda_track_base, 1);
     }
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1)]).expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)]).expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
 
     #[test]
     fn rejects_more_entries_than_fit() {
-        let too_many = [Entry::new("X", 1); MAX_ENTRIES + 1];
+        let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
         assert!(encode(&too_many).is_none());
     }
 
     #[test]
     fn truncates_an_overlong_name() {
-        let entry = Entry::new("0123456789012345678901234567890", 7);
+        let entry = Entry::new("0123456789012345678901234567890", 7, 0, 0);
         assert_eq!(entry.name_str().len(), NAME_BYTES);
     }
 }
