@@ -18,6 +18,12 @@ OUT        := $(BUILD)/mipsel-sony-psx/release
 EXAMPLES   := $(PSOXIDE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 
+# Menu music, used with the artist's permission. The credit ships on the disc
+# and stays on screen the whole time the track plays; keep the two together.
+MENU_CDDA   := $(ROOT)/audio/knuckle-dust.cdda $(ROOT)/audio/rusted-hammer.cdda \
+               $(ROOT)/audio/chainsaw-heart.cdda $(ROOT)/audio/night-crawler.cdda
+MENU_CREDIT := Music by Just Music, used by permission
+
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
 DISC_NAME ?= PSoXide Demo Disc
@@ -89,6 +95,7 @@ disc: launcher programs mkdisc
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
+		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") --credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GUITAR HERO" \
 		--describe "CORTEX IGNITION=Explore a derelict complex in this original 3D action game|Esplora un complesso abbandonato in un gioco d'azione 3D" \
 		--describe "HALF-LIFE=Half-Life rebuilt for the PlayStation, streamed off this disc|Half-Life ricostruito per PlayStation, caricato da questo disco" \
