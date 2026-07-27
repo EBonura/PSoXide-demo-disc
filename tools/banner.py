@@ -5,9 +5,12 @@ The menu draws no textures anywhere else, so this is the one asset on the
 screen. It has to fit a single PlayStation texture page: UVs are bytes, which
 caps a page at 256 texels, and 4bpp keeps sixteen colours in 80 bytes a row.
 
-Palette index 0 is reserved for transparent. The PlayStation treats a CLUT
-entry of 0x0000 as see-through, so the logo's alpha becomes index 0 and the
-starfield shows through the letterforms instead of a black box sitting on it.
+The logo is composited onto black rather than kept transparent: its edges are
+antialiased against nothing, and thresholding that alpha left them ragged.
+
+Palette index 0 is therefore opaque black, written 0x8000 and not 0x0000. On
+this hardware a CLUT entry of 0x0000 means see-through, so a literal black
+would punch holes in the mark instead of backing it.
 
     python3 tools/banner.py <logo.png> <out-dir> [width] [height] [crop-rows]
 
@@ -24,8 +27,10 @@ import sys
 import zlib
 from pathlib import Path
 
-TRANSPARENT = 0
+BLACK = 0
 COLOURS = 16
+# Black with the mask bit set. 0x0000 would be transparent.
+OPAQUE_BLACK = 0x8000
 
 
 def read_png(path):
@@ -109,7 +114,14 @@ def resample(rows, src_w, src_h, dst_w, dst_h):
                     b += pb * pa
                     a += pa
                     n += 1
-            line.append((r // a, g // a, b // a, a // n) if a else (0, 0, 0, 0))
+            # Composited onto black: coverage scales the colour toward it.
+            coverage = a // n
+            if a:
+                line.append(
+                    ((r // a) * coverage // 255, (g // a) * coverage // 255, (b // a) * coverage // 255)
+                )
+            else:
+                line.append((0, 0, 0))
         out.append(line)
     return out
 
@@ -119,15 +131,14 @@ def to_555(r, g, b):
 
 
 def build_palette(pixels):
-    """Fifteen opaque colours by popularity in 15-bit space, plus transparent
-    at index 0. The logo is a flat mark with a glow, so a handful of levels
+    """Fifteen colours by popularity in 15-bit space, plus opaque black at
+    index 0. The logo is a flat mark with a glow, so a handful of levels
     covers it; there is no need for anything cleverer than counting."""
     counts = {}
-    for r, g, b, a in pixels:
-        if a >= 128:
-            counts[to_555(r, g, b)] = counts.get(to_555(r, g, b), 0) + 1
+    for r, g, b in pixels:
+        counts[to_555(r, g, b)] = counts.get(to_555(r, g, b), 0) + 1
     ranked = sorted(counts, key=lambda c: -counts[c])[: COLOURS - 1]
-    return [0x0000] + ranked
+    return [OPAQUE_BLACK] + ranked
 
 
 def nearest(palette, colour):
@@ -166,11 +177,11 @@ def main(argv):
 
     lookup = {}
     indices = []
-    for r, g, b, a in flat:
-        if a < 128:
-            indices.append(TRANSPARENT)
-            continue
+    for r, g, b in flat:
         key = to_555(r, g, b)
+        if key == 0:
+            indices.append(BLACK)
+            continue
         if key not in lookup:
             lookup[key] = nearest(palette, key)
         indices.append(lookup[key])
@@ -184,11 +195,11 @@ def main(argv):
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "banner.tex").write_bytes(bytes(packed))
     (out_dir / "banner.clut").write_bytes(b"".join(struct.pack("<H", c) for c in palette))
-    opaque = sum(1 for i in indices if i != TRANSPARENT)
+    inked = sum(1 for i in indices if i != BLACK)
     print(
         f"{src} {src_w}x{src_h} -> {width}x{height}, "
         f"{len(packed)} bytes of 4bpp, {len(set(indices))} of {COLOURS} palette slots used, "
-        f"{opaque * 100 // len(indices)}% opaque"
+        f"{inked * 100 // len(indices)}% inked over black"
     )
     return 0
 
