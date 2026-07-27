@@ -69,6 +69,9 @@ const LABEL: (u8, u8, u8) = (255, 255, 255);
 const FAR_LABEL: (u8, u8, u8) = (215, 78, 62);
 const ERROR: (u8, u8, u8) = (255, 214, 90);
 
+/// The carousel entry that shows the credits instead of running something.
+const CREDITS_NAME: &str = "CREDITS";
+
 const STARS: u32 = 90;
 
 /// Turns per frame the ring eases toward its target, as a fraction: the gap
@@ -157,7 +160,14 @@ fn main() {
     // Read the table before a note of music plays: a data read while the
     // drive is playing CD-DA is the one thing this hardware is worst at.
     let header = read_toc(&mut entries);
-    let count = header.map_or(0, |h| h.count);
+    // Credits ride the carousel like everything else, with no program behind
+    // them. A zero LBA is what marks an entry as nothing to boot.
+    let mut count = header.map_or(0, |h| h.count);
+    if count > 0 && count < MAX_ENTRIES {
+        entries[count] = Entry::new(CREDITS_NAME, 0, 0, 0);
+        count += 1;
+    }
+    let count = count;
     if count == 0 {
         tty::println("launcher: no table of contents on this disc");
     }
@@ -193,7 +203,6 @@ fn main() {
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
-    let mut credits = false;
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
@@ -228,9 +237,6 @@ fn main() {
         if pressed(button::UP) || pressed(button::DOWN) {
             italian = !italian;
         }
-        if pressed(button::SELECT) {
-            credits = !credits;
-        }
         // Skipping tracks by hand. The drive is already playing, so this is
         // the same handshake the end of a track takes, just triggered early.
         // The drive takes the better part of a second to pick up a new track.
@@ -264,8 +270,11 @@ fn main() {
             }
             if pressed(button::CROSS) || pressed(button::START) {
                 let index = selected.rem_euclid(count as i32) as usize;
-                // Never returns when the disc is readable.
-                boot(&entries[index]);
+                // Nothing behind the credits entry to chain-load.
+                if entries[index].exe_lba != 0 {
+                    // Never returns when the disc is readable.
+                    boot(&entries[index]);
+                }
             }
         }
         prev_held = pad;
@@ -287,7 +296,6 @@ fn main() {
             }
             _ => carousel::Beat::default(),
         };
-        let pulse = beat.pulse;
         // The downbeat gets the bigger shove. A hard browse adds to the same
         // term, so the ball blows apart and re-forms as the kick decays.
         let swell_beat = (beat.pulse as i32
@@ -333,10 +341,10 @@ fn main() {
             centred(&font, DESC_TOP, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
-            if credits {
-                draw_credits(&font, &small, &header.expect("count came from it"));
+            if entries[index].exe_lba == 0 {
+                draw_credits(&font, &header.expect("count came from it"));
             } else {
-                draw_description(&font, &small, &entries[index], italian);
+                draw_description(&font, &entries[index], italian);
             }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
         }
@@ -418,25 +426,31 @@ fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
 /// Who made what is on the disc. The music is here by permission, and an
 /// attribution that only exists in a README is not an attribution, so this is
 /// the page that discharges it: artist first, then every track by name.
-fn draw_credits(font: &FontAtlas, small: &FontAtlas, header: &Header) {
+fn draw_credits(font: &FontAtlas, header: &Header) {
     let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
     paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
 
-    centred(font, DESC_TOP - 1, "CREDITS", TITLE);
-    let credit = header.credit_str();
-    if !credit.is_empty() {
-        let x = 160 - (small.text_width(credit) as i16) / 2;
-        small.draw_text(x, DESC_TOP + 13, credit, BLURB);
+    // The same font and the same wrap as a description, because this is one:
+    // an entry on the carousel that happens to have no program behind it.
+    // The artist takes two lines and the four tracks take the other four,
+    // which is exactly the room a description has.
+    let mut line = 0i16;
+    let mut rest = header.credit_str();
+    while !rest.is_empty() && line < 2 {
+        let (head, tail) = wrap(rest, WRAP_CHARS);
+        centred(font, DESC_TOP + line * DESC_LEADING, head, BLURB);
+        line += 1;
+        rest = tail;
     }
-    let mut row = DESC_TOP + 26;
     for track in 0..header.menu_track_count as usize {
-        let title = header.title(track);
-        if title.is_empty() {
-            continue;
+        if line >= disc_toc::DESC_LINES as i16 {
+            break;
         }
-        let x = 160 - (small.text_width(title) as i16) / 2;
-        small.draw_text(x, row, title, TRACK_NAME);
-        row += 9;
+        let title = header.title(track);
+        if !title.is_empty() {
+            centred(font, DESC_TOP + line * DESC_LEADING, title, TRACK_NAME);
+            line += 1;
+        }
     }
 }
 
@@ -495,7 +509,7 @@ fn draw_music_panel(
 
 /// The selected game's blurb in one language, under the flag of whichever
 /// one it is. Up or down swaps.
-fn draw_description(font: &FontAtlas, small: &FontAtlas, entry: &Entry, italian: bool) {
+fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
         paint::flag_it(320 - paint::FLAG_W - 5, 4);
@@ -511,8 +525,6 @@ fn draw_description(font: &FontAtlas, small: &FontAtlas, entry: &Entry, italian:
     // the starfield behind it.
     let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
     paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
-    // Nothing else says the credits page is there.
-    small.draw_text(268, bottom + 1, "SELECT", HINT);
 
     // Greedy wrap, a line at a time. mkdisc has already checked the text fits
     // in DESC_LINES of them, so nothing is dropped here.
