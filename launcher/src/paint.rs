@@ -195,12 +195,19 @@ pub const FLAG_H: i16 = 12;
 
 /// The Union flag.
 ///
-/// Proportions matter more than detail at this size. The cross of St George is
-/// about a fifth of the height with a thin white border either side, not the
-/// third of the height an eyeballed version ends up with, and the red saltire
-/// sits off-centre inside the white one rather than down its middle. Getting
-/// the counterchange truly right needs more pixels than the corner has, so
-/// this offsets by one and leaves it there.
+/// Drawn a row at a time rather than as two big parallelograms. At 24x12 the
+/// saltire steps exactly two across for one down, corner to corner, and
+/// stepping it by hand gets that; handing the GPU a parallelogram lets its
+/// own edge rules pick the steps, which came out ragged and uneven.
+///
+/// Proportions follow the real flag where they fit: the cross of St George is
+/// a fifth of the height in red with a pixel of white either side. The arms of
+/// the saltire are a pixel wider than geometry wants, because at twelve pixels
+/// tall a true-width diagonal disappears.
+///
+/// The counterchange is real: St Patrick's red sits below the white diagonal
+/// on the hoist and above it on the fly, which is the asymmetry the flag is
+/// recognised by and the first thing an eyeballed version loses.
 pub fn flag_uk(x: i16, y: i16) {
     const BLUE: (u8, u8, u8) = (8, 24, 92);
     const WHITE: (u8, u8, u8) = (238, 238, 242);
@@ -209,37 +216,32 @@ pub fn flag_uk(x: i16, y: i16) {
 
     gpu::draw_rect_flat(x, y, w as u16, h as u16, BLUE.0, BLUE.1, BLUE.2);
 
-    // Saltire. `shift` slides the band along the top edge, which is how the
-    // red one ends up on one side of the white rather than centred in it.
-    let band = |thick: i16, shift: i16, c: (u8, u8, u8)| {
-        gpu::draw_quad_flat(
-            [
-                (x + shift, y),
-                (x + shift + thick, y),
-                (x + w - thick - shift, y + h),
-                (x + w - shift, y + h),
-            ],
-            c.0,
-            c.1,
-            c.2,
-        );
-        gpu::draw_quad_flat(
-            [
-                (x + w - shift - thick, y),
-                (x + w - shift, y),
-                (x + shift, y + h),
-                (x + shift + thick, y + h),
-            ],
-            c.0,
-            c.1,
-            c.2,
-        );
+    // A horizontal run of one row, clipped to the flag.
+    let run = |from: i16, len: i16, row: i16, c: (u8, u8, u8)| {
+        let start = from.max(0);
+        let end = (from + len).min(w);
+        if end > start {
+            gpu::draw_rect_flat(x + start, y + row, (end - start) as u16, 1, c.0, c.1, c.2);
+        }
     };
-    band(5, 0, WHITE);
-    band(2, 1, RED);
 
-    // Cross of St George, white-bordered. A fifth of the height in red, with
-    // one pixel of white showing either side.
+    for row in 0..h {
+        // Two across for one down, both ways.
+        let down = row * 2;
+        let up = w - 2 - down;
+        run(down - 1, 4, row, WHITE);
+        run(up - 1, 4, row, WHITE);
+
+        // St Patrick, offset within the white. Hoist half low, fly half high,
+        // which is what counterchanged means here.
+        let hoist = row < h / 2;
+        let down_red = if hoist { down + 1 } else { down - 1 };
+        let up_red = if hoist { up - 1 } else { up + 1 };
+        run(down_red, 2, row, RED);
+        run(up_red, 2, row, RED);
+    }
+
+    // Cross of St George over the top, white-bordered.
     gpu::draw_rect_flat(x, y + 4, w as u16, 4, WHITE.0, WHITE.1, WHITE.2);
     gpu::draw_rect_flat(x + 10, y, 4, h as u16, WHITE.0, WHITE.1, WHITE.2);
     gpu::draw_rect_flat(x, y + 5, w as u16, 2, RED.0, RED.1, RED.2);
