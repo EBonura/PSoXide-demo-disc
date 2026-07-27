@@ -55,19 +55,23 @@ const SMALL_CLUT: Clut = Clut::new(416, 256);
 /// the font. Tpage X must be a multiple of 64.
 const BANNER_TPAGE: Tpage = Tpage::new(384, 0, TexDepth::Bit4);
 const BANNER_CLUT: Clut = Clut::new(400, 256);
-const BANNER_W: i16 = 140;
-const BANNER_H: i16 = 26;
+const BANNER_W: i16 = 120;
+const BANNER_H: i16 = 22;
 static BANNER_TEX: &[u8] = include_bytes!("../assets/banner.tex");
 static BANNER_CLUT_DATA: &[u8] = include_bytes!("../assets/banner.clut");
 
-const TITLE: (u8, u8, u8) = (255, 84, 62);
-const HINT: (u8, u8, u8) = (168, 44, 40);
-const NOW_PLAYING: (u8, u8, u8) = (172, 40, 34);
-const TRACK_NAME: (u8, u8, u8) = (255, 88, 64);
-const BLURB: (u8, u8, u8) = (255, 206, 196);
-const LABEL: (u8, u8, u8) = (255, 255, 255);
-const FAR_LABEL: (u8, u8, u8) = (215, 78, 62);
-const ERROR: (u8, u8, u8) = (255, 214, 90);
+use paint::palette::*;
+
+const TITLE: (u8, u8, u8) = GOLD;
+const HINT: (u8, u8, u8) = RED_ORANGE;
+const NOW_PLAYING: (u8, u8, u8) = RED_ORANGE;
+const TRACK_NAME: (u8, u8, u8) = LIGHT_ORANGE;
+const BLURB: (u8, u8, u8) = AMBER;
+const LABEL: (u8, u8, u8) = GOLD;
+const FAR_LABEL: (u8, u8, u8) = RED_ORANGE;
+/// The only thing on screen that must not be missed, so the brightest the
+/// palette has.
+const ERROR: (u8, u8, u8) = GOLD;
 
 const STARS: u32 = 90;
 
@@ -99,14 +103,13 @@ const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// words under it. Full width rather than a box round the logo: centred is
 /// where the mark belongs, and anything narrower collides with the music
 /// panel, which is what pushed it off-centre before.
-const HEADER_H: i16 = 50;
+const HEADER_H: i16 = 44;
 /// The music panel stacks down the header's left edge: label, title, meter,
 /// hint. The mark sits below the title row rather than beside it, because a
 /// title runs to 112 pixels and a centred mark starts at 90.
 const MUSIC_TOP: i16 = 4;
 const TRACK_TOP: i16 = 13;
 const METER_BASE: i16 = 38;
-const HINT_TOP: i16 = 40;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
 const BANNER_Y: i16 = 2;
@@ -194,6 +197,7 @@ fn main() {
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
+    let mut credits = false;
     let mut prev_held = ButtonState::default();
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
@@ -227,6 +231,9 @@ fn main() {
 
         if pressed(button::UP) || pressed(button::DOWN) {
             italian = !italian;
+        }
+        if pressed(button::SELECT) {
+            credits = !credits;
         }
         // Skipping tracks by hand. The drive is already playing, so this is
         // the same handshake the end of a track takes, just triggered early.
@@ -307,16 +314,11 @@ fn main() {
         // with the ball.
         travel = travel.wrapping_add(spin_rate.max(1));
 
-        fb.clear(26, 0, 4);
+        fb.clear(INK.0, INK.1, INK.2);
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
         paint::header_strip(HEADER_H);
-        // The one control worth labelling, in the header where there is room
-        // for it beside the mark.
-        if menu_track_count > 1 {
-            small.draw_text(6, HINT_TOP, "L1/R1", HINT);
-        }
         banner.draw(160 - BANNER_W / 2, BANNER_Y);
         centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
         if let Some(header) = header {
@@ -325,6 +327,7 @@ fn main() {
                 &header,
                 menu_track_index,
                 &beat,
+                menu_track_count > 1,
                 loading,
                 spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
             );
@@ -334,7 +337,11 @@ fn main() {
             centred(&font, DESC_TOP, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
-            draw_description(&font, &entries[index], italian);
+            if credits {
+                draw_credits(&font, &small, &header.expect("count came from it"));
+            } else {
+                draw_description(&font, &small, &entries[index], italian);
+            }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
         }
 
@@ -393,8 +400,20 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         let lift = if twinkler { offbeat / 3 } else { offbeat / 8 };
         let b = star.bright.saturating_add(lift);
         let size = star.size + u16::from(twinkler && offbeat > 190);
-        // Warm white going to ember red as they fade into the distance.
-        gpu::draw_rect_flat(star.x, star.y, size, size, b, (b * 3) / 8, (b * 4) / 16);
+        // Along the palette as they come at you: dark red far off, gold near.
+        let t = b as u32;
+        let along = |far: u8, near: u8| {
+            (far as u32 + (near as u32 - far as u32) * t / 255) as u8
+        };
+        gpu::draw_rect_flat(
+            star.x,
+            star.y,
+            size,
+            size,
+            along(DARK_RED.0, GOLD.0),
+            along(DARK_RED.1, GOLD.1),
+            along(DARK_RED.2, GOLD.2),
+        );
     }
 }
 
@@ -412,6 +431,31 @@ fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
     }
 }
 
+/// Who made what is on the disc. The music is here by permission, and an
+/// attribution that only exists in a README is not an attribution, so this is
+/// the page that discharges it: artist first, then every track by name.
+fn draw_credits(font: &FontAtlas, small: &FontAtlas, header: &Header) {
+    let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
+    paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
+
+    centred(font, DESC_TOP - 1, "CREDITS", TITLE);
+    let credit = header.credit_str();
+    if !credit.is_empty() {
+        let x = 160 - (small.text_width(credit) as i16) / 2;
+        small.draw_text(x, DESC_TOP + 13, credit, BLURB);
+    }
+    let mut row = DESC_TOP + 26;
+    for track in 0..header.menu_track_count as usize {
+        let title = header.title(track);
+        if title.is_empty() {
+            continue;
+        }
+        let x = 160 - (small.text_width(title) as i16) / 2;
+        small.draw_text(x, row, title, TRACK_NAME);
+        row += 9;
+    }
+}
+
 /// Top-left: what is playing, a level meter that dances on the beat, and the
 /// one control worth labelling. Nothing about the screen suggests the
 /// shoulder buttons do anything, so that one is spelled out.
@@ -420,6 +464,7 @@ fn draw_music_panel(
     header: &Header,
     track: u8,
     beat: &carousel::Beat,
+    skippable: bool,
     loading: bool,
     levels: Option<&[u8]>,
 ) {
@@ -432,11 +477,22 @@ fn draw_music_panel(
         // The drive takes a moment to pick a track up, and a menu that just
         // goes quiet reads as broken. Say what it is doing, where the label
         // that it is playing would be.
-        font.draw_text(6, MUSIC_TOP, "LOADING", NOW_PLAYING);
+        font.draw_text(4, MUSIC_TOP, "LOADING", NOW_PLAYING);
         font.draw_text(6, TRACK_TOP, title, TRACK_NAME);
         return;
     }
-    font.draw_text(6, MUSIC_TOP, "PLAYING", NOW_PLAYING);
+    // Label and control share a row. Spelling out the one control worth
+    // labelling costs nothing here and saves a row of header.
+    font.draw_text(
+        4,
+        MUSIC_TOP,
+        if skippable {
+            "NOW PLAYING | L1/R1"
+        } else {
+            "NOW PLAYING"
+        },
+        NOW_PLAYING,
+    );
     // The title brightens on the beat, so the words themselves keep time.
     let lift = beat.pulse / 4;
     let tint = (
@@ -455,7 +511,7 @@ fn draw_music_panel(
 
 /// The selected game's blurb in one language, under the flag of whichever
 /// one it is. Up or down swaps.
-fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
+fn draw_description(font: &FontAtlas, small: &FontAtlas, entry: &Entry, italian: bool) {
     // Top-right, clear of the description band and the ball.
     if italian {
         paint::flag_it(320 - paint::FLAG_W - 5, 4);
@@ -471,6 +527,8 @@ fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     // the starfield behind it.
     let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
     paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
+    // Nothing else says the credits page is there.
+    small.draw_text(268, bottom + 1, "SELECT", HINT);
 
     // Greedy wrap, a line at a time. mkdisc has already checked the text fits
     // in DESC_LINES of them, so nothing is dropped here.
