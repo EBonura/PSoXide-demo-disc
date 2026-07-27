@@ -26,20 +26,20 @@ const FOCAL: i32 = 300;
 /// Ring radius.
 const RING_R: i32 = 205;
 /// Screen row the ring's centre projects to.
-const RING_Y: i16 = 176;
+const RING_Y: i16 = 180;
 /// How far the ring's far side rides up the screen: the tilt that turns a
 /// circle into an ellipse.
-const RING_TILT: i32 = 34;
+const RING_TILT: i32 = 30;
 
-/// Pill size at the front of the ring, before perspective.
-const PILL_RX: i32 = 52;
-const PILL_RY: i32 = 15;
+/// Pill size at the front of the ring, before perspective. Wide and deep
+/// enough to carry a two-line title without the words hanging off the ends.
+const PILL_RX: i32 = 68;
+const PILL_RY: i32 = 19;
 
-/// The ball of balls hangs above the ring and slightly right of centre, the
-/// way the demo-disc intros framed it.
-const SPHERE_CENTRE_X: i16 = 190;
-const SPHERE_CENTRE_Y: i16 = 70;
-const SPHERE_R: i32 = 96;
+/// The ball of balls hangs centred above the ring.
+const SPHERE_CENTRE_X: i16 = 160;
+const SPHERE_CENTRE_Y: i16 = 66;
+const SPHERE_R: i32 = 84;
 /// Rings of latitude, and points around each. Poles are added separately.
 /// Dense enough that the beads crowd each other, which is what stops the
 /// cluster reading as scattered confetti.
@@ -160,6 +160,20 @@ pub fn sort_by_depth<T: Copy, F: Fn(&T) -> i32>(items: &mut [T], depth: F) {
     }
 }
 
+/// Bleed a browse-kick off the ball's spin rate, one frame's worth.
+///
+/// The shift alone stalls a few units short of `idle` once the gap is small
+/// enough that it rounds to zero, so the last of it closes by hand. Without
+/// that the ball would keep creeping after the player stopped browsing.
+pub fn ease_spin(rate: i32, idle: i32, decay_shift: i32) -> i32 {
+    let excess = idle - rate;
+    rate + if excess.abs() < (1 << decay_shift) {
+        excess.signum()
+    } else {
+        excess >> decay_shift
+    }
+}
+
 /// Deterministic specks of starfield. No RNG on the guest: a cheap integer
 /// hash of the index gives a fixed, evenly scattered sky.
 pub fn star(index: u32) -> (i16, i16, u8) {
@@ -198,6 +212,25 @@ mod tests {
         assert!(front.y > back.y, "front sits lower on screen");
         assert!(front.front > back.front);
         assert_eq!(front.x, 160, "the selection is centred");
+    }
+
+    #[test]
+    fn a_browse_kick_always_settles_back_to_the_idle_drift() {
+        const IDLE: i32 = 5;
+        for start in [IDLE + 110, IDLE - 110, IDLE, IDLE + 1, IDLE - 1] {
+            let mut rate = start;
+            for _ in 0..400 {
+                rate = ease_spin(rate, IDLE, 4);
+            }
+            assert_eq!(rate, IDLE, "starting from {start}");
+        }
+    }
+
+    #[test]
+    fn a_kick_decays_rather_than_snapping() {
+        let after_one_frame = ease_spin(115, 5, 4);
+        assert!(after_one_frame < 115, "it slows");
+        assert!(after_one_frame > 40, "but is still clearly spun up");
     }
 
     #[test]

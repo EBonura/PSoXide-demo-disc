@@ -18,8 +18,8 @@
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
 //!         0x20  u32 CD-DA tracks belonging to programs ahead of this one
-//!         0x24  English one-liner, NUL-padded ASCII
-//!         0x4C  Italian one-liner, NUL-padded ASCII
+//!         0x24  English description, NUL-padded ASCII
+//!         0x64  Italian description, NUL-padded ASCII
 //! ```
 
 #![no_std]
@@ -41,14 +41,15 @@ pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
 pub const TOC_BYTES: usize = 2048;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 116;
+pub const ENTRY_BYTES: usize = 164;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
 
-/// Bytes reserved for each of an entry's two descriptions. At the 8-pixel
-/// font this is about as much as fits across a 320-pixel screen.
-pub const DESC_BYTES: usize = 40;
+/// Bytes reserved for each of an entry's two descriptions. The launcher wraps
+/// them to two lines, so this is two screen-widths of the 8-pixel font less a
+/// little slack.
+pub const DESC_BYTES: usize = 64;
 
 const HEADER_BYTES: usize = 0x10;
 

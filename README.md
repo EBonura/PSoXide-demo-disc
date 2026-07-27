@@ -52,7 +52,7 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-All nine, each verified booting from the built disc. 517 MiB, 51 minutes, 29
+All ten, each verified booting from the built disc. 521 MiB, 51 minutes, 30
 CD-DA tracks, comfortably inside an 80-minute CD-R.
 
 | Program | How it ships |
@@ -66,6 +66,7 @@ CD-DA tracks, comfortably inside an 80-minute CD-R.
 | Breakout | bare EXE |
 | Space Invaders | bare EXE |
 | Magikaaaaarp Pong | bare EXE, plays Guitar Hero's track |
+| Hardware Tests | whole image, 1 CD-DA track |
 
 Voxide, Celeste and PSXcel never read the disc after boot, so they ride as
 bare EXEs and do not care which SDK built them: a `_start` that ignores the
@@ -73,11 +74,15 @@ loader's arguments is still a correct `_start`.
 
 ## The menu
 
-A carousel of glossy blue pills under a slowly turning ball of balls, over a
+A carousel of glossy blue pills under a turning ball of balls, over a
 starfield: the PlayStation demo discs, as closely as flat and gouraud
-triangles get you. Left and right spin the ring, X runs the pill at the front.
-Each entry carries a one-line description in English and Italian, both shown
-at once.
+triangles get you. Left and right spin the ring, X runs the pill at the front,
+up or down swaps the description between English and Italian under a drawn
+flag. Titles too long for a pill break across two lines.
+
+The ball is not just decoration: browsing shoves it, and it coasts back down
+to its idle drift over the next second or so, so the whole screen answers the
+d-pad rather than only the ring.
 
 No textures and no floating point. Ellipses are twelve-segment triangle fans
 shaded top to bottom; the ring and the sphere are one perspective divide each,
