@@ -112,7 +112,7 @@ const METER_BASE: i16 = 38;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
 const BANNER_Y: i16 = 2;
-const DESC_TOP: i16 = 88;
+const DESC_TOP: i16 = 93;
 const DESC_LEADING: i16 = 9;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
