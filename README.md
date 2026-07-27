@@ -76,9 +76,13 @@ loader's arguments is still a correct `_start`.
 
 A carousel of glossy blue pills under a turning ball of balls, over a
 starfield: the PlayStation demo discs, as closely as flat and gouraud
-triangles get you. Left and right spin the ring, X runs the pill at the front,
-up or down swaps the description between English and Italian under a drawn
-flag. Titles too long for a pill break across two lines.
+triangles get you. Left and right spin the ring, X runs the pill at the front, up or down swaps
+the description between English and Italian under a drawn flag, and L1 or R1
+skips the music. Titles too long for a pill break across two lines.
+
+Only the music skip is labelled on screen. The rest a PlayStation owner tries
+without being told; nothing about the screen suggests the shoulder buttons do
+anything at all.
 
 The whole scene answers the music. `tools/beatgrid.py` fits a tempo and phase
 to each track's onset envelope offline and the numbers ship in the disc table,

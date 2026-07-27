@@ -45,6 +45,7 @@ const FONT_CLUT: Clut = Clut::new(320, 256);
 
 const TITLE: (u8, u8, u8) = (170, 220, 255);
 const CREDIT: (u8, u8, u8) = (95, 125, 175);
+const HINT: (u8, u8, u8) = (80, 105, 150);
 const BLURB: (u8, u8, u8) = (215, 235, 255);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
 const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
@@ -170,6 +171,21 @@ fn main() {
         if pressed(button::UP) || pressed(button::DOWN) {
             italian = !italian;
         }
+        // Skipping tracks by hand. The drive is already playing, so this is
+        // the same handshake the end of a track takes, just triggered early.
+        if menu_track != 0 && menu_track_count > 1 {
+            let skip = if pressed(button::R1) {
+                1
+            } else if pressed(button::L1) {
+                menu_track_count - 1 // one back, without going negative
+            } else {
+                0
+            };
+            if skip != 0 {
+                menu_track_index = (menu_track_index + skip) % menu_track_count;
+                music.begin(tick);
+            }
+        }
         if count > 0 {
             if pressed(button::LEFT) {
                 selected -= 1;
@@ -231,6 +247,12 @@ fn main() {
         draw_sphere(spin, swell, &mut beads);
 
         centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
+        // The one control worth labelling: nothing about the screen suggests
+        // the shoulder buttons do anything.
+        if menu_track_count > 1 {
+            font.draw_text(6, 6, "L1/R1", HINT);
+            font.draw_text(6, 16, "MUSIC", HINT);
+        }
 
         if count == 0 {
             centred(&font, 118, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
