@@ -80,6 +80,11 @@ struct Args {
     shared_cdda: Vec<(String, String)>,
     /// `(name, english, italian)` blurbs shown under the carousel.
     descriptions: Vec<(String, String, String)>,
+    /// Raw 44.1 kHz stereo PCM the menu cycles through behind itself, in the
+    /// order given.
+    menu_cdda: Vec<PathBuf>,
+    /// Attribution the menu prints for that track.
+    credit: String,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -89,6 +94,8 @@ fn parse_args() -> Result<Args, String> {
     let mut programs = Vec::new();
     let mut shared_cdda = Vec::new();
     let mut descriptions = Vec::new();
+    let mut menu_cdda = Vec::new();
+    let mut credit = String::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -146,6 +153,10 @@ fn parse_args() -> Result<Args, String> {
                     italian.trim().to_string(),
                 ));
             }
+            "--menu-cdda" => menu_cdda.push(PathBuf::from(
+                it.next().ok_or("--menu-cdda takes a path".to_string())?,
+            )),
+            "--credit" => credit = it.next().ok_or("--credit takes a string".to_string())?,
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -161,6 +172,8 @@ fn parse_args() -> Result<Args, String> {
         programs,
         shared_cdda,
         descriptions,
+        menu_cdda,
+        credit,
     })
 }
 
@@ -173,7 +186,10 @@ fn print_usage() {
          --image       places a whole game disc image, data track and CD-DA alike\n\
          --share-cdda  points one program at another's CD-DA tracks, so a song\n\
         \x20             two programs both use is only burned once\n\
-         --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel"
+         --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
+         --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
+        \x20             menu cycles through the tracks in order\n\
+         --credit      attribution the menu prints for that track"
     );
 }
 
@@ -501,7 +517,52 @@ fn run() -> Result<(), String> {
     let names: Vec<&str> = args.programs.iter().map(|p| p.name.as_str()).collect();
     apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
-    let toc = disc_toc::encode(&entries).ok_or_else(|| {
+    // The menu's own track goes last, after every game's, so adding or
+    // removing it cannot shift a game's CD-DA base.
+    let mut menu_audio = Vec::new();
+    for path in &args.menu_cdda {
+        let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        if bytes.len() % SECTOR_BYTES != 0 {
+            return Err(format!(
+                "{}: {} bytes is not a whole number of {SECTOR_BYTES}-byte CD-DA sectors. \
+                 Pad it, or the last sector will be a click.",
+                path.display(),
+                bytes.len()
+            ));
+        }
+        menu_audio.push(bytes);
+    }
+    let menu_track = if menu_audio.is_empty() {
+        0
+    } else {
+        // Track 1 is the data track, so audio starts at 2.
+        2 + cdda_track_base
+    };
+    // The menu draws the credit as one centred line at the 8-pixel font, so a
+    // long one runs off both edges. Same silent-clipping trap as the blurbs.
+    const CREDIT_COLUMNS: usize = 39;
+    if args.credit.len() > CREDIT_COLUMNS {
+        return Err(format!(
+            "--credit is {} characters, {} more than the {CREDIT_COLUMNS} the menu can \
+             draw on one line:\n  {}",
+            args.credit.len(),
+            args.credit.len() - CREDIT_COLUMNS,
+            args.credit
+        ));
+    }
+    if !menu_audio.is_empty() && args.credit.is_empty() {
+        return Err("--menu-cdda without --credit: the menu has nowhere to attribute the \
+                    track, which is the one thing an attribution licence asks for"
+            .to_string());
+    }
+
+    let toc = disc_toc::encode(
+        &entries,
+        menu_track,
+        menu_audio.len() as u32,
+        &args.credit,
+    )
+    .ok_or_else(|| {
         format!(
             "{} programs is more than the {} that fit in the table sector",
             entries.len(),
@@ -532,6 +593,14 @@ fn run() -> Result<(), String> {
         }
         disc.extend_from_slice(&image.audio_bytes);
     }
+    for bytes in &menu_audio {
+        let at = (disc.len() / SECTOR_BYTES) as u32;
+        placed_audio.push(PlacedAudio {
+            index00: at,
+            index01: at,
+        });
+        disc.extend_from_slice(bytes);
+    }
 
     fs::write(&args.out, &disc).map_err(|e| format!("write {}: {e}", args.out.display()))?;
     let cue_path = args.out.with_extension("cue");
@@ -550,6 +619,18 @@ fn run() -> Result<(), String> {
         disc.len() as f64 / (1024.0 * 1024.0),
     );
     println!("wrote {}", cue_path.display());
+    if menu_track != 0 {
+        println!(
+            "menu music on CD-DA track{} {menu_track}{}, credited as {:?}",
+            if menu_audio.len() > 1 { "s" } else { "" },
+            if menu_audio.len() > 1 {
+                format!("-{}", menu_track + menu_audio.len() as u32 - 1)
+            } else {
+                String::new()
+            },
+            args.credit
+        );
+    }
     println!(
         "{} program(s), {} CD-DA track(s), table of contents at LBA {}:",
         entries.len(),
@@ -687,6 +768,13 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("GH-PSX"), "{err}");
+    }
+
+    #[test]
+    fn an_overlong_description_and_credit_share_the_same_reasoning() {
+        // The credit check lives in `run` against the CLI argument, so this
+        // only pins the width the menu can actually draw. 320 pixels, 8 wide.
+        assert_eq!(320 / 8, 40);
     }
 
     #[test]

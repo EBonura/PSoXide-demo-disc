@@ -19,9 +19,12 @@ extern crate psx_rt;
 mod paint;
 
 use carousel::{Bead, Placed, SPHERE_POINTS, TURN};
-use disc_toc::{Entry, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
+use disc_toc::{Entry, Header, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
 use psx_font::{fonts::BASIC, FontAtlas};
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
+use psx_io::cdda::CddaStarter;
+use psx_io::cdrom;
+use psx_spu::{self as spu, CdVolume, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_pad::{button, poll_port1, ButtonState};
 use psx_rt::tty;
@@ -41,6 +44,7 @@ const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
 
 const TITLE: (u8, u8, u8) = (170, 220, 255);
+const CREDIT: (u8, u8, u8) = (95, 125, 175);
 const BLURB: (u8, u8, u8) = (215, 235, 255);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
 const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
@@ -62,6 +66,15 @@ const SPHERE_DECAY_SHIFT: i32 = 4;
 /// Widest line the 8-pixel font fits on screen with a margin either side.
 const WRAP_CHARS: usize = 36;
 
+/// Ticks between drive-status polls while the menu track plays. Often enough
+/// to restart the loop without a gap anyone notices, rare enough that the
+/// polling does not fight the audio.
+const CDDA_POLL_TICKS: u32 = 30;
+/// Status bit the drive sets while it is playing CD-DA.
+const CDDA_PLAYING: u8 = 0x80;
+/// Spin budget per CD command. Silicon wants more than an emulator does.
+const CDDA_SPINS: u32 = 0x10_0000;
+
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
 static mut TOC_SECTOR: [u32; SECTOR_WORDS] = [0; SECTOR_WORDS];
@@ -77,9 +90,31 @@ fn main() {
     let font = FontAtlas::upload(&BASIC, FONT_TPAGE, FONT_CLUT);
 
     let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
-    let count = read_toc(&mut entries);
+    // Read the table before a note of music plays: a data read while the
+    // drive is playing CD-DA is the one thing this hardware is worst at.
+    let header = read_toc(&mut entries);
+    let count = header.map_or(0, |h| h.count);
     if count == 0 {
         tty::println("launcher: no table of contents on this disc");
+    }
+
+    let menu_track = header.map_or(0, |h| h.menu_track) as u8;
+    let menu_track_count = header.map_or(0, |h| h.menu_track_count).max(1) as u8;
+    // Which of the run is playing. Cycling beats looping one track when the
+    // disc might sit on the menu for a whole presentation.
+    let mut menu_track_index: u8 = 0;
+    let mut music = CddaStarter::new().with_spins(CDDA_SPINS);
+    let mut tick: u32 = 0;
+    let mut next_music_poll = CDDA_POLL_TICKS;
+    if menu_track != 0 {
+        // The CD controller playing is only half of it: the SPU's CD input
+        // comes up silent, so without this the drive spins a track nobody
+        // hears.
+        spu::init();
+        spu::set_main_volume(Volume::MAX, Volume::MAX);
+        spu::set_cd_volume(CdVolume::MAX, CdVolume::MAX);
+        spu::enable_cd_audio(true);
+        music.begin(tick);
     }
 
     let mut selected: i32 = 0;
@@ -92,6 +127,27 @@ fn main() {
     let mut beads = [Bead::default(); SPHERE_POINTS];
 
     loop {
+        tick = tick.wrapping_add(1);
+        if menu_track != 0 {
+            music.tick(tick, menu_track + menu_track_index);
+            // The track is the last on the disc, so when it ends the drive
+            // has nowhere to go. Notice and start it again.
+            if music.started() && tick.wrapping_sub(next_music_poll) < u32::MAX / 2 {
+                next_music_poll = tick.wrapping_add(CDDA_POLL_TICKS);
+                let idle = match cdrom::try_get_stat(CDDA_SPINS) {
+                    Some(status) => status
+                        .bytes()
+                        .first()
+                        .is_some_and(|s| s & CDDA_PLAYING == 0),
+                    None => false,
+                };
+                if idle {
+                    menu_track_index = (menu_track_index + 1) % menu_track_count;
+                    music.begin(tick);
+                }
+            }
+        }
+
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
 
@@ -138,6 +194,11 @@ fn main() {
             let index = selected.rem_euclid(count as i32) as usize;
             draw_description(&font, &entries[index], italian);
             draw_ring(&font, &entries[..count], ring, step, &mut order);
+        }
+        // The music is used by permission, so the credit is not optional
+        // decoration: it stays on screen the whole time the track plays.
+        if let Some(header) = header {
+            centred(&font, 230, header.credit_str(), CREDIT);
         }
 
         gpu::draw_sync();
@@ -257,8 +318,8 @@ fn draw_ring(
     }
 }
 
-/// Read the table of contents. Returns 0 if the disc has none.
-fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> usize {
+/// Read the table of contents. `None` if the disc has none.
+fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
     // SAFETY: single-threaded, polled; `main` runs once and nothing else
     // touches these statics.
     let reader = unsafe { &mut *core::ptr::addr_of_mut!(READER) };
@@ -267,13 +328,13 @@ fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> usize {
     let ok = unsafe { reader.prepare() && reader.start_read(TOC_LBA) && reader.read_sector(sector) };
     unsafe { reader.stop() };
     if !ok {
-        return 0;
+        return None;
     }
     // SAFETY: a [u32; 512] is 2048 bytes; the target is little-endian, so the
     // word buffer and the on-disc byte order agree.
     let bytes: &[u8; TOC_BYTES] =
         unsafe { &*(sector.as_ptr() as *const u8 as *const [u8; TOC_BYTES]) };
-    disc_toc::decode(bytes, entries).unwrap_or(0)
+    disc_toc::decode(bytes, entries)
 }
 
 /// Copy the chain-load blob high and jump to it. Never returns while the disc
@@ -283,8 +344,10 @@ fn boot(entry: &Entry) -> ! {
     tty::println("launcher: chain-loading");
 
     // Let the GPU finish before the blob resets it out from under whatever is
-    // still on screen.
+    // still on screen, and get the drive off CD-DA before the blob starts
+    // reading sectors with it.
     gpu::draw_sync();
+    let _ = cdrom::try_stop(CDDA_SPINS);
 
     // SAFETY: `LOADER_BASE` is above every game's payload (mkdisc enforces
     // that) and below the stack, so nothing live is being overwritten. The

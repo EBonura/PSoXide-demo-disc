@@ -12,8 +12,10 @@
 //! ```text
 //! 0x00  magic "PSXDEMO1"
 //! 0x08  u32 entry count
-//! 0x0C  u32 reserved
-//! 0x10  entries, ENTRY_BYTES each:
+//! 0x0C  u32 first CD-DA track the menu plays, 0 for none
+//! 0x10  u32 how many consecutive tracks it cycles through
+//! 0x14  music credit, NUL-padded ASCII
+//! 0x50  entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
@@ -51,7 +53,13 @@ pub const NAME_BYTES: usize = 24;
 /// little slack.
 pub const DESC_BYTES: usize = 64;
 
-const HEADER_BYTES: usize = 0x10;
+/// Bytes reserved for the music credit the menu prints. A licence that asks
+/// for attribution is only satisfied if the attribution ships with the disc,
+/// so it travels in the table beside the track number it refers to.
+pub const CREDIT_BYTES: usize = 48;
+
+const HEADER_BYTES: usize = 0x50;
+const CREDIT_AT: usize = 0x14;
 
 /// Entries that fit in one sector.
 pub const MAX_ENTRIES: usize = (TOC_BYTES - HEADER_BYTES) / ENTRY_BYTES;
@@ -127,16 +135,44 @@ impl Entry {
     }
 }
 
+/// What the table says apart from the programs themselves.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Header {
+    /// How many entries follow.
+    pub count: usize,
+    /// First CD-DA track the menu plays, or 0 if the disc has none.
+    pub menu_track: u32,
+    /// How many consecutive tracks from `menu_track` it cycles through.
+    pub menu_track_count: u32,
+    /// Music credit, NUL-padded.
+    pub credit: [u8; CREDIT_BYTES],
+}
+
+impl Header {
+    /// The credit as a `str`, NUL padding stripped.
+    pub fn credit_str(&self) -> &str {
+        trimmed(&self.credit)
+    }
+}
+
 /// Serialize `entries` into the table sector.
 ///
 /// Returns `None` if there are more than [`MAX_ENTRIES`].
-pub fn encode(entries: &[Entry]) -> Option<[u8; TOC_BYTES]> {
+pub fn encode(
+    entries: &[Entry],
+    menu_track: u32,
+    menu_track_count: u32,
+    credit: &str,
+) -> Option<[u8; TOC_BYTES]> {
     if entries.len() > MAX_ENTRIES {
         return None;
     }
     let mut out = [0u8; TOC_BYTES];
     out[..8].copy_from_slice(&MAGIC);
     out[8..12].copy_from_slice(&(entries.len() as u32).to_le_bytes());
+    out[12..16].copy_from_slice(&menu_track.to_le_bytes());
+    out[16..20].copy_from_slice(&menu_track_count.to_le_bytes());
+    out[CREDIT_AT..CREDIT_AT + CREDIT_BYTES].copy_from_slice(&fixed::<CREDIT_BYTES>(credit));
     for (i, entry) in entries.iter().enumerate() {
         let at = HEADER_BYTES + i * ENTRY_BYTES;
         out[at..at + NAME_BYTES].copy_from_slice(&entry.name);
@@ -151,11 +187,12 @@ pub fn encode(entries: &[Entry]) -> Option<[u8; TOC_BYTES]> {
     Some(out)
 }
 
-/// Parse the table sector into `into`, returning the entry count.
+/// Parse the table sector into `into`, returning everything that is not an
+/// entry.
 ///
 /// Returns `None` on a bad magic or an implausible count, which is how the
 /// launcher tells "this disc has no table" from "this disc's table is empty".
-pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Option<usize> {
+pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
     if sector[..8] != MAGIC {
         return None;
     }
@@ -163,6 +200,14 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     if count > MAX_ENTRIES {
         return None;
     }
+    let mut credit = [0u8; CREDIT_BYTES];
+    credit.copy_from_slice(&sector[CREDIT_AT..CREDIT_AT + CREDIT_BYTES]);
+    let header = Header {
+        count,
+        menu_track: u32::from_le_bytes([sector[12], sector[13], sector[14], sector[15]]),
+        menu_track_count: u32::from_le_bytes([sector[16], sector[17], sector[18], sector[19]]),
+        credit,
+    };
     for (i, slot) in into.iter_mut().enumerate().take(count) {
         let at = HEADER_BYTES + i * ENTRY_BYTES;
         let mut name = [0u8; NAME_BYTES];
@@ -179,7 +224,7 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         slot.desc_en.copy_from_slice(&sector[d..d + DESC_BYTES]);
         slot.desc_it.copy_from_slice(&sector[d + DESC_BYTES..d + 2 * DESC_BYTES]);
     }
-    Some(count)
+    Some(header)
 }
 
 #[cfg(test)]
@@ -197,9 +242,13 @@ mod tests {
                 .described("Original 3D action game", "Gioco d'azione 3D originale"),
             Entry::new("HALF-LIFE", 40960, 40938, 1),
         ];
-        let sector = encode(&entries).expect("fits");
+        let sector = encode(&entries, 30, 4, "Music by Just Music").expect("fits");
         let mut out = blank();
-        assert_eq!(decode(&sector, &mut out), Some(2));
+        let header = decode(&sector, &mut out).expect("decodes");
+        assert_eq!(header.count, 2);
+        assert_eq!(header.menu_track, 30);
+        assert_eq!(header.menu_track_count, 4);
+        assert_eq!(header.credit_str(), "Music by Just Music");
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
@@ -212,7 +261,7 @@ mod tests {
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1, 0, 0)]).expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "").expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
@@ -220,7 +269,7 @@ mod tests {
     #[test]
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
-        assert!(encode(&too_many).is_none());
+        assert!(encode(&too_many, 0, 0, "").is_none());
     }
 
     #[test]
