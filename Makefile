@@ -114,16 +114,16 @@ disc-only: mkdisc
 		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
-		--describe "CORTEX IGNITION=Original souls-like built from the ground up for PS1, streaming its world off this disc. Tech demo.|Souls-like originale creato da zero per PS1, con il mondo caricato da questo disco. Tech demo." \
-		--describe "HALF-LIFE=Half-Life rebuilt from the ground up for PS1. Real maps and models streamed from disc. Semi-playable.|Half-Life ricostruito da zero per PS1 in Rust. Mappe e modelli veri, caricati dal disco. Semi-giocabile." \
-		--describe "VOXIDE=A Minecraft clone: mine blocks and build in a world generated as you walk. Early tech-demo.|Clone di Minecraft: scava e costruisci in un mondo generato mentre cammini. Tech-demo iniziale." \
-		--describe "CELESTE COLLECTION=Both Celeste Classic PICO-8 games ported to PS1, one screen at a time. Fully playable.|Entrambi i Celeste Classic PICO-8 portati su PS1, uno schermo alla volta. Giocabili per intero." \
-		--describe "PSXCEL=An Excel clone because why not? Formulas, charts and memory-card saves, all driven with a gamepad.|Un clone di Excel, per il gusto di farlo. Formule, grafici e salvataggi su memory card." \
-		--describe "GH-PSX=Guitar Hero clone: hit the notes as the fretboard rushes at you, in time with CD audio. Early tech-demo.|Clone di Guitar Hero: colpisci le note a tempo con l'audio del CD. Tech-demo iniziale." \
-		--describe "BREAKOUT=A simple Breakout clone. Clear every brick without losing the ball off the bottom of the screen.|Un semplice clone di Breakout. Elimina i mattoni senza perdere la palla in fondo." \
-		--describe "SPACE INVADERS=A simple Space Invaders clone. Hold the line as the wave drops lower with every pass.|Un semplice clone di Space Invaders. Resisti mentre l'ondata scende a ogni passaggio." \
-		--describe "MAGIKAAAAARP PONG=Simple pong with Magikaaaaarp music, built to test streaming CD audio while the game runs.|Pong con musica di Magikaaaaarp, per provare l'audio da CD mentre il gioco gira." \
-		--describe "HARDWARE TESTS=Collection of tests used to extract metrics from real hardware, and to check the emulator against it.|Raccolta di test per misurare l'hardware reale e confrontarlo con l'emulatore."
+		--describe "CORTEX IGNITION=Souls-like on the PSoXide engine. World streams off disc in chunks, sim at 60 Hz, render at 30.|Souls-like sul motore PSoXide. Il mondo arriva dal disco a blocchi, sim a 60 Hz, render a 30." \
+		--describe "HALF-LIFE=Half-Life's real maps and models, cut to fit 2 MB of RAM and streamed off this disc. Rust, no C.|Mappe e modelli veri di Half-Life, ridotti a 2 MB di RAM e letti da questo disco. In Rust, senza C." \
+		--describe "VOXIDE=Voxel world generated as you walk. Chunks are meshed a ring ahead of the draw distance. Tech-demo.|Mondo a voxel generato mentre cammini. I blocchi sono preparati un anello oltre la vista. Tech-demo." \
+		--describe "CELESTE COLLECTION=Both PICO-8 carts rebuilt as native PS1 code. Two games and a menu in one 490 KB executable.|Le due cartucce PICO-8 riscritte in codice PS1 nativo. Due giochi e un menu in 490 KB." \
+		--describe "PSXCEL=A spreadsheet on a machine with no floating point: every cell is decimal fixed-point in i64.|Un foglio di calcolo su una macchina senza virgola mobile: ogni cella e in fixed-point i64." \
+		--describe "GH-PSX=Note timing anchored to the CD's playback position, not the frame counter, so it cannot drift.|Le note seguono la posizione di lettura del CD, non il contatore dei frame, quindi non sfasano." \
+		--describe "BREAKOUT=Engine sample: the whole 2D path, sprites to collision, in 180 KB of PS1 executable.|Esempio del motore: tutto il percorso 2D, dagli sprite alle collisioni, in 180 KB." \
+		--describe "SPACE INVADERS=Engine sample: a wave of sprites and per-enemy state, in 188 KB of PS1 executable.|Esempio del motore: un'ondata di sprite con stato per nemico, in 188 KB." \
+		--describe "MAGIKAAAAARP PONG=Built to test CD audio under read load. The bars are a spectrum analysed offline, 16 bands at 30 Hz.|Fatto per provare l'audio da CD sotto carico. Le barre sono uno spettro analizzato prima, 16 bande." \
+		--describe "HARDWARE TESTS=Measures this console and prints the results as QR pages, so silicon can be diffed against the emulator.|Misura questa console e stampa i risultati come QR, per confrontarla con l'emulatore."
 
 check:
 	cd carousel && cargo test
