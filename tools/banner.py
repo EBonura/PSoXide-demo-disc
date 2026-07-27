@@ -215,9 +215,23 @@ def main(argv):
     if crop_rows:
         rows = rows[:crop_rows]
         src_h = crop_rows
-    small = resample(rows, src_w, src_h, width, height)
-    small = sharpen(small, width, height, SHARPEN)
-    small = [[tuple(to_srgb(c) for c in px) for px in line] for line in small]
+    if (src_w, src_h) == (width, height):
+        # Already at the target size, so it was rendered there rather than
+        # reduced. A vector rasterised at final size computes its coverage
+        # from the geometry, which is as good as this gets; resampling and
+        # sharpening it again would only add ringing.
+        # Composite onto black at the alpha the rasteriser produced.
+        small = [
+            [
+                tuple(int(c * px[3] / 255.0 + 0.5) for c in (px[0], px[1], px[2]))
+                for px in line
+            ]
+            for line in rows
+        ]
+    else:
+        small = resample(rows, src_w, src_h, width, height)
+        small = sharpen(small, width, height, SHARPEN)
+        small = [[tuple(to_srgb(c) for c in px) for px in line] for line in small]
     flat = [p for line in small for p in line]
     palette = build_palette(flat)
     palette += [0x0000] * (COLOURS - len(palette))

@@ -56,7 +56,7 @@ const SMALL_CLUT: Clut = Clut::new(416, 256);
 const BANNER_TPAGE: Tpage = Tpage::new(384, 0, TexDepth::Bit4);
 const BANNER_CLUT: Clut = Clut::new(400, 256);
 const BANNER_W: i16 = 120;
-const BANNER_H: i16 = 22;
+const BANNER_H: i16 = 19;
 static BANNER_TEX: &[u8] = include_bytes!("../assets/banner.tex");
 static BANNER_CLUT_DATA: &[u8] = include_bytes!("../assets/banner.clut");
 
