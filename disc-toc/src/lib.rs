@@ -16,7 +16,8 @@
 //! 0x10  u32 how many consecutive tracks it cycles through
 //! 0x14  music credit, NUL-padded ASCII
 //! 0x44  beat grid, MAX_MENU_TRACKS x (u32 milli-BPM, u32 first-beat ms)
-//! 0x90  entries, ENTRY_BYTES each:
+//! 0x84  menu track titles, MAX_MENU_TRACKS x MENU_TITLE_BYTES
+//! 0x144 entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
@@ -40,8 +41,12 @@ pub const TOC_FILE_NAME: &str = "DEMOTOC.BIN";
 /// Identifies a demo-disc table of contents.
 pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
 
-/// One sector.
-pub const TOC_BYTES: usize = 2048;
+/// Sectors the table occupies. Two, since the per-track titles and the two
+/// descriptions per program stopped fitting in one.
+pub const TOC_SECTORS: u32 = 2;
+
+/// The whole table.
+pub const TOC_BYTES: usize = 2048 * TOC_SECTORS as usize;
 
 /// Bytes per entry.
 pub const ENTRY_BYTES: usize = 164;
@@ -62,9 +67,13 @@ pub const CREDIT_BYTES: usize = 48;
 /// Menu tracks the beat grid has room for.
 pub const MAX_MENU_TRACKS: usize = 8;
 
-const HEADER_BYTES: usize = 0x90;
+/// Bytes reserved for each menu track's title, shown as "now playing".
+pub const MENU_TITLE_BYTES: usize = 24;
+
+const HEADER_BYTES: usize = 0x144;
 const CREDIT_AT: usize = 0x14;
 const BEATS_AT: usize = 0x44;
+const TITLES_AT: usize = 0x84;
 
 /// Entries that fit in one sector.
 pub const MAX_ENTRIES: usize = (TOC_BYTES - HEADER_BYTES) / ENTRY_BYTES;
@@ -157,12 +166,21 @@ pub struct Header {
     /// beats over a four-minute track, which looks like a bug rather than an
     /// effect.
     pub beats: [(u32, u32); MAX_MENU_TRACKS],
+    /// Title of each menu track, NUL-padded, for the menu to name what is
+    /// playing. The permission was given per track, so the disc says which.
+    pub titles: [[u8; MENU_TITLE_BYTES]; MAX_MENU_TRACKS],
 }
 
 impl Header {
     /// The credit as a `str`, NUL padding stripped.
     pub fn credit_str(&self) -> &str {
         trimmed(&self.credit)
+    }
+
+    /// Title of menu track `index`, NUL padding stripped. Empty when the
+    /// disc did not name it.
+    pub fn title(&self, index: usize) -> &str {
+        self.titles.get(index).map_or("", |t| trimmed(t))
     }
 
     /// Milliseconds per beat for menu track `index`, and how far into the
@@ -188,8 +206,12 @@ pub fn encode(
     menu_track_count: u32,
     credit: &str,
     beats: &[(u32, u32)],
+    titles: &[&str],
 ) -> Option<[u8; TOC_BYTES]> {
-    if entries.len() > MAX_ENTRIES || beats.len() > MAX_MENU_TRACKS {
+    if entries.len() > MAX_ENTRIES
+        || beats.len() > MAX_MENU_TRACKS
+        || titles.len() > MAX_MENU_TRACKS
+    {
         return None;
     }
     let mut out = [0u8; TOC_BYTES];
@@ -198,6 +220,10 @@ pub fn encode(
     out[12..16].copy_from_slice(&menu_track.to_le_bytes());
     out[16..20].copy_from_slice(&menu_track_count.to_le_bytes());
     out[CREDIT_AT..CREDIT_AT + CREDIT_BYTES].copy_from_slice(&fixed::<CREDIT_BYTES>(credit));
+    for (i, title) in titles.iter().enumerate() {
+        let at = TITLES_AT + i * MENU_TITLE_BYTES;
+        out[at..at + MENU_TITLE_BYTES].copy_from_slice(&fixed::<MENU_TITLE_BYTES>(title));
+    }
     for (i, (milli_bpm, phase_ms)) in beats.iter().enumerate() {
         let at = BEATS_AT + i * 8;
         out[at..at + 4].copy_from_slice(&milli_bpm.to_le_bytes());
@@ -232,6 +258,11 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     }
     let mut credit = [0u8; CREDIT_BYTES];
     credit.copy_from_slice(&sector[CREDIT_AT..CREDIT_AT + CREDIT_BYTES]);
+    let mut titles = [[0u8; MENU_TITLE_BYTES]; MAX_MENU_TRACKS];
+    for (i, slot) in titles.iter_mut().enumerate() {
+        let at = TITLES_AT + i * MENU_TITLE_BYTES;
+        slot.copy_from_slice(&sector[at..at + MENU_TITLE_BYTES]);
+    }
     let mut beats = [(0u32, 0u32); MAX_MENU_TRACKS];
     for (i, slot) in beats.iter_mut().enumerate() {
         let at = BEATS_AT + i * 8;
@@ -241,6 +272,7 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
     let header = Header {
         count,
         beats,
+        titles,
         menu_track: u32::from_le_bytes([sector[12], sector[13], sector[14], sector[15]]),
         menu_track_count: u32::from_le_bytes([sector[16], sector[17], sector[18], sector[19]]),
         credit,
@@ -285,6 +317,7 @@ mod tests {
             4,
             "Music by Just Music",
             &[(176_000, 34), (175_000, 23)],
+            &["KNUCKLE DUST", "RUSTED HAMMER"],
         )
         .expect("fits");
         let mut out = blank();
@@ -297,6 +330,9 @@ mod tests {
         assert_eq!(header.beat(0), Some((340, 34)));
         assert_eq!(header.beat(1), Some((342, 23)));
         assert_eq!(header.beat(2), None, "no measured tempo, no pulse");
+        assert_eq!(header.title(0), "KNUCKLE DUST");
+        assert_eq!(header.title(1), "RUSTED HAMMER");
+        assert_eq!(header.title(2), "", "unnamed track");
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
@@ -309,7 +345,7 @@ mod tests {
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[]).expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[], &[]).expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
@@ -317,7 +353,7 @@ mod tests {
     #[test]
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
-        assert!(encode(&too_many, 0, 0, "", &[]).is_none());
+        assert!(encode(&too_many, 0, 0, "", &[], &[]).is_none());
     }
 
     #[test]

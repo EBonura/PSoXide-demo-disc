@@ -88,6 +88,9 @@ struct Args {
     /// Per menu track, in the same order: `(milli-BPM, first-beat ms)` from
     /// `tools/beatgrid.py`.
     menu_beats: Vec<(u32, u32)>,
+    /// Per menu track, in the same order: the title the menu shows as
+    /// "now playing".
+    menu_titles: Vec<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -100,6 +103,7 @@ fn parse_args() -> Result<Args, String> {
     let mut menu_cdda = Vec::new();
     let mut credit = String::new();
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
+    let mut menu_titles: Vec<String> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -161,6 +165,9 @@ fn parse_args() -> Result<Args, String> {
                 it.next().ok_or("--menu-cdda takes a path".to_string())?,
             )),
             "--credit" => credit = it.next().ok_or("--credit takes a string".to_string())?,
+            "--menu-title" => {
+                menu_titles.push(it.next().ok_or("--menu-title takes a string".to_string())?)
+            }
             "--menu-beat" => {
                 let spec = it.next().ok_or("--menu-beat takes MILLIBPM:PHASEMS")?;
                 let (bpm, phase) = spec.split_once(':').ok_or_else(|| {
@@ -190,6 +197,7 @@ fn parse_args() -> Result<Args, String> {
         menu_cdda,
         credit,
         menu_beats,
+        menu_titles,
     })
 }
 
@@ -207,7 +215,8 @@ fn print_usage() {
         \x20             menu cycles through the tracks in order\n\
          --credit      attribution the menu prints for that track\n\
          --menu-beat   MILLIBPM:PHASEMS for the matching --menu-cdda, from\n\
-        \x20             tools/beatgrid.py; drives the menu's beat pulse"
+        \x20             tools/beatgrid.py; drives the menu's beat pulse\n\
+         --menu-title  title of the matching --menu-cdda, shown as now playing"
     );
 }
 
@@ -436,7 +445,7 @@ fn run() -> Result<(), String> {
     // Bare EXEs ride inside the launcher's own ISO, so their LBAs follow from
     // the file order. Whole images are appended after the ISO ends, which the
     // ISO's own length decides -- so build the ISO first, then place them.
-    let mut next_lba = toc_lba + 1 + sectors_for(launcher.len());
+    let mut next_lba = toc_lba + disc_toc::TOC_SECTORS + sectors_for(launcher.len());
     let mut entries: Vec<Option<Entry>> = vec![None; args.programs.len()];
     let mut iso_files = Vec::new();
     let mut map = Vec::new();
@@ -499,7 +508,7 @@ fn run() -> Result<(), String> {
     // Sizing pass: the ISO's length fixes where the first image lands, and the
     // table has to name that. The table is exactly one sector either way, so
     // the second build comes out the same length.
-    let iso_frames = (build_iso(vec![0u8; SECTOR_SIZE]).len() / SECTOR_BYTES) as u32;
+    let iso_frames = (build_iso(vec![0u8; disc_toc::TOC_BYTES]).len() / SECTOR_BYTES) as u32;
 
     let mut image_lba = iso_frames;
     let mut cdda_track_base = 0u32;
@@ -568,13 +577,27 @@ fn run() -> Result<(), String> {
             args.credit
         ));
     }
-    if !args.menu_beats.is_empty() && args.menu_beats.len() != menu_audio.len() {
-        return Err(format!(
-            "{} --menu-beat against {} --menu-cdda: they pair up in order, so give one \
-             per track or none at all",
-            args.menu_beats.len(),
-            menu_audio.len()
-        ));
+    for (flag, given) in [
+        ("--menu-beat", args.menu_beats.len()),
+        ("--menu-title", args.menu_titles.len()),
+    ] {
+        if given != 0 && given != menu_audio.len() {
+            return Err(format!(
+                "{given} {flag} against {} --menu-cdda: they pair up in order, so give one \
+                 per track or none at all",
+                menu_audio.len()
+            ));
+        }
+    }
+    for title in &args.menu_titles {
+        if title.len() > disc_toc::MENU_TITLE_BYTES {
+            return Err(format!(
+                "--menu-title {title:?} is {} characters, {} over the {} the table holds",
+                title.len(),
+                title.len() - disc_toc::MENU_TITLE_BYTES,
+                disc_toc::MENU_TITLE_BYTES
+            ));
+        }
     }
     if !menu_audio.is_empty() && args.credit.is_empty() {
         return Err("--menu-cdda without --credit: the menu has nowhere to attribute the \
@@ -588,6 +611,11 @@ fn run() -> Result<(), String> {
         menu_audio.len() as u32,
         &args.credit,
         &args.menu_beats,
+        &args
+            .menu_titles
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
     )
     .ok_or_else(|| {
         format!(

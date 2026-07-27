@@ -46,6 +46,8 @@ const FONT_CLUT: Clut = Clut::new(320, 256);
 const TITLE: (u8, u8, u8) = (170, 220, 255);
 const CREDIT: (u8, u8, u8) = (95, 125, 175);
 const HINT: (u8, u8, u8) = (80, 105, 150);
+const NOW_PLAYING: (u8, u8, u8) = (70, 100, 150);
+const TRACK_NAME: (u8, u8, u8) = (150, 200, 250);
 const BLURB: (u8, u8, u8) = (215, 235, 255);
 const LABEL: (u8, u8, u8) = (255, 255, 255);
 const FAR_LABEL: (u8, u8, u8) = (110, 150, 200);
@@ -90,7 +92,8 @@ const TICKS_HZ: u32 = 60;
 
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
-static mut TOC_SECTOR: [u32; SECTOR_WORDS] = [0; SECTOR_WORDS];
+static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
+    [0; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize];
 
 #[no_mangle]
 fn main() {
@@ -247,11 +250,8 @@ fn main() {
         draw_sphere(spin, swell, &mut beads);
 
         centred(&font, 6, "PSOXIDE DEMO DISC", TITLE);
-        // The one control worth labelling: nothing about the screen suggests
-        // the shoulder buttons do anything.
-        if menu_track_count > 1 {
-            font.draw_text(6, 6, "L1/R1", HINT);
-            font.draw_text(6, 16, "MUSIC", HINT);
+        if let Some(header) = header {
+            draw_music_panel(&font, &header, menu_track_index, &beat, menu_track_count > 1);
         }
 
         if count == 0 {
@@ -335,6 +335,37 @@ fn draw_sphere(spin: i32, swell: i32, beads: &mut [Bead; SPHERE_POINTS]) {
     }
 }
 
+/// Top-left: what is playing, a level meter that dances on the beat, and the
+/// one control worth labelling. Nothing about the screen suggests the
+/// shoulder buttons do anything, so that one is spelled out.
+fn draw_music_panel(
+    font: &FontAtlas,
+    header: &Header,
+    track: u8,
+    beat: &carousel::Beat,
+    skippable: bool,
+) {
+    let title = header.title(track as usize);
+    if title.is_empty() {
+        return;
+    }
+    // "NOW PLAYING" is wide enough to touch the centred header. "PLAYING"
+    // says the same thing with the level meter beside it.
+    font.draw_text(6, 6, "PLAYING", NOW_PLAYING);
+    // The title brightens on the beat, so the words themselves keep time.
+    let lift = beat.pulse / 4;
+    let tint = (
+        TRACK_NAME.0.saturating_add(lift),
+        TRACK_NAME.1.saturating_add(lift),
+        TRACK_NAME.2.saturating_add(lift),
+    );
+    font.draw_text(6, 17, title, tint);
+    paint::level_meter(6, 44, beat.pulse);
+    if skippable {
+        font.draw_text(6, 48, "L1/R1", HINT);
+    }
+}
+
 /// The selected game's blurb in one language, under the flag of whichever
 /// one it is. Up or down swaps.
 fn draw_description(font: &FontAtlas, entry: &Entry, italian: bool) {
@@ -413,7 +444,13 @@ fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
     let reader = unsafe { &mut *core::ptr::addr_of_mut!(READER) };
     let sector = unsafe { &mut *core::ptr::addr_of_mut!(TOC_SECTOR) };
 
-    let ok = unsafe { reader.prepare() && reader.start_read(TOC_LBA) && reader.read_sector(sector) };
+    // The table spans more than one sector now; `read_sector` walks the same
+    // ReadN stream, so they arrive back to back.
+    let mut ok = unsafe { reader.prepare() && reader.start_read(TOC_LBA) };
+    for chunk in sector.chunks_exact_mut(SECTOR_WORDS) {
+        let slot: &mut [u32; SECTOR_WORDS] = chunk.try_into().expect("exact chunks");
+        ok = ok && unsafe { reader.read_sector(slot) };
+    }
     unsafe { reader.stop() };
     if !ok {
         return None;
