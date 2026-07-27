@@ -87,9 +87,12 @@ const SPHERE_DECAY_SHIFT: i32 = 4;
 /// Widest line the 8-pixel font fits on screen with a margin either side.
 const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// Top of the description block, and the gap between its lines.
-/// The music panel starts below the banner rather than beside it: at 140
-/// pixels wide the mark reaches too far left to share the row.
-const MUSIC_TOP: i16 = 38;
+/// The music panel sits in the top-left corner, where it reads best. The
+/// banner shifts right of it rather than the panel dropping below: stacking
+/// them pushed the L1/R1 label under the description panel.
+const MUSIC_TOP: i16 = 6;
+/// Left edge of the banner, clear of the widest track title the panel draws.
+const BANNER_X: i16 = 120;
 const DESC_TOP: i16 = 92;
 const DESC_LEADING: i16 = 9;
 
@@ -290,8 +293,15 @@ fn main() {
         draw_starfield(travel, beat.offbeat);
         draw_sphere(spin, swell, &mut beads);
 
-        banner.draw(160 - BANNER_W / 2, 1);
-        centred(&font, BANNER_H + 3, "DEMO DISC", TITLE);
+        banner.draw(BANNER_X, 1);
+        let under_banner = BANNER_X + BANNER_W / 2;
+        let demo = "DEMO DISC";
+        font.draw_text(
+            under_banner - (font.text_width(demo) as i16) / 2,
+            BANNER_H + 3,
+            demo,
+            TITLE,
+        );
         if let Some(header) = header {
             draw_music_panel(
                 &font,
