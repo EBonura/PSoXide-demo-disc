@@ -73,9 +73,12 @@ Every game currently assumes it owns the disc:
 - CD-DA: `cdrom::try_play_track(track: u8)` takes an absolute track number.
   Half-Life's track 2 is not track 2 on this disc.
 
-So each game needs two build-time knobs: a base LBA and a CD-DA track base. Both
-are one constant each; the work is plumbing them through six repos' build systems
-and re-cooking.
+The first plan was two build-time knobs per game, plumbed through six repos and
+re-cooked. **Superseded.** `mkdisc` places each game's existing image verbatim
+instead, so one offset relocates every LBA that game knows at once, and the two
+numbers travel at runtime through `psx_io::disc_base` rather than at build time.
+No re-cook, no per-disc build, and the same binary still boots standalone. See
+the README.
 
 ## Build shape
 
