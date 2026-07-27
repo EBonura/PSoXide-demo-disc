@@ -1,0 +1,23 @@
+[package]
+name    = "loader"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+# Standalone: this crate links at its own base address with its own linker
+# script, so it must not join any workspace.
+[workspace]
+
+[[bin]]
+name = "loader"
+path = "src/main.rs"
+
+[profile.release]
+panic         = "abort"
+codegen-units = 1
+lto           = true
+opt-level     = "s"
+
+[dependencies]
+psx-pack = { path = "../games/PSoXide/sdk/crates/psx-pack" }
+psx-io   = { path = "../games/PSoXide/sdk/crates/psx-io" }

@@ -1,0 +1,18 @@
+[submodule "games/PSoXide"]
+	path = games/PSoXide
+	url = https://github.com/EBonura/PSoXide.git
+[submodule "games/hl-psx"]
+	path = games/hl-psx
+	url = https://github.com/EBonura/hl-psx.git
+[submodule "games/pico8-psx"]
+	path = games/pico8-psx
+	url = https://github.com/EBonura/pico8-psx.git
+[submodule "games/voxide"]
+	path = games/voxide
+	url = https://github.com/EBonura/voxide.git
+[submodule "games/gh-psx"]
+	path = games/gh-psx
+	url = https://github.com/EBonura/gh-psx.git
+[submodule "games/psxcel"]
+	path = games/psxcel
+	url = https://github.com/EBonura/psxcel.git
