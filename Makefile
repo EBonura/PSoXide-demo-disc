@@ -6,7 +6,7 @@
 # Only the small PSoXide examples are wired up so far; the six full games need
 # their per-disc base LBA / CD-DA track knobs first (see PLAN.md).
 
-.PHONY: help disc loader launcher examples mkdisc check clean
+.PHONY: help disc loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    := $(ROOT)/games/PSoXide
@@ -22,9 +22,10 @@ LOADER_EXE  := $(OUT)/loader.exe
 LAUNCHER_EXE := $(OUT)/launcher.exe
 
 help:
-	@echo "make disc     - build everything and lay out dist/demo.{bin,cue}"
-	@echo "make check    - host tests (disc-toc, mkdisc)"
-	@echo "make clean    - drop build/ and dist/"
+	@echo "make disc             - build everything and lay out dist/demo.{bin,cue}"
+	@echo "make check            - host tests (disc-toc, mkdisc)"
+	@echo "make relocation-check - disc that proves a relocated game still finds its data"
+	@echo "make clean            - drop build/ and dist/"
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
@@ -53,6 +54,23 @@ disc: launcher examples mkdisc
 check:
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
+
+# hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
+# list, which makes it the end-to-end test for the relocation machinery: its
+# image lands 200-odd sectors in, every LBA it was cooked with is wrong by that
+# much, and psx_io::disc_base has to make up the difference. Run the result
+# with the emulator and read the banner.
+relocation-check: launcher mkdisc
+	$(MAKE) -C $(PSOXIDE) hello-pack-disc
+	@mkdir -p $(DIST)
+	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(DIST)/relocation.bin --volume PSXRELOC \
+		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
+		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
+	@echo
+	@echo "Now: cd $(PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"
+	@echo "       --path $(DIST)/relocation.cue --steps 200000000 \\"
+	@echo "       --press '150:down,220:cross:8' --dump-hw /tmp/relocation.ppm"
+	@echo "The dumped frame must read ALL PASS."
 
 clean:
 	rm -rf $(BUILD) $(DIST)

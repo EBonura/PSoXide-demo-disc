@@ -32,12 +32,17 @@ const EXE_MAGIC: [u32; 2] = [0x582D_5350, 0x4558_4520]; // "PS-X EXE"
 
 /// Read the PSX-EXE at `exe_lba` into its load address and run it.
 ///
+/// `lba_offset` and `cdda_track_base` describe where the target's own disc
+/// image landed on this one; they are handed to the target's `_start` in the
+/// argument registers, where `psx_io::disc_base` picks them up. See
+/// `psx-io/src/disc_base.rs`.
+///
 /// # Safety
 /// Overwrites RAM from the target's load address onwards, including the
 /// caller. Never returns.
 #[link_section = ".text.loader_entry"]
 #[no_mangle]
-pub unsafe extern "C" fn loader_entry(exe_lba: u32) -> ! {
+pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_base: u32) -> ! {
     unsafe { quiesce() };
 
     let mut reader = SectorReader::new();
@@ -75,7 +80,7 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32) -> ! {
     unsafe { reader.stop() };
 
     unsafe { flush_cache() };
-    unsafe { enter(pc0, gp0, sp) }
+    unsafe { enter(pc0, gp0, sp, lba_offset, cdda_track_base) }
 }
 
 /// This blob's link base, read from the linker script rather than repeated
@@ -134,9 +139,14 @@ extern "C" {
     fn flush_cache();
 }
 
-/// Seed GP / SP and jump to the game's entry point. Nothing after this
-/// touches the stack, which is about to belong to the target.
-unsafe fn enter(pc0: u32, gp0: u32, sp: u32) -> ! {
+/// Seed GP / SP / the disc-base handover and jump to the game's entry point.
+/// Nothing after this touches the stack, which is about to belong to the
+/// target.
+///
+/// `$a0..$a2` are the MIPS ABI's first three arguments, which is exactly how
+/// `psx-rt`'s `_start` declares them, so the handover needs no assembly on the
+/// receiving side.
+unsafe fn enter(pc0: u32, gp0: u32, sp: u32, lba_offset: u32, cdda_track_base: u32) -> ! {
     unsafe {
         core::arch::asm!(
             "move $28, {gp}",
@@ -147,6 +157,9 @@ unsafe fn enter(pc0: u32, gp0: u32, sp: u32) -> ! {
             gp = in(reg) gp0,
             sp = in(reg) sp,
             pc = in(reg) pc0,
+            in("$4") psx_io::disc_base::HANDOFF_MAGIC,
+            in("$5") lba_offset,
+            in("$6") cdda_track_base,
             options(noreturn),
         );
     }
