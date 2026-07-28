@@ -4,10 +4,11 @@
 # them out into the PSoXide game library as one disc. `make check` runs the
 # host tests.
 #
-# Two of the nine cannot be rebuilt from a fresh clone: Cortex Ignition's
-# project lives under editor/projects/, which PSoXide gitignores, and hl-psx
-# keeps its cooked assets and music outside git too. Both are staged from the
-# sibling working trees. See PLAN.md.
+# Three of the eleven cannot be rebuilt from a fresh clone: Cortex Ignition's
+# project lives under editor/projects/, which PSoXide gitignores, hl-psx keeps
+# its cooked assets and music outside git too, and NitroXide has no remote yet
+# so it cannot be a submodule. All three are staged from the sibling working
+# trees. See PLAN.md.
 
 .PHONY: help disc disc-only programs loader launcher examples mkdisc check relocation-check clean
 
@@ -51,6 +52,11 @@ HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX   := $(PSOXIDE)/editor/projects/cortex_v1/baked/cortex_v1.cue
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
+# NitroXide is not a submodule: it has no remote yet. Staged from the sibling
+# working tree, the same way Cortex's project and hl-psx's assets are.
+NITROXIDE_SRC ?= $(ROOT)/../nitroxide
+NITROXIDE     := $(NITROXIDE_SRC)/game/target/$(PSX_TARGET)/release/nitroxide.exe
+
 help:
 	@echo "make disc             - build everything into \"$(DIST)\""
 	@echo "make disc-only        - relay out the disc without rebuilding the programs"
@@ -73,13 +79,15 @@ examples:
 	$(MAKE) -C $(PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
 	$(MAKE) -C $(PSOXIDE) hardware-tests-disc
 
-# voxide, PSXcel and the Celeste collection never read the disc after boot, so
-# they ride as bare EXEs and do not care which SDK they were built against.
+# voxide, NitroXide, PSXcel and the Celeste collection never read the disc
+# after boot, so they ride as bare EXEs and do not care which SDK they were
+# built against.
 # gh-psx plays CD-DA, so it ships its whole image and needs the SDK with
 # psx_io::disc_base (PSoXide branch demo-disc-lba-base, pinned in its own
 # third_party/PSoXide).
 programs: examples
 	$(MAKE) -C $(GAMES)/voxide compile
+	$(MAKE) -C $(NITROXIDE_SRC) build
 	$(MAKE) -C $(GAMES)/psxcel build
 	$(MAKE) -C $(GAMES)/pico8-psx collection
 	$(MAKE) -C $(GAMES)/gh-psx disc
@@ -101,6 +109,7 @@ disc-only: mkdisc
 		--image "CORTEX IGNITION=$(CORTEX)" \
 		--image "HALF-LIFE=$(HLPSX)" \
 		--game "VOXIDE=$(VOXIDE)" \
+		--game "NITROXIDE=$(NITROXIDE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--game "PSXCEL=$(PSXCEL)" \
 		--image "GH-PSX=$(GHPSX)" \
@@ -114,16 +123,17 @@ disc-only: mkdisc
 		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
-		--describe "CORTEX IGNITION=A souls-like built from nothing for a machine with two megabytes of memory. The world arrives off the disc as you walk into it, a room at a time, so it can be far larger than the console can hold.|Un souls-like creato da zero per una macchina con due megabyte di memoria. Il mondo arriva dal disco mentre cammini, una stanza alla volta, e per questo supera di molto la memoria della console." \
-		--describe "HALF-LIFE=Black Mesa on a PlayStation. The real maps and models, squeezed until they fit and fed off the disc as you move through them. Rebuilt from scratch, and far enough along to walk around in.|Black Mesa su PlayStation. Le mappe e i modelli originali, ridotti quanto basta per entrare in memoria e letti dal disco mentre avanzi. Riscritto da zero, abbastanza avanti da camminarci dentro." \
-		--describe "VOXIDE=An endless block world the console invents as you walk. It quietly builds the ground one ring beyond what you can see, so the horizon is always finished by the time you get there.|Un mondo di blocchi infinito che la console inventa mentre cammini. Prepara il terreno un anello oltre quello che vedi, quindi trovi l'orizzonte sempre pronto quando ci arrivi." \
-		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation code rather than emulated. Two complete games and the menu that picks between them, in less space than one photograph off a phone.|I due Celeste Classic, riscritti in codice PlayStation nativo invece che emulati. Due giochi interi e il menu che li sceglie, in meno spazio di una singola foto da telefono." \
-		--describe "PSXCEL=A working spreadsheet on a games console, driven entirely with a joypad. The PlayStation cannot do decimal arithmetic at all, so every cell counts in whole numbers and puts the point back afterwards.|Un foglio di calcolo vero su una console, guidato solo col joypad. La PlayStation non sa fare i decimali, quindi ogni cella conta in numeri interi e rimette la virgola alla fine." \
-		--describe "GH-PSX=A rhythm game that listens to the disc instead of counting frames. It keeps asking the CD where the needle is, so the notes stay with the music even when the console falls behind.|Un gioco ritmico che ascolta il disco invece di contare i frame. Chiede al CD dove si trova la puntina, quindi le note restano con la musica anche quando la console rimane indietro." \
-		--describe "BREAKOUT=The oldest idea in games, built as a sample for the engine everything else here runs on. Small enough to sit in a corner of the disc, complete enough to lose an evening to.|La prima idea dei videogiochi, scritta come esempio per il motore su cui gira tutto il resto. Occupa un angolo del disco, ma basta e avanza per perderci una serata." \
-		--describe "SPACE INVADERS=A wall of aliens coming down a row at a time. Another engine sample, here to show how little you actually need before something stops being a demo and starts being a game.|Un muro di alieni che scende una fila alla volta. Un altro esempio del motore, qui per mostrare quanto poco serve prima che una demo diventi davvero un gioco." \
-		--describe "MAGIKAAAAARP PONG=Pong, written as an excuse to torture the CD drive: music playing off the disc while the game reads from it. The bars are the song itself, measured beforehand and replayed in step.|Pong, scritto come scusa per torturare il lettore CD: la musica suona dal disco mentre il gioco legge dallo stesso disco. Le barre di lato sono la canzone, misurata prima e riprodotta a tempo." \
-		--describe "HARDWARE TESTS=Not a game. It measures what this particular console actually does, prints the answers as codes you can photograph, and hands them back so the emulator can be held to the same standard.|Questo non lo si gioca. Misura quello che fa davvero questa console, stampa le risposte come codici da fotografare e le restituisce per mettere alla prova l'emulatore."
+		--describe "CORTEX IGNITION=An original souls-like, built from scratch for the PlayStation. The current build is a PSoXide engine tech demo rather than a complete game, with streamed rooms, combat and animation.|Un souls-like originale, creato da zero per PlayStation. La versione attuale e una tech demo del motore PSoXide, non un gioco completo, con stanze in streaming, combattimento e animazioni." \
+		--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine." \
+		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Questa e una prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
+		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. This is a bare-bones prototype: you can drive, boost and score, but there is no opponent, sound or aerial play yet.|Un clone di Rocket League per la prima PlayStation. E un prototipo essenziale: puoi guidare, usare il boost e segnare, ma non ci sono ancora avversari, audio o gioco aereo." \
+		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \
+		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
+		--describe "GH-PSX=A Guitar Hero-style rhythm game for the original PlayStation. This is a bare-bones, one-song prototype: the full loop works, but sustains, star power and polish are still missing.|Un gioco in stile Guitar Hero per la prima PlayStation. E un prototipo essenziale con una sola canzone: il ciclo completo funziona, ma mancano note lunghe, star power e rifiniture." \
+		--describe "BREAKOUT=A Breakout clone and compact example of the engine used across this disc. This one is complete and fully playable, with input, collision, sound, scoring and a full game loop.|Un clone di Breakout e un esempio compatto del motore usato in questo disco. Il gioco e completo, con input, collisioni, audio, punti e un ciclo di gioco completo." \
+		--describe "SPACE INVADERS=A Space Invaders clone and a second engine example. This one is also complete and fully playable, with formations, shields, scoring and enemy fire.|Un clone di Space Invaders e un secondo esempio del motore. Anche questo e completo e giocabile, con formazioni, scudi, punti e fuoco nemico." \
+		--describe "MAGIKAAAAARP PONG=Pong with a live CD-audio visualizer. The game is complete and playable: music streams from the disc while pre-analysed frequency bands drive the bars in sync.|Pong con un visualizzatore audio dal vivo. Il gioco e completo: la musica arriva dal CD mentre le frequenze analizzate in anticipo muovono le barre a tempo." \
+		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori."
 
 check:
 	cd carousel && cargo test
