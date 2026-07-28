@@ -122,6 +122,16 @@ const DESC_LEADING: i16 = 9;
 const CDDA_POLL_TICKS: u32 = 30;
 /// Status bit the drive sets while it is playing CD-DA.
 const CDDA_PLAYING: u8 = 0x80;
+/// Status bit the drive sets while the head is still on its way. Play is a
+/// seek followed by playback, and the two bits are mutually exclusive, so a
+/// drive that has accepted Play and not yet arrived reads as neither reading
+/// nor playing.
+const CDDA_SEEKING: u8 = 0x40;
+/// Consecutive idle polls that mean the track really has ended. One does not:
+/// the menu tracks sit at the far end of the disc, so the seek after Play runs
+/// well past a single poll, and there are moments in between where the drive
+/// claims neither bit.
+const CDDA_IDLE_POLLS_TO_ADVANCE: u8 = 3;
 /// Spin budget per CD command. Silicon wants more than an emulator does.
 const CDDA_SPINS: u32 = 0x10_0000;
 /// Display frames a second, which is what the CD clock counts in.
@@ -203,6 +213,7 @@ fn main() {
     let mut clock = CddaClock::new(TICKS_HZ);
     let mut tick: u32 = 0;
     let mut next_music_poll = CDDA_POLL_TICKS;
+    let mut idle_polls: u8 = 0;
     if menu_track != 0 {
         // The CD controller playing is only half of it: the SPU's CD input
         // comes up silent, so without this the drive spins a track nobody
@@ -264,10 +275,12 @@ fn main() {
                     Some(status) => status
                         .bytes()
                         .first()
-                        .is_some_and(|s| s & CDDA_PLAYING == 0),
+                        .is_some_and(|s| s & (CDDA_PLAYING | CDDA_SEEKING) == 0),
                     None => false,
                 };
-                if idle {
+                idle_polls = if idle { idle_polls.saturating_add(1) } else { 0 };
+                if idle_polls >= CDDA_IDLE_POLLS_TO_ADVANCE {
+                    idle_polls = 0;
                     menu_track_index = (menu_track_index + 1) % menu_track_count;
                     music.begin(tick);
                 }
@@ -313,6 +326,7 @@ fn main() {
                 // Silence first: the handshake re-issues Play, and leaving the
                 // old track running under it is how the drive got wedged.
                 let _ = cdrom::try_stop(CDDA_SPINS);
+                idle_polls = 0;
                 music.begin(tick);
             }
         }
