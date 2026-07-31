@@ -16,6 +16,8 @@
 #![no_main]
 #![feature(asm_experimental_arch)]
 
+mod paint;
+
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 
 const SECTOR_BYTES: u32 = (SECTOR_WORDS * 4) as u32;
@@ -45,17 +47,22 @@ const EXE_MAGIC: [u32; 2] = [0x582D_5350, 0x4558_4520]; // "PS-X EXE"
 pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_base: u32) -> ! {
     unsafe { quiesce() };
 
+    // The screen comes up immediately: dark base plus a progress strip, so
+    // a photo of a hang says which stage it died in even without a panel.
+    paint::setup();
+    paint::rect(0, 0, 320, 240, paint::RED_BASE);
+    paint::show();
+
     let mut reader = SectorReader::new();
     let mut header = [0u32; SECTOR_WORDS];
 
-    // Two attempts. The first silicon burn failed every chain-load with the
-    // plain red screen, and the prime suspect is a drive still winding down
-    // from the menu's CD-DA Stop when the first commands arrive. The first
-    // failure paints its diagnostic panel (photograph it), waits a couple of
-    // seconds for the drive to settle, and retries the whole load from
-    // scratch; a second failure paints a second panel below and halts. A
-    // game that boots after a brief red flash is itself a finding: the
-    // failure is transient drive state, not the read path.
+    // Two attempts. The first silicon burn failed every chain-load, and the
+    // second (instrumented) one showed prepare failing and an instant retry
+    // reaching the header read: the drive is still winding down from the
+    // menu's CD-DA when the first commands arrive, and the old settle delay
+    // was an empty loop the optimizer deleted. The first failure paints its
+    // panel (photograph it), waits a real two seconds, and retries from
+    // scratch; the second failure paints a second panel below and halts.
     let mut attempt: u32 = 0;
     let exe = loop {
         match unsafe { try_load(&mut reader, exe_lba, &mut header) } {
@@ -73,6 +80,11 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
 
     unsafe { flush_cache() };
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
+}
+
+/// Mark load stage `n` (1-based) as passed: a green block in the top strip.
+fn progress(n: i16) {
+    paint::rect(8 + (n - 1) * 18, 8, 14, 10, paint::GREEN);
 }
 
 struct LoadedExe {
@@ -93,19 +105,23 @@ unsafe fn try_load(
         if !reader.prepare() {
             return Err((1, 0));
         }
+        progress(1);
         if !reader.start_read(exe_lba) {
             reader.stop();
             return Err((2, exe_lba));
         }
+        progress(2);
         if !reader.read_sector(header) {
             reader.stop();
             return Err((3, exe_lba));
         }
+        progress(3);
     }
     if header[0] != EXE_MAGIC[0] || header[1] != EXE_MAGIC[1] {
         unsafe { reader.stop() };
         return Err((4, header[0]));
     }
+    progress(4);
 
     let pc0 = header[HDR_PC0];
     let gp0 = header[HDR_GP0];
@@ -118,9 +134,11 @@ unsafe fn try_load(
     if t_addr < 0x8001_0000 || t_addr.saturating_add(t_size) > loader_base() {
         return Err((5, t_addr));
     }
+    progress(5);
 
     // Payload sectors follow the header sector contiguously, and `read_sector`
-    // continues the same ReadN stream, so no reseek is needed.
+    // continues the same ReadN stream, so no reseek is needed. The strip's
+    // right side is a coarse loading bar, one step per 16 sectors.
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
     for sector in 0..sectors {
@@ -129,6 +147,10 @@ unsafe fn try_load(
             return Err((6, sector));
         }
         dst = unsafe { dst.add(1) };
+        if sector % 16 == 0 {
+            let done = (sector * 200 / sectors.max(1)) as i16;
+            paint::rect(112, 8, done.clamp(1, 200), 10, paint::WHITE);
+        }
     }
     unsafe { reader.stop() };
     Ok(LoadedExe { pc0, gp0, sp })
@@ -225,53 +247,26 @@ unsafe fn enter(pc0: u32, gp0: u32, sp: u32, lba_offset: u32, cdda_track_base: u
     }
 }
 
-/// GP0(02h) fill. `rgb` is `0xBBGGRR`, the GPU's own order.
-fn fill(x: i16, y: i16, w: i16, h: i16, rgb: u32) {
-    unsafe {
-        psx_io::write32(0x1F80_1810, 0x0200_0000 | rgb);
-        psx_io::write32(0x1F80_1810, ((y as u32) << 16) | (x as u32 & 0xFFFF));
-        psx_io::write32(0x1F80_1810, ((h as u32) << 16) | (w as u32 & 0xFFFF));
-    }
-}
-
-/// One 32-bit word as two rows of 16 bit-cells, MSB first, a wider gap
-/// every byte so a photo can be read back without counting pixels. Set
-/// bits are white, clear bits dark grey (so alignment survives).
-fn bits_rows(y: i16, word: u32) {
-    for bit in 0..32u32 {
-        let row = (bit / 16) as i16;
-        let col = (bit % 16) as i16;
-        let x = 8 + col * 18 + (col / 8) * 8;
-        let set = word & (1 << (31 - bit)) != 0;
-        let rgb = if set { 0x00FF_FFFF } else { 0x0028_2828 };
-        fill(x, y + row * 18, 14, 14, rgb);
-    }
-}
-
-/// The diagnostic panel: stage as a count of white blocks, then the
-/// caller's detail word and the reader's diag word as bit rows. Attempt 0
-/// paints the top half over the dark red base, attempt 1 the bottom half,
-/// so both survive on screen together.
+/// The diagnostic panel: stage as a count of white blocks, an alignment
+/// ruler, then the caller's detail word and the reader's diag word as bit
+/// rows. Attempt 0 paints the upper half, attempt 1 the lower, so both
+/// survive on screen together.
 fn fail_panel(attempt: u32, stage: u32, detail: u32, diag: u32) {
-    unsafe { psx_io::write32(0x1F80_1814, 0x0300_0001) }; // display off
-    if attempt == 0 {
-        fill(0, 0, 640, 256, 0x0000_0040); // the familiar dark red base
-    }
-    let y0 = 8 + (attempt as i16) * 116;
+    let y0 = 36 + (attempt as i16) * 104;
     for i in 0..stage.min(8) as i16 {
-        fill(8 + i * 30, y0, 22, 22, 0x00FF_FFFF);
+        paint::rect(8 + i * 30, y0, 22, 22, paint::WHITE);
     }
-    bits_rows(y0 + 28, detail);
-    bits_rows(y0 + 70, diag);
-    unsafe { psx_io::write32(0x1F80_1814, 0x0300_0000) }; // display on
+    paint::ruler(y0 + 24);
+    paint::bits_rows(y0 + 32, detail);
+    paint::bits_rows(y0 + 66, diag);
 }
 
-/// Give the drive time to settle before the retry: a couple of seconds of
-/// busy spinning. The panel is already on screen, so the wait is also the
-/// photo opportunity.
+/// Give the drive time to settle before the retry: roughly two seconds of
+/// GPUSTAT reads. Volatile MMIO reads, so unlike a plain spin loop the
+/// optimizer cannot delete it (the first debug burn proved it will).
 fn settle_delay() {
-    for _ in 0..40_000_000u32 {
-        core::hint::spin_loop();
+    for _ in 0..1_500_000u32 {
+        unsafe { core::ptr::read_volatile(0x1F80_1814 as *const u32) };
     }
 }
 
@@ -283,6 +278,9 @@ fn halt() -> ! {
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
+    paint::setup();
+    paint::rect(0, 0, 320, 240, paint::RED_BASE);
     fail_panel(1, 7, 0, 0);
+    paint::show();
     halt()
 }
