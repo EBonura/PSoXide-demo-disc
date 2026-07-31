@@ -48,11 +48,63 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
     let mut reader = SectorReader::new();
     let mut header = [0u32; SECTOR_WORDS];
 
-    let ok = unsafe {
-        reader.prepare() && reader.start_read(exe_lba) && reader.read_sector(&mut header)
+    // Two attempts. The first silicon burn failed every chain-load with the
+    // plain red screen, and the prime suspect is a drive still winding down
+    // from the menu's CD-DA Stop when the first commands arrive. The first
+    // failure paints its diagnostic panel (photograph it), waits a couple of
+    // seconds for the drive to settle, and retries the whole load from
+    // scratch; a second failure paints a second panel below and halts. A
+    // game that boots after a brief red flash is itself a finding: the
+    // failure is transient drive state, not the read path.
+    let mut attempt: u32 = 0;
+    let exe = loop {
+        match unsafe { try_load(&mut reader, exe_lba, &mut header) } {
+            Ok(exe) => break exe,
+            Err((stage, detail)) => {
+                fail_panel(attempt, stage, detail, reader.diag());
+                attempt += 1;
+                if attempt >= 2 {
+                    halt();
+                }
+                settle_delay();
+            }
+        }
     };
-    if !ok || header[0] != EXE_MAGIC[0] || header[1] != EXE_MAGIC[1] {
-        fail();
+
+    unsafe { flush_cache() };
+    unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
+}
+
+struct LoadedExe {
+    pc0: u32,
+    gp0: u32,
+    sp: u32,
+}
+
+/// Load stages, doubling as the fail panel's block count: 1 prepare,
+/// 2 start_read, 3 header sector, 4 magic, 5 bounds, 6 payload sector
+/// (detail = failing sector index), 7 panic.
+unsafe fn try_load(
+    reader: &mut SectorReader,
+    exe_lba: u32,
+    header: &mut [u32; SECTOR_WORDS],
+) -> Result<LoadedExe, (u32, u32)> {
+    unsafe {
+        if !reader.prepare() {
+            return Err((1, 0));
+        }
+        if !reader.start_read(exe_lba) {
+            reader.stop();
+            return Err((2, exe_lba));
+        }
+        if !reader.read_sector(header) {
+            reader.stop();
+            return Err((3, exe_lba));
+        }
+    }
+    if header[0] != EXE_MAGIC[0] || header[1] != EXE_MAGIC[1] {
+        unsafe { reader.stop() };
+        return Err((4, header[0]));
     }
 
     let pc0 = header[HDR_PC0];
@@ -64,23 +116,22 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
     // The payload must not reach this blob; `mkdisc` rejects such a game at
     // build time, so a failure here means the disc and the blob disagree.
     if t_addr < 0x8001_0000 || t_addr.saturating_add(t_size) > loader_base() {
-        fail();
+        return Err((5, t_addr));
     }
 
     // Payload sectors follow the header sector contiguously, and `read_sector`
     // continues the same ReadN stream, so no reseek is needed.
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
-    for _ in 0..sectors {
+    for sector in 0..sectors {
         if !unsafe { reader.read_sector(&mut *dst) } {
-            fail();
+            unsafe { reader.stop() };
+            return Err((6, sector));
         }
         dst = unsafe { dst.add(1) };
     }
     unsafe { reader.stop() };
-
-    unsafe { flush_cache() };
-    unsafe { enter(pc0, gp0, sp, lba_offset, cdda_track_base) }
+    Ok(LoadedExe { pc0, gp0, sp })
 }
 
 /// This blob's link base, read from the linker script rather than repeated
@@ -174,17 +225,57 @@ unsafe fn enter(pc0: u32, gp0: u32, sp: u32, lba_offset: u32, cdda_track_base: u
     }
 }
 
-/// Nothing sane is left to do: the disc is unreadable or the EXE is not one.
-/// Paint the screen red through a freshly reset GPU so the failure is visible
-/// on a TV, then stop.
-fn fail() -> ! {
+/// GP0(02h) fill. `rgb` is `0xBBGGRR`, the GPU's own order.
+fn fill(x: i16, y: i16, w: i16, h: i16, rgb: u32) {
     unsafe {
-        psx_io::write32(0x1F80_1814, 0x0300_0001); // GP1(03h): display off
-        psx_io::write32(0x1F80_1810, 0x0200_0040); // GP0(02h): fill rect, dark red
-        psx_io::write32(0x1F80_1810, 0x0000_0000); //   at (0,0)
-        psx_io::write32(0x1F80_1810, 0x0100_0280); //   640x256
-        psx_io::write32(0x1F80_1814, 0x0300_0000); // GP1(03h): display on
+        psx_io::write32(0x1F80_1810, 0x0200_0000 | rgb);
+        psx_io::write32(0x1F80_1810, ((y as u32) << 16) | (x as u32 & 0xFFFF));
+        psx_io::write32(0x1F80_1810, ((h as u32) << 16) | (w as u32 & 0xFFFF));
     }
+}
+
+/// One 32-bit word as two rows of 16 bit-cells, MSB first, a wider gap
+/// every byte so a photo can be read back without counting pixels. Set
+/// bits are white, clear bits dark grey (so alignment survives).
+fn bits_rows(y: i16, word: u32) {
+    for bit in 0..32u32 {
+        let row = (bit / 16) as i16;
+        let col = (bit % 16) as i16;
+        let x = 8 + col * 18 + (col / 8) * 8;
+        let set = word & (1 << (31 - bit)) != 0;
+        let rgb = if set { 0x00FF_FFFF } else { 0x0028_2828 };
+        fill(x, y + row * 18, 14, 14, rgb);
+    }
+}
+
+/// The diagnostic panel: stage as a count of white blocks, then the
+/// caller's detail word and the reader's diag word as bit rows. Attempt 0
+/// paints the top half over the dark red base, attempt 1 the bottom half,
+/// so both survive on screen together.
+fn fail_panel(attempt: u32, stage: u32, detail: u32, diag: u32) {
+    unsafe { psx_io::write32(0x1F80_1814, 0x0300_0001) }; // display off
+    if attempt == 0 {
+        fill(0, 0, 640, 256, 0x0000_0040); // the familiar dark red base
+    }
+    let y0 = 8 + (attempt as i16) * 116;
+    for i in 0..stage.min(8) as i16 {
+        fill(8 + i * 30, y0, 22, 22, 0x00FF_FFFF);
+    }
+    bits_rows(y0 + 28, detail);
+    bits_rows(y0 + 70, diag);
+    unsafe { psx_io::write32(0x1F80_1814, 0x0300_0000) }; // display on
+}
+
+/// Give the drive time to settle before the retry: a couple of seconds of
+/// busy spinning. The panel is already on screen, so the wait is also the
+/// photo opportunity.
+fn settle_delay() {
+    for _ in 0..40_000_000u32 {
+        core::hint::spin_loop();
+    }
+}
+
+fn halt() -> ! {
     loop {
         core::hint::spin_loop();
     }
@@ -192,5 +283,6 @@ fn fail() -> ! {
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
-    fail()
+    fail_panel(1, 7, 0, 0);
+    halt()
 }
