@@ -12,6 +12,17 @@ const GP0: u32 = 0x1F80_1810;
 const GP1: u32 = 0x1F80_1814;
 
 fn gp0(word: u32) {
+    // Wait for GPUSTAT bit 26 (ready for the next command word) before
+    // every write. The panel once burst hundreds of words unpaced;
+    // silicon dropped enough of them mid-fill to desync the command
+    // stream into garbage rectangles, while an emulator FIFO never
+    // overflows and rendered it perfectly. Bounded so a dead GPU cannot
+    // hang the panel that is trying to report on it.
+    for _ in 0..1_000_000u32 {
+        if unsafe { psx_io::read32(GP1) } & (1 << 26) != 0 {
+            break;
+        }
+    }
     unsafe { psx_io::write32(GP0, word) };
 }
 
