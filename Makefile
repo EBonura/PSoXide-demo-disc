@@ -10,7 +10,7 @@
 # so it cannot be a submodule. All three are staged from the sibling working
 # trees. See PLAN.md.
 
-.PHONY: help disc disc-only programs loader launcher probe examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    := $(ROOT)/games/PSoXide
@@ -41,7 +41,6 @@ PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
 LOADER_EXE  := $(OUT)/loader.exe
 LAUNCHER_EXE := $(OUT)/launcher.exe
-PROBE_EXE   := $(OUT)/irq-probe.exe
 
 # Sibling game repos, as submodules.
 GAMES    := $(ROOT)/games
@@ -76,12 +75,6 @@ launcher: loader
 		RUSTFLAGS="-Clink-arg=-T$(PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
-# The chain-load freeze diagnostic; see probe/src/main.rs.
-probe:
-	cd probe && CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Clink-arg=-T$(PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
-		cargo build $(PSX_FLAGS)
-
 examples:
 	$(MAKE) -C $(PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
 	$(MAKE) -C $(PSOXIDE) hardware-tests-disc
@@ -104,7 +97,7 @@ programs: examples
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
-disc: launcher probe programs mkdisc
+disc: launcher programs mkdisc
 	$(MAKE) disc-only
 
 # Just the layout, for when nothing but the text or the audio changed. Also
@@ -124,7 +117,6 @@ disc-only: mkdisc
 		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
 		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
-		--game "IRQ PROBE=$(PROBE_EXE)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
@@ -142,7 +134,7 @@ disc-only: mkdisc
 		--describe "SPACE INVADERS=A Space Invaders clone and a second engine example. This one is also complete and fully playable, with formations, shields, scoring and enemy fire.|Un clone di Space Invaders e un secondo esempio del motore. Anche questo e completo e giocabile, con formazioni, scudi, punti e fuoco nemico." \
 		--describe "MAGIKAAAAARP PONG=Pong with a live CD-audio visualizer. The game is complete and playable: music streams from the disc while pre-analysed frequency bands drive the bars in sync.|Pong con un visualizzatore audio dal vivo. Il gioco e completo: la musica arriva dal CD mentre le frequenze analizzate in anticipo muovono le barre a tempo." \
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
-		--describe "IRQ PROBE=A diagnostic, not a game: live interrupt and video-timing state after a chain load. If games freeze after launch, run this and photograph the numbers on screen.|Una diagnostica, non un gioco: stato di interrupt e timing video dopo il chain load. Se i giochi si bloccano dopo l'avvio, esegui questo e fotografa i numeri sullo schermo."
+
 
 check:
 	cd carousel && cargo test
