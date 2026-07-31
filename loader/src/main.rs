@@ -108,9 +108,18 @@ unsafe fn quiesce() {
     // game's own setup. Shift the bit out and back rather than masking with a
     // register: MIPS-I `andi` zero-extends, and letting the allocator pick a
     // mask register lands on $at, which the assembler reserves.
+    //
+    // The nop after mfc0 is load-bearing: MFC0 has a one-instruction
+    // load-delay hazard on the R3000, so without it the srl reads the STALE
+    // $8 (whatever the caller left there) and writes it into SR. That
+    // exact failure shipped once: the launcher's cache flush leaves
+    // 0xFFFE0000 in $8, which landed in SR with BEV set and sent every
+    // interrupt to the ROM vector. See psx-rt's enable_cpu_interrupts for
+    // the same hazard note.
     unsafe {
         core::arch::asm!(
             "mfc0 $8, $12",
+            "nop",
             "srl  $8, $8, 1",
             "sll  $8, $8, 1",
             "mtc0 $8, $12",
