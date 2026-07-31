@@ -154,6 +154,20 @@ const ATTRACT_AFTER: u32 = 60 * 20;
 /// enough that nobody waits for it.
 const FADE_FRAMES: i32 = 14;
 
+/// Frames the launch warp runs before that fade: the starfield accelerates
+/// into streaks and the ball blows apart, so leaving the menu is an event
+/// rather than a cut.
+const WARP_FRAMES: i32 = 40;
+/// Warp travel per frame is the frame count squared over this, which reads as
+/// acceleration rather than a jump to speed.
+const WARP_RAMP: i32 = 3;
+/// Cap on that. The field is 1360 deep; at 280 a star crosses it in five
+/// frames, which is as fast as streaks read as motion rather than noise.
+const WARP_TOP_SPEED: i32 = 280;
+/// How much a warp frame adds to the ball's swell, in 256ths of its radius.
+/// By the fade the beads are three screens wide and gone past the camera.
+const WARP_SWELL: i32 = 18;
+
 // The reader owns a one-sector bounce buffer; keep it off the 32 KiB stack.
 static mut READER: SectorReader = SectorReader::new();
 static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
@@ -243,6 +257,9 @@ fn main() {
     }
 
     let mut selected: i32 = 0;
+    // Frames into the launch warp, or -1 while the menu is just a menu.
+    let mut warp: i32 = -1;
+    let mut launch_index = 0usize;
     let mut ring = 0i32;
     // Two axes. A browse shoves it in some direction, and whatever tumble
     // that leaves is what it keeps until the damping bleeds it off.
@@ -304,56 +321,75 @@ fn main() {
         idle = if touched { 0 } else { idle.saturating_add(1) };
         let attract = idle > ATTRACT_AFTER;
 
-        if pressed(button::UP) || pressed(button::DOWN) {
-            italian = !italian;
-        }
-        // Skipping tracks by hand. The drive is already playing, so this is
-        // the same handshake the end of a track takes, just triggered early.
-        // The drive takes the better part of a second to pick up a new track.
-        // Ignore further presses until it has, or the handshake gets re-armed
-        // from the start each time and never finishes.
         let loading = menu_track != 0 && !music.started();
-        if menu_track != 0 && menu_track_count > 1 && !loading {
-            let skip = if pressed(button::R1) {
-                1
-            } else if pressed(button::L1) {
-                menu_track_count - 1 // one back, without going negative
-            } else {
-                0
-            };
-            if skip != 0 {
-                menu_track_index = (menu_track_index + skip) % menu_track_count;
-                // Silence first: the handshake re-issues Play, and leaving the
-                // old track running under it is how the drive got wedged.
-                let _ = cdrom::try_stop(CDDA_SPINS);
-                idle_polls = 0;
-                music.begin(tick);
+        // The pad goes quiet once a launch is under way: the warp is short,
+        // and half a browse queued behind it would land in the game.
+        if warp < 0 {
+            if pressed(button::UP) || pressed(button::DOWN) {
+                italian = !italian;
             }
-        }
-        if count > 0 {
-            let browse = pressed(button::LEFT) as i32 - pressed(button::RIGHT) as i32;
-            if browse != 0 {
-                selected -= browse;
-                // The shove points somewhere unpredictable rather than along
-                // one axis, so the ball tumbles instead of spinning on the
-                // spot. Which way the carousel went only sets the sign.
-                shoves = shoves.wrapping_add(1);
-                let (dx, dy) = carousel::impulse(shoves);
-                yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
-                pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
-                Voice::key_on(VOICE_BROWSE.mask());
+            // Skipping tracks by hand. The drive is already playing, so this is
+            // the same handshake the end of a track takes, just triggered early.
+            // The drive takes the better part of a second to pick up a new track.
+            // Ignore further presses until it has, or the handshake gets re-armed
+            // from the start each time and never finishes.
+            if menu_track != 0 && menu_track_count > 1 && !loading {
+                let skip = if pressed(button::R1) {
+                    1
+                } else if pressed(button::L1) {
+                    menu_track_count - 1 // one back, without going negative
+                } else {
+                    0
+                };
+                if skip != 0 {
+                    menu_track_index = (menu_track_index + skip) % menu_track_count;
+                    // Silence first: the handshake re-issues Play, and leaving the
+                    // old track running under it is how the drive got wedged.
+                    let _ = cdrom::try_stop(CDDA_SPINS);
+                    idle_polls = 0;
+                    music.begin(tick);
+                }
             }
-            if pressed(button::CROSS) || pressed(button::START) {
-                let index = selected.rem_euclid(count as i32) as usize;
-                // Nothing behind the credits entry to chain-load.
-                if entries[index].exe_lba != 0 {
-                    Voice::key_on(VOICE_SELECT.mask());
-                    // Never returns when the disc is readable.
-                    boot(&entries[index], &mut fb);
+            if count > 0 {
+                let browse = pressed(button::LEFT) as i32 - pressed(button::RIGHT) as i32;
+                if browse != 0 {
+                    selected -= browse;
+                    // The shove points somewhere unpredictable rather than along
+                    // one axis, so the ball tumbles instead of spinning on the
+                    // spot. Which way the carousel went only sets the sign.
+                    shoves = shoves.wrapping_add(1);
+                    let (dx, dy) = carousel::impulse(shoves);
+                    yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
+                    pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
+                    Voice::key_on(VOICE_BROWSE.mask());
+                }
+                if pressed(button::CROSS) || pressed(button::START) {
+                    let index = selected.rem_euclid(count as i32) as usize;
+                    // Nothing behind the credits entry to chain-load.
+                    if entries[index].exe_lba != 0 {
+                        Voice::key_on(VOICE_SELECT.mask());
+                        launch_index = index;
+                        warp = 0;
+                    }
                 }
             }
         }
         prev_held = pad;
+
+        // The warp itself: count it forward, and hand over to the fade and
+        // the chain-load once it has run its course.
+        if warp >= 0 {
+            warp += 1;
+            if warp >= WARP_FRAMES {
+                // Never returns when the disc is readable.
+                boot(&entries[launch_index], &mut fb);
+            }
+        }
+        let warp_speed = if warp >= 0 {
+            (warp * warp / WARP_RAMP).min(WARP_TOP_SPEED)
+        } else {
+            0
+        };
 
         // Ease toward the selection instead of snapping. `target` is allowed
         // to run past a full turn so the ring keeps spinning the short way
@@ -396,7 +432,9 @@ fn main() {
         let shake = yaw_rate.abs().max(pitch_rate.abs());
         let scatter = ((shake - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
             .min(SCATTER_MAX);
-        let swell = swell_beat + scatter;
+        // The warp term dwarfs the other two: the ball does not pulse its way
+        // out, it detonates.
+        let swell = swell_beat + scatter + warp.max(0) * WARP_SWELL;
 
         // Coast the ball back to its idle drift, which is itself riding the
         // bar: quickest just after the downbeat, slowest going into the next.
@@ -409,25 +447,30 @@ fn main() {
         pitch = (pitch + pitch_rate) & (TURN - 1);
         // Flying forward the whole time, and a browse shoves the camera along
         // with the ball.
-        travel = travel.wrapping_add(yaw_rate.abs().max(1));
+        travel = travel.wrapping_add(yaw_rate.abs().max(1) + warp_speed);
 
         fb.clear(26, 0, 4);
-        draw_starfield(travel, beat.offbeat);
+        draw_starfield(travel, beat.offbeat, warp_speed);
         draw_sphere(yaw, pitch, swell, &mut beads);
 
-        paint::header_strip(HEADER_H);
-        banner.draw(160 - BANNER_W / 2, BANNER_Y);
-        centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
-        if let Some(header) = header {
-            draw_music_panel(
-                &small,
-                &header,
-                menu_track_index,
-                &beat,
-                menu_track_count > 1,
-                loading,
-                spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
-            );
+        // A launch clears the header and the description away entirely:
+        // nothing between the warp and the eye but the ring it is leaving,
+        // and the chosen title on the front pill.
+        if warp < 0 {
+            paint::header_strip(HEADER_H);
+            banner.draw(160 - BANNER_W / 2, BANNER_Y);
+            centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
+            if let Some(header) = header {
+                draw_music_panel(
+                    &small,
+                    &header,
+                    menu_track_index,
+                    &beat,
+                    menu_track_count > 1,
+                    loading,
+                    spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
+                );
+            }
         }
 
         if count == 0 {
@@ -438,7 +481,8 @@ fn main() {
             // so it is rendered off-screen on those frames and blitted on the
             // rest. A glyph at a time cost about a whole vblank.
             let key = (index as u32) << 1 | italian as u32;
-            if attract {
+            let hide_text = attract || warp >= 0;
+            if hide_text {
                 // Nothing but the ball turning over the carousel.
             } else if !text_cache.holds(key) {
                 text_cache.begin(key);
@@ -449,7 +493,7 @@ fn main() {
                 }
                 text_cache.end(&fb);
             }
-            if !attract {
+            if !hide_text {
                 draw_text_block(&font, &text_cache, italian);
             }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
@@ -505,11 +549,13 @@ fn split_title(name: &str) -> (&str, &str) {
     }
 }
 
-/// `offbeat` is 255 between two beats and 0 on them, so the sky twinkles in
-/// the gaps the ball and the pills leave.
 /// Stars flying past the camera. `offbeat` is 255 between two beats and 0 on
 /// them, so the sky twinkles in the gaps the ball and the pills leave.
-fn draw_starfield(travel: i32, offbeat: u8) {
+///
+/// `streak` is how far the camera moved this frame. During a launch that is
+/// hundreds of units, and each star trails a line back to where it was a
+/// frame ago, dim at the far end: the classic warp.
+fn draw_starfield(travel: i32, offbeat: u8, streak: i32) {
     for i in 0..STARS {
         let star = carousel::star(i, travel);
         if !star.visible {
@@ -524,9 +570,16 @@ fn draw_starfield(travel: i32, offbeat: u8) {
         // collapsed green and blue to almost nothing, which is why the field
         // was a scatter of near-black red rather than stars.
         let shade = |numerator: u16| ((b as u16 * numerator) / 16) as u8;
+        let head = (b, shade(13), shade(11));
+        if streak > 0 {
+            if let Some((tx, ty)) = carousel::streak_tail(i, travel, streak) {
+                let tail = (b / 4, shade(13) / 4, shade(11) / 4);
+                gpu::draw_line_gouraud(tx, ty, tail, star.x, star.y, head);
+            }
+        }
         // Barely tinted rather than deeply red: against a red field a red
         // star disappears, and these are meant to read as flying past.
-        gpu::draw_rect_flat(star.x, star.y, size, size, b, shade(13), shade(11));
+        gpu::draw_rect_flat(star.x, star.y, size, size, head.0, head.1, head.2);
     }
 }
 
