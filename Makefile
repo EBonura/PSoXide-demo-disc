@@ -23,10 +23,10 @@ MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 # and stays on screen the whole time the track plays; keep the two together.
 MENU_CDDA   := $(ROOT)/audio/knuckle-dust.cdda $(ROOT)/audio/rusted-hammer.cdda \
                $(ROOT)/audio/chainsaw-heart.cdda $(ROOT)/audio/night-crawler.cdda
-MENU_CREDIT := Music by Just Music, used by permission
+MENU_CREDIT := Just Music - YouTube @Just-Music-Beats
 # Tempo and first-beat offset per track, in the same order, measured by
 # tools/beatgrid.py. The menu pulses on these; a guessed tempo drifts.
-MENU_BEATS  := 176000:34 175000:23 173980:46 174380:342
+MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # Shown as "now playing", in the same order as MENU_CDDA. Written out rather
 # than looped: make's foreach splits on whitespace, which takes the titles
 # apart at their spaces.
