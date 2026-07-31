@@ -83,6 +83,23 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
     // next instruction: anything wrong past this point is the game's own
     // first moments, not the load.
     progress(7);
+    // Scratchpad probe, drawn as a second-row block under block 1: green
+    // means the scratchpad answered a write/readback after the flush,
+    // white means it did not -- the fingerprint of a cache-control
+    // restore swallowed while the cache was isolated (see flush_cache's
+    // ordering note). The game inherits whichever machine this saw.
+    unsafe {
+        let probe = 0x1F80_0000 as *mut u32;
+        core::ptr::write_volatile(probe, 0xC0DE_5EED);
+        let alive = core::ptr::read_volatile(probe) == 0xC0DE_5EED;
+        paint::rect(
+            8,
+            22,
+            14,
+            10,
+            if alive { paint::GREEN } else { paint::WHITE },
+        );
+    }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
 
@@ -236,7 +253,18 @@ unsafe fn quiesce() {
 // the cache-control port in tag-test mode with the i-cache enabled,
 // isolate the cache (COP0 SR bit 16) so stores hit tags instead of
 // memory, clear one tag per 16-byte line across the 4 KiB cache, then
-// restore the normal 0x1E988 cache-control value and the caller's SR.
+// DROP ISOLATION FIRST (SR = 0, interrupts still off), restore the
+// normal 0x1E988 cache-control value, then the caller's SR.
+//
+// The restore order is load-bearing and matches the BIOS routine (and
+// psx-rt after its 2026-07-31 fix): with IsC still set, whether a store
+// reaches the CPU-internal cache-control port or is swallowed by the
+// isolated cache is undocumented. A swallowed restore leaves cache
+// control at 0x804 -- tag-test latched, SCRATCHPAD UNMAPPED -- which is
+// exactly the machine every chain-loaded game would then inherit: seven
+// green blocks, full payload bar, dead game, and an emulator that
+// forgives it. The scratchpad probe after the flush call makes the next
+// burn answer this on screen either way.
 core::arch::global_asm!(
     r#"
     .set noreorder
@@ -265,6 +293,9 @@ __loader_flush_cache:
     sw    $zero, 0($9)
     addiu $9, $9, 0x0010
     bne   $9, $11, .Lloader_flush_line
+    nop
+    mtc0  $zero, $12
+    nop
     nop
     lui   $9, 0x0001
     ori   $9, $9, 0xe988
