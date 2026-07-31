@@ -25,7 +25,7 @@ use psx_font::{
     FontAtlas,
 };
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
-use psx_io::cdda::{CddaClock, CddaStarter};
+use psx_io::cdda::{CddaClock, CddaEndDetector, CddaStarter};
 use psx_io::cdrom;
 use psx_asset::Audio;
 use psx_spu::{self as spu, Adsr, CdVolume, SpuAddr, Voice, Volume};
@@ -120,13 +120,6 @@ const DESC_LEADING: i16 = 9;
 /// to restart the loop without a gap anyone notices, rare enough that the
 /// polling does not fight the audio.
 const CDDA_POLL_TICKS: u32 = 30;
-/// Status bit the drive sets while it is playing CD-DA.
-const CDDA_PLAYING: u8 = 0x80;
-/// Status bit the drive sets while the head is still on its way. Play is a
-/// seek followed by playback, and the two bits are mutually exclusive, so a
-/// drive that has accepted Play and not yet arrived reads as neither reading
-/// nor playing.
-const CDDA_SEEKING: u8 = 0x40;
 /// Consecutive idle polls that mean the track really has ended. One does not:
 /// the menu tracks sit at the far end of the disc, so the seek after Play runs
 /// well past a single poll, and there are moments in between where the drive
@@ -227,18 +220,16 @@ fn main() {
     let mut clock = CddaClock::new(TICKS_HZ);
     let mut tick: u32 = 0;
     let mut next_music_poll = CDDA_POLL_TICKS;
-    let mut idle_polls: u8 = 0;
+    // End-of-track detection lives in the SDK now: the detector only arms
+    // once the drive has been SEEN playing the current track, which is what
+    // stops the 0x00 stop/spin-up window a real drive reports from reading
+    // as track-over (the first debug burn's phantom skip).
+    let mut track_end = CddaEndDetector::new(CDDA_IDLE_POLLS_TO_ADVANCE);
     // --- CD debug overlay state (SELECT toggles the display; capture is
     // always on so the counters are honest from boot). Built after the first
     // silicon burn: tracks double-advance and chain-loads fail red, and the
     // emulator reproduces neither, so the console screen is the debugger.
     let mut debug = false;
-    // The idle detector only arms once the drive has been SEEN playing the
-    // current track. The debug burn showed why: after a skip the real drive
-    // reports 0x00 (motor down, not seeking) for one to two seconds while
-    // it stops and re-spins, and an unarmed detector read that as
-    // "track over" and advanced again -- the phantom skip.
-    let mut cdda_armed = false;
     let mut last_stat: u8 = 0xEE; // 0xEE = no reading yet, 0xDD = timeout
     let mut stat_hist = [0xEEu8; 10]; // newest first
     let mut stat_timeouts: u16 = 0;
@@ -319,25 +310,12 @@ fn main() {
                 };
                 stat_hist.copy_within(0..9, 1);
                 stat_hist[0] = last_stat;
-                if last_stat != 0xDD && last_stat & CDDA_PLAYING != 0 {
-                    cdda_armed = true;
-                }
-                let quiet = match status {
-                    Some(status) => status
-                        .bytes()
-                        .first()
-                        .is_some_and(|s| s & (CDDA_PLAYING | CDDA_SEEKING) == 0),
-                    None => false,
-                };
-                let idle = cdda_armed && quiet;
-                idle_polls = if idle { idle_polls.saturating_add(1) } else { 0 };
-                if idle_polls >= CDDA_IDLE_POLLS_TO_ADVANCE {
-                    idle_polls = 0;
+                let status_byte = status.and_then(|r| r.bytes().first().copied());
+                if track_end.poll(status_byte) {
                     menu_track_index = (menu_track_index + 1) % menu_track_count;
                     adv_idle = adv_idle.saturating_add(1);
                     push_event(&mut events, 0x80 | menu_track_index);
                     hsk_begin = tick;
-                    cdda_armed = false;
                     music.begin(tick);
                 }
             }
@@ -390,11 +368,10 @@ fn main() {
                     if cdrom::try_stop(CDDA_SPINS).is_none() {
                         stop_timeouts = stop_timeouts.saturating_add(1);
                     }
-                    idle_polls = 0;
+                    track_end.rearm();
                     adv_btn = adv_btn.saturating_add(1);
                     push_event(&mut events, 0x40 | menu_track_index);
                     hsk_begin = tick;
-                    cdda_armed = false;
                     music.begin(tick);
                 }
             }
@@ -550,8 +527,8 @@ fn main() {
                     &small,
                     menu_track + menu_track_index,
                     music.step_code(),
-                    cdda_armed,
-                    idle_polls,
+                    track_end.armed(),
+                    track_end.quiet_polls(),
                     hsk_ticks,
                     &stat_hist,
                     adv_idle,
@@ -1048,27 +1025,11 @@ fn boot(entry: &Entry, fb: &mut FrameBuffer) -> ! {
     // still on screen, and get the drive off CD-DA before the blob starts
     // reading sectors with it.
     gpu::draw_sync();
-    let _ = cdrom::try_stop(CDDA_SPINS);
-    // Stop is only ACCEPTED above; on silicon the drive then spins down for
-    // a good fraction of a second, and chain-load reads issued into that
-    // window fail (the debug burn's stage-1 prepare panel). Wait until the
-    // drive reports neither playing nor seeking twice in a row, bounded so
-    // a wedged drive cannot hang the launch forever.
-    let mut settled = 0u8;
-    for _ in 0..240 {
-        psx_rt::interrupts::wait_vblank();
-        let quiet = match cdrom::try_get_stat(CDDA_SPINS) {
-            Some(r) => r
-                .bytes()
-                .first()
-                .is_some_and(|s| s & (CDDA_PLAYING | CDDA_SEEKING) == 0),
-            None => false,
-        };
-        settled = if quiet { settled + 1 } else { 0 };
-        if settled >= 2 {
-            break;
-        }
-    }
+    // Stop only gets ACCEPTED promptly; on silicon the drive then spins
+    // down for a good fraction of a second, and chain-load reads issued
+    // into that window fail (the debug burn's stage-1 prepare panel). The
+    // SDK helper waits, bounded, until the drive is genuinely quiet.
+    let _ = cdrom::stop_and_settle(CDDA_SPINS, 240);
 
     // SAFETY: `LOADER_BASE` is above every game's payload (mkdisc enforces
     // that) and below the stack, so nothing live is being overwritten. The
