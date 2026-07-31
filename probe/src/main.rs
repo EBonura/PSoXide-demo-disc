@@ -121,6 +121,12 @@ impl Line {
 #[no_mangle]
 fn main() {
     gpu::init(VideoMode::Ntsc, Resolution::R320X240);
+    // GP1(00h) zeroes the drawing area on silicon; games get theirs back
+    // from FrameBuffer, which this probe deliberately does not use (its
+    // swap machinery is part of what is under test). Without this every
+    // draw clips to nothing on hardware, while the emulator leaves the
+    // area open and forgives it.
+    gpu::set_draw_area(0, 0, 319, 239);
     let font = FontAtlas::upload(&BASIC, FONT_TPAGE, FONT_CLUT);
 
     // Proof of life before the vblank machinery is touched: if install
