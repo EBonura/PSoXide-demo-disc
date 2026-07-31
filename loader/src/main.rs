@@ -172,8 +172,16 @@ unsafe fn quiesce() {
         // Mask + acknowledge every interrupt source.
         psx_io::write32(0x1F80_1074, 0); // I_MASK
         psx_io::write32(0x1F80_1070, 0); // I_STAT
-        // Disable every DMA channel (the CD reader re-enables ch3 itself).
-        psx_io::write32(0x1F80_10F0, 0); // DPCR
+        // Disable every DMA channel but keep the BIOS's priority ladder.
+        // The third debug burn proved silicon cares about the difference:
+        // with DPCR fully zeroed, re-enabling channel 3 alone (enable bit,
+        // priority nibble 0) left the CD DMA transferring nothing, and
+        // every chain-loaded header arrived as all zeros with no drive
+        // error. Standalone programs inherit 0x07654321 from the BIOS and
+        // the identical reader code works there; hand the next program
+        // the same baseline. (The emulator does not model priorities, so
+        // only a burn could catch this.)
+        psx_io::write32(0x1F80_10F0, 0x0765_4321); // DPCR
         // GP1(00h): reset the GPU (display off, FIFO cleared, defaults).
         psx_io::write32(0x1F80_1814, 0);
     }
