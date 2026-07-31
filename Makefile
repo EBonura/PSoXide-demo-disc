@@ -154,7 +154,7 @@ relocation-check: launcher mkdisc
 	@echo
 	@echo "Now: cd $(PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
-	@echo "       --press '150:down,220:cross:8' --dump-hw /tmp/relocation.ppm"
+	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."
 
 clean:
