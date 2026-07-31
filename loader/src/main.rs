@@ -79,6 +79,10 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
     };
 
     unsafe { flush_cache() };
+    // Seven blocks means the cache flush returned and the jump is the very
+    // next instruction: anything wrong past this point is the game's own
+    // first moments, not the load.
+    progress(7);
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
 
@@ -153,6 +157,7 @@ unsafe fn try_load(
         }
     }
     unsafe { reader.stop() };
+    progress(6);
     Ok(LoadedExe { pc0, gp0, sp })
 }
 
@@ -211,17 +216,66 @@ unsafe fn quiesce() {
     }
 }
 
-// BIOS A(44h) `FlushCache`, as a tail-call trampoline. Same 3-instruction
-// shape as `psx-rt`'s `bios_calls!`, open-coded here so the blob does not link
-// `psx-rt` (which would bring a second `_start` and panic handler with it).
+// Direct instruction-cache invalidation, open-coded here so the blob does
+// not link `psx-rt` (which would bring a second `_start` and panic handler
+// with it).
+//
+// This replaces a BIOS A(44h) FlushCache tail call. The flush is the last
+// thing standing between a loaded payload and a running game: the game's
+// code lands at 0x80010000, which is exactly where the launcher was
+// executing from moments earlier, so those cache lines hold launcher
+// instructions. Miss the invalidation and `jr pc0` re-executes the
+// launcher instead of the game, leaving the loader's own screen up --
+// which is precisely what the console showed with five green stages and
+// a full payload bar.
+//
+// The BIOS call was never proven on silicon in this position. This
+// sequence is: it is the routine psx-rt uses, and the launcher boots and
+// runs on the console with it. Steps, per the documented recipe: jump to
+// this code's KSEG1 alias so fetches bypass the cache being cleared, put
+// the cache-control port in tag-test mode with the i-cache enabled,
+// isolate the cache (COP0 SR bit 16) so stores hit tags instead of
+// memory, clear one tag per 16-byte line across the 4 KiB cache, then
+// restore the normal 0x1E988 cache-control value and the caller's SR.
 core::arch::global_asm!(
-    ".set noreorder",
-    ".section .text.loader_flush_cache",
-    ".globl __loader_flush_cache",
-    "__loader_flush_cache:",
-    "  la $8, 0xA0",
-    "  jr $8",
-    "  li $9, 0x44",
+    r#"
+    .set noreorder
+    .section .text.loader_flush_cache
+    .globl __loader_flush_cache
+__loader_flush_cache:
+    la    $8, .Lloader_flush_body
+    lui   $9, 0x2000
+    or    $8, $8, $9
+    jr    $8
+    nop
+
+.Lloader_flush_body:
+    mfc0  $10, $12
+    nop
+    lui   $8, 0xfffe
+    ori   $9, $zero, 0x0804
+    sw    $9, 0x0130($8)
+    lui   $9, 0x0001
+    mtc0  $9, $12
+    nop
+    nop
+    or    $9, $zero, $zero
+    ori   $11, $zero, 0x1000
+.Lloader_flush_line:
+    sw    $zero, 0($9)
+    addiu $9, $9, 0x0010
+    bne   $9, $11, .Lloader_flush_line
+    nop
+    lui   $9, 0x0001
+    ori   $9, $9, 0xe988
+    sw    $9, 0x0130($8)
+    mtc0  $10, $12
+    nop
+    nop
+    jr    $31
+    nop
+    .set reorder
+    "#
 );
 
 extern "C" {
