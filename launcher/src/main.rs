@@ -228,6 +228,20 @@ fn main() {
     let mut tick: u32 = 0;
     let mut next_music_poll = CDDA_POLL_TICKS;
     let mut idle_polls: u8 = 0;
+    // --- CD debug overlay state (SELECT toggles the display; capture is
+    // always on so the counters are honest from boot). Built after the first
+    // silicon burn: tracks double-advance and chain-loads fail red, and the
+    // emulator reproduces neither, so the console screen is the debugger.
+    let mut debug = false;
+    let mut last_stat: u8 = 0xEE; // 0xEE = no reading yet, 0xDD = timeout
+    let mut stat_hist = [0xEEu8; 10]; // newest first
+    let mut stat_timeouts: u16 = 0;
+    let mut adv_idle: u16 = 0;
+    let mut adv_btn: u16 = 0;
+    let mut stop_timeouts: u16 = 0;
+    let mut hsk_begin: u32 = 0;
+    let mut hsk_ticks: u32 = 0; // last completed Play handshake, in ticks
+    let mut events = [0u8; 10]; // bit7 = idle advance, bit6 = button; low bits = track index
     if menu_track != 0 {
         // The CD controller playing is only half of it: the SPU's CD input
         // comes up silent, so without this the drive spins a track nobody
@@ -283,12 +297,23 @@ fn main() {
         if menu_track != 0 {
             if music.tick(tick, menu_track + menu_track_index) {
                 clock.start(tick);
+                hsk_ticks = tick.wrapping_sub(hsk_begin);
             }
             // The track is the last on the disc, so when it ends the drive
             // has nowhere to go. Notice and start it again.
             if music.started() && tick.wrapping_sub(next_music_poll) < u32::MAX / 2 {
                 next_music_poll = tick.wrapping_add(CDDA_POLL_TICKS);
-                let idle = match cdrom::try_get_stat(CDDA_SPINS) {
+                let status = cdrom::try_get_stat(CDDA_SPINS);
+                last_stat = match &status {
+                    Some(r) => r.bytes().first().copied().unwrap_or(0xEF),
+                    None => {
+                        stat_timeouts = stat_timeouts.saturating_add(1);
+                        0xDD
+                    }
+                };
+                stat_hist.copy_within(0..9, 1);
+                stat_hist[0] = last_stat;
+                let idle = match status {
                     Some(status) => status
                         .bytes()
                         .first()
@@ -299,6 +324,9 @@ fn main() {
                 if idle_polls >= CDDA_IDLE_POLLS_TO_ADVANCE {
                     idle_polls = 0;
                     menu_track_index = (menu_track_index + 1) % menu_track_count;
+                    adv_idle = adv_idle.saturating_add(1);
+                    push_event(&mut events, 0x80 | menu_track_index);
+                    hsk_begin = tick;
                     music.begin(tick);
                 }
             }
@@ -328,6 +356,9 @@ fn main() {
             if pressed(button::UP) || pressed(button::DOWN) {
                 italian = !italian;
             }
+            if pressed(button::SELECT) {
+                debug = !debug;
+            }
             // Skipping tracks by hand. The drive is already playing, so this is
             // the same handshake the end of a track takes, just triggered early.
             // The drive takes the better part of a second to pick up a new track.
@@ -345,8 +376,13 @@ fn main() {
                     menu_track_index = (menu_track_index + skip) % menu_track_count;
                     // Silence first: the handshake re-issues Play, and leaving the
                     // old track running under it is how the drive got wedged.
-                    let _ = cdrom::try_stop(CDDA_SPINS);
+                    if cdrom::try_stop(CDDA_SPINS).is_none() {
+                        stop_timeouts = stop_timeouts.saturating_add(1);
+                    }
                     idle_polls = 0;
+                    adv_btn = adv_btn.saturating_add(1);
+                    push_event(&mut events, 0x40 | menu_track_index);
+                    hsk_begin = tick;
                     music.begin(tick);
                 }
             }
@@ -481,7 +517,7 @@ fn main() {
             // so it is rendered off-screen on those frames and blitted on the
             // rest. A glyph at a time cost about a whole vblank.
             let key = (index as u32) << 1 | italian as u32;
-            let hide_text = attract || warp >= 0;
+            let hide_text = attract || warp >= 0 || debug;
             if hide_text {
                 // Nothing but the ball turning over the carousel.
             } else if !text_cache.holds(key) {
@@ -497,6 +533,21 @@ fn main() {
                 draw_text_block(&font, &text_cache, italian);
             }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
+            if debug {
+                draw_cd_debug(
+                    &small,
+                    menu_track + menu_track_index,
+                    music.step_code(),
+                    idle_polls,
+                    hsk_ticks,
+                    &stat_hist,
+                    adv_idle,
+                    adv_btn,
+                    stat_timeouts,
+                    stop_timeouts,
+                    &events,
+                );
+            }
         }
 
         gpu::draw_sync();
@@ -601,6 +652,117 @@ fn draw_sphere(yaw: i32, pitch: i32, swell: i32, beads: &mut [Bead; SPHERE_POINT
 /// attribution that only exists in a README is not an attribution, so this is
 /// the page that discharges it: artist first, then every track by name.
 /// The panel, the flag, and the cached block of text on top of them.
+// --- CD debug overlay ---------------------------------------------------
+
+fn push_event(events: &mut [u8; 10], ev: u8) {
+    events.copy_within(0..9, 1);
+    events[0] = ev;
+}
+
+fn put_hex2(buf: &mut [u8], at: usize, v: u8) -> usize {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    buf[at] = HEX[(v >> 4) as usize];
+    buf[at + 1] = HEX[(v & 0xF) as usize];
+    at + 2
+}
+
+fn put_dec(buf: &mut [u8], at: usize, v: u32) -> usize {
+    let mut digits = [0u8; 10];
+    let mut n = 0;
+    let mut v = v;
+    loop {
+        digits[n] = b'0' + (v % 10) as u8;
+        v /= 10;
+        n += 1;
+        if v == 0 {
+            break;
+        }
+    }
+    for i in 0..n {
+        buf[at + i] = digits[n - 1 - i];
+    }
+    at + n
+}
+
+fn put_str(buf: &mut [u8], at: usize, s: &str) -> usize {
+    buf[at..at + s.len()].copy_from_slice(s.as_bytes());
+    at + s.len()
+}
+
+/// The SELECT overlay, drawn over the description block: the requested
+/// track and handshake state, the raw GetStat bytes the idle detector saw
+/// (newest first), and who advanced the track and why. Everything the
+/// silicon track-skip needs, photographable from the couch.
+#[allow(clippy::too_many_arguments)]
+fn draw_cd_debug(
+    small: &FontAtlas,
+    requested_track: u8,
+    step: u8,
+    idle_polls: u8,
+    hsk_ticks: u32,
+    stat_hist: &[u8; 10],
+    adv_idle: u16,
+    adv_btn: u16,
+    stat_timeouts: u16,
+    stop_timeouts: u16,
+    events: &[u8; 10],
+) {
+    let x = 10;
+    let mut y = DESC_TOP - 4;
+    let mut buf = [0u8; 56];
+    let mut emit = |small: &FontAtlas, y: &mut i16, buf: &[u8], n: usize| {
+        // SAFETY: every byte written above is ASCII.
+        small.draw_text(x, *y, unsafe { core::str::from_utf8_unchecked(&buf[..n]) }, LABEL);
+        *y += 9;
+    };
+
+    let mut n = put_str(&mut buf, 0, "REQ ");
+    n = put_dec(&mut buf, n, requested_track as u32);
+    n = put_str(&mut buf, n, " STEP ");
+    n = put_dec(&mut buf, n, step as u32);
+    n = put_str(&mut buf, n, " IDLE ");
+    n = put_dec(&mut buf, n, idle_polls as u32);
+    n = put_str(&mut buf, n, "/3 HSK ");
+    n = put_dec(&mut buf, n, hsk_ticks);
+    emit(small, &mut y, &buf, n);
+
+    let mut n = put_str(&mut buf, 0, "STAT ");
+    for (i, s) in stat_hist.iter().enumerate() {
+        n = put_hex2(&mut buf, n, *s);
+        if i < stat_hist.len() - 1 {
+            buf[n] = b' ';
+            n += 1;
+        }
+    }
+    emit(small, &mut y, &buf, n);
+
+    let mut n = put_str(&mut buf, 0, "ADV IDLE ");
+    n = put_dec(&mut buf, n, adv_idle as u32);
+    n = put_str(&mut buf, n, " BTN ");
+    n = put_dec(&mut buf, n, adv_btn as u32);
+    n = put_str(&mut buf, n, " STTO ");
+    n = put_dec(&mut buf, n, stat_timeouts as u32);
+    n = put_str(&mut buf, n, " SPTO ");
+    n = put_dec(&mut buf, n, stop_timeouts as u32);
+    emit(small, &mut y, &buf, n);
+
+    let mut n = put_str(&mut buf, 0, "EV ");
+    for ev in events {
+        let cause = if ev & 0x80 != 0 {
+            b'I'
+        } else if ev & 0x40 != 0 {
+            b'B'
+        } else {
+            b'-'
+        };
+        buf[n] = cause;
+        buf[n + 1] = b'0' + (ev & 0x0F);
+        buf[n + 2] = b' ';
+        n += 3;
+    }
+    emit(small, &mut y, &buf, n);
+}
+
 fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
     let _ = font;
     let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
