@@ -286,6 +286,20 @@ pub fn star(index: u32, travel: i32) -> Star {
     }
 }
 
+/// Where the warp streak behind star `index` starts: its position `delta`
+/// travel ago, or `None` when a line between the two ends would be wrong.
+///
+/// Wrong two ways. Either end off screen is the easy one. The subtle one is a
+/// star that wrapped back to the far plane between the two samples, where the
+/// line would cross the whole sky. No distance threshold separates that from
+/// a legitimately fast near star, but brightness does, exactly: approaching
+/// is brightening, so a tail brighter than its head can only be a wrap.
+pub fn streak_tail(index: u32, travel: i32, delta: i32) -> Option<(i16, i16)> {
+    let head = star(index, travel);
+    let tail = star(index, travel - delta);
+    (head.visible && tail.visible && tail.bright <= head.bright).then_some((tail.x, tail.y))
+}
+
 /// Beats in a bar. Drum and bass is four to the floor at this level, so the
 /// downbeat is every fourth.
 pub const BEATS_PER_BAR: u32 = 4;
@@ -466,6 +480,51 @@ mod tests {
     fn the_field_wraps_rather_than_running_out() {
         let span = STAR_FAR - STAR_NEAR;
         assert_eq!(star(7, 0), star(7, span), "one lap round is where it began");
+    }
+
+    /// At full warp speed roughly a fifth of the field wraps between two
+    /// frames; the guard exists for those, and must not eat the rest of the
+    /// effect with them.
+    #[test]
+    fn most_stars_still_streak_at_warp_speed() {
+        for travel in (0..STAR_FAR).step_by(97) {
+            let (mut visible, mut streaked) = (0, 0);
+            for i in 0..120u32 {
+                if !star(i, travel).visible {
+                    continue;
+                }
+                visible += 1;
+                if streak_tail(i, travel, 280).is_some() {
+                    streaked += 1;
+                }
+            }
+            assert!(
+                streaked * 2 >= visible,
+                "only {streaked} of {visible} streak at travel {travel}"
+            );
+        }
+    }
+
+    /// A tail is the same world point seen further away, so it always sits
+    /// radially inward of its head. A wrap that slipped the guard would put
+    /// tails outward, all over the sky.
+    #[test]
+    fn a_streak_points_at_the_centre_of_the_screen() {
+        for travel in (0..STAR_FAR * 2).step_by(53) {
+            for i in 0..120u32 {
+                if let Some((tx, ty)) = streak_tail(i, travel, 280) {
+                    let head = star(i, travel);
+                    assert!(
+                        (tx as i32 - 160).abs() <= (head.x as i32 - 160).abs() + 1,
+                        "star {i} travel {travel}: tail x outward of head"
+                    );
+                    assert!(
+                        (ty as i32 - 120).abs() <= (head.y as i32 - 120).abs() + 1,
+                        "star {i} travel {travel}: tail y outward of head"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

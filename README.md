@@ -111,6 +111,13 @@ A shaft of light crosses the frame behind everything, drawn additively so it
 brightens what it passes rather than covering it, and the carousel is mirrored
 in the floor below it.
 
+Choosing a program is an event rather than a cut: the camera accelerates into
+the starfield until the stars streak into lines, the ball blows itself apart
+past the edges of the screen, and only then does the fade hand over to the
+chain-load. A tail brighter than its head marks a star that wrapped back to
+the far plane between two frames, which is what keeps a streak from crossing
+the whole sky.
+
 None of it uses a texture or a float. Ellipses are triangle fans whose segment
 count follows their size: at a flat twelve the ball alone put the frame over
 2000 triangles and the menu stopped holding 60 Hz, which stretched every
