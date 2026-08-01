@@ -12,8 +12,28 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 name = "loader"
 version = "0.1.0"
 dependencies = [
+ "psx-font",
  "psx-io",
  "psx-pack",
+]
+
+[[package]]
+name = "psx-font"
+version = "0.1.0"
+dependencies = [
+ "psx-gpu",
+ "psx-hw",
+ "psx-io",
+ "psx-math",
+ "psx-vram",
+]
+
+[[package]]
+name = "psx-gpu"
+version = "0.1.0"
+dependencies = [
+ "psx-hw",
+ "psx-io",
 ]
 
 [[package]]
@@ -31,8 +51,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "psx-math"
+version = "0.1.0"
+
+[[package]]
 name = "psx-pack"
 version = "0.1.0"
 dependencies = [
+ "psx-io",
+]
+
+[[package]]
+name = "psx-vram"
+version = "0.1.0"
+dependencies = [
+ "psx-hw",
  "psx-io",
 ]

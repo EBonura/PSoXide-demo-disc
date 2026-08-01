@@ -21,3 +21,6 @@ opt-level     = "s"
 [dependencies]
 psx-pack = { path = "../games/PSoXide/sdk/crates/psx-pack" }
 psx-io   = { path = "../games/PSoXide/sdk/crates/psx-io" }
+# Data only: the checklist borrows the SDK's 8x8 font table and draws it
+# with GP0 rectangles itself, so none of psx-font's VRAM code is linked.
+psx-font = { path = "../games/PSoXide/sdk/crates/psx-font" }
