@@ -617,7 +617,11 @@ fn run() -> Result<(), String> {
     let iso_frames = (build_iso(vec![0u8; disc_toc::TOC_BYTES]).len() / SECTOR_BYTES) as u32;
 
     let mut image_lba = iso_frames;
-    let mut cdda_track_base = 0u32;
+    // Game audio numbers from AFTER the menu's tracks: the menu music is
+    // placed innermost (see the concatenation below), so every game's base
+    // shifts by the menu track count. All of the bases are computed right
+    // here and travel through disc_base, so the shift costs nothing.
+    let mut cdda_track_base = menu_audio.len() as u32;
     for (index, path, image, payload_fnv) in &images {
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
         let program = &args.programs[*index];
@@ -653,13 +657,19 @@ fn run() -> Result<(), String> {
     let names: Vec<&str> = args.programs.iter().map(|p| p.name.as_str()).collect();
     apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
-    // The menu's own track goes last, after every game's, so adding or
-    // removing it cannot shift a game's CD-DA base.
+    // The menu's tracks come FIRST among the audio, immediately after the
+    // data. They used to go last so adding one could not shift a game's
+    // base, but last physically means the outer edge of the burn, and the
+    // v0.2 console run showed the PS1 drive fighting exactly that region:
+    // the first menu track locked after six ~1.5 s servo retries and the
+    // further-out ones never locked at all, while every inner track read
+    // fine. The menu music plays whenever the disc is on the menu, so it
+    // gets the comfortable radius; the bases above absorb the shift.
     let menu_track = if menu_audio.is_empty() {
         0
     } else {
         // Track 1 is the data track, so audio starts at 2.
-        2 + cdda_track_base
+        2
     };
     // The menu draws the credit as one centred line at the 8-pixel font, so a
     // long one runs off both edges. Same silent-clipping trap as the blurbs.
@@ -734,8 +744,17 @@ fn run() -> Result<(), String> {
         lba += (image.data.len() / SECTOR_BYTES) as u32;
     }
 
-    // All audio follows all data, in program order.
+    // All audio follows all data: the menu's tracks first (innermost radius,
+    // see the menu_track note above), then each game's in program order.
     let mut placed_audio = Vec::new();
+    for bytes in &menu_audio {
+        let at = (disc.len() / SECTOR_BYTES) as u32;
+        placed_audio.push(PlacedAudio {
+            index00: at,
+            index01: at,
+        });
+        disc.extend_from_slice(bytes);
+    }
     for (_, _, image, _) in &images {
         let base = (disc.len() / SECTOR_BYTES) as u32;
         for track in &image.audio {
@@ -745,14 +764,6 @@ fn run() -> Result<(), String> {
             });
         }
         disc.extend_from_slice(&image.audio_bytes);
-    }
-    for bytes in &menu_audio {
-        let at = (disc.len() / SECTOR_BYTES) as u32;
-        placed_audio.push(PlacedAudio {
-            index00: at,
-            index01: at,
-        });
-        disc.extend_from_slice(bytes);
     }
 
     fs::write(&args.out, &disc).map_err(|e| format!("write {}: {e}", args.out.display()))?;
