@@ -37,6 +37,13 @@ use psx_vram::{Clut, TexDepth, Tpage};
 /// The chain-load blob, linked at `LOADER_BASE` by `loader/loader.ld`.
 const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
 
+/// Which pressing this is: `git describe` at build time, on screen in the
+/// header so every photo and recording says which disc is in the console.
+const DISC_VERSION: &str = match option_env!("DISC_VERSION") {
+    Some(v) => v,
+    None => "DEV",
+};
+
 /// Where the blob expects to run. Must match `loader.ld`.
 const LOADER_BASE: u32 = 0x801F_0000;
 
@@ -490,6 +497,7 @@ fn main() {
             paint::header_strip(HEADER_H);
             banner.draw(160 - BANNER_W / 2, BANNER_Y);
             centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
+            centred(&small, HEADER_H - 8, DISC_VERSION, HINT);
             if let Some(header) = header {
                 draw_music_panel(
                     &small,
