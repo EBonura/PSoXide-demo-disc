@@ -68,41 +68,25 @@ pub unsafe extern "C" fn loader_entry(
     // was an empty loop the optimizer deleted. The first failure paints its
     // panel (photograph it), waits a real two seconds, and retries from
     // scratch; the second failure paints a second panel below and halts.
+    // Three attempts: the 2026-08-01 console run proved the payload reads
+    // corrupt silently (row-3 white with every load stage green), so a
+    // failed checksum is EXPECTED occasionally and a retry is cheaper than
+    // a frozen console. Single-speed reads double the per-sector margin;
+    // the checksum gate below catches whatever still slips through.
     let mut attempt: u32 = 0;
     let exe = loop {
-        match unsafe { try_load(&mut reader, exe_lba, &mut header) } {
+        match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv) } {
             Ok(exe) => break exe,
             Err((stage, detail)) => {
                 fail_panel(attempt, stage, detail, reader.diag());
                 attempt += 1;
-                if attempt >= 2 {
+                if attempt >= 3 {
                     halt();
                 }
                 settle_delay();
             }
         }
     };
-
-    // Payload integrity, verified in RAM against the checksum mkdisc computed
-    // from the disc layout. Every earlier stage trusts the drive: the header
-    // gets a magic check but the payload -- hundreds of back-to-back sector
-    // reads on a bus with a documented DMA fault -- was never checked, and a
-    // corrupt payload freezes identically no matter which game it belongs
-    // to, which is exactly the failure the console shows. Third-row block:
-    // green = RAM matches the disc build, white = the reads corrupted it.
-    {
-        let mut hash: u32 = 0x811C_9DC5;
-        let mut at = exe.t_addr as *const u8;
-        let end = unsafe { at.add(exe.t_size as usize) };
-        while at < end {
-            // Volatile: the buffer was just written by the sector reader.
-            hash ^= unsafe { core::ptr::read_volatile(at) } as u32;
-            hash = hash.wrapping_mul(0x0100_0193);
-            at = unsafe { at.add(1) };
-        }
-        let ok = hash == payload_fnv;
-        paint::rect(8, 36, 14, 10, if ok { paint::GREEN } else { paint::WHITE });
-    }
 
     unsafe { flush_cache() };
     // Seven blocks means the cache flush returned and the jump is the very
@@ -144,14 +128,19 @@ struct LoadedExe {
 
 /// Load stages, doubling as the fail panel's block count: 1 prepare,
 /// 2 start_read, 3 header sector, 4 magic, 5 bounds, 6 payload sector
-/// (detail = failing sector index), 7 panic.
+/// (detail = failing sector index), 7 panic, 8 payload checksum mismatch
+/// (detail = the FNV the RAM actually hashed to).
 unsafe fn try_load(
     reader: &mut SectorReader,
     exe_lba: u32,
     header: &mut [u32; SECTOR_WORDS],
+    payload_fnv: u32,
 ) -> Result<LoadedExe, (u32, u32)> {
     unsafe {
-        if !reader.prepare() {
+        // Single speed, not double: the payload checksum caught silent
+        // corruption over sustained double-speed reads on the console
+        // (2026-08-01), while the lone header sector always read clean.
+        if !reader.prepare_single_speed() {
             return Err((1, 0));
         }
         progress(1);
@@ -203,6 +192,27 @@ unsafe fn try_load(
     }
     unsafe { reader.stop() };
     progress(6);
+
+    // Payload integrity, verified in RAM against the checksum mkdisc
+    // computed from the disc layout, and GATING: a mismatch retries the
+    // whole load rather than jumping into a corrupt payload. Third-row
+    // block: green = RAM matches the disc build, white = this attempt's
+    // reads corrupted it (the fail panel then shows the hash RAM got).
+    let mut hash: u32 = 0x811C_9DC5;
+    let mut at = t_addr as *const u8;
+    let end = unsafe { at.add(t_size as usize) };
+    while at < end {
+        // Volatile: the buffer was just written by the sector reader.
+        hash ^= unsafe { core::ptr::read_volatile(at) } as u32;
+        hash = hash.wrapping_mul(0x0100_0193);
+        at = unsafe { at.add(1) };
+    }
+    let ok = hash == payload_fnv;
+    paint::rect(8, 36, 14, 10, if ok { paint::GREEN } else { paint::WHITE });
+    if !ok {
+        return Err((8, hash));
+    }
+
     Ok(LoadedExe {
         pc0,
         gp0,
