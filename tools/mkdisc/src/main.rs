@@ -59,6 +59,17 @@ const PREGAP_FRAMES: u32 = 150;
 
 const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 
+/// FNV-1a-32 over `bytes`: the payload checksum the chain loader recomputes
+/// over RAM before jumping. Must match the loader's implementation.
+fn fnv1a32(bytes: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811C_9DC5;
+    for &b in bytes {
+        hash ^= b as u32;
+        hash = hash.wrapping_mul(0x0100_0193);
+    }
+    hash
+}
+
 /// Pre-analysed level-meter data for every menu track, end to end.
 const SPECTRUM_FILE_NAME: &str = "SPECTRUM.BIN";
 
@@ -518,7 +529,17 @@ fn run() -> Result<(), String> {
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let header = parse_exe_header(&bytes, path)?;
         check_fits_below_loader(&header, path)?;
-        entries[index] = Some(Entry::new(&program.name, next_lba, 0, 0));
+        let payload_end = 2048usize + header.payload_bytes as usize;
+        if bytes.len() < payload_end {
+            return Err(format!(
+                "{}: header claims {} payload bytes but the file holds {}",
+                path.display(),
+                header.payload_bytes,
+                bytes.len().saturating_sub(2048)
+            ));
+        }
+        let fnv = fnv1a32(&bytes[2048..payload_end]);
+        entries[index] = Some(Entry::new(&program.name, next_lba, 0, 0).with_payload_fnv(fnv));
         map.push((
             next_lba,
             bytes.len(),
@@ -550,7 +571,28 @@ fn run() -> Result<(), String> {
             )
         })?;
         check_fits_below_loader(&header, path)?;
-        images.push((index, path.clone(), image));
+        // Checksum the payload as the loader will read it: the 2048-byte
+        // data windows of the raw sectors after the header sector.
+        let mut remaining = header.payload_bytes as usize;
+        let mut hash: u32 = 0x811C_9DC5;
+        let mut sector = IMAGE_BOOT_EXE_LBA as usize + 1;
+        while remaining > 0 {
+            let at = sector * SECTOR_BYTES + 24;
+            let take = remaining.min(SECTOR_SIZE);
+            let data = image.data.get(at..at + take).ok_or_else(|| {
+                format!(
+                    "{}: image ends inside its boot EXE payload",
+                    path.display()
+                )
+            })?;
+            for &b in data {
+                hash ^= b as u32;
+                hash = hash.wrapping_mul(0x0100_0193);
+            }
+            remaining -= take;
+            sector += 1;
+        }
+        images.push((index, path.clone(), image, hash));
     }
 
     let build_iso = |toc: Vec<u8>| {
@@ -576,15 +618,18 @@ fn run() -> Result<(), String> {
 
     let mut image_lba = iso_frames;
     let mut cdda_track_base = 0u32;
-    for (index, path, image) in &images {
+    for (index, path, image, payload_fnv) in &images {
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
         let program = &args.programs[*index];
-        entries[*index] = Some(Entry::new(
-            &program.name,
-            image_lba + IMAGE_BOOT_EXE_LBA,
-            image_lba,
-            cdda_track_base,
-        ));
+        entries[*index] = Some(
+            Entry::new(
+                &program.name,
+                image_lba + IMAGE_BOOT_EXE_LBA,
+                image_lba,
+                cdda_track_base,
+            )
+            .with_payload_fnv(*payload_fnv),
+        );
         map.push((
             image_lba,
             image.data.len(),
@@ -684,14 +729,14 @@ fn run() -> Result<(), String> {
     }
 
     let mut lba = iso_frames;
-    for (_, _, image) in &images {
+    for (_, _, image, _) in &images {
         place_data_track(&mut disc, &image.data, lba)?;
         lba += (image.data.len() / SECTOR_BYTES) as u32;
     }
 
     // All audio follows all data, in program order.
     let mut placed_audio = Vec::new();
-    for (_, _, image) in &images {
+    for (_, _, image, _) in &images {
         let base = (disc.len() / SECTOR_BYTES) as u32;
         for track in &image.audio {
             placed_audio.push(PlacedAudio {
