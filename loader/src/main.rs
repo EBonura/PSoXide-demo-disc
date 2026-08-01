@@ -22,6 +22,10 @@ use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 
 const SECTOR_BYTES: u32 = (SECTOR_WORDS * 4) as u32;
 
+/// Spins granted to one SeekL completion: covers the measured worst-case
+/// mech travel (~310 ms) with margin, far short of a hang.
+const SEEK_POLL: u32 = 4_000_000;
+
 // PSX-EXE header word offsets (see `psoxide.ld`).
 const HDR_PC0: usize = 0x10 / 4;
 const HDR_GP0: usize = 0x14 / 4;
@@ -58,7 +62,6 @@ pub unsafe extern "C" fn loader_entry(
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
     paint::show();
 
-    let mut reader = SectorReader::new();
     let mut header = [0u32; SECTOR_WORDS];
 
     // Two attempts. The first silicon burn failed every chain-load, and the
@@ -75,6 +78,11 @@ pub unsafe extern "C" fn loader_entry(
     // the checksum gate below catches whatever still slips through.
     let mut attempt: u32 = 0;
     let exe = loop {
+        // A fresh reader every attempt: SectorReader skips its boot-leftover
+        // drain after the first prepare(), but a failed attempt leaves the
+        // drive mid-stream -- the 2026-08-01 console panels showed retry 2
+        // reading an all-ones header straight from a poisoned FIFO.
+        let mut reader = SectorReader::new();
         match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv) } {
             Ok(exe) => break exe,
             Err((stage, detail)) => {
@@ -144,7 +152,10 @@ unsafe fn try_load(
             return Err((1, 0));
         }
         progress(1);
-        if !reader.start_read(exe_lba) {
+        // BIOS-style bracket: explicit SeekL waited to completion before
+        // ReadN, for the header and every payload chunk alike. Seek poll
+        // budget covers the measured worst case (~310 ms cross-disc).
+        if !reader.start_read_seek_first(exe_lba, SEEK_POLL) {
             reader.stop();
             return Err((2, exe_lba));
         }
@@ -174,23 +185,39 @@ unsafe fn try_load(
     }
     progress(5);
 
-    // Payload sectors follow the header sector contiguously, and `read_sector`
-    // continues the same ReadN stream, so no reseek is needed. The strip's
-    // right side is a coarse loading bar, one step per 16 sectors.
+    // Payload reads go the way the BIOS reads an EXE: short bursts, each
+    // with its own absolute SetLoc + ReadN and a Pause after, instead of
+    // one continuous 445-sector stream. This console's BIOS loads 1.4 MB
+    // EXEs reliably while our single sustained stream returned corrupt
+    // bytes with every stage green (2026-08-01 checksum panels), so the
+    // stream length was the variable: a mis-sync can now propagate at
+    // most one chunk, and every chunk boundary is a hard re-sync.
+    const CHUNK_SECTORS: u32 = 16;
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
-    for sector in 0..sectors {
-        if !unsafe { reader.read_sector(&mut *dst) } {
-            unsafe { reader.stop() };
-            return Err((6, sector));
-        }
-        dst = unsafe { dst.add(1) };
-        if sector % 16 == 0 {
-            let done = (sector * 200 / sectors.max(1)) as i16;
-            paint::rect(112, 8, done.clamp(1, 200), 10, paint::WHITE);
-        }
-    }
     unsafe { reader.stop() };
+    let mut sector = 0u32;
+    while sector < sectors {
+        let chunk_lba = exe_lba + 1 + sector;
+        if !unsafe { reader.start_read_seek_first(chunk_lba, SEEK_POLL) } {
+            unsafe { reader.stop() };
+            return Err((2, chunk_lba));
+        }
+        let n = CHUNK_SECTORS.min(sectors - sector);
+        let mut k = 0;
+        while k < n {
+            if !unsafe { reader.read_sector(&mut *dst) } {
+                unsafe { reader.stop() };
+                return Err((6, sector + k));
+            }
+            dst = unsafe { dst.add(1) };
+            k += 1;
+        }
+        unsafe { reader.stop() };
+        sector += n;
+        let done = (sector * 200 / sectors.max(1)) as i16;
+        paint::rect(112, 8, done.clamp(1, 200), 10, paint::WHITE);
+    }
     progress(6);
 
     // Payload integrity, verified in RAM against the checksum mkdisc
@@ -389,7 +416,11 @@ unsafe fn enter(pc0: u32, gp0: u32, sp: u32, lba_offset: u32, cdda_track_base: u
 /// rows. Attempt 0 paints the upper half, attempt 1 the lower, so both
 /// survive on screen together.
 fn fail_panel(attempt: u32, stage: u32, detail: u32, diag: u32) {
-    let y0 = 36 + (attempt as i16) * 104;
+    // Two panel slots; the third attempt overwrites the first (the screen
+    // is 240 lines, a third slot painted at y=244 -- invisible, which on
+    // the 2026-08-01 run hid the final attempt's verdict).
+    let y0 = 36 + ((attempt % 2) as i16) * 104;
+    paint::rect(0, y0, 320, 100, paint::RED_BASE);
     for i in 0..stage.min(8) as i16 {
         paint::rect(8 + i * 30, y0, 22, 22, paint::WHITE);
     }
