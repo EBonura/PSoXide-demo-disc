@@ -222,6 +222,16 @@ unsafe fn try_load(
     header: &mut [u32; SECTOR_WORDS],
     payload_fnv: u32,
 ) -> Result<LoadedExe, (u32, u32)> {
+    // Scrub the header buffer before every attempt, volatile so the
+    // write cannot be elided. The 2026-08-01 11:00 burn's MAGIC panel
+    // showed detail = the requested LBA -- a value that exists only in
+    // the launcher's stack, meaning read_sector reported success while
+    // transferring nothing and the panel printed stale RAM as if the
+    // disc had said it. After this scrub that failure mode reads as
+    // detail = 00000000: unambiguous on a photo.
+    for word in header.iter_mut() {
+        unsafe { core::ptr::write_volatile(word, 0) };
+    }
     unsafe {
         // Single speed, not double: the payload checksum caught silent
         // corruption over sustained double-speed reads on the console
