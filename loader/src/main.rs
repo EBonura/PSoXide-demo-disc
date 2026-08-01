@@ -11,6 +11,12 @@
 //! Only the header LBA is passed in. Load address, payload size, entry point
 //! and stack all come out of the target's own PSX-EXE header, so the launcher
 //! needs no per-game build-time knowledge.
+//!
+//! While it works the blob paints a checklist: one named row per load
+//! stage, marked OK as it passes, plus a fail log with the stage's detail
+//! word and the reader's diag word in hex. A photo of the screen -- mid
+//! -load, hung, or halted -- says exactly how far the boot got and why it
+//! stopped.
 
 #![no_std]
 #![no_main]
@@ -36,6 +42,27 @@ const HDR_SP_OFFSET: usize = 0x34 / 4;
 
 const EXE_MAGIC: [u32; 2] = [0x582D_5350, 0x4558_4520]; // "PS-X EXE"
 
+/// Load stages, in screen order and in failure-code order: stage `n` is
+/// row `n - 1` of the checklist. The detail word logged with a failure
+/// is per stage: DRIVE none, SEEK the LBA that would not start, HEADER
+/// the header LBA, MAGIC the first header word, BOUNDS the load address,
+/// PAYLOAD the failing sector index, VERIFY the FNV the RAM actually
+/// hashed to. Stage 8 is the panic handler.
+const STAGE_NAMES: [&str; 7] = ["DRIVE", "SEEK", "HEADER", "MAGIC", "BOUNDS", "PAYLOAD", "VERIFY"];
+const STAGE_PANIC: u32 = 8;
+
+/// Checklist geometry: stage names down the left at 2x scale, OK / FAIL
+/// in a status column, the payload bar between them. The fail log sits
+/// below `LOG_Y` at 1x and survives the checklist repaint on retry.
+const LIST_X: i16 = 8;
+const LIST_Y: i16 = 34;
+const ROW_H: i16 = 18;
+const BAR_X: i16 = 128;
+const BAR_W: i16 = 112;
+const STATUS_X: i16 = 248;
+const LOG_Y: i16 = 190;
+const VERDICT_Y: i16 = 222;
+
 /// Read the PSX-EXE at `exe_lba` into its load address and run it.
 ///
 /// `lba_offset` and `cdda_track_base` describe where the target's own disc
@@ -56,28 +83,26 @@ pub unsafe extern "C" fn loader_entry(
 ) -> ! {
     unsafe { quiesce() };
 
-    // The screen comes up immediately: dark base plus a progress strip, so
-    // a photo of a hang says which stage it died in even without a panel.
+    // The screen comes up immediately, so a photo of a hang says which
+    // stage it died in even without a panel.
     paint::setup();
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
     paint::show();
 
     let mut header = [0u32; SECTOR_WORDS];
 
-    // Two attempts. The first silicon burn failed every chain-load, and the
-    // second (instrumented) one showed prepare failing and an instant retry
-    // reaching the header read: the drive is still winding down from the
-    // menu's CD-DA when the first commands arrive, and the old settle delay
-    // was an empty loop the optimizer deleted. The first failure paints its
-    // panel (photograph it), waits a real two seconds, and retries from
-    // scratch; the second failure paints a second panel below and halts.
-    // Three attempts: the 2026-08-01 console run proved the payload reads
-    // corrupt silently (row-3 white with every load stage green), so a
-    // failed checksum is EXPECTED occasionally and a retry is cheaper than
-    // a frozen console. Single-speed reads double the per-sector margin;
-    // the checksum gate below catches whatever still slips through.
+    // Three attempts. The first silicon burn failed every chain-load, and
+    // the second (instrumented) one showed prepare failing and an instant
+    // retry reaching the header read: the drive is still winding down from
+    // the menu's CD-DA when the first commands arrive, and the old settle
+    // delay was an empty loop the optimizer deleted. The 2026-08-01 run
+    // then proved the payload reads corrupt silently, so a failed checksum
+    // is EXPECTED occasionally and a retry is cheaper than a frozen
+    // console. Single-speed reads double the per-sector margin; the
+    // checksum gate catches whatever still slips through.
     let mut attempt: u32 = 0;
     let exe = loop {
+        draw_checklist(attempt);
         // A fresh reader every attempt: SectorReader skips its boot-leftover
         // drain after the first prepare(), but a failed attempt leaves the
         // drive mid-stream -- the 2026-08-01 console panels showed retry 2
@@ -86,58 +111,111 @@ pub unsafe extern "C" fn loader_entry(
         match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv) } {
             Ok(exe) => break exe,
             Err((stage, detail)) => {
-                fail_panel(attempt, stage, detail, reader.diag());
+                stage_fail(stage);
+                log_fail(attempt, stage, detail, reader.diag());
                 attempt += 1;
                 if attempt >= 3 {
+                    verdict("HALTED - SEE LOG", paint::YELLOW);
                     halt();
                 }
+                verdict("RETRYING...", paint::DIM);
                 settle_delay();
             }
         }
     };
 
     unsafe { flush_cache() };
-    // Seven blocks means the cache flush returned and the jump is the very
-    // next instruction: anything wrong past this point is the game's own
-    // first moments, not the load.
-    progress(7);
-    // Scratchpad probe, drawn as a second-row block under block 1: green
-    // means the scratchpad answered a write/readback after the flush,
-    // white means it did not -- the fingerprint of a cache-control
+    // The JUMP row going green means the cache flush returned and the jump
+    // is the very next thing: anything wrong past this point is the game's
+    // own first moments, not the load. Its status is a scratchpad
+    // write/readback probe: NOSPAD is the fingerprint of a cache-control
     // restore swallowed while the cache was isolated (see flush_cache's
-    // ordering note). The game inherits whichever machine this saw.
-    unsafe {
+    // ordering note) -- the game inherits whichever machine this saw.
+    let alive = unsafe {
         let probe = 0x1F80_0000 as *mut u32;
         core::ptr::write_volatile(probe, 0xC0DE_5EED);
-        let alive = core::ptr::read_volatile(probe) == 0xC0DE_5EED;
-        paint::rect(
-            8,
-            22,
-            14,
-            10,
-            if alive { paint::GREEN } else { paint::WHITE },
-        );
+        core::ptr::read_volatile(probe) == 0xC0DE_5EED
+    };
+    let y = row_y(STAGE_NAMES.len());
+    paint::text(LIST_X, y, 2, "JUMP", paint::WHITE);
+    if alive {
+        paint::text(STATUS_X, y, 2, "OK", paint::GREEN);
+    } else {
+        paint::text(STATUS_X - 32, y, 2, "NOSPAD", paint::YELLOW);
     }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
 
-/// Mark load stage `n` (1-based) as passed: a green block in the top strip.
-fn progress(n: i16) {
-    paint::rect(8 + (n - 1) * 18, 8, 14, 10, paint::GREEN);
+fn row_y(row: usize) -> i16 {
+    LIST_Y + row as i16 * ROW_H
+}
+
+/// Repaint the checklist for a fresh attempt: title, try counter, every
+/// stage pending. Only the region above `LOG_Y` is cleared, so the fail
+/// log accumulates across retries.
+fn draw_checklist(attempt: u32) {
+    paint::rect(0, 0, 320, LOG_Y, paint::RED_BASE);
+    paint::text(LIST_X, 8, 2, "CHAIN LOADER", paint::WHITE);
+    paint::text_bytes(232, 8, 2, &[b'T', b'R', b'Y', b' ', b'1' + attempt as u8], paint::DIM);
+    for (row, name) in STAGE_NAMES.iter().enumerate() {
+        paint::text(LIST_X, row_y(row), 2, name, paint::DIM);
+    }
+    paint::text(LIST_X, row_y(STAGE_NAMES.len()), 2, "JUMP", paint::DIM);
+}
+
+/// Mark load stage `n` (1-based) as passed.
+fn stage_ok(stage: u32) {
+    let row = (stage - 1) as usize;
+    paint::text(LIST_X, row_y(row), 2, STAGE_NAMES[row], paint::WHITE);
+    paint::text(STATUS_X, row_y(row), 2, "OK", paint::GREEN);
+}
+
+fn stage_fail(stage: u32) {
+    if stage as usize > STAGE_NAMES.len() {
+        return;
+    }
+    let y = row_y((stage - 1) as usize);
+    // Clear only the status cell: on the payload row the bar to its left
+    // shows how far the read got before it died.
+    paint::rect(STATUS_X, y, 320 - STATUS_X, 16, paint::RED_BASE);
+    paint::text(STATUS_X, y, 2, "FAIL", paint::YELLOW);
+}
+
+fn stage_name(stage: u32) -> &'static str {
+    match stage {
+        1..=7 => STAGE_NAMES[(stage - 1) as usize],
+        STAGE_PANIC => "PANIC",
+        _ => "?",
+    }
+}
+
+/// One line per attempt: which stage failed, its detail word, and the
+/// reader's diag word. Hex at 1x -- small, but the checklist above
+/// already tells the story at arm's length; this is the close-up.
+fn log_fail(attempt: u32, stage: u32, detail: u32, diag: u32) {
+    let y = LOG_Y + attempt.min(2) as i16 * 10;
+    let mut x = paint::text_bytes(8, y, 1, &[b'T', b'1' + attempt as u8], paint::WHITE);
+    x = paint::text(x + 8, y, 1, stage_name(stage), paint::YELLOW);
+    x = paint::text(x + 8, y, 1, "D=", paint::DIM);
+    x = paint::hex32(x, y, 1, detail, paint::WHITE);
+    x = paint::text(x + 8, y, 1, "R=", paint::DIM);
+    paint::hex32(x, y, 1, diag, paint::WHITE);
+}
+
+/// The bottom line: what happens next.
+fn verdict(s: &str, rgb: u32) {
+    paint::rect(0, VERDICT_Y, 320, 18, paint::RED_BASE);
+    paint::text(8, VERDICT_Y, 2, s, rgb);
 }
 
 struct LoadedExe {
     pc0: u32,
     gp0: u32,
     sp: u32,
-    t_addr: u32,
-    t_size: u32,
 }
 
-/// Load stages, doubling as the fail panel's block count: 1 prepare,
-/// 2 start_read, 3 header sector, 4 magic, 5 bounds, 6 payload sector
-/// (detail = failing sector index), 7 panic, 8 payload checksum mismatch
-/// (detail = the FNV the RAM actually hashed to).
+/// One load attempt, stage by stage. `Err((stage, detail))` names the
+/// failing row of [`STAGE_NAMES`] and its detail word.
 unsafe fn try_load(
     reader: &mut SectorReader,
     exe_lba: u32,
@@ -151,7 +229,7 @@ unsafe fn try_load(
         if !reader.prepare_single_speed() {
             return Err((1, 0));
         }
-        progress(1);
+        stage_ok(1);
         // BIOS-style bracket: explicit SeekL waited to completion before
         // ReadN, for the header and every payload chunk alike. Seek poll
         // budget covers the measured worst case (~310 ms cross-disc).
@@ -159,18 +237,18 @@ unsafe fn try_load(
             reader.stop();
             return Err((2, exe_lba));
         }
-        progress(2);
+        stage_ok(2);
         if !reader.read_sector(header) {
             reader.stop();
             return Err((3, exe_lba));
         }
-        progress(3);
+        stage_ok(3);
     }
     if header[0] != EXE_MAGIC[0] || header[1] != EXE_MAGIC[1] {
         unsafe { reader.stop() };
         return Err((4, header[0]));
     }
-    progress(4);
+    stage_ok(4);
 
     let pc0 = header[HDR_PC0];
     let gp0 = header[HDR_GP0];
@@ -183,7 +261,7 @@ unsafe fn try_load(
     if t_addr < 0x8001_0000 || t_addr.saturating_add(t_size) > loader_base() {
         return Err((5, t_addr));
     }
-    progress(5);
+    stage_ok(5);
 
     // Payload reads go the way the BIOS reads an EXE: short bursts, each
     // with its own absolute SetLoc + ReadN and a Pause after, instead of
@@ -196,6 +274,8 @@ unsafe fn try_load(
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
     unsafe { reader.stop() };
+    let bar_y = row_y(5);
+    paint::rect(BAR_X, bar_y + 2, BAR_W, 12, paint::DIM);
     let mut sector = 0u32;
     while sector < sectors {
         let chunk_lba = exe_lba + 1 + sector;
@@ -215,16 +295,15 @@ unsafe fn try_load(
         }
         unsafe { reader.stop() };
         sector += n;
-        let done = (sector * 200 / sectors.max(1)) as i16;
-        paint::rect(112, 8, done.clamp(1, 200), 10, paint::WHITE);
+        let done = (sector * BAR_W as u32 / sectors.max(1)) as i16;
+        paint::rect(BAR_X, bar_y + 2, done.clamp(2, BAR_W), 12, paint::WHITE);
     }
-    progress(6);
+    stage_ok(6);
 
     // Payload integrity, verified in RAM against the checksum mkdisc
     // computed from the disc layout, and GATING: a mismatch retries the
-    // whole load rather than jumping into a corrupt payload. Third-row
-    // block: green = RAM matches the disc build, white = this attempt's
-    // reads corrupted it (the fail panel then shows the hash RAM got).
+    // whole load rather than jumping into a corrupt payload. The fail log
+    // then shows the hash RAM actually got.
     let mut hash: u32 = 0x811C_9DC5;
     let mut at = t_addr as *const u8;
     let end = unsafe { at.add(t_size as usize) };
@@ -234,19 +313,12 @@ unsafe fn try_load(
         hash = hash.wrapping_mul(0x0100_0193);
         at = unsafe { at.add(1) };
     }
-    let ok = hash == payload_fnv;
-    paint::rect(8, 36, 14, 10, if ok { paint::GREEN } else { paint::WHITE });
-    if !ok {
-        return Err((8, hash));
+    if hash != payload_fnv {
+        return Err((7, hash));
     }
+    stage_ok(7);
 
-    Ok(LoadedExe {
-        pc0,
-        gp0,
-        sp,
-        t_addr,
-        t_size,
-    })
+    Ok(LoadedExe { pc0, gp0, sp })
 }
 
 /// This blob's link base, read from the linker script rather than repeated
@@ -332,10 +404,10 @@ unsafe fn quiesce() {
 // reaches the CPU-internal cache-control port or is swallowed by the
 // isolated cache is undocumented. A swallowed restore leaves cache
 // control at 0x804 -- tag-test latched, SCRATCHPAD UNMAPPED -- which is
-// exactly the machine every chain-loaded game would then inherit: seven
-// green blocks, full payload bar, dead game, and an emulator that
-// forgives it. The scratchpad probe after the flush call makes the next
-// burn answer this on screen either way.
+// exactly the machine every chain-loaded game would then inherit: a
+// green checklist, a dead game, and an emulator that forgives it. The
+// scratchpad probe on the JUMP row makes the next burn answer this on
+// screen either way.
 core::arch::global_asm!(
     r#"
     .set noreorder
@@ -411,24 +483,6 @@ unsafe fn enter(pc0: u32, gp0: u32, sp: u32, lba_offset: u32, cdda_track_base: u
     }
 }
 
-/// The diagnostic panel: stage as a count of white blocks, an alignment
-/// ruler, then the caller's detail word and the reader's diag word as bit
-/// rows. Attempt 0 paints the upper half, attempt 1 the lower, so both
-/// survive on screen together.
-fn fail_panel(attempt: u32, stage: u32, detail: u32, diag: u32) {
-    // Two panel slots; the third attempt overwrites the first (the screen
-    // is 240 lines, a third slot painted at y=244 -- invisible, which on
-    // the 2026-08-01 run hid the final attempt's verdict).
-    let y0 = 36 + ((attempt % 2) as i16) * 104;
-    paint::rect(0, y0, 320, 100, paint::RED_BASE);
-    for i in 0..stage.min(8) as i16 {
-        paint::rect(8 + i * 30, y0, 22, 22, paint::WHITE);
-    }
-    paint::ruler(y0 + 24);
-    paint::bits_rows(y0 + 32, detail);
-    paint::bits_rows(y0 + 66, diag);
-}
-
 /// Give the drive time to settle before the retry: roughly two seconds of
 /// GPUSTAT reads. Volatile MMIO reads, so unlike a plain spin loop the
 /// optimizer cannot delete it (the first debug burn proved it will).
@@ -448,7 +502,7 @@ fn halt() -> ! {
 fn panic(_: &core::panic::PanicInfo) -> ! {
     paint::setup();
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
-    fail_panel(1, 7, 0, 0);
+    paint::text(8, 8, 2, "LOADER PANIC", paint::YELLOW);
     paint::show();
     halt()
 }

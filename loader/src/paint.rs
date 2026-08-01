@@ -1,11 +1,14 @@
-//! Fail-panel painting for the chain-load blob, pixel-exact.
+//! Diagnostic painting for the chain-load blob: exact-pixel rectangles
+//! and a small text renderer built out of them.
 //!
-//! The first debug burn drew the panel with GP0(02h) FillVram, whose X
-//! coordinate and width snap to 16-pixel steps on hardware: the stage
-//! blocks fused into bars and the bit grid slid off its own columns.
-//! Everything here goes through GP0(60h) monochrome rectangles instead,
-//! which honour exact coordinates, at the cost of needing the drawing
-//! area configured after the GPU reset `quiesce()` performs.
+//! The first debug burn drew panels with GP0(02h) FillVram, whose X
+//! coordinate and width snap to 16-pixel steps on hardware: shapes fused
+//! and grids slid off their own columns. Everything here goes through
+//! GP0(60h) monochrome rectangles instead, which honour exact
+//! coordinates, at the cost of needing the drawing area configured after
+//! the GPU reset `quiesce()` performs.
+
+use psx_font::fonts::basic::BASIC_BITMAP;
 
 /// GP0/GP1 ports.
 const GP0: u32 = 0x1F80_1810;
@@ -48,29 +51,66 @@ pub fn rect(x: i16, y: i16, w: i16, h: i16, rgb: u32) {
 }
 
 pub const WHITE: u32 = 0x00FF_FFFF;
-pub const BLUE: u32 = 0x00A0_3000; // BBGGRR: readable against the red base
+pub const GREEN: u32 = 0x0000_D000;
+pub const YELLOW: u32 = 0x0000_D8FF;
+/// Pending / de-emphasised text. Light enough to survive a phone photo
+/// of a CRT, dark enough to read as "not yet".
+pub const DIM: u32 = 0x0080_8080;
 pub const RED_BASE: u32 = 0x0000_0040;
-pub const GREEN: u32 = 0x0000_A000;
 
-/// One 32-bit word as two rows of 16 cells, MSB first. Set bits white,
-/// clear bits blue (blue survives video compression where dark grey did
-/// not), a wider gap between bytes. Cell pitch 18px, cells 14px.
-pub fn bits_rows(y: i16, word: u32) {
-    for bit in 0..32u32 {
-        let row = (bit / 16) as i16;
-        let col = (bit % 16) as i16;
-        let x = 8 + col * 18 + (col / 8) * 8;
-        let set = word & (1 << (31 - bit)) != 0;
-        rect(x, y + row * 16, 14, 14, if set { WHITE } else { BLUE });
-    }
+/// The SDK's 8x8 public-domain font (dhepper font8x8), reused as plain
+/// data: glyphs are drawn as runs of GP0 rectangles, so the blob needs
+/// no VRAM upload and leaves no texture state behind for the game.
+static FONT: [u8; 1024] = BASIC_BITMAP;
+
+/// Draw `s` at (x, y), every glyph pixel a `scale`-square rectangle.
+/// Returns the x just past the text, so calls chain along one line.
+pub fn text(x: i16, y: i16, scale: i16, s: &str, rgb: u32) -> i16 {
+    text_bytes(x, y, scale, s.as_bytes(), rgb)
 }
 
-/// Alignment ruler: alternating white/blue cells on the same grid as
-/// [`bits_rows`], so a photo can always recover the column positions.
-pub fn ruler(y: i16) {
-    for col in 0..16i16 {
-        let x = 8 + col * 18 + (col / 8) * 8;
-        let rgb = if col % 2 == 0 { WHITE } else { BLUE };
-        rect(x, y, 14, 6, rgb);
+pub fn text_bytes(mut x: i16, y: i16, scale: i16, s: &[u8], rgb: u32) -> i16 {
+    for &b in s {
+        glyph(x, y, scale, b, rgb);
+        x += 8 * scale;
+    }
+    x
+}
+
+/// `v` as eight hex digits. Returns the x just past them.
+pub fn hex32(mut x: i16, y: i16, scale: i16, v: u32, rgb: u32) -> i16 {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    for i in 0..8 {
+        glyph(x, y, scale, HEX[((v >> (28 - 4 * i)) & 0xF) as usize], rgb);
+        x += 8 * scale;
+    }
+    x
+}
+
+/// One glyph as horizontal runs of set pixels, one rectangle per run:
+/// a fifth of the GP0 traffic of a rect per pixel, on a port every word
+/// of which is paced against GPUSTAT.
+fn glyph(x: i16, y: i16, scale: i16, code: u8, rgb: u32) {
+    let rows = &FONT[(code as usize & 0x7F) * 8..][..8];
+    for (row, bits) in rows.iter().enumerate() {
+        let mut col: u32 = 0;
+        while col < 8 {
+            if bits & (1 << col) == 0 {
+                col += 1;
+                continue;
+            }
+            let start = col;
+            while col < 8 && bits & (1 << col) != 0 {
+                col += 1;
+            }
+            // Bit 0 is the leftmost pixel (the font8x8 convention).
+            rect(
+                x + start as i16 * scale,
+                y + row as i16 * scale,
+                (col - start) as i16 * scale,
+                scale,
+                rgb,
+            );
+        }
     }
 }
