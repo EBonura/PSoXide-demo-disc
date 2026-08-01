@@ -1041,8 +1041,13 @@ fn boot(entry: &Entry, fb: &mut FrameBuffer) -> ! {
             LOADER_BLOB.len(),
         );
         psx_rt::cache::flush_i_cache();
-        let blob: unsafe extern "C" fn(u32, u32, u32) -> ! =
+        let blob: unsafe extern "C" fn(u32, u32, u32, u32) -> ! =
             core::mem::transmute(LOADER_BASE as usize);
-        blob(entry.exe_lba, entry.lba_offset, entry.cdda_track_base)
+        blob(
+            entry.exe_lba,
+            entry.lba_offset,
+            entry.cdda_track_base,
+            entry.payload_fnv,
+        )
     }
 }

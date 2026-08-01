@@ -44,7 +44,12 @@ const EXE_MAGIC: [u32; 2] = [0x582D_5350, 0x4558_4520]; // "PS-X EXE"
 /// caller. Never returns.
 #[link_section = ".text.loader_entry"]
 #[no_mangle]
-pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_base: u32) -> ! {
+pub unsafe extern "C" fn loader_entry(
+    exe_lba: u32,
+    lba_offset: u32,
+    cdda_track_base: u32,
+    payload_fnv: u32,
+) -> ! {
     unsafe { quiesce() };
 
     // The screen comes up immediately: dark base plus a progress strip, so
@@ -77,6 +82,27 @@ pub unsafe extern "C" fn loader_entry(exe_lba: u32, lba_offset: u32, cdda_track_
             }
         }
     };
+
+    // Payload integrity, verified in RAM against the checksum mkdisc computed
+    // from the disc layout. Every earlier stage trusts the drive: the header
+    // gets a magic check but the payload -- hundreds of back-to-back sector
+    // reads on a bus with a documented DMA fault -- was never checked, and a
+    // corrupt payload freezes identically no matter which game it belongs
+    // to, which is exactly the failure the console shows. Third-row block:
+    // green = RAM matches the disc build, white = the reads corrupted it.
+    {
+        let mut hash: u32 = 0x811C_9DC5;
+        let mut at = exe.t_addr as *const u8;
+        let end = unsafe { at.add(exe.t_size as usize) };
+        while at < end {
+            // Volatile: the buffer was just written by the sector reader.
+            hash ^= unsafe { core::ptr::read_volatile(at) } as u32;
+            hash = hash.wrapping_mul(0x0100_0193);
+            at = unsafe { at.add(1) };
+        }
+        let ok = hash == payload_fnv;
+        paint::rect(8, 36, 14, 10, if ok { paint::GREEN } else { paint::WHITE });
+    }
 
     unsafe { flush_cache() };
     // Seven blocks means the cache flush returned and the jump is the very
@@ -112,6 +138,8 @@ struct LoadedExe {
     pc0: u32,
     gp0: u32,
     sp: u32,
+    t_addr: u32,
+    t_size: u32,
 }
 
 /// Load stages, doubling as the fail panel's block count: 1 prepare,
@@ -175,7 +203,13 @@ unsafe fn try_load(
     }
     unsafe { reader.stop() };
     progress(6);
-    Ok(LoadedExe { pc0, gp0, sp })
+    Ok(LoadedExe {
+        pc0,
+        gp0,
+        sp,
+        t_addr,
+        t_size,
+    })
 }
 
 /// This blob's link base, read from the linker script rather than repeated

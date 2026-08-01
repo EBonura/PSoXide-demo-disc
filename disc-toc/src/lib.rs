@@ -41,7 +41,7 @@ pub const TOC_LBA: u32 = 22;
 pub const TOC_FILE_NAME: &str = "DEMOTOC.BIN";
 
 /// Identifies a demo-disc table of contents.
-pub const MAGIC: [u8; 8] = *b"PSXDEMO1";
+pub const MAGIC: [u8; 8] = *b"PSXDEMO2";
 
 /// Sectors the table occupies. Four: two descriptions of [`DESC_BYTES`] per
 /// program is most of an entry, and there are ten of them.
@@ -51,7 +51,7 @@ pub const TOC_SECTORS: u32 = 4;
 pub const TOC_BYTES: usize = 2048 * TOC_SECTORS as usize;
 
 /// Bytes per entry.
-pub const ENTRY_BYTES: usize = 484;
+pub const ENTRY_BYTES: usize = 488;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
@@ -104,6 +104,12 @@ pub struct Entry {
     pub lba_offset: u32,
     /// CD-DA tracks belonging to programs placed ahead of this one.
     pub cdda_track_base: u32,
+    /// FNV-1a-32 over the program's PSX-EXE payload exactly as it sits on
+    /// this disc (t_size bytes, the sectors after the header sector). The
+    /// chain loader recomputes it over RAM before jumping: the one link in
+    /// the chain no earlier stage verifies, and the first suspect when a
+    /// game freezes identically no matter which game it is.
+    pub payload_fnv: u32,
     /// One-line description, English.
     pub desc_en: [u8; DESC_BYTES],
     /// One-line description, Italian.
@@ -134,9 +140,16 @@ impl Entry {
             exe_lba,
             lba_offset,
             cdda_track_base,
+            payload_fnv: 0,
             desc_en: [0; DESC_BYTES],
             desc_it: [0; DESC_BYTES],
         }
+    }
+
+    /// Attach the payload checksum mkdisc computed from the disc layout.
+    pub fn with_payload_fnv(mut self, fnv: u32) -> Self {
+        self.payload_fnv = fnv;
+        self
     }
 
     /// Attach the two descriptions, each truncated to [`DESC_BYTES`].
@@ -276,7 +289,8 @@ pub fn encode(
         out[n..n + 4].copy_from_slice(&entry.exe_lba.to_le_bytes());
         out[n + 4..n + 8].copy_from_slice(&entry.lba_offset.to_le_bytes());
         out[n + 8..n + 12].copy_from_slice(&entry.cdda_track_base.to_le_bytes());
-        let d = n + 12;
+        out[n + 12..n + 16].copy_from_slice(&entry.payload_fnv.to_le_bytes());
+        let d = n + 16;
         out[d..d + DESC_BYTES].copy_from_slice(&entry.desc_en);
         out[d + DESC_BYTES..d + 2 * DESC_BYTES].copy_from_slice(&entry.desc_it);
     }
@@ -335,7 +349,8 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         slot.exe_lba = word(n);
         slot.lba_offset = word(n + 4);
         slot.cdda_track_base = word(n + 8);
-        let d = n + 12;
+        slot.payload_fnv = word(n + 12);
+        let d = n + 16;
         slot.desc_en.copy_from_slice(&sector[d..d + DESC_BYTES]);
         slot.desc_it.copy_from_slice(&sector[d + DESC_BYTES..d + 2 * DESC_BYTES]);
     }
