@@ -66,9 +66,13 @@ loader:
 		RUSTFLAGS="-Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
+# Which pressing this is, drawn in the launcher's header. Tag a burn
+# (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
+DISC_VERSION := $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null)
+
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) \
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) \
 		RUSTFLAGS="-Clink-arg=-T$(PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
