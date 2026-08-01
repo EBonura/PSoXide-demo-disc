@@ -16,3 +16,6 @@
 [submodule "games/psxcel"]
 	path = games/psxcel
 	url = https://github.com/EBonura/psxcel.git
+[submodule "games/nitroxide"]
+	path = games/nitroxide
+	url = https://github.com/EBonura/nitroxide.git

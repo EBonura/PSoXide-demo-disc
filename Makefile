@@ -4,11 +4,10 @@
 # them out into the PSoXide game library as one disc. `make check` runs the
 # host tests.
 #
-# Three of the eleven cannot be rebuilt from a fresh clone: Cortex Ignition's
-# project lives under editor/projects/, which PSoXide gitignores, hl-psx keeps
-# its cooked assets and music outside git too, and NitroXide has no remote yet
-# so it cannot be a submodule. All three are staged from the sibling working
-# trees. See PLAN.md.
+# Two of the eleven cannot be rebuilt from a fresh clone: Cortex Ignition's
+# project lives under editor/projects/, which PSoXide gitignores, and hl-psx
+# keeps its cooked assets and music outside git too. Both are staged from the
+# sibling working trees. See PLAN.md.
 
 .PHONY: help disc disc-only programs loader launcher examples mkdisc check relocation-check clean
 
@@ -52,9 +51,7 @@ HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX   := $(PSOXIDE)/editor/projects/cortex_v1/baked/cortex_v1.cue
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
-# NitroXide is not a submodule: it has no remote yet. Staged from the sibling
-# working tree, the same way Cortex's project and hl-psx's assets are.
-NITROXIDE_SRC ?= $(ROOT)/../nitroxide
+NITROXIDE_SRC ?= $(GAMES)/nitroxide
 NITROXIDE     := $(NITROXIDE_SRC)/game/target/$(PSX_TARGET)/release/nitroxide.exe
 
 help:
