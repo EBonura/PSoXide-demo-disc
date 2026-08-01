@@ -43,7 +43,7 @@ LAUNCHER_EXE := $(OUT)/launcher.exe
 
 # Sibling game repos, as submodules.
 GAMES    := $(ROOT)/games
-VOXIDE   := $(GAMES)/voxide/game/target/$(PSX_TARGET)/release/voxide.exe
+VOXIDE   := $(GAMES)/voxide/dist/voxide.cue
 PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
@@ -76,14 +76,16 @@ examples:
 	$(MAKE) -C $(PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
 	$(MAKE) -C $(PSOXIDE) hardware-tests-disc
 
-# voxide, NitroXide, PSXcel and the Celeste collection never read the disc
-# after boot, so they ride as bare EXEs and do not care which SDK they were
-# built against.
+# NitroXide, PSXcel and the Celeste collection never read the disc after
+# boot, so they ride as bare EXEs and do not care which SDK they were built
+# against.
+# voxide (V0.1.5) streams its sfx bank from WORLD.PAK at boot, so it ships
+# its whole image and rides the same disc_base relocation as hello-pack.
 # gh-psx plays CD-DA, so it ships its whole image and needs the SDK with
 # psx_io::disc_base (PSoXide branch demo-disc-lba-base, pinned in its own
 # third_party/PSoXide).
 programs: examples
-	$(MAKE) -C $(GAMES)/voxide compile
+	$(MAKE) -C $(GAMES)/voxide disc
 	$(MAKE) -C $(NITROXIDE_SRC) build
 	$(MAKE) -C $(GAMES)/psxcel build
 	$(MAKE) -C $(GAMES)/pico8-psx collection
@@ -105,7 +107,7 @@ disc-only: mkdisc
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX)" \
 		--image "HALF-LIFE=$(HLPSX)" \
-		--game "VOXIDE=$(VOXIDE)" \
+		--image "VOXIDE=$(VOXIDE)" \
 		--game "NITROXIDE=$(NITROXIDE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--game "PSXCEL=$(PSXCEL)" \
