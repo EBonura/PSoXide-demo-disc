@@ -12,11 +12,14 @@
 //! and stack all come out of the target's own PSX-EXE header, so the launcher
 //! needs no per-game build-time knowledge.
 //!
-//! While it works the blob paints a checklist: one named row per load
-//! stage, marked OK as it passes, plus a fail log with the stage's detail
-//! word and the reader's diag word in hex. A photo of the screen -- mid
-//! -load, hung, or halted -- says exactly how far the boot got and why it
-//! stopped.
+//! A clean load shows nothing: the launcher fades to black, the GPU reset
+//! in `quiesce` leaves the display off, and the next thing on screen is
+//! the game (proven across every program on the 2026-08-01 19:10 console
+//! run). The diagnostic checklist only materialises on the first failure:
+//! one named row per load stage, OK/FAIL statuses, and a fail log with
+//! the stage's detail word and the reader's diag word in hex. Retries
+//! then paint live, so a photo of a hung or halted screen still says
+//! exactly how far the boot got and why it stopped.
 
 #![no_std]
 #![no_main]
@@ -83,11 +86,9 @@ pub unsafe extern "C" fn loader_entry(
 ) -> ! {
     unsafe { quiesce() };
 
-    // The screen comes up immediately, so a photo of a hang says which
-    // stage it died in even without a panel.
-    paint::setup();
-    paint::rect(0, 0, 320, 240, paint::RED_BASE);
-    paint::show();
+    // No screen yet: the display stays off (quiesce's GPU reset) and a
+    // clean load runs dark, straight into the game. reveal() brings the
+    // diagnostics up on the first failure.
 
     let mut header = [0u32; SECTOR_WORDS];
 
@@ -111,6 +112,7 @@ pub unsafe extern "C" fn loader_entry(
         match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv) } {
             Ok(exe) => break exe,
             Err((stage, detail)) => {
+                reveal(attempt, stage);
                 stage_fail(stage);
                 log_fail(attempt, stage, detail, reader.diag());
                 attempt += 1;
@@ -131,6 +133,8 @@ pub unsafe extern "C" fn loader_entry(
     // write/readback probe: NOSPAD is the fingerprint of a cache-control
     // restore swallowed while the cache was isolated (see flush_cache's
     // ordering note) -- the game inherits whichever machine this saw.
+    // Invisible on a clean load; on a retried one the row is the last
+    // thing the diagnostics record before the game takes the machine.
     let alive = unsafe {
         let probe = 0x1F80_0000 as *mut u32;
         core::ptr::write_volatile(probe, 0xC0DE_5EED);
@@ -144,6 +148,23 @@ pub unsafe extern "C" fn loader_entry(
         paint::text(STATUS_X - 32, y, 2, "NOSPAD", paint::YELLOW);
     }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
+}
+
+/// First failure: turn the screen on and reconstruct the checklist up to
+/// the failing stage, so the panel a photo captures looks the same as if
+/// it had painted live. Later failures find the screen already on.
+fn reveal(attempt: u32, failed_stage: u32) {
+    if paint::visible() {
+        return;
+    }
+    paint::set_visible();
+    paint::setup();
+    paint::rect(0, 0, 320, 240, paint::RED_BASE);
+    paint::show();
+    draw_checklist(attempt);
+    for stage in 1..failed_stage.min(STAGE_NAMES.len() as u32 + 1) {
+        stage_ok(stage);
+    }
 }
 
 fn row_y(row: usize) -> i16 {
@@ -510,6 +531,7 @@ fn halt() -> ! {
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
+    paint::set_visible();
     paint::setup();
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
     paint::text(8, 8, 2, "LOADER PANIC", paint::YELLOW);

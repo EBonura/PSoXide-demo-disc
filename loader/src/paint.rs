@@ -53,8 +53,28 @@ pub fn show() {
     unsafe { psx_io::write32(GP1, 0x0300_0000) }; // display on
 }
 
+/// Whether the diagnostics have been revealed. A clean load never draws:
+/// every paint call funnels through [`rect`], which no-ops until
+/// [`set_visible`]. Deliberately initialised non-zero -- a zero-initialised
+/// static would land in .bss, and loader.ld forbids .bss because nothing
+/// zeroes it for the blob.
+static mut HIDDEN: u8 = 1;
+
+pub fn visible() -> bool {
+    unsafe { core::ptr::read_volatile(&raw const HIDDEN) == 0 }
+}
+
+pub fn set_visible() {
+    unsafe { core::ptr::write_volatile(&raw mut HIDDEN, 0) }
+}
+
 /// Solid rectangle at exact pixel coordinates. `rgb` is `0xBBGGRR`.
+/// Draws nothing until [`set_visible`]: this is the one gate that keeps
+/// a clean load dark, while text layout above it still computes.
 pub fn rect(x: i16, y: i16, w: i16, h: i16, rgb: u32) {
+    if !visible() {
+        return;
+    }
     gp0_packet(&[
         0x60_00_0000 | rgb,
         ((y as u32) << 16) | (x as u32 & 0xFFFF),

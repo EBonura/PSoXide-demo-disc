@@ -120,11 +120,16 @@ const DESC_LEADING: i16 = 9;
 /// to restart the loop without a gap anyone notices, rare enough that the
 /// polling does not fight the audio.
 const CDDA_POLL_TICKS: u32 = 30;
-/// Consecutive idle polls that mean the track really has ended. One does not:
-/// the menu tracks sit at the far end of the disc, so the seek after Play runs
-/// well past a single poll, and there are moments in between where the drive
-/// claims neither bit.
-const CDDA_IDLE_POLLS_TO_ADVANCE: u8 = 3;
+/// Consecutive idle polls that mean the track really has ended. At 30 ticks
+/// a poll this is four seconds of silence, and it has to be that long: the
+/// menu tracks sit at the far end of the disc, and around the cross-disc
+/// seek after Play a real drive spends one to two seconds reporting neither
+/// playing nor seeking. At 3 polls (1.5 s) that window read as track-over
+/// and the menu skipped through all four tracks before playback stuck --
+/// the 2026-08-01 19:10 console recording, music arriving in blips. A
+/// genuine end of track now takes four quiet seconds to advance, which the
+/// inter-track pregap absorbs.
+const CDDA_IDLE_POLLS_TO_ADVANCE: u8 = 8;
 /// Spin budget per CD command. Silicon wants more than an emulator does.
 const CDDA_SPINS: u32 = 0x10_0000;
 /// Display frames a second, which is what the CD clock counts in.
