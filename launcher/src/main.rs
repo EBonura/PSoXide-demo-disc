@@ -159,16 +159,26 @@ const TICKS_HZ: u32 = 60;
 /// the two; select is a one-off and can afford to land.
 const BROWSE_GAIN: Volume = Volume::linear(1, 4);
 const SELECT_GAIN: Volume = Volume::linear(1, 3);
+/// The launch swoosh rides under the warp, so it carries the moment and is
+/// the loudest of the three.
+const LAUNCH_GAIN: Volume = Volume::linear(2, 5);
 
 /// A blip when the carousel turns and a heavier one when a program is
 /// chosen. Two voices, well clear of the CD input.
 const VOICE_BROWSE: Voice = Voice::V0;
 const VOICE_SELECT: Voice = Voice::V1;
+/// The launch swoosh gets its own voice so the confirm chirp underneath it
+/// is not cut off by the round-robin.
+const VOICE_LAUNCH: Voice = Voice::V2;
 const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
 static SFX_BROWSE: &[u8] =
     include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/ui_beep.psau");
 static SFX_SELECT: &[u8] =
     include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/pickup_coin.psau");
+/// 0.56 s of rushing air, which is just under the 40 frames of warp the
+/// starfield accelerates through before the fade takes the screen.
+static SFX_LAUNCH: &[u8] =
+    include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/swoosh.psau");
 
 /// Idle frames before the menu clears itself down to the ball turning over
 /// the carousel. A demo disc spends most of its life unattended.
@@ -292,9 +302,14 @@ fn main() {
     // carries a menu track.
     {
         let mut at = SFX_BASE;
-        for (voice, bytes, gain) in [
-            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN),
-            (VOICE_SELECT, SFX_SELECT, SELECT_GAIN),
+        for (voice, bytes, gain, envelope) in [
+            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN, Adsr::percussive()),
+            (VOICE_SELECT, SFX_SELECT, SELECT_GAIN, Adsr::percussive()),
+            // default_tone, not percussive: percussive self-fades in about
+            // 150 ms, which would swallow five sixths of a 0.56 s swoosh.
+            // default_tone plays a one-shot out in full and lets the END
+            // flag stop it, which is what a sample this long needs.
+            (VOICE_LAUNCH, SFX_LAUNCH, LAUNCH_GAIN, Adsr::default_tone()),
         ] {
             let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
             let adpcm = audio.adpcm_bytes();
@@ -308,7 +323,7 @@ fn main() {
             // key_off inert). The emulator zeroes the envelope instead,
             // which is why it never repeated there. percussive() self-
             // fades in ~150 ms: env 0000 by frame 2 in the same capture.
-            voice.configure_sample(at, audio.sample_rate_hz(), gain, Adsr::percussive());
+            voice.configure_sample(at, audio.sample_rate_hz(), gain, envelope);
             at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
         }
     }
@@ -505,7 +520,9 @@ fn main() {
                     let index = selected.rem_euclid(count as i32) as usize;
                     // Nothing behind the credits entry to chain-load.
                     if entries[index].exe_lba != 0 {
-                        Voice::key_on(VOICE_SELECT.mask());
+                        // Confirm chirp and launch swoosh together: the chirp
+                        // answers the button, the swoosh carries the warp.
+                        Voice::key_on(VOICE_SELECT.mask() | VOICE_LAUNCH.mask());
                         launch_index = index;
                         warp = 0;
                     }
