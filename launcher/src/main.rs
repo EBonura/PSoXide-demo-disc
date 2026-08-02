@@ -782,7 +782,9 @@ fn draw_cd_debug(
     n = put_dec(&mut buf, n, armed as u32);
     n = put_str(&mut buf, n, " IDLE ");
     n = put_dec(&mut buf, n, idle_polls as u32);
-    n = put_str(&mut buf, n, "/3 HSK ");
+    buf[n] = b'/';
+    n = put_dec(&mut buf, n + 1, CDDA_IDLE_POLLS_TO_ADVANCE as u32);
+    n = put_str(&mut buf, n, " HSK ");
     n = put_dec(&mut buf, n, hsk_ticks);
     emit(small, &mut y, &buf, n);
 
