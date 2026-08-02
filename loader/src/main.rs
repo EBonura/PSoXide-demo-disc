@@ -63,6 +63,10 @@ const ROW_H: i16 = 18;
 const BAR_X: i16 = 128;
 const BAR_W: i16 = 112;
 const STATUS_X: i16 = 248;
+/// The plain loading screen: a word and a bar, centred-ish and clear of
+/// the checklist rows so a reveal can draw straight over it.
+const LOADING_Y: i16 = 104;
+const LOADING_BAR_Y: i16 = 124;
 const LOG_Y: i16 = 190;
 const VERDICT_Y: i16 = 222;
 
@@ -86,9 +90,17 @@ pub unsafe extern "C" fn loader_entry(
 ) -> ! {
     unsafe { quiesce() };
 
-    // No screen yet: the display stays off (quiesce's GPU reset) and a
-    // clean load runs dark, straight into the game. reveal() brings the
-    // diagnostics up on the first failure.
+    // A clean load is no longer silent. It used to run dark on purpose,
+    // which read as a hung console for however many seconds the payload
+    // took -- the biggest game on the disc is a megabyte and a half. So
+    // the screen comes up immediately with a title and a progress bar,
+    // and nothing else: the diagnostic checklist still stays out of sight
+    // until something actually fails.
+    paint::setup();
+    paint::rect(0, 0, 320, 240, paint::RED_BASE);
+    paint::show();
+    paint::text(LIST_X, LOADING_Y, 2, "LOADING", paint::WHITE);
+    paint::rect(BAR_X - 2, LOADING_BAR_Y - 2, BAR_W + 4, 16, paint::DIM);
 
     let mut header = [0u32; SECTOR_WORDS];
 
@@ -103,7 +115,9 @@ pub unsafe extern "C" fn loader_entry(
     // checksum gate catches whatever still slips through.
     let mut attempt: u32 = 0;
     let exe = loop {
-        draw_checklist(attempt);
+        if paint::checklist_shown() {
+            draw_checklist(attempt);
+        }
         // A fresh reader every attempt: SectorReader skips its boot-leftover
         // drain after the first prepare(), but a failed attempt leaves the
         // drive mid-stream -- the 2026-08-01 console panels showed retry 2
@@ -140,12 +154,18 @@ pub unsafe extern "C" fn loader_entry(
         core::ptr::write_volatile(probe, 0xC0DE_5EED);
         core::ptr::read_volatile(probe) == 0xC0DE_5EED
     };
-    let y = row_y(STAGE_NAMES.len());
-    paint::text(LIST_X, y, 2, "JUMP", paint::WHITE);
-    if alive {
-        paint::text(STATUS_X, y, 2, "OK", paint::GREEN);
-    } else {
-        paint::text(STATUS_X - 32, y, 2, "NOSPAD", paint::YELLOW);
+    if paint::checklist_shown() {
+        let y = row_y(STAGE_NAMES.len());
+        paint::text(LIST_X, y, 2, "JUMP", paint::WHITE);
+        if alive {
+            paint::text(STATUS_X, y, 2, "OK", paint::GREEN);
+        } else {
+            paint::text(STATUS_X - 32, y, 2, "NOSPAD", paint::YELLOW);
+        }
+    } else if !alive {
+        // Nothing else on a clean load, but a dead scratchpad is worth
+        // saying even when the checklist stayed away.
+        paint::text(LIST_X, LOADING_Y, 2, "NOSPAD ", paint::YELLOW);
     }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
@@ -154,13 +174,12 @@ pub unsafe extern "C" fn loader_entry(
 /// the failing stage, so the panel a photo captures looks the same as if
 /// it had painted live. Later failures find the screen already on.
 fn reveal(attempt: u32, failed_stage: u32) {
-    if paint::visible() {
+    if paint::checklist_shown() {
         return;
     }
-    paint::set_visible();
-    paint::setup();
+    paint::show_checklist();
+    // Wipe the loading screen and put the diagnostics in its place.
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
-    paint::show();
     draw_checklist(attempt);
     for stage in 1..failed_stage.min(STAGE_NAMES.len() as u32 + 1) {
         stage_ok(stage);
@@ -186,13 +205,16 @@ fn draw_checklist(attempt: u32) {
 
 /// Mark load stage `n` (1-based) as passed.
 fn stage_ok(stage: u32) {
+    if !paint::checklist_shown() {
+        return;
+    }
     let row = (stage - 1) as usize;
     paint::text(LIST_X, row_y(row), 2, STAGE_NAMES[row], paint::WHITE);
     paint::text(STATUS_X, row_y(row), 2, "OK", paint::GREEN);
 }
 
 fn stage_fail(stage: u32) {
-    if stage as usize > STAGE_NAMES.len() {
+    if !paint::checklist_shown() || stage as usize > STAGE_NAMES.len() {
         return;
     }
     let y = row_y((stage - 1) as usize);
@@ -254,10 +276,15 @@ unsafe fn try_load(
         unsafe { core::ptr::write_volatile(word, 0) };
     }
     unsafe {
-        // Single speed, not double: the payload checksum caught silent
-        // corruption over sustained double-speed reads on the console
-        // (2026-08-01), while the lone header sector always read clean.
-        if !reader.prepare_single_speed() {
+        // Double speed again. Single speed was belt-and-braces from
+        // 2026-08-01, when sustained reads returned corrupt bytes -- but
+        // that was BEFORE the SDK's SectorReader learned the BIOS bracket
+        // (re-send SetMode between seek completion and ReadN), which is
+        // the actual fix. At 75 sectors a second Cortex's 1620-sector
+        // payload alone took 22 seconds of pure transfer, and the payload
+        // checksum still gates the jump: if this is wrong the screen says
+        // so and retries rather than booting garbage.
+        if !reader.prepare() {
             return Err((1, 0));
         }
         stage_ok(1);
@@ -301,12 +328,20 @@ unsafe fn try_load(
     // bytes with every stage green (2026-08-01 checksum panels), so the
     // stream length was the variable: a mis-sync can now propagate at
     // most one chunk, and every chunk boundary is a hard re-sync.
-    const CHUNK_SECTORS: u32 = 16;
+    // 64, not 16. Every chunk costs a full SeekL to completion, and at 16
+    // Cortex needed a hundred of them -- on the order of fifteen seconds of
+    // seeking on top of the transfer. Chunking still bounds how far a
+    // mis-sync can propagate and still re-syncs hard at every boundary;
+    // it just does it four times less often.
+    const CHUNK_SECTORS: u32 = 64;
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
     unsafe { reader.stop() };
-    let bar_y = row_y(5);
-    paint::rect(BAR_X, bar_y + 2, BAR_W, 12, paint::DIM);
+    // The bar lives on the loading screen; if the checklist has been
+    // revealed it sits on the PAYLOAD row instead, which is where a
+    // failure capture expects it.
+    let bar_y = if paint::checklist_shown() { row_y(5) + 2 } else { LOADING_BAR_Y };
+    paint::rect(BAR_X, bar_y, BAR_W, 12, paint::DIM);
     let mut sector = 0u32;
     while sector < sectors {
         let chunk_lba = exe_lba + 1 + sector;
@@ -327,7 +362,7 @@ unsafe fn try_load(
         unsafe { reader.stop() };
         sector += n;
         let done = (sector * BAR_W as u32 / sectors.max(1)) as i16;
-        paint::rect(BAR_X, bar_y + 2, done.clamp(2, BAR_W), 12, paint::WHITE);
+        paint::rect(BAR_X, bar_y, done.clamp(2, BAR_W), 12, paint::WHITE);
     }
     stage_ok(6);
 
@@ -531,7 +566,7 @@ fn halt() -> ! {
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
-    paint::set_visible();
+    paint::show_checklist();
     paint::setup();
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
     paint::text(8, 8, 2, "LOADER PANIC", paint::YELLOW);
