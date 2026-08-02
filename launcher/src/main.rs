@@ -149,6 +149,17 @@ const END_MARGIN_MS: u32 = 4000;
 /// Display frames a second, which is what the CD clock counts in.
 const TICKS_HZ: u32 = 60;
 
+/// How loud the two blips sit against the menu music, which plays at full
+/// CD volume. The old 1/14 was about seven percent of full scale and was
+/// nearly inaudible on a console: it had been set while the blips were
+/// still keyed under `Adsr::sample()`, where the SB1 bug held them at full
+/// envelope indefinitely, so a tiny gain still carried. `percussive()`
+/// self-fades in ~150 ms, and at 1/14 that left almost nothing to hear.
+/// Browse fires on every turn of the carousel so it stays the quieter of
+/// the two; select is a one-off and can afford to land.
+const BROWSE_GAIN: Volume = Volume::linear(1, 4);
+const SELECT_GAIN: Volume = Volume::linear(1, 3);
+
 /// A blip when the carousel turns and a heavier one when a program is
 /// chosen. Two voices, well clear of the CD input.
 const VOICE_BROWSE: Voice = Voice::V0;
@@ -281,7 +292,10 @@ fn main() {
     // carries a menu track.
     {
         let mut at = SFX_BASE;
-        for (voice, bytes) in [(VOICE_BROWSE, SFX_BROWSE), (VOICE_SELECT, SFX_SELECT)] {
+        for (voice, bytes, gain) in [
+            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN),
+            (VOICE_SELECT, SFX_SELECT, SELECT_GAIN),
+        ] {
             let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
             let adpcm = audio.adpcm_bytes();
             spu::upload_adpcm(at, adpcm);
@@ -294,12 +308,7 @@ fn main() {
             // key_off inert). The emulator zeroes the envelope instead,
             // which is why it never repeated there. percussive() self-
             // fades in ~150 ms: env 0000 by frame 2 in the same capture.
-            voice.configure_sample(
-                at,
-                audio.sample_rate_hz(),
-                Volume::linear(1, 14),
-                Adsr::percussive(),
-            );
+            voice.configure_sample(at, audio.sample_rate_hz(), gain, Adsr::percussive());
             at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
         }
     }
