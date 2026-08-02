@@ -139,6 +139,13 @@ const CDDA_POLL_TICKS: u32 = 30;
 const CDDA_IDLE_POLLS_TO_ADVANCE: u8 = 8;
 /// Spin budget per CD command. Silicon wants more than an emulator does.
 const CDDA_SPINS: u32 = 0x10_0000;
+/// Ticks after an accepted Play by which the drive must have been seen
+/// actually playing, or the start is retried. Covers a spin-up plus a
+/// worst-case seek with room to spare.
+const PLAY_CONFIRM_TICKS: u32 = 480;
+/// How close to a track's known length "quiet" still counts as the song
+/// finishing rather than the drive losing its place mid-track.
+const END_MARGIN_MS: u32 = 4000;
 /// Display frames a second, which is what the CD clock counts in.
 const TICKS_HZ: u32 = 60;
 
@@ -247,6 +254,10 @@ fn main() {
     let mut stat_timeouts: u16 = 0;
     let mut adv_idle: u16 = 0;
     let mut adv_btn: u16 = 0;
+    // Same-track restarts by the playback watchdog: a start that was never
+    // seen playing, or quiet in the middle of a track.
+    let mut stalls: u16 = 0;
+    let mut confirm_by: u32 = 0;
     let mut stop_timeouts: u16 = 0;
     let mut hsk_begin: u32 = 0;
     let mut hsk_ticks: u32 = 0; // last completed Play handshake, in ticks
@@ -303,13 +314,21 @@ fn main() {
 
     loop {
         tick = tick.wrapping_add(1);
+        // One clock read a frame, up here so the music watchdog below and
+        // the beat code further down agree on where the song is.
+        let song_ms = if clock.playing() { clock.tick(tick) } else { 0 };
         if menu_track != 0 {
             if music.tick(tick, menu_track + menu_track_index) {
                 clock.start(tick);
                 hsk_ticks = tick.wrapping_sub(hsk_begin);
+                // The drive accepted Play; now it must be SEEN playing
+                // before this deadline, or the start gets retried. The
+                // v0.2 console run proved a Play can be accepted and then
+                // sink without trace: the end detector never arms on a
+                // track that never starts, which left the menu silent
+                // forever ("other songs don't work at all").
+                confirm_by = tick.wrapping_add(PLAY_CONFIRM_TICKS);
             }
-            // The track is the last on the disc, so when it ends the drive
-            // has nowhere to go. Notice and start it again.
             if music.started() && tick.wrapping_sub(next_music_poll) < u32::MAX / 2 {
                 next_music_poll = tick.wrapping_add(CDDA_POLL_TICKS);
                 let status = cdrom::try_get_stat(CDDA_SPINS);
@@ -323,10 +342,43 @@ fn main() {
                 stat_hist.copy_within(0..9, 1);
                 stat_hist[0] = last_stat;
                 let status_byte = status.and_then(|r| r.bytes().first().copied());
+                // Quiet long enough to mean the audio is over -- but over
+                // can mean two things, and the spectrum data already on the
+                // disc tells them apart: quiet NEAR the track's known end
+                // is the song finishing (advance), quiet in the middle is
+                // the drive losing the track (retry the same one). Without
+                // an analysis for the track, quiet advances as before.
                 if track_end.poll(status_byte) {
-                    menu_track_index = (menu_track_index + 1) % menu_track_count;
-                    adv_idle = adv_idle.saturating_add(1);
-                    push_event(&mut events, 0x80 | menu_track_index);
+                    let near_end = header
+                        .and_then(|h| h.spectrum_span(menu_track_index as usize))
+                        .map_or(true, |(_, frames)| {
+                            let duration_ms =
+                                frames * 1000 / disc_toc::SPECTRUM_FRAME_RATE;
+                            song_ms + END_MARGIN_MS >= duration_ms
+                        });
+                    if near_end {
+                        menu_track_index = (menu_track_index + 1) % menu_track_count;
+                        adv_idle = adv_idle.saturating_add(1);
+                        push_event(&mut events, 0x80 | menu_track_index);
+                    } else {
+                        stalls = stalls.saturating_add(1);
+                        push_event(&mut events, 0x20 | menu_track_index);
+                    }
+                    hsk_begin = tick;
+                    music.begin(tick);
+                } else if !track_end.armed()
+                    && tick.wrapping_sub(confirm_by) < u32::MAX / 2
+                {
+                    // Accepted but never seen playing: re-run the start
+                    // from Stop, same track, however long it takes. Silence
+                    // first, as the manual skip does -- re-Playing over a
+                    // wedged drive is how it stayed wedged.
+                    if cdrom::try_stop(CDDA_SPINS).is_none() {
+                        stop_timeouts = stop_timeouts.saturating_add(1);
+                    }
+                    stalls = stalls.saturating_add(1);
+                    push_event(&mut events, 0x20 | menu_track_index);
+                    track_end.rearm();
                     hsk_begin = tick;
                     music.begin(tick);
                 }
@@ -437,8 +489,8 @@ fn main() {
 
         // Everything visual answers the beat. The grid was measured off the
         // audio and shipped in the table, so this stays in step for the whole
-        // length of a track rather than drifting out of it.
-        let song_ms = if clock.playing() { clock.tick(tick) } else { 0 };
+        // length of a track rather than drifting out of it. `song_ms` was
+        // read once at the top of the loop, shared with the watchdog.
         let beat = match header.and_then(|h| h.beat(menu_track_index as usize)) {
             Some((beat_ms, phase_ms)) if clock.playing() => {
                 carousel::beat_at(song_ms, beat_ms, phase_ms)
@@ -546,6 +598,7 @@ fn main() {
                     &stat_hist,
                     adv_idle,
                     adv_btn,
+                    stalls,
                     stat_timeouts,
                     stop_timeouts,
                     &events,
@@ -707,6 +760,7 @@ fn draw_cd_debug(
     stat_hist: &[u8; 10],
     adv_idle: u16,
     adv_btn: u16,
+    stalls: u16,
     stat_timeouts: u16,
     stop_timeouts: u16,
     events: &[u8; 10],
@@ -746,6 +800,8 @@ fn draw_cd_debug(
     n = put_dec(&mut buf, n, adv_idle as u32);
     n = put_str(&mut buf, n, " BTN ");
     n = put_dec(&mut buf, n, adv_btn as u32);
+    n = put_str(&mut buf, n, " STALL ");
+    n = put_dec(&mut buf, n, stalls as u32);
     n = put_str(&mut buf, n, " STTO ");
     n = put_dec(&mut buf, n, stat_timeouts as u32);
     n = put_str(&mut buf, n, " SPTO ");
@@ -758,6 +814,8 @@ fn draw_cd_debug(
             b'I'
         } else if ev & 0x40 != 0 {
             b'B'
+        } else if ev & 0x20 != 0 {
+            b'S' // watchdog same-track restart
         } else {
             b'-'
         };
