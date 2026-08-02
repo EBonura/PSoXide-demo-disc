@@ -319,10 +319,18 @@ fn main() {
 
     loop {
         tick = tick.wrapping_add(1);
+        // One slot past the last track is MUSIC OFF: the L1/R1 cycle
+        // walks through every song and then silence, so muting needs no
+        // button of its own and the panel can say which state it is in.
+        let muted = menu_track != 0 && menu_track_index >= menu_track_count;
         // One clock read a frame, up here so the music watchdog below and
         // the beat code further down agree on where the song is.
-        let song_ms = if clock.playing() { clock.tick(tick) } else { 0 };
-        if menu_track != 0 {
+        let song_ms = if !muted && clock.playing() {
+            clock.tick(tick)
+        } else {
+            0
+        };
+        if menu_track != 0 && !muted {
             // Debug-only, and issued BEFORE this frame's GetStat: command
             // then status-drain is the order the controller tolerates (see
             // CddaStarter's note; the reverse has wedged it on silicon).
@@ -431,31 +439,35 @@ fn main() {
             if pressed(button::SELECT) {
                 debug = !debug;
             }
-            // Skipping tracks by hand. The drive is already playing, so this is
-            // the same handshake the end of a track takes, just triggered early.
-            // The drive takes the better part of a second to pick up a new track.
-            // Ignore further presses until it has, or the handshake gets re-armed
-            // from the start each time and never finishes.
-            if menu_track != 0 && menu_track_count > 1 && !loading {
+            // Skipping tracks by hand, through every song and then the
+            // MUSIC OFF slot. The drive takes the better part of a second
+            // to pick up a new track; ignore further presses until it has,
+            // or the handshake gets re-armed from the start each time and
+            // never finishes.
+            if menu_track != 0 && !loading {
+                let slots = menu_track_count + 1; // the last one is silence
                 let skip = if pressed(button::R1) {
                     1
                 } else if pressed(button::L1) {
-                    menu_track_count - 1 // one back, without going negative
+                    slots - 1 // one back, without going negative
                 } else {
                     0
                 };
                 if skip != 0 {
-                    menu_track_index = (menu_track_index + skip) % menu_track_count;
+                    menu_track_index = (menu_track_index + skip) % slots;
                     // Silence first: the handshake re-issues Play, and leaving the
                     // old track running under it is how the drive got wedged.
+                    // Entering the off slot, this stop IS the feature.
                     if cdrom::try_stop(CDDA_SPINS).is_none() {
                         stop_timeouts = stop_timeouts.saturating_add(1);
                     }
                     track_end.rearm();
                     adv_btn = adv_btn.saturating_add(1);
                     push_event(&mut events, 0x40 | menu_track_index);
-                    hsk_begin = tick;
-                    music.begin(tick);
+                    if menu_track_index < menu_track_count {
+                        hsk_begin = tick;
+                        music.begin(tick);
+                    }
                 }
             }
             if count > 0 {
@@ -575,7 +587,7 @@ fn main() {
                     &header,
                     menu_track_index,
                     &beat,
-                    menu_track_count > 1,
+                    muted,
                     loading,
                     spectrum_frame(&header, menu_track_index, song_ms, spectrum_frames),
                 );
@@ -939,10 +951,17 @@ fn draw_music_panel(
     header: &Header,
     track: u8,
     beat: &carousel::Beat,
-    skippable: bool,
+    muted: bool,
     loading: bool,
     levels: Option<&[u8]>,
 ) {
+    // The off slot past the last track: say so where the title would be,
+    // and keep the one control that gets the music back on screen.
+    if muted {
+        font.draw_text(4, MUSIC_TOP, "MUSIC | L1/R1", NOW_PLAYING);
+        font.draw_text(6, TRACK_TOP, "OFF", TRACK_NAME);
+        return;
+    }
     let title = header.title(track as usize);
     if title.is_empty() {
         return;
@@ -957,20 +976,10 @@ fn draw_music_panel(
         return;
     }
     // Label and control share a row. Spelling out the one control worth
-    // labelling costs nothing here and saves a row of header.
-    font.draw_text(
-        4,
-        MUSIC_TOP,
-        // Fifteen characters, so it stops at x=79 and leaves the centred
-        // mark alone. At nineteen it ran to 97 against a banner starting at
-        // 100, which is a gap nobody would call deliberate.
-        if skippable {
-            "PLAYING | L1/R1"
-        } else {
-            "PLAYING"
-        },
-        NOW_PLAYING,
-    );
+    // labelling costs nothing here and saves a row of header. Fifteen
+    // characters, so it stops at x=79 and leaves the centred mark alone.
+    // Always skippable now: the cycle holds every track plus MUSIC OFF.
+    font.draw_text(4, MUSIC_TOP, "PLAYING | L1/R1", NOW_PLAYING);
     // The title brightens on the beat, so the words themselves keep time.
     let lift = beat.pulse / 4;
     let tint = (
