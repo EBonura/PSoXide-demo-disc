@@ -748,11 +748,18 @@ fn run() -> Result<(), String> {
     // see the menu_track note above), then each game's in program order.
     let mut placed_audio = Vec::new();
     for bytes in &menu_audio {
-        let at = (disc.len() / SECTOR_BYTES) as u32;
-        placed_audio.push(PlacedAudio {
-            index00: at,
-            index01: at,
-        });
+        // A real two-second pregap, like every game image's audio carries.
+        // These tracks used to start flush at INDEX 01 with no pause
+        // region at all, and the v0.4 console overlay showed what that
+        // costs on silicon: Play accepted, then STAT 0x42 -- seeking --
+        // on every poll forever, for all four tracks. A drive approaches
+        // a track from before its start; with no pause there is nothing
+        // to land in (and track 2's approach lay inside the DATA track,
+        // a type transition Red Book pads for exactly this reason).
+        let index00 = (disc.len() / SECTOR_BYTES) as u32;
+        disc.resize(disc.len() + (PREGAP_FRAMES as usize) * SECTOR_BYTES, 0);
+        let index01 = (disc.len() / SECTOR_BYTES) as u32;
+        placed_audio.push(PlacedAudio { index00, index01 });
         disc.extend_from_slice(bytes);
     }
     for (_, _, image, _) in &images {
