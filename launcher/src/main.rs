@@ -26,7 +26,7 @@ use psx_font::{
 };
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaEndDetector, CddaStarter};
-use psx_io::cdrom;
+use psx_io::cdrom::{self, PlayPosition};
 use psx_asset::Audio;
 use psx_spu::{self as spu, Adsr, CdVolume, SpuAddr, Voice, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
@@ -259,6 +259,11 @@ fn main() {
     let mut stalls: u16 = 0;
     let mut confirm_by: u32 = 0;
     let mut stop_timeouts: u16 = 0;
+    // Where the drive says its head is, polled only while the overlay is
+    // up. The v0.4 footage showed WHAT the drive was doing (seeking,
+    // forever) but not WHERE; this is the missing column.
+    let mut last_pos: Option<PlayPosition> = None;
+    let mut next_pos_poll: u32 = CDDA_POLL_TICKS + 15;
     let mut hsk_begin: u32 = 0;
     let mut hsk_ticks: u32 = 0; // last completed Play handshake, in ticks
     let mut events = [0u8; 10]; // bit7 = idle advance, bit6 = button; low bits = track index
@@ -318,6 +323,20 @@ fn main() {
         // the beat code further down agree on where the song is.
         let song_ms = if clock.playing() { clock.tick(tick) } else { 0 };
         if menu_track != 0 {
+            // Debug-only, and issued BEFORE this frame's GetStat: command
+            // then status-drain is the order the controller tolerates (see
+            // CddaStarter's note; the reverse has wedged it on silicon).
+            if debug
+                && music.started()
+                && tick.wrapping_sub(next_pos_poll) < u32::MAX / 2
+            {
+                next_pos_poll = tick.wrapping_add(CDDA_POLL_TICKS);
+                if let Some(r) = cdrom::try_get_loc_p(CDDA_SPINS) {
+                    if let Some(p) = PlayPosition::parse(&r) {
+                        last_pos = Some(p);
+                    }
+                }
+            }
             if music.tick(tick, menu_track + menu_track_index) {
                 clock.start(tick);
                 hsk_ticks = tick.wrapping_sub(hsk_begin);
@@ -588,6 +607,11 @@ fn main() {
             }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
             if debug {
+                let dur_ms = header
+                    .and_then(|h| h.spectrum_span(menu_track_index as usize))
+                    .map_or(0, |(_, frames)| {
+                        frames * 1000 / disc_toc::SPECTRUM_FRAME_RATE
+                    });
                 draw_cd_debug(
                     &small,
                     menu_track + menu_track_index,
@@ -602,6 +626,9 @@ fn main() {
                     stat_timeouts,
                     stop_timeouts,
                     &events,
+                    last_pos.as_ref(),
+                    song_ms,
+                    dur_ms,
                 );
             }
         }
@@ -764,6 +791,9 @@ fn draw_cd_debug(
     stat_timeouts: u16,
     stop_timeouts: u16,
     events: &[u8; 10],
+    pos: Option<&PlayPosition>,
+    song_ms: u32,
+    dur_ms: u32,
 ) {
     let x = 10;
     let mut y = DESC_TOP - 4;
@@ -808,6 +838,39 @@ fn draw_cd_debug(
     n = put_dec(&mut buf, n, stat_timeouts as u32);
     n = put_str(&mut buf, n, " SPTO ");
     n = put_dec(&mut buf, n, stop_timeouts as u32);
+    emit(small, &mut y, &buf, n);
+
+    // Where the drive says its head is (GetlocP), and where the watchdog
+    // thinks the song is against its known length. "POS ?" until the
+    // first successful position read.
+    let mut put_msf = |buf: &mut [u8; 56], at: usize, m: u8, s: u8, f: u8| {
+        let mut n = put_dec(buf, at, m as u32);
+        buf[n] = b':';
+        n = put_dec(buf, n + 1, s as u32);
+        buf[n] = b':';
+        put_dec(buf, n + 1, f as u32)
+    };
+    let mut n = put_str(&mut buf, 0, "POS ");
+    match pos {
+        Some(p) => {
+            buf[n] = b'T';
+            n = put_dec(&mut buf, n + 1, p.track as u32);
+            buf[n] = b' ';
+            buf[n + 1] = b'I';
+            n = put_dec(&mut buf, n + 2, p.index as u32);
+            buf[n] = b' ';
+            buf[n + 1] = b'R';
+            n = put_msf(&mut buf, n + 2, p.relative_min, p.relative_sec, p.relative_frame);
+            buf[n] = b' ';
+            buf[n + 1] = b'A';
+            n = put_msf(&mut buf, n + 2, p.absolute_min, p.absolute_sec, p.absolute_frame);
+        }
+        None => n = put_str(&mut buf, n, "?"),
+    }
+    n = put_str(&mut buf, n, " MS ");
+    n = put_dec(&mut buf, n, song_ms);
+    buf[n] = b'/';
+    n = put_dec(&mut buf, n + 1, dur_ms);
     emit(small, &mut y, &buf, n);
 
     let mut n = put_str(&mut buf, 0, "EV ");
