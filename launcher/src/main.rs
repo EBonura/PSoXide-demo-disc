@@ -285,11 +285,20 @@ fn main() {
             let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
             let adpcm = audio.adpcm_bytes();
             spu::upload_adpcm(at, adpcm);
+            // Percussive, NOT Adsr::sample(): the SB1 console capture
+            // (2026-08-02) proved that on silicon a one-shot under
+            // sample() never dies -- the END+mute terminator drops the
+            // voice into RELEASE at the ADSR's release rate, sample()'s
+            // release is the slowest the hardware encodes, and the voice
+            // loops the blip at full envelope forever (env 7FFF at 4.7 s,
+            // key_off inert). The emulator zeroes the envelope instead,
+            // which is why it never repeated there. percussive() self-
+            // fades in ~150 ms: env 0000 by frame 2 in the same capture.
             voice.configure_sample(
                 at,
                 audio.sample_rate_hz(),
                 Volume::linear(1, 14),
-                Adsr::sample(),
+                Adsr::percussive(),
             );
             at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
         }
