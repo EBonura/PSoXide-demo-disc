@@ -157,6 +157,13 @@ const TICKS_HZ: u32 = 60;
 /// self-fades in ~150 ms, and at 1/14 that left almost nothing to hear.
 /// Browse fires on every turn of the carousel so it stays the quieter of
 /// the two; select is a one-off and can afford to land.
+/// Frames the browse blip must have to itself before it may retrigger.
+/// Holding a direction turns the carousel far faster than the sample is
+/// long, and re-keying it every press restarted the attack over and over
+/// -- on console that came out as a warbling machine-gun rather than a
+/// blip per step. Six frames is a tenth of a second: fast browsing still
+/// ticks, it just stops stuttering over itself.
+const BLIP_MIN_GAP: u32 = 6;
 const BROWSE_GAIN: Volume = Volume::linear(1, 4);
 const SELECT_GAIN: Volume = Volume::linear(1, 3);
 /// The launch swoosh rides under the warp, so it carries the moment and is
@@ -340,6 +347,8 @@ fn main() {
     let mut yaw_rate = SPHERE_IDLE_SPIN;
     let mut pitch_rate = 0i32;
     let mut shoves: u32 = 0;
+    /// Tick the browse blip last sounded on, for [`BLIP_MIN_GAP`].
+    let mut last_blip: u32 = 0;
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
@@ -514,7 +523,13 @@ fn main() {
                     let (dx, dy) = carousel::impulse(shoves);
                     yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
                     pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
-                    Voice::key_on(VOICE_BROWSE.mask());
+                    // The ring still turns on every press; only the blip
+                    // is rate-limited, so fast browsing stays responsive
+                    // without the sample restarting over itself.
+                    if tick.wrapping_sub(last_blip) >= BLIP_MIN_GAP {
+                        Voice::key_on(VOICE_BROWSE.mask());
+                        last_blip = tick;
+                    }
                 }
                 if pressed(button::CROSS) || pressed(button::START) {
                     let index = selected.rem_euclid(count as i32) as usize;

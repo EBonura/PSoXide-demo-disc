@@ -63,10 +63,14 @@ const ROW_H: i16 = 18;
 const BAR_X: i16 = 128;
 const BAR_W: i16 = 112;
 const STATUS_X: i16 = 248;
-/// The plain loading screen: a word and a bar, centred-ish and clear of
-/// the checklist rows so a reveal can draw straight over it.
-const LOADING_Y: i16 = 104;
-const LOADING_BAR_Y: i16 = 124;
+/// The loading screen is one centred bar on black and nothing else. It
+/// had a LOADING caption beside an off-centre bar; a bar alone reads as
+/// "working" without asking anyone to read anything, and black keeps the
+/// hand-over from the launcher's fade invisible.
+const LOAD_BAR_W: i16 = 160;
+const LOAD_BAR_H: i16 = 12;
+const LOAD_BAR_X: i16 = (320 - LOAD_BAR_W) / 2;
+const LOAD_BAR_Y: i16 = (240 - LOAD_BAR_H) / 2;
 const LOG_Y: i16 = 190;
 const VERDICT_Y: i16 = 222;
 
@@ -97,10 +101,10 @@ pub unsafe extern "C" fn loader_entry(
     // and nothing else: the diagnostic checklist still stays out of sight
     // until something actually fails.
     paint::setup();
-    paint::rect(0, 0, 320, 240, paint::RED_BASE);
+    paint::rect(0, 0, 320, 240, paint::BLACK);
     paint::show();
-    paint::text(LIST_X, LOADING_Y, 2, "LOADING", paint::WHITE);
-    paint::rect(BAR_X - 2, LOADING_BAR_Y - 2, BAR_W + 4, 16, paint::DIM);
+    // The empty track, so the bar has somewhere visible to grow into.
+    paint::rect(LOAD_BAR_X, LOAD_BAR_Y, LOAD_BAR_W, LOAD_BAR_H, paint::TRACK);
 
     let mut header = [0u32; SECTOR_WORDS];
 
@@ -165,7 +169,7 @@ pub unsafe extern "C" fn loader_entry(
     } else if !alive {
         // Nothing else on a clean load, but a dead scratchpad is worth
         // saying even when the checklist stayed away.
-        paint::text(LIST_X, LOADING_Y, 2, "NOSPAD ", paint::YELLOW);
+        paint::text(LOAD_BAR_X, LOAD_BAR_Y - 24, 2, "NOSPAD", paint::YELLOW);
     }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
@@ -340,8 +344,11 @@ unsafe fn try_load(
     // The bar lives on the loading screen; if the checklist has been
     // revealed it sits on the PAYLOAD row instead, which is where a
     // failure capture expects it.
-    let bar_y = if paint::checklist_shown() { row_y(5) + 2 } else { LOADING_BAR_Y };
-    paint::rect(BAR_X, bar_y, BAR_W, 12, paint::DIM);
+    let (bar_x, bar_y, bar_w) = if paint::checklist_shown() {
+        (BAR_X, row_y(5) + 2, BAR_W)
+    } else {
+        (LOAD_BAR_X, LOAD_BAR_Y, LOAD_BAR_W)
+    };
     let mut sector = 0u32;
     while sector < sectors {
         let chunk_lba = exe_lba + 1 + sector;
@@ -361,8 +368,8 @@ unsafe fn try_load(
         }
         unsafe { reader.stop() };
         sector += n;
-        let done = (sector * BAR_W as u32 / sectors.max(1)) as i16;
-        paint::rect(BAR_X, bar_y, done.clamp(2, BAR_W), 12, paint::WHITE);
+        let done = (sector * bar_w as u32 / sectors.max(1)) as i16;
+        paint::rect(bar_x, bar_y, done.clamp(2, bar_w), LOAD_BAR_H, paint::WHITE);
     }
     stage_ok(6);
 
@@ -400,6 +407,16 @@ fn loader_base() -> u32 {
 /// expect to inherit that.
 unsafe fn quiesce() {
     unsafe {
+        // Silence the SPU before anything else. The launcher hands over
+        // with its launch swoosh still sounding, and nothing between here
+        // and the game's own spu::init() stops it -- on console that came
+        // out as the sound cutting at the end of the warp and then
+        // repeating over the game's first moments. Key off all 24 voices
+        // and drop the main volume; every program sets its own on boot.
+        psx_io::write16(0x1F80_1D8C, 0xFFFF); // KEY_OFF lo
+        psx_io::write16(0x1F80_1D8E, 0x00FF); // KEY_OFF hi
+        psx_io::write16(0x1F80_1D80, 0); // main volume L
+        psx_io::write16(0x1F80_1D82, 0); // main volume R
         // Mask + acknowledge every interrupt source.
         psx_io::write32(0x1F80_1074, 0); // I_MASK
         psx_io::write32(0x1F80_1070, 0); // I_STAT
