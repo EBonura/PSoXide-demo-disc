@@ -181,8 +181,15 @@ const VOICE_SELECT: Voice = Voice::V1;
 /// is not cut off by the round-robin.
 const VOICE_LAUNCH: Voice = Voice::V2;
 const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
+/// ui_beep sat here until the 2026-08-03 tape, where the browse blip was all
+/// but inaudible on a TV speaker. Amplitude was never the problem: every psau
+/// in the set peaks within 4% of full scale. Length was. ui_beep is 0.08 s,
+/// about thirty cycles of a 400 Hz tone, and the ear integrates loudness over
+/// roughly 200 ms, so a click that short gets discounted no matter what gain
+/// it is given. jump is 0.25 s and the hottest sample in the set (RMS 22946
+/// against ui_beep's 15826), and nothing else on the disc uses it.
 static SFX_BROWSE: &[u8] =
-    include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/ui_beep.psau");
+    include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/jump.psau");
 static SFX_SELECT: &[u8] =
     include_bytes!("../../games/PSoXide/assets/audio/freesfx/psau/pickup_coin.psau");
 /// 0.56 s of rushing air, which is just under the 40 frames of warp the
@@ -316,7 +323,10 @@ fn main() {
     {
         let mut at = SFX_BASE;
         for (slot, (voice, bytes, gain, envelope)) in [
-            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN, Adsr::percussive()),
+            // default_tone for the same reason as the swoosh below: percussive
+            // self-fades in ~150 ms and the browse blip is now 0.25 s, so
+            // percussive would throw away most of what made it audible.
+            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN, Adsr::default_tone()),
             (VOICE_SELECT, SFX_SELECT, SELECT_GAIN, Adsr::percussive()),
             // default_tone, not percussive: percussive self-fades in about
             // 150 ms, which would swallow five sixths of a 0.56 s swoosh.
@@ -369,10 +379,10 @@ fn main() {
     let mut shoves: u32 = 0;
     /// Tick each SFX voice must be silenced on, or 0 for idle.
     ///
-    /// A one-shot does NOT stop itself on this hardware. The blip sample is
-    /// eighty milliseconds long and the 2026-08-03 tape has a single browse
-    /// press sounding for 1.05 seconds -- one onset, no retrigger -- because
-    /// the voice runs straight past its own END flag into whatever sits
+    /// A one-shot does NOT stop itself on this hardware. The blip sample was
+    /// eighty milliseconds long then and the 2026-08-03 tape has a single
+    /// browse press sounding for 1.05 seconds -- one onset, no retrigger --
+    /// because the voice runs straight past its own END flag into whatever sits
     /// after it in SPU RAM and keeps going until the envelope gives up.
     /// (SB1 measured the same thing: END+mute enters RELEASE rather than
     /// muting.) So the launcher stops them itself: volume to silence a
