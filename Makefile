@@ -86,8 +86,8 @@ examples:
 # voxide (V0.1.5) streams its sfx bank from WORLD.PAK at boot, so it ships
 # its whole image and rides the same disc_base relocation as hello-pack.
 # gh-psx plays CD-DA, so it ships its whole image and needs the SDK with
-# psx_io::disc_base (PSoXide branch demo-disc-lba-base, pinned in its own
-# third_party/PSoXide).
+# psx_io::disc_base. Every game reaches that SDK through psoxide-link now, and
+# PSOXIDE_FROM below puts them all on this submodule's copy of it.
 # PSOXIDE_FROM on every game that carries its own pin. Each of them records a
 # rev for its standalone build, and those revs drift -- three of them sat eight
 # commits behind a measured SPU fix and nothing said so. A disc built from
@@ -95,7 +95,7 @@ examples:
 # pin is overridden here and all eleven programs come off the submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
-	$(MAKE) -C $(GAMES)/voxide disc
+	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PSOXIDE)
 	$(MAKE) -C $(NITROXIDE_SRC) build PSOXIDE_FROM=$(PSOXIDE)
 	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PSOXIDE)
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PSOXIDE)
