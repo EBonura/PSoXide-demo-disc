@@ -88,12 +88,18 @@ examples:
 # gh-psx plays CD-DA, so it ships its whole image and needs the SDK with
 # psx_io::disc_base (PSoXide branch demo-disc-lba-base, pinned in its own
 # third_party/PSoXide).
+# PSOXIDE_FROM on every game that carries its own pin. Each of them records a
+# rev for its standalone build, and those revs drift -- three of them sat eight
+# commits behind a measured SPU fix and nothing said so. A disc built from
+# whatever each game happened to pin would press several different SDKs, so the
+# pin is overridden here and all eleven programs come off the submodule.
+# hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
 	$(MAKE) -C $(GAMES)/voxide disc
-	$(MAKE) -C $(NITROXIDE_SRC) build
-	$(MAKE) -C $(GAMES)/psxcel build
-	$(MAKE) -C $(GAMES)/pico8-psx collection
-	$(MAKE) -C $(GAMES)/gh-psx disc
+	$(MAKE) -C $(NITROXIDE_SRC) build PSOXIDE_FROM=$(PSOXIDE)
+	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PSOXIDE)
+	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PSOXIDE)
+	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PSOXIDE)
 	@$(MAKE) cortex-if-stale
 	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
 
@@ -168,10 +174,39 @@ disc-only: mkdisc
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 
 
-check:
+check: sdk-coherence
 	cd carousel && cargo test
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
+
+# Every program on this disc has to be built against one SDK.
+#
+# It was not always so. The games carrying their own pin drifted, and on
+# 2026-08-03 three of them were eight commits behind a measured SPU fix with
+# nothing to say so -- the disc pressed several SDKs and looked fine. `programs`
+# passes PSOXIDE_FROM to stop that; this checks it actually took, by reading the
+# marker psoxide-link leaves in each hydrated tree.
+#
+# Only games that have been hydrated are checked: a tree nobody has built yet
+# has no marker, and demanding one would fail a fresh clone for no reason.
+.PHONY: sdk-coherence
+sdk-coherence:
+	@expected="local:$(PSOXIDE)"; bad=0; seen=0; \
+	for m in $(GAMES)/*/.psoxide/.psoxide-source; do \
+		[ -f "$$m" ] || continue; \
+		seen=$$((seen+1)); \
+		got=$$(cat "$$m"); \
+		name=$$(basename $$(dirname $$(dirname "$$m"))); \
+		if [ "$$got" != "$$expected" ]; then \
+			echo "sdk-coherence: $$name is on $$got, not $$expected"; \
+			bad=1; \
+		fi; \
+	done; \
+	if [ $$bad -ne 0 ]; then \
+		echo "sdk-coherence: run 'make programs' to put every game on this tree"; \
+		exit 1; \
+	fi; \
+	echo "sdk-coherence: $$seen game(s) on $(PSOXIDE)"
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its
