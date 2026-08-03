@@ -87,6 +87,9 @@ pub const YELLOW: u32 = 0x0000_D8FF;
 /// of a CRT, dark enough to read as "not yet".
 pub const DIM: u32 = 0x0080_8080;
 pub const RED_BASE: u32 = 0x0000_0040;
+/// The loading screen's background and its empty bar track.
+pub const BLACK: u32 = 0x0000_0000;
+pub const TRACK: u32 = 0x0030_3030;
 
 /// The SDK's 8x8 public-domain font (dhepper font8x8), reused as plain
 /// data: glyphs are drawn as runs of GP0 rectangles, so the blob needs
