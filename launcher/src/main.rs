@@ -157,13 +157,9 @@ const TICKS_HZ: u32 = 60;
 /// self-fades in ~150 ms, and at 1/14 that left almost nothing to hear.
 /// Browse fires on every turn of the carousel so it stays the quieter of
 /// the two; select is a one-off and can afford to land.
-/// Frames the browse blip must have to itself before it may retrigger.
-/// Holding a direction turns the carousel far faster than the sample is
-/// long, and re-keying it every press restarted the attack over and over
-/// -- on console that came out as a warbling machine-gun rather than a
-/// blip per step. Six frames is a tenth of a second: fast browsing still
-/// ticks, it just stops stuttering over itself.
-const BLIP_MIN_GAP: u32 = 6;
+/// Frames of margin past a sample's own length before its voice is
+/// silenced outright. See `SFX_OFF_AT`.
+const SFX_TAIL_FRAMES: u32 = 2;
 const BROWSE_GAIN: Volume = Volume::linear(1, 4);
 const SELECT_GAIN: Volume = Volume::linear(1, 3);
 /// The launch swoosh rides under the warp, so it carries the moment and is
@@ -305,11 +301,14 @@ fn main() {
         spu::enable_cd_audio(true);
         music.begin(tick);
     }
+    // How long each SFX sample actually lasts, in frames; filled in as
+    // each one is uploaded.
+    let mut sfx_frames: [u32; 3] = [8; 3];
     // Independent of the music: the blips play whether or not the disc
     // carries a menu track.
     {
         let mut at = SFX_BASE;
-        for (voice, bytes, gain, envelope) in [
+        for (slot, (voice, bytes, gain, envelope)) in [
             (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN, Adsr::percussive()),
             (VOICE_SELECT, SFX_SELECT, SELECT_GAIN, Adsr::percussive()),
             // default_tone, not percussive: percussive self-fades in about
@@ -317,7 +316,10 @@ fn main() {
             // default_tone plays a one-shot out in full and lets the END
             // flag stop it, which is what a sample this long needs.
             (VOICE_LAUNCH, SFX_LAUNCH, LAUNCH_GAIN, Adsr::default_tone()),
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
             let adpcm = audio.adpcm_bytes();
             spu::upload_adpcm(at, adpcm);
@@ -331,6 +333,11 @@ fn main() {
             // which is why it never repeated there. percussive() self-
             // fades in ~150 ms: env 0000 by frame 2 in the same capture.
             voice.configure_sample(at, audio.sample_rate_hz(), gain, envelope);
+            // 28 samples per ADPCM block, in display frames at this
+            // sample's own rate, plus a little margin.
+            let samples = (adpcm.len() / 16) as u32 * 28;
+            sfx_frames[slot] =
+                samples * TICKS_HZ / audio.sample_rate_hz().max(1) + SFX_TAIL_FRAMES;
             at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
         }
     }
@@ -347,8 +354,18 @@ fn main() {
     let mut yaw_rate = SPHERE_IDLE_SPIN;
     let mut pitch_rate = 0i32;
     let mut shoves: u32 = 0;
-    /// Tick the browse blip last sounded on, for [`BLIP_MIN_GAP`].
-    let mut last_blip: u32 = 0;
+    /// Tick each SFX voice must be silenced on, or 0 for idle.
+    ///
+    /// A one-shot does NOT stop itself on this hardware. The blip sample is
+    /// eighty milliseconds long and the 2026-08-03 tape has a single browse
+    /// press sounding for 1.05 seconds -- one onset, no retrigger -- because
+    /// the voice runs straight past its own END flag into whatever sits
+    /// after it in SPU RAM and keeps going until the envelope gives up.
+    /// (SB1 measured the same thing: END+mute enters RELEASE rather than
+    /// muting.) So the launcher stops them itself: volume to silence a
+    /// couple of frames after the sample's own length, which is immediate
+    /// and owes nothing to envelope behaviour.
+    let mut sfx_off_at: [u32; 3] = [0; 3];
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
@@ -454,6 +471,16 @@ fn main() {
             }
         }
 
+        // Stop any SFX voice that has outlived its own sample. Volume,
+        // not key_off: this has to be immediate and independent of how
+        // the envelope behaves on real hardware.
+        for (slot, voice) in [VOICE_BROWSE, VOICE_SELECT, VOICE_LAUNCH].iter().enumerate() {
+            if sfx_off_at[slot] != 0 && tick.wrapping_sub(sfx_off_at[slot]) < u32::MAX / 2 {
+                voice.set_volume(Volume::SILENCE, Volume::SILENCE);
+                sfx_off_at[slot] = 0;
+            }
+        }
+
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
         let touched = [
@@ -523,13 +550,8 @@ fn main() {
                     let (dx, dy) = carousel::impulse(shoves);
                     yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
                     pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
-                    // The ring still turns on every press; only the blip
-                    // is rate-limited, so fast browsing stays responsive
-                    // without the sample restarting over itself.
-                    if tick.wrapping_sub(last_blip) >= BLIP_MIN_GAP {
-                        Voice::key_on(VOICE_BROWSE.mask());
-                        last_blip = tick;
-                    }
+                    Voice::key_on(VOICE_BROWSE.mask());
+                    sfx_off_at[0] = tick.wrapping_add(sfx_frames[0]);
                 }
                 if pressed(button::CROSS) || pressed(button::START) {
                     let index = selected.rem_euclid(count as i32) as usize;
@@ -538,6 +560,8 @@ fn main() {
                         // Confirm chirp and launch swoosh together: the chirp
                         // answers the button, the swoosh carries the warp.
                         Voice::key_on(VOICE_SELECT.mask() | VOICE_LAUNCH.mask());
+                        sfx_off_at[1] = tick.wrapping_add(sfx_frames[1]);
+                        sfx_off_at[2] = tick.wrapping_add(sfx_frames[2]);
                         launch_index = index;
                         warp = 0;
                     }
