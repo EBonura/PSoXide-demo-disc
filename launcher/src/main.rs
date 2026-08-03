@@ -516,7 +516,11 @@ fn main() {
                 }
             }
             if count > 0 {
-                let browse = pressed(button::LEFT) as i32 - pressed(button::RIGHT) as i32;
+                // RIGHT advances the carousel, LEFT goes back. The ring
+                // turns the other way underneath, so pressing right moves the
+                // selection toward you rather than sending the ring that way,
+                // which is the reading people expect from a list.
+                let browse = pressed(button::RIGHT) as i32 - pressed(button::LEFT) as i32;
                 if browse != 0 {
                     selected -= browse;
                     // The shove points somewhere unpredictable rather than along
