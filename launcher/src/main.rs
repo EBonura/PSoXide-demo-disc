@@ -165,6 +165,13 @@ const SELECT_GAIN: Volume = Volume::linear(1, 3);
 /// The launch swoosh rides under the warp, so it carries the moment and is
 /// the loudest of the three.
 const LAUNCH_GAIN: Volume = Volume::linear(2, 5);
+/// The swoosh is 0.56 s and the launch animation is 40 frames of warp
+/// plus 14 of fade -- 0.9 s. Played at its own rate it finished a third
+/// of a second before the screen did, which read as too quick. Pitching
+/// it to 11/16 of unity stretches it to about 0.82 s, so it carries the
+/// whole warp and deepens as it goes, which suits a launch.
+const LAUNCH_STRETCH_NUM: u32 = 11;
+const LAUNCH_STRETCH_DEN: u32 = 16;
 
 /// A blip when the carousel turns and a heavier one when a program is
 /// chosen. Two voices, well clear of the CD input.
@@ -333,6 +340,12 @@ fn main() {
             // which is why it never repeated there. percussive() self-
             // fades in ~150 ms: env 0000 by frame 2 in the same capture.
             voice.configure_sample(at, audio.sample_rate_hz(), gain, envelope);
+            if slot == 2 {
+                // 0x1000 is unity; scaling it down stretches the sample.
+                voice.set_pitch(psx_spu::Pitch::raw(
+                    (0x1000 * LAUNCH_STRETCH_NUM / LAUNCH_STRETCH_DEN) as u16,
+                ));
+            }
             // 28 samples per ADPCM block, in display frames at this
             // sample's own rate, plus a little margin.
             let samples = (adpcm.len() / 16) as u32 * 28;
@@ -550,6 +563,11 @@ fn main() {
                     let (dx, dy) = carousel::impulse(shoves);
                     yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
                     pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
+                    // Volume first, every time. The cutoff below silences
+                    // the voice by writing its volume to zero, and key_on
+                    // does not restore it -- so without this the first
+                    // blip played and every one after it was mute.
+                    VOICE_BROWSE.set_volume(BROWSE_GAIN, BROWSE_GAIN);
                     Voice::key_on(VOICE_BROWSE.mask());
                     sfx_off_at[0] = tick.wrapping_add(sfx_frames[0]);
                 }
@@ -559,9 +577,14 @@ fn main() {
                     if entries[index].exe_lba != 0 {
                         // Confirm chirp and launch swoosh together: the chirp
                         // answers the button, the swoosh carries the warp.
+                        VOICE_SELECT.set_volume(SELECT_GAIN, SELECT_GAIN);
+                        VOICE_LAUNCH.set_volume(LAUNCH_GAIN, LAUNCH_GAIN);
                         Voice::key_on(VOICE_SELECT.mask() | VOICE_LAUNCH.mask());
                         sfx_off_at[1] = tick.wrapping_add(sfx_frames[1]);
-                        sfx_off_at[2] = tick.wrapping_add(sfx_frames[2]);
+                        // The swoosh is stretched to span the warp, so its
+                        // cutoff has to stretch with it.
+                        sfx_off_at[2] =
+                            tick.wrapping_add(sfx_frames[2] * LAUNCH_STRETCH_DEN / LAUNCH_STRETCH_NUM);
                         launch_index = index;
                         warp = 0;
                     }
