@@ -27,8 +27,8 @@ use psx_font::{
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaEndDetector, CddaStarter};
 use psx_io::cdrom::{self, PlayPosition};
-use psx_asset::Audio;
-use psx_spu::{self as spu, Adsr, CdVolume, SpuAddr, Voice, Volume};
+use psx_sfx::{Bank, OneShot, Player};
+use psx_spu::{self as spu, Adsr, CdVolume, Pitch, SpuAddr, Voice, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_pad::{button, poll_port1, ButtonState};
 use psx_rt::tty;
@@ -157,9 +157,6 @@ const TICKS_HZ: u32 = 60;
 /// self-fades in ~150 ms, and at 1/14 that left almost nothing to hear.
 /// Browse fires on every turn of the carousel so it stays the quieter of
 /// the two; select is a one-off and can afford to land.
-/// Frames of margin past a sample's own length before its voice is
-/// silenced outright. See `SFX_OFF_AT`.
-const SFX_TAIL_FRAMES: u32 = 2;
 const BROWSE_GAIN: Volume = Volume::linear(1, 4);
 const SELECT_GAIN: Volume = Volume::linear(1, 3);
 /// The launch swoosh rides under the warp, so it carries the moment and is
@@ -315,55 +312,29 @@ fn main() {
         spu::enable_cd_audio(true);
         music.begin(tick);
     }
-    // How long each SFX sample actually lasts, in frames; filled in as
-    // each one is uploaded.
-    let mut sfx_frames: [u32; 3] = [8; 3];
     // Independent of the music: the blips play whether or not the disc
     // carries a menu track.
-    {
-        let mut at = SFX_BASE;
-        for (slot, (voice, bytes, gain, envelope)) in [
-            // default_tone for the same reason as the swoosh below: percussive
-            // self-fades in ~150 ms and the browse blip is now 0.25 s, so
-            // percussive would throw away most of what made it audible.
-            (VOICE_BROWSE, SFX_BROWSE, BROWSE_GAIN, Adsr::default_tone()),
-            (VOICE_SELECT, SFX_SELECT, SELECT_GAIN, Adsr::percussive()),
-            // default_tone, not percussive: percussive self-fades in about
-            // 150 ms, which would swallow five sixths of a 0.56 s swoosh.
-            // default_tone plays a one-shot out in full and lets the END
-            // flag stop it, which is what a sample this long needs.
-            (VOICE_LAUNCH, SFX_LAUNCH, LAUNCH_GAIN, Adsr::default_tone()),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let audio = Audio::from_bytes(bytes).expect("cooked psau sample");
-            let adpcm = audio.adpcm_bytes();
-            spu::upload_adpcm(at, adpcm);
-            // Percussive, NOT Adsr::sample(): the SB1 console capture
-            // (2026-08-02) proved that on silicon a one-shot under
-            // sample() never dies -- the END+mute terminator drops the
-            // voice into RELEASE at the ADSR's release rate, sample()'s
-            // release is the slowest the hardware encodes, and the voice
-            // loops the blip at full envelope forever (env 7FFF at 4.7 s,
-            // key_off inert). The emulator zeroes the envelope instead,
-            // which is why it never repeated there. percussive() self-
-            // fades in ~150 ms: env 0000 by frame 2 in the same capture.
-            voice.configure_sample(at, audio.sample_rate_hz(), gain, envelope);
-            if slot == 2 {
-                // 0x1000 is unity; scaling it down stretches the sample.
-                voice.set_pitch(psx_spu::Pitch::raw(
-                    (0x1000 * LAUNCH_STRETCH_NUM / LAUNCH_STRETCH_DEN) as u16,
-                ));
-            }
-            // 28 samples per ADPCM block, in display frames at this
-            // sample's own rate, plus a little margin.
-            let samples = (adpcm.len() / 16) as u32 * 28;
-            sfx_frames[slot] =
-                samples * TICKS_HZ / audio.sample_rate_hz().max(1) + SFX_TAIL_FRAMES;
-            at = SpuAddr::new(at.byte_offset() + adpcm.len() as u32);
-        }
-    }
+    //
+    // psx-sfx owns what used to sit here: the sequential upload, the key-on
+    // that writes a repeat address, and the cutoff that stops a one-shot on a
+    // clock because END will not. Its Player also scales the launch swoosh's
+    // cutoff by its own pitch, which this had to do by hand.
+    let mut bank = Bank::new(SFX_BASE);
+    // OneShot defaults to default_tone. percussive self-fades in about 150 ms,
+    // which suits the select chirp and would throw away most of a 0.25 s blip
+    // or a 0.56 s swoosh.
+    let sfx_browse = OneShot::new(bank.upload(SFX_BROWSE), BROWSE_GAIN);
+    let sfx_select =
+        OneShot::new(bank.upload(SFX_SELECT), SELECT_GAIN).with_adsr(Adsr::percussive());
+    // 0x1000 is unity; scaling it down stretches the sample over the warp.
+    let sfx_launch = OneShot::new(bank.upload(SFX_LAUNCH), LAUNCH_GAIN).with_pitch(Pitch::raw(
+        (0x1000 * LAUNCH_STRETCH_NUM / LAUNCH_STRETCH_DEN) as u16,
+    ));
+    let mut sfx: Player<3> = Player::new([VOICE_BROWSE, VOICE_SELECT, VOICE_LAUNCH], TICKS_HZ);
+    /// Slots into `sfx`, in the order its voices were handed over.
+    const SFX_BROWSE_SLOT: usize = 0;
+    const SFX_SELECT_SLOT: usize = 1;
+    const SFX_LAUNCH_SLOT: usize = 2;
 
     let mut selected: i32 = 0;
     // Frames into the launch warp, or -1 while the menu is just a menu.
@@ -377,18 +348,6 @@ fn main() {
     let mut yaw_rate = SPHERE_IDLE_SPIN;
     let mut pitch_rate = 0i32;
     let mut shoves: u32 = 0;
-    /// Tick each SFX voice must be silenced on, or 0 for idle.
-    ///
-    /// A one-shot does NOT stop itself on this hardware. The blip sample was
-    /// eighty milliseconds long then and the 2026-08-03 tape has a single
-    /// browse press sounding for 1.05 seconds -- one onset, no retrigger --
-    /// because the voice runs straight past its own END flag into whatever sits
-    /// after it in SPU RAM and keeps going until the envelope gives up.
-    /// (SB1 measured the same thing: END+mute enters RELEASE rather than
-    /// muting.) So the launcher stops them itself: volume to silence a
-    /// couple of frames after the sample's own length, which is immediate
-    /// and owes nothing to envelope behaviour.
-    let mut sfx_off_at: [u32; 3] = [0; 3];
     // How far the camera has flown into the starfield.
     let mut travel: i32 = 0;
     let mut italian = false;
@@ -494,15 +453,9 @@ fn main() {
             }
         }
 
-        // Stop any SFX voice that has outlived its own sample. Volume,
-        // not key_off: this has to be immediate and independent of how
-        // the envelope behaves on real hardware.
-        for (slot, voice) in [VOICE_BROWSE, VOICE_SELECT, VOICE_LAUNCH].iter().enumerate() {
-            if sfx_off_at[slot] != 0 && tick.wrapping_sub(sfx_off_at[slot]) < u32::MAX / 2 {
-                voice.set_volume(Volume::SILENCE, Volume::SILENCE);
-                sfx_off_at[slot] = 0;
-            }
-        }
+        // Stop any SFX voice that has outlived its own sample. Volume, not
+        // key_off: immediate, and owing nothing to envelope behaviour.
+        sfx.tick(tick);
 
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
@@ -573,13 +526,7 @@ fn main() {
                     let (dx, dy) = carousel::impulse(shoves);
                     yaw_rate -= browse * ((SPHERE_KICK * dx) >> 12);
                     pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
-                    // Volume first, every time. The cutoff below silences
-                    // the voice by writing its volume to zero, and key_on
-                    // does not restore it -- so without this the first
-                    // blip played and every one after it was mute.
-                    VOICE_BROWSE.set_volume(BROWSE_GAIN, BROWSE_GAIN);
-                    Voice::key_on(VOICE_BROWSE.mask());
-                    sfx_off_at[0] = tick.wrapping_add(sfx_frames[0]);
+                    sfx.play_on(SFX_BROWSE_SLOT, &sfx_browse, tick);
                 }
                 if pressed(button::CROSS) || pressed(button::START) {
                     let index = selected.rem_euclid(count as i32) as usize;
@@ -587,14 +534,10 @@ fn main() {
                     if entries[index].exe_lba != 0 {
                         // Confirm chirp and launch swoosh together: the chirp
                         // answers the button, the swoosh carries the warp.
-                        VOICE_SELECT.set_volume(SELECT_GAIN, SELECT_GAIN);
-                        VOICE_LAUNCH.set_volume(LAUNCH_GAIN, LAUNCH_GAIN);
-                        Voice::key_on(VOICE_SELECT.mask() | VOICE_LAUNCH.mask());
-                        sfx_off_at[1] = tick.wrapping_add(sfx_frames[1]);
-                        // The swoosh is stretched to span the warp, so its
-                        // cutoff has to stretch with it.
-                        sfx_off_at[2] =
-                            tick.wrapping_add(sfx_frames[2] * LAUNCH_STRETCH_DEN / LAUNCH_STRETCH_NUM);
+                        // The swoosh's cutoff stretches with its pitch on its
+                        // own now, which this used to work out by hand.
+                        sfx.play_on(SFX_SELECT_SLOT, &sfx_select, tick);
+                        sfx.play_on(SFX_LAUNCH_SLOT, &sfx_launch, tick);
                         launch_index = index;
                         warp = 0;
                     }
