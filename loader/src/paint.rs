@@ -43,6 +43,18 @@ fn gp0_packet(words: &[u32]) {
 /// whole displayed framebuffer, zero offset, display area at 0,0.
 pub fn setup() {
     unsafe { psx_io::write32(GP1, 0x0300_0001) }; // display off while painting
+    // Program the display the way the launcher's gpu::init does, rather
+    // than inheriting whatever GP1(00h) reset leaves behind. Without
+    // these the loader's 320x240 image was shown through the reset
+    // defaults, so a bar centred in the framebuffer landed off-centre on
+    // the TV. GP1(08h) 320x240 NTSC, GP1(06h) X 0x260..0x260+320*8,
+    // GP1(07h) Y 0x10..0x10+240 -- the standard centred NTSC picture.
+    unsafe {
+        psx_io::write32(GP1, 0x0800_0001); // display mode: 320x240, NTSC
+        psx_io::write32(GP1, 0x0600_0000 | 0x260 | ((0x260 + 320 * 8) << 12));
+        psx_io::write32(GP1, 0x0700_0000 | 0x10 | ((0x10 + 240) << 10));
+        psx_io::write32(GP1, 0x0500_0000); // display area starts at VRAM 0,0
+    }
     gp0_packet(&[0xE1_00_0000]); // texpage/draw-mode defaults
     gp0_packet(&[0xE3_00_0000]); // drawing area top-left (0,0)
     gp0_packet(&[0xE4_00_0000 | (255 << 10) | 320]); // bottom-right (320,255)
