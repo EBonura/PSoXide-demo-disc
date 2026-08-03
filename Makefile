@@ -94,8 +94,37 @@ programs: examples
 	$(MAKE) -C $(GAMES)/psxcel build
 	$(MAKE) -C $(GAMES)/pico8-psx collection
 	$(MAKE) -C $(GAMES)/gh-psx disc
-	$(MAKE) -C $(PSOXIDE) cortex-ignition-v1-project-disc
+	@$(MAKE) cortex-if-stale
 	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
+
+# Bake Cortex Ignition only when its project has actually changed.
+#
+# The bake shells out to the PSoXide frontend, which is built with the
+# editor feature by default -- so re-baking compiles the whole host
+# editor, including crates that have nothing to do with the disc. The
+# project itself changes rarely (it is authored content, not code), so
+# every other build was paying for a rebuild that produced identical
+# bytes, and coupling the disc to whatever state the editor happened to
+# be in. Now the bake runs only if a project file is newer than the
+# baked cue, and `make disc CORTEX_FORCE=1` overrides. find needs -L and
+# a trailing slash: cortex_v1 is a symlink into the sibling PSoXide
+# checkout, and find will not descend one otherwise -- which silently
+# made the check answer "unchanged" no matter what.
+#
+# The proper fix is to split the frontend's `editor` feature so the
+# authoring CLI does not drag the GUI in with it. That is a bigger job;
+# this removes the coupling in the meantime.
+CORTEX_PROJECT := $(PSOXIDE)/editor/projects/cortex_v1
+CORTEX_FORCE   ?=
+
+.PHONY: cortex-if-stale
+cortex-if-stale:
+	@if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX)" ] || [ -n "$$(find -L "$(CORTEX_PROJECT)/" -type f -newer "$(CORTEX)" -not -path '*/baked/*' -print -quit 2>/dev/null)" ]; then \
+		echo "cortex: project changed (or forced) -- baking"; \
+		$(MAKE) -C $(PSOXIDE) cortex-ignition-v1-project-disc; \
+	else \
+		echo "cortex: project unchanged -- reusing $(CORTEX)"; \
+	fi
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
