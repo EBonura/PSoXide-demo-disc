@@ -343,6 +343,34 @@ fn msf(frames: u32) -> String {
 }
 
 /// One audio track's final position on the demo disc.
+/// NitroXide plays the launcher's menu songs, and it finds them by convention
+/// rather than by being told: CD-DA is addressed by track number, so it assumes
+/// the menu music is tracks 2 through 5 and reads GetTN only to check the disc
+/// has that many. Nothing hands it a base. That works because this laying-out
+/// puts all the menu audio down before any program's, which makes the menu
+/// songs the first audio tracks on the disc wherever NitroXide sits in the
+/// running order.
+///
+/// It is a convention, so it can be broken from this side without NitroXide
+/// noticing: it would play the wrong four tracks rather than fail. This is the
+/// check that stops that being silent. It compares placement rather than
+/// trusting the loop order above, so interleaving or reordering trips it too.
+fn check_menu_tracks_lead(placed: &[PlacedAudio], menu_count: usize) -> Result<(), String> {
+    let (menu, games) = placed.split_at(menu_count.min(placed.len()));
+    let Some(last_menu) = menu.iter().map(|t| t.index01).max() else {
+        return Ok(());
+    };
+    match games.iter().map(|t| t.index01).min() {
+        Some(first_game) if first_game <= last_menu => Err(format!(
+            "menu audio must be the first CD-DA on the disc, so NitroXide's \
+             tracks 2-{} are the menu songs: a program's track starts at LBA \
+             {first_game}, at or before the last menu track at LBA {last_menu}",
+            menu_count + 1
+        )),
+        _ => Ok(()),
+    }
+}
+
 struct PlacedAudio {
     index00: u32,
     index01: u32,
@@ -773,6 +801,8 @@ fn run() -> Result<(), String> {
         disc.extend_from_slice(&image.audio_bytes);
     }
 
+    check_menu_tracks_lead(&placed_audio, menu_audio.len())?;
+
     fs::write(&args.out, &disc).map_err(|e| format!("write {}: {e}", args.out.display()))?;
     let cue_path = args.out.with_extension("cue");
     let bin_name = args
@@ -842,6 +872,34 @@ mod tests {
             load_addr,
             payload_bytes: payload,
         }
+    }
+
+    fn at(index01: u32) -> PlacedAudio {
+        PlacedAudio {
+            index00: index01.saturating_sub(150),
+            index01,
+        }
+    }
+
+    #[test]
+    fn menu_audio_leading_the_disc_is_accepted() {
+        let placed = [at(1000), at(2000), at(3000), at(4000), at(9000), at(9500)];
+        assert!(check_menu_tracks_lead(&placed, 4).is_ok());
+    }
+
+    #[test]
+    fn a_program_track_before_the_menu_songs_is_an_error() {
+        // What a future layout change would look like: some game's audio laid
+        // down first, which silently moves the menu off tracks 2-5 and leaves
+        // NitroXide playing whatever landed there.
+        let placed = [at(9000), at(9500), at(1000), at(2000), at(3000), at(4000)];
+        let err = check_menu_tracks_lead(&placed, 4).unwrap_err();
+        assert!(err.contains("first CD-DA"), "{err}");
+    }
+
+    #[test]
+    fn a_disc_with_no_menu_music_has_nothing_to_check() {
+        assert!(check_menu_tracks_lead(&[at(9000)], 0).is_ok());
     }
 
     #[test]
