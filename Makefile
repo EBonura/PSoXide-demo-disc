@@ -200,6 +200,7 @@ endif
 # and description would press, but announce itself wrong.
 ifneq ($(HL),)
 HL_ARGS = --image "HALF-LIFE=$(HLPSX)" \
+	--shot "HALF-LIFE=$(SHOTS_OUT)/halflife.shot" \
 	--version-of "HALF-LIFE=$(V_HLPSX)" \
 	--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine."
 endif
@@ -216,7 +217,7 @@ SHOTS_OUT := $(BUILD)/shots
 SHOT_NAMES := cortex cortex2 voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
-              invaders2 pong pong2 hwtests hwtests2
+              invaders2 pong pong2 hwtests hwtests2 halflife
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
