@@ -355,8 +355,8 @@ pub struct TextCache {
 /// boundary the way the old full-width block did.
 const CACHE_X: u16 = 512;
 const CACHE_Y: u16 = 0;
-pub const CACHE_W: i16 = 168;
-pub const CACHE_H: i16 = 110;
+pub const CACHE_W: i16 = 115;
+pub const CACHE_H: i16 = 92;
 
 impl TextCache {
     /// A cache holding nothing. Any key re-renders it.
@@ -438,18 +438,9 @@ pub fn upload_shot(shot: &[u8]) {
 /// The screenshot itself, with its top-left at `x, y`, faded up through
 /// `level` (128 is full brightness). A sprite rather than a quad: a sprite
 /// steps one texel per pixel from its start, which keeps the frame
-/// pixel-exact instead of trusting interpolated UVs.
-///
-/// A one-pixel border in the panels' red ties the free-standing image to
-/// the box beside it; without one it floats over the starfield like a
-/// glitch.
+/// pixel-exact instead of trusting interpolated UVs. Its box supplies the
+/// border, so the image draws bare.
 pub fn draw_shot(x: i16, y: i16, level: u8) {
-    const BORDER: (u8, u8, u8) = (150, 30, 34);
-    let (w, h) = (disc_toc::SHOT_W as i16, disc_toc::SHOT_H as i16);
-    gpu::draw_rect_flat(x - 1, y - 1, w as u16 + 2, 1, BORDER.0, BORDER.1, BORDER.2);
-    gpu::draw_rect_flat(x - 1, y + h, w as u16 + 2, 1, BORDER.0, BORDER.1, BORDER.2);
-    gpu::draw_rect_flat(x - 1, y, 1, h as u16, BORDER.0, BORDER.1, BORDER.2);
-    gpu::draw_rect_flat(x + w, y, 1, h as u16, BORDER.0, BORDER.1, BORDER.2);
     gpu::draw_sprite_material(
         x,
         y,

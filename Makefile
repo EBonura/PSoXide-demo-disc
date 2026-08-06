@@ -213,9 +213,10 @@ disc: launcher programs mkdisc
 # pixels always come from the PNGs actually in the repo.
 SHOTS_SRC := $(ROOT)/assets/shots
 SHOTS_OUT := $(BUILD)/shots
-SHOT_NAMES := cortex voxide-day voxide-night nitroxide-boost nitroxide-aerial \
-              nitroxide-goal celeste psxcel-chart psxcel-editing ghpsx \
-              breakout invaders pong hwtests
+SHOT_NAMES := cortex cortex2 voxide-day voxide-night nitroxide-boost \
+              nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
+              psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
+              invaders2 pong pong2 hwtests hwtests2
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
@@ -246,19 +247,26 @@ disc-only: mkdisc $(SHOT_FILES)
 		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
 		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex.shot" \
+		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex2.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-day.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-night.shot" \
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-boost.shot" \
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-aerial.shot" \
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-goal.shot" \
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste.shot" \
+		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste2.shot" \
 		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
 		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
 		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx.shot" \
+		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx2.shot" \
 		--shot "BREAKOUT=$(SHOTS_OUT)/breakout.shot" \
+		--shot "BREAKOUT=$(SHOTS_OUT)/breakout2.shot" \
 		--shot "SPACE INVADERS=$(SHOTS_OUT)/invaders.shot" \
+		--shot "SPACE INVADERS=$(SHOTS_OUT)/invaders2.shot" \
 		--shot "MAGIKAAAAARP PONG=$(SHOTS_OUT)/pong.shot" \
+		--shot "MAGIKAAAAARP PONG=$(SHOTS_OUT)/pong2.shot" \
 		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
+		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests2.shot" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
@@ -270,7 +278,7 @@ disc-only: mkdisc $(SHOT_FILES)
 		--version-of "SPACE INVADERS=$(V_INVADERS)" \
 		--version-of "MAGIKAAAAARP PONG=$(V_MAGIPONG)" \
 		--describe "CORTEX IGNITION=An original souls-like, built from scratch for the PlayStation. The current build is a PSoXide engine tech demo rather than a complete game, with streamed rooms, combat and animation.|Un souls-like originale, creato da zero per PlayStation. La versione attuale e una tech demo del motore PSoXide, non un gioco completo, con stanze in streaming, combattimento e animazioni." \
-		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Questa e una prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
+		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Play against the CPU or a friend in split screen: drive, boost, jump, dodge and score, with music off the disc.|Un clone di Rocket League per la prima PlayStation. Gioca contro la CPU o in due a schermo diviso: guida, boost, salti, dodge e gol, con la musica del disco." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \

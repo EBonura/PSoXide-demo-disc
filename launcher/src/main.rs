@@ -148,20 +148,27 @@ const METER_BASE: i16 = 38;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
 const BANNER_Y: i16 = 7;
-/// The description box, on the left of the band between the header and the
-/// carousel. The screenshot stands beside it, not inside it.
-const PANEL_X: i16 = 8;
-const PANEL_Y: i16 = 46;
-const PANEL_W: i16 = 180;
-const PANEL_H: i16 = 117;
-/// Where the text column blits inside it, and the gap between its lines.
-const TEXT_X: i16 = PANEL_X + 6;
-const TEXT_Y: i16 = PANEL_Y + 5;
+/// Two boxes of the same size sit centred in the band between the header
+/// and the carousel: the description on the left, the screenshot on the
+/// right. The box is the screenshot plus its one-pixel border and nothing
+/// else -- the image runs edge to edge.
+const PANEL_W: i16 = disc_toc::SHOT_W as i16 + 2;
+const PANEL_H: i16 = disc_toc::SHOT_H as i16 + 2;
+/// Horizontally the pair splits its spare width into three equal gaps:
+/// edge, middle, edge. Vertically it centres between the header's bottom
+/// and the far pills' tops.
+const PANEL_GAP: i16 = (320 - 2 * PANEL_W) / 3;
+const PANEL_X: i16 = PANEL_GAP;
+const PANEL_Y: i16 = HEADER_H + (168 - HEADER_H - PANEL_H) / 2;
+/// The right box mirrors the left one across the screen's centre line.
+const SHOT_BOX_X: i16 = 320 - PANEL_GAP - PANEL_W;
+/// Where the text column blits inside its box, and the line pitch.
+const TEXT_X: i16 = PANEL_X + (PANEL_W - paint::CACHE_W) / 2;
+const TEXT_Y: i16 = PANEL_Y + (PANEL_H - paint::CACHE_H) / 2;
 const DESC_LEADING: i16 = 9;
-/// The screenshot's top-left: its own framed element on the right,
-/// vertically centred on the same band as the text box.
-const SHOT_X: i16 = 190;
-const SHOT_Y: i16 = PANEL_Y + (PANEL_H - disc_toc::SHOT_H as i16) / 2;
+/// The screenshot, flush inside its border.
+const SHOT_X: i16 = SHOT_BOX_X + 1;
+const SHOT_Y: i16 = PANEL_Y + 1;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -760,17 +767,20 @@ fn main() {
             let index = selected.rem_euclid(count as i32) as usize;
             // The block only changes when the selection or the language does,
             // so it is rendered off-screen on those frames and blitted on the
-            // rest. A glyph at a time cost about a whole vblank.
-            let key = (index as u32) << 1 | italian as u32;
+            // rest. A glyph at a time cost about a whole vblank. The unlock
+            // bit matters too: the cheat code rebuilds the list with Cortex
+            // at the index the old selection held, and a key without it kept
+            // showing the old entry's text under the new entry's pill.
+            let key = (index as u32) << 2 | (unlocked as u32) << 1 | italian as u32;
             let hide_text = attract || warp >= 0 || debug;
             if hide_text {
                 // Nothing but the ball turning over the carousel.
             } else if !text_cache.holds(key) {
                 text_cache.begin(key);
                 if entries[index].exe_lba == 0 {
-                    render_credits(&font, &header.expect("count came from it"));
+                    render_credits(&small, &header.expect("count came from it"));
                 } else {
-                    render_description(&font, &entries[index], italian);
+                    render_description(&small, &entries[index], italian);
                 }
                 text_cache.end(&fb);
             }
@@ -815,18 +825,19 @@ fn main() {
             if !hide_text {
                 draw_text_block(&font, &text_cache, italian);
                 if shot_level > 0 && shot_shown >= 0 {
+                    paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
                     paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
                 }
-                // The program's own version, right-aligned under the
-                // screenshot's frame. The header already says which pressing
+                // The program's own version, right-aligned just below the
+                // screenshot's box. The header already says which pressing
                 // this is; this says which build of the thing you are about
                 // to run, which is the question when one game looks wrong
                 // and ten others do not.
                 let version = entries[index].version_str();
                 if !version.is_empty() {
                     let w = 1 + version.len() as i16;
-                    let vx = SHOT_X + disc_toc::SHOT_W as i16 - w * 5;
-                    let vy = SHOT_Y + disc_toc::SHOT_H as i16 + 4;
+                    let vx = SHOT_BOX_X + PANEL_W - w * 5;
+                    let vy = PANEL_Y + PANEL_H + 3;
                     small.draw_text(vx, vy, "v", NOW_PLAYING);
                     small.draw_text(vx + 5, vy, version, TRACK_NAME);
                 }
@@ -1136,11 +1147,23 @@ fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
 fn render_credits(font: &FontAtlas, header: &Header) {
     // The same font and the same wrap as a description, because this is one:
     // an entry on the carousel that happens to have no program behind it.
-    // The artist takes two lines and the four tracks take the other four,
-    // which is exactly the room a description has.
-    let mut line = 0i16;
+    // The artist takes a line or two and the tracks take one each; count
+    // them first so the block sits centred in its box.
+    let mut lines = 0i16;
     let mut rest = header.credit_str();
-    while !rest.is_empty() && line < 2 {
+    while !rest.is_empty() && lines < 2 {
+        let (_, tail) = wrap(rest, WRAP_CHARS);
+        lines += 1;
+        rest = tail;
+    }
+    let titled = (0..header.menu_track_count as usize)
+        .filter(|&t| !header.title(t).is_empty())
+        .count() as i16;
+    let total = (lines + titled).min(disc_toc::DESC_LINES as i16);
+    let mut line = (disc_toc::DESC_LINES as i16 - total) / 2;
+    let mut rest = header.credit_str();
+    let credit_end = line + lines;
+    while !rest.is_empty() && line < credit_end {
         let (head, tail) = wrap(rest, WRAP_CHARS);
         cached_line(font, line, head, BLURB);
         line += 1;
@@ -1220,18 +1243,23 @@ fn render_description(font: &FontAtlas, entry: &Entry, italian: bool) {
     } else {
         entry.desc_en_str()
     };
-    // A panel first, so the text does not have to compete with the ball and
-    // the starfield behind it.
+    // Count the lines first, so a short blurb sits centred in its box the
+    // way the screenshot does in the one beside it.
+    let mut lines = 0i16;
+    let mut rest = text;
+    while !rest.is_empty() && lines < disc_toc::DESC_LINES as i16 {
+        let (_, tail) = wrap(rest, WRAP_CHARS);
+        lines += 1;
+        rest = tail;
+    }
+    let start = (disc_toc::DESC_LINES as i16 - lines) / 2;
     // Greedy wrap, a line at a time. mkdisc has already checked the text fits
     // in DESC_LINES of them, so nothing is dropped here.
     let mut rest = text;
-    for line in 0..disc_toc::DESC_LINES as i16 {
+    for line in 0..lines {
         let (head, tail) = wrap(rest, WRAP_CHARS);
-        cached_line(font, line, head, BLURB);
+        cached_line(font, start + line, head, BLURB);
         rest = tail;
-        if rest.is_empty() {
-            break;
-        }
     }
 }
 

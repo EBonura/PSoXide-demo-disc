@@ -2,8 +2,8 @@
 """Cook a screenshot into the disc's menu-panel format.
 
 One shot is a 512-byte CLUT (256 RGB555 entries, little-endian) followed by
-120x90 pixel indices, which is what `mkdisc --shot` presses and the launcher
-uploads straight into VRAM to draw beside the description text. Colours are
+120x90 pixel indices, which is what `mkdisc --shot` presses and the
+launcher uploads straight into VRAM to fill the box beside the description. Colours are
 quantized to 256: exactly, when the downscaled frame already fits, and by
 median cut with dithering when it does not.
 
