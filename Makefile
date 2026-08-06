@@ -189,6 +189,13 @@ cortex-if-stale:
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
+# Cortex Ignition is pressed on the public disc but held off the carousel
+# until the Konami code reveals it: its own release comes later, and this
+# lets friends test ahead of it. The Comicon pressing shows everything.
+ifeq ($(HL),)
+GATE_ARGS = --gate "CORTEX IGNITION"
+endif
+
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
 ifneq ($(HL),)
@@ -207,6 +214,7 @@ disc-only: mkdisc
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX)" \
+		$(GATE_ARGS) \
 		$(HL_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \

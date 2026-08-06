@@ -108,6 +108,9 @@ struct Args {
     /// Per menu track, in the same order: the title the menu shows as
     /// "now playing".
     menu_titles: Vec<String>,
+    /// Display names pressed onto the disc but held off the carousel until
+    /// the cheat code reveals them.
+    gates: Vec<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -122,6 +125,7 @@ fn parse_args() -> Result<Args, String> {
     let mut credit = String::new();
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
     let mut menu_titles: Vec<String> = Vec::new();
+    let mut gates: Vec<String> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -171,6 +175,9 @@ fn parse_args() -> Result<Args, String> {
                     .split_once('=')
                     .ok_or_else(|| format!("--version-of wants NAME=VERSION, got {spec:?}"))?;
                 versions.push((name.to_string(), version.trim().to_string()));
+            }
+            "--gate" => {
+                gates.push(it.next().ok_or("--gate takes a display NAME".to_string())?)
             }
             "--describe" => {
                 let spec = it.next().ok_or("--describe takes NAME=ENGLISH|ITALIAN")?;
@@ -224,6 +231,7 @@ fn parse_args() -> Result<Args, String> {
         credit,
         menu_beats,
         menu_titles,
+        gates,
     })
 }
 
@@ -237,6 +245,7 @@ fn print_usage() {
          --share-cdda  points one program at another's CD-DA tracks, so a song\n\
         \x20             two programs both use is only burned once\n\
          --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
+         --gate        NAME stays off the carousel until the cheat code\n\
          --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
         \x20             menu cycles through the tracks in order\n\
          --credit      attribution the menu prints for that track\n\
@@ -507,6 +516,19 @@ fn apply_versions(
     Ok(())
 }
 
+/// Mark gated programs hidden. An unknown name fails the build: a gate that
+/// silently does not take would ship the one thing it existed to hold back.
+fn apply_gates(entries: &mut [Entry], names: &[&str], gates: &[String]) -> Result<(), String> {
+    for name in gates {
+        let at = names
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| format!("--gate names {name:?}, which is not on this disc"))?;
+        entries[at] = entries[at].gated();
+    }
+    Ok(())
+}
+
 fn apply_descriptions(
     entries: &mut [Entry],
     names: &[&str],
@@ -733,6 +755,7 @@ fn run() -> Result<(), String> {
     apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
     apply_versions(&mut entries, &names, &args.versions)?;
+    apply_gates(&mut entries, &names, &args.gates)?;
     // The menu's tracks come FIRST among the audio, immediately after the
     // data. They used to go last so adding one could not shift a game's
     // base, but last physically means the outer edge of the burn, and the
