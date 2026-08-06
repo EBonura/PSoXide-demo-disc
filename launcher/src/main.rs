@@ -148,19 +148,19 @@ const METER_BASE: i16 = 38;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
 const BANNER_Y: i16 = 7;
-/// The description panel: full width between the header and the carousel,
-/// the text column on the left and the screenshot on the right.
+/// The description box, on the left of the band between the header and the
+/// carousel. The screenshot stands beside it, not inside it.
 const PANEL_X: i16 = 8;
 const PANEL_Y: i16 = 46;
-const PANEL_W: i16 = 304;
+const PANEL_W: i16 = 180;
 const PANEL_H: i16 = 117;
 /// Where the text column blits inside it, and the gap between its lines.
 const TEXT_X: i16 = PANEL_X + 6;
 const TEXT_Y: i16 = PANEL_Y + 5;
 const DESC_LEADING: i16 = 9;
-/// The screenshot's top-left: right-aligned inside the panel, vertically
-/// centred.
-const SHOT_X: i16 = PANEL_X + PANEL_W - 4 - disc_toc::SHOT_W as i16;
+/// The screenshot's top-left: its own framed element on the right,
+/// vertically centred on the same band as the text box.
+const SHOT_X: i16 = 190;
 const SHOT_Y: i16 = PANEL_Y + (PANEL_H - disc_toc::SHOT_H as i16) / 2;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
@@ -817,16 +817,16 @@ fn main() {
                 if shot_level > 0 && shot_shown >= 0 {
                     paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
                 }
-                // The program's own version, right-aligned inside the
-                // panel's bottom corner, under the screenshot. The header
-                // already says which pressing this is; this says which build
-                // of the thing you are about to run, which is the question
-                // when one game looks wrong and ten others do not.
+                // The program's own version, right-aligned under the
+                // screenshot's frame. The header already says which pressing
+                // this is; this says which build of the thing you are about
+                // to run, which is the question when one game looks wrong
+                // and ten others do not.
                 let version = entries[index].version_str();
                 if !version.is_empty() {
                     let w = 1 + version.len() as i16;
-                    let vx = PANEL_X + PANEL_W - 4 - w * 5;
-                    let vy = PANEL_Y + PANEL_H - 12;
+                    let vx = SHOT_X + disc_toc::SHOT_W as i16 - w * 5;
+                    let vy = SHOT_Y + disc_toc::SHOT_H as i16 + 4;
                     small.draw_text(vx, vy, "v", NOW_PLAYING);
                     small.draw_text(vx + 5, vy, version, TRACK_NAME);
                 }
