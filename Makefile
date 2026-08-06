@@ -118,7 +118,9 @@ V_MAGIPONG  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-magikaaaaaar
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
-DISC_VERSION := $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null)
+# Only v* tags name pressings; the rolling `web-disc` release tag that feeds
+# the browser emulator would otherwise leak into every version string.
+DISC_VERSION := $(shell git -C $(ROOT) describe --tags --match 'v*' --always --dirty 2>/dev/null)
 
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
@@ -241,6 +243,23 @@ disc-only: mkdisc
 		--describe "MAGIKAAAAARP PONG=Pong with a live CD-audio visualizer. The game is complete and playable: music streams from the disc while pre-analysed frequency bands drive the bars in sync.|Pong con un visualizzatore audio dal vivo. Il gioco e completo: la musica arriva dal CD mentre le frequenze analizzate in anticipo muovono le barre a tempo." \
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 
+
+# Keep the browser emulator's copy current. PSoXide's Pages deploy stages
+# these two files from the rolling `web-disc` release next to the wasm, and
+# the frontend streams them on demand; the cue's FILE line is rewritten to the
+# stable asset name. Run after pressing a public disc worth shipping -- the
+# next PSoXide deploy picks it up.
+.PHONY: release-web
+release-web:
+	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
+	$(MAKE) disc
+	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
+	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
+	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
+	gh release view web-disc >/dev/null 2>&1 || gh release create web-disc \
+		--title "Browser emulator disc" \
+		--notes "Rolling backing store for the browser emulator's streamed demo disc. For the packaged download, use itch.io."
+	gh release upload web-disc "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" --clobber
 
 # Push the public pressing to itch.io from this machine: the ~200 MB bin is
 # too big for GitHub, so CI cannot carry it. Needs butler on PATH and a
