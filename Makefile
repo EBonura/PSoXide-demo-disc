@@ -282,10 +282,15 @@ disc-only: mkdisc $(SHOT_FILES)
 
 
 # Keep the browser emulator's copy current. PSoXide's Pages deploy stages
-# these two files from the rolling `web-disc` release next to the wasm, and
-# the frontend streams them on demand; the cue's FILE line is rewritten to the
+# these files from the rolling `web-disc` release next to the wasm, and the
+# frontend streams them on demand; the cue's FILE line is rewritten to the
 # stable asset name. Run after pressing a public disc worth shipping -- the
 # next PSoXide deploy picks it up.
+#
+# The release lives on the PSoXide repo, not this one: this repo is private,
+# and the Pages workflow's own token can only read releases on the repo it
+# runs in.
+WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
 release-web:
 	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
@@ -296,10 +301,11 @@ release-web:
 	python3 tools/web-delivery.py "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
 		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
 		"CORTEX IGNITION" "GH-PSX" "HARDWARE TESTS"
-	gh release view web-disc >/dev/null 2>&1 || gh release create web-disc \
+	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
+		--repo $(WEB_DISC_REPO) \
 		--title "PSoXide Demo Disc (disc image)" \
 		--notes "The public pressing as a raw disc image plus the browser emulator's split delivery."
-	gh release upload web-disc "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" \
+	gh release upload web-disc --repo $(WEB_DISC_REPO) "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" \
 		"$(BUILD)/web/web-manifest.txt" "$(BUILD)/web/demo-data.bin.gz" $(BUILD)/web/track-*.flac --clobber
 
 # Push the public pressing to itch.io from this machine: the ~200 MB bin is
