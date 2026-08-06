@@ -242,6 +242,19 @@ disc-only: mkdisc
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 
 
+# Push the public pressing to itch.io from this machine: the ~200 MB bin is
+# too big for GitHub, so CI cannot carry it. Needs butler on PATH and a
+# one-time `butler login`. The HL pressing is never distributed -- the music
+# permission is scoped to the disc without it.
+.PHONY: itch
+itch:
+	@test -z "$(HL)" || { echo "itch: the HL pressing is never distributed"; exit 1; }
+	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
+	$(MAKE) disc
+	@rm -rf "$(BUILD)/itch" && mkdir -p "$(BUILD)/itch"
+	cp "$(DIST)/$(DISC_NAME).bin" "$(DIST)/$(DISC_NAME).cue" release/README.txt "$(BUILD)/itch/"
+	butler push --userversion "$(DISC_VERSION)" "$(BUILD)/itch" bonnie-studios/psoxide-demo-disc:psx
+
 check: sdk-coherence check-locks
 	cd carousel && cargo test
 	cd disc-toc && cargo test
