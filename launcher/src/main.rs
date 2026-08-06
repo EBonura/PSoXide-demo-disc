@@ -130,7 +130,8 @@ const SPHERE_KICK: i32 = 110;
 /// How fast that shove bleeds off: a sixteenth of the excess per frame.
 const SPHERE_DECAY_SHIFT: i32 = 4;
 
-/// Widest line the 8-pixel font fits on screen with a margin either side.
+/// Widest line the description column fits at the 8-pixel font, with the
+/// screenshot taking the rest of the panel's width.
 const WRAP_CHARS: usize = disc_toc::DESC_COLUMNS;
 /// Top of the description block, and the gap between its lines.
 /// A black header strip across the whole screen, holding the mark and the
@@ -147,8 +148,20 @@ const METER_BASE: i16 = 38;
 /// The mark sits beside the column now rather than under it: at five pixels a
 /// character the widest track title stops well short of a centred mark.
 const BANNER_Y: i16 = 7;
-const DESC_TOP: i16 = 106;
+/// The description panel: full width between the header and the carousel,
+/// the text column on the left and the screenshot on the right.
+const PANEL_X: i16 = 8;
+const PANEL_Y: i16 = 46;
+const PANEL_W: i16 = 304;
+const PANEL_H: i16 = 117;
+/// Where the text column blits inside it, and the gap between its lines.
+const TEXT_X: i16 = PANEL_X + 6;
+const TEXT_Y: i16 = PANEL_Y + 5;
 const DESC_LEADING: i16 = 9;
+/// The screenshot's top-left: right-aligned inside the panel, vertically
+/// centred.
+const SHOT_X: i16 = PANEL_X + PANEL_W - 4 - disc_toc::SHOT_W as i16;
+const SHOT_Y: i16 = PANEL_Y + (PANEL_H - disc_toc::SHOT_H as i16) / 2;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -260,6 +273,25 @@ const SPECTRUM_MAX_SECTORS: usize = 192;
 static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
     [0; SECTOR_WORDS * SPECTRUM_MAX_SECTORS];
 
+/// Every screenshot on the disc, cached whole at boot for the same reason
+/// the spectrum is: once the menu music has the drive, a disc read means a
+/// seek away from the audio and back, audible every time. Swapping a shot
+/// from RAM is a moment of DMA instead. ~200 KiB of .bss.
+const SHOT_SLOT_WORDS: usize = disc_toc::SHOT_SECTORS as usize * SECTOR_WORDS;
+static mut SHOTS: [u32; SHOT_SLOT_WORDS * disc_toc::MAX_SHOTS] =
+    [0; SHOT_SLOT_WORDS * disc_toc::MAX_SHOTS];
+
+/// Full brightness for the shot, in GPU tint units.
+const SHOT_FULL: i32 = 128;
+/// Tint steps per frame: out faster than in, so a browse feels like the menu
+/// answering rather than the old image lingering under the new pill. The
+/// single VRAM slot only swaps at black, which is what makes the upload
+/// invisible.
+const SHOT_FADE_IN: i32 = 10;
+const SHOT_FADE_OUT: i32 = 16;
+/// Frames a shot rests before a multi-shot entry moves to its next one.
+const SHOT_SLIDE_FRAMES: u32 = 60 * 7;
+
 #[no_mangle]
 fn main() {
     tty::println("launcher: booted");
@@ -298,6 +330,9 @@ fn main() {
     // Before the music starts, for the same reason the table is: reading the
     // disc while it plays CD-DA is what this hardware is worst at.
     let spectrum_frames = read_spectrum(header.as_ref());
+    // The whole region, gated entries included: unlocking must not need the
+    // drive back.
+    let shot_total = read_shots(header.as_ref(), &all_entries, all_count);
 
     let menu_track = header.map_or(0, |h| h.menu_track) as u8;
     let menu_track_count = header.map_or(0, |h| h.menu_track_count).max(1) as u8;
@@ -393,6 +428,14 @@ fn main() {
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
     let mut text_cache = paint::TextCache::new();
+    // The backdrop: which cached shot is in VRAM, how bright it is drawn,
+    // and the slideshow clock. -1 means the single VRAM slot holds nothing
+    // worth showing.
+    let mut shot_shown: i32 = -1;
+    let mut shot_level: i32 = 0;
+    let mut shot_cycle: u8 = 0;
+    let mut shot_dwell: u32 = 0;
+    let mut shot_entry: usize = usize::MAX;
 
     loop {
         tick = tick.wrapping_add(1);
@@ -712,7 +755,7 @@ fn main() {
         }
 
         if count == 0 {
-            centred(&font, DESC_TOP, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
+            centred(&font, 106, "DISC TABLE OF CONTENTS UNREADABLE", ERROR);
         } else {
             let index = selected.rem_euclid(count as i32) as usize;
             // The block only changes when the selection or the language does,
@@ -731,22 +774,61 @@ fn main() {
                 }
                 text_cache.end(&fb);
             }
+            // The screenshot rides the panel's visibility. Its one VRAM slot
+            // only changes at black: ease the old image out, swap while
+            // nothing shows, ease the new one in. A browse, the slideshow
+            // and the launch warp all ride the same three steps.
+            let shot_desired: i32 = if shot_total == 0 || hide_text {
+                -1
+            } else {
+                let entry = &entries[index];
+                if shot_entry != index {
+                    shot_entry = index;
+                    shot_cycle = 0;
+                    shot_dwell = 0;
+                }
+                if entry.shot_count == 0
+                    || (entry.shot_first as u32 + entry.shot_count as u32) > shot_total
+                {
+                    -1
+                } else {
+                    if entry.shot_count > 1 && shot_dwell >= SHOT_SLIDE_FRAMES {
+                        shot_cycle = (shot_cycle + 1) % entry.shot_count;
+                        shot_dwell = 0;
+                    }
+                    (entry.shot_first + shot_cycle) as i32
+                }
+            };
+            if shot_desired != shot_shown {
+                shot_level -= SHOT_FADE_OUT;
+                if shot_level <= 0 {
+                    shot_level = 0;
+                    if shot_desired >= 0 {
+                        paint::upload_shot(shot_bytes(shot_desired as u8));
+                    }
+                    shot_shown = shot_desired;
+                }
+            } else if shot_shown >= 0 {
+                shot_level = (shot_level + SHOT_FADE_IN).min(SHOT_FULL);
+                shot_dwell += 1;
+            }
             if !hide_text {
                 draw_text_block(&font, &text_cache, italian);
-                // The program's own version, right-aligned under its panel.
-                // The header already says which pressing this is; this says
-                // which build of the thing you are about to run, which is the
-                // question when one game looks wrong and ten others do not.
+                if shot_level > 0 && shot_shown >= 0 {
+                    paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
+                }
+                // The program's own version, right-aligned inside the
+                // panel's bottom corner, under the screenshot. The header
+                // already says which pressing this is; this says which build
+                // of the thing you are about to run, which is the question
+                // when one game looks wrong and ten others do not.
                 let version = entries[index].version_str();
                 if !version.is_empty() {
                     let w = 1 + version.len() as i16;
-                    small.draw_text(
-                        312 - w * 5,
-                        DESC_TOP - 15,
-                        "v",
-                        NOW_PLAYING,
-                    );
-                    small.draw_text(312 - w * 5 + 5, DESC_TOP - 15, version, TRACK_NAME);
+                    let vx = PANEL_X + PANEL_W - 4 - w * 5;
+                    let vy = PANEL_Y + PANEL_H - 12;
+                    small.draw_text(vx, vy, "v", NOW_PLAYING);
+                    small.draw_text(vx + 5, vy, version, TRACK_NAME);
                 }
             }
             draw_ring(&font, &entries[..count], ring, step, &beat, &mut order);
@@ -940,7 +1022,9 @@ fn draw_cd_debug(
     dur_ms: u32,
 ) {
     let x = 10;
-    let mut y = DESC_TOP - 4;
+    // Where the description panel's text used to start; the overlay keeps
+    // the spot now that the panel spans the band above it too.
+    let mut y = 102;
     let mut buf = [0u8; 56];
     let mut emit = |small: &FontAtlas, y: &mut i16, buf: &[u8], n: usize| {
         // SAFETY: every byte written above is ASCII.
@@ -1038,15 +1122,14 @@ fn draw_cd_debug(
 
 fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
     let _ = font;
-    let bottom = DESC_TOP + (disc_toc::DESC_LINES as i16 - 1) * DESC_LEADING + 8;
-    paint::text_panel(8, DESC_TOP - 6, 304, bottom - DESC_TOP + 12);
+    paint::text_panel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
     // Top-right, inside the header.
     if italian {
         paint::flag_it(320 - paint::FLAG_W - 5, 4);
     } else {
         paint::flag_uk(320 - paint::FLAG_W - 5, 4);
     }
-    cache.draw(160 - paint::CACHE_W / 2, DESC_TOP - 2);
+    cache.draw(TEXT_X, TEXT_Y);
 }
 
 /// Draw the credits into the cache. Coordinates are local to it.
@@ -1208,6 +1291,54 @@ fn draw_ring(
 /// Read the level-meter data for every menu track. Returns how many frames
 /// landed in the buffer, which is 0 when the disc carries none or when it
 /// carries more than there is room for.
+/// Pull every screenshot on the disc into the RAM cache, while the drive is
+/// still free. Returns how many shots landed; 0 keeps the backdrop off.
+fn read_shots(header: Option<&Header>, entries: &[Entry], count: usize) -> u32 {
+    let Some(header) = header else { return 0 };
+    if header.shots_lba == 0 {
+        return 0;
+    }
+    // The region's extent comes from the entries: shots sit end to end, so
+    // the furthest-reaching claim is the read length.
+    let total = entries[..count]
+        .iter()
+        .map(|e| e.shot_first as u32 + e.shot_count as u32)
+        .max()
+        .unwrap_or(0);
+    if total == 0 || total as usize > disc_toc::MAX_SHOTS {
+        return 0;
+    }
+    // SAFETY: single-threaded, polled; only `main` reaches these statics.
+    let reader = unsafe { &mut *core::ptr::addr_of_mut!(READER) };
+    let buffer = unsafe { &mut *core::ptr::addr_of_mut!(SHOTS) };
+    let sectors = total as usize * disc_toc::SHOT_SECTORS as usize;
+    let mut ok = unsafe { reader.prepare() && reader.start_read(header.shots_lba) };
+    for chunk in buffer.chunks_exact_mut(SECTOR_WORDS).take(sectors) {
+        let slot: &mut [u32; SECTOR_WORDS] = chunk.try_into().expect("exact chunks");
+        ok = ok && unsafe { reader.read_sector(slot) };
+    }
+    unsafe { reader.stop() };
+    if ok {
+        total
+    } else {
+        tty::println("launcher: screenshot read failed, backdrops off");
+        0
+    }
+}
+
+/// Shot `index` of the RAM cache, as the bytes `paint::upload_shot`
+/// wants. The cache is `u32` for the sector reader's sake; the reinterpret
+/// down to bytes is always aligned.
+fn shot_bytes(index: u8) -> &'static [u8] {
+    // SAFETY: single-threaded; read_shots finished with the buffer at boot.
+    let buffer = unsafe { &*core::ptr::addr_of!(SHOTS) };
+    let words = &buffer[index as usize * SHOT_SLOT_WORDS..];
+    // SAFETY: u32 -> u8 loosens alignment; SHOT_BYTES fits inside a slot.
+    unsafe {
+        core::slice::from_raw_parts(words.as_ptr() as *const u8, disc_toc::SHOT_BYTES)
+    }
+}
+
 fn read_spectrum(header: Option<&Header>) -> u32 {
     let Some(header) = header else { return 0 };
     if header.spectrum_lba == 0 {

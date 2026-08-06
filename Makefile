@@ -207,10 +207,25 @@ endif
 disc: launcher programs mkdisc
 	$(MAKE) disc-only
 
+# Menu backdrops: the same in-game captures the itch pages use, cooked from
+# assets/shots into the 8bpp CLUT blobs the launcher uploads to VRAM.
+# Cooked at build time (needs PIL, like the other tools) so the pressed
+# pixels always come from the PNGs actually in the repo.
+SHOTS_SRC := $(ROOT)/assets/shots
+SHOTS_OUT := $(BUILD)/shots
+SHOT_NAMES := cortex voxide-day voxide-night nitroxide-boost nitroxide-aerial \
+              nitroxide-goal celeste psxcel-chart psxcel-editing ghpsx \
+              breakout invaders pong hwtests
+SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
+
+$(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
+	@mkdir -p "$(SHOTS_OUT)"
+	python3 tools/cook-shots.py "$<" "$@"
+
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
 # `make disc` builds.
-disc-only: mkdisc
+disc-only: mkdisc $(SHOT_FILES)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX)" \
@@ -230,6 +245,20 @@ disc-only: mkdisc
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
 		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
+		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex.shot" \
+		--shot "VOXIDE=$(SHOTS_OUT)/voxide-day.shot" \
+		--shot "VOXIDE=$(SHOTS_OUT)/voxide-night.shot" \
+		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-boost.shot" \
+		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-aerial.shot" \
+		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-goal.shot" \
+		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste.shot" \
+		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
+		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
+		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx.shot" \
+		--shot "BREAKOUT=$(SHOTS_OUT)/breakout.shot" \
+		--shot "SPACE INVADERS=$(SHOTS_OUT)/invaders.shot" \
+		--shot "MAGIKAAAAARP PONG=$(SHOTS_OUT)/pong.shot" \
+		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \

@@ -19,7 +19,8 @@
 //! 0x84  menu track titles, MAX_MENU_TRACKS x MENU_TITLE_BYTES
 //! 0x144 u32 LBA of the spectrum region, 0 when the disc has none
 //! 0x148 spectrum frame count per menu track, MAX_MENU_TRACKS x u32
-//! 0x168 entries, ENTRY_BYTES each:
+//! 0x168 u32 LBA of the screenshot region, 0 when the disc has none
+//! 0x16C entries, ENTRY_BYTES each:
 //!         0x00  name, NUL-padded ASCII
 //!         0x18  u32 LBA of the program's PSX-EXE header sector
 //!         0x1C  u32 sectors between disc LBA 0 and the program's image
@@ -27,6 +28,7 @@
 //!         0x24  English description, NUL-padded ASCII
 //!         0x64  Italian description, NUL-padded ASCII
 //!         (after the version) u32 flags, bit 0 = hidden until the cheat code
+//!         then u8 first screenshot in the region, u8 how many
 //! ```
 
 #![no_std]
@@ -42,7 +44,7 @@ pub const TOC_LBA: u32 = 22;
 pub const TOC_FILE_NAME: &str = "DEMOTOC.BIN";
 
 /// Identifies a demo-disc table of contents.
-pub const MAGIC: [u8; 8] = *b"PSXDEMO3";
+pub const MAGIC: [u8; 8] = *b"PSXDEMO4";
 
 /// Sectors the table occupies. Four: two descriptions of [`DESC_BYTES`] per
 /// program is most of an entry, and there are ten of them.
@@ -75,10 +77,11 @@ pub const VERSION_BYTES: usize = 16;
 /// them to [`DESC_LINES`] lines of [`DESC_COLUMNS`] at the 8-pixel font.
 pub const DESC_BYTES: usize = 224;
 
-/// Widest line the menu draws a description at, in characters.
-pub const DESC_COLUMNS: usize = 36;
-/// Lines it has room for, between the ball above and the carousel below.
-pub const DESC_LINES: usize = 6;
+/// Widest line the menu draws a description at, in characters. Narrow
+/// because the text shares its panel with the screenshot beside it.
+pub const DESC_COLUMNS: usize = 21;
+/// Lines it has room for, between the header above and the carousel below.
+pub const DESC_LINES: usize = 12;
 
 /// Bytes reserved for the music credit the menu prints. A licence that asks
 /// for attribution is only satisfied if the attribution ships with the disc,
@@ -96,9 +99,25 @@ pub const MENU_TITLE_BYTES: usize = 24;
 pub const SPECTRUM_BANDS: usize = 16;
 pub const SPECTRUM_FRAME_RATE: u32 = 30;
 
-const HEADER_BYTES: usize = 0x168;
+/// A screenshot as pressed: 8bpp indexed, its 256-colour RGB555 palette in
+/// front of the pixels. 120x90 keeps the game's 4:3 shape and is what fits
+/// beside [`DESC_COLUMNS`] of text in the menu's panel.
+pub const SHOT_W: usize = 120;
+pub const SHOT_H: usize = 90;
+/// 256 CLUT entries of 2 bytes, then one byte per pixel.
+pub const SHOT_CLUT_BYTES: usize = 512;
+pub const SHOT_BYTES: usize = SHOT_CLUT_BYTES + SHOT_W * SHOT_H;
+/// Sectors one screenshot occupies in the region: shots sit on sector
+/// boundaries so the launcher can address them by index alone.
+pub const SHOT_SECTORS: u32 = SHOT_BYTES.div_ceil(2048) as u32;
+/// Screenshots the whole disc may carry: the launcher caches every one in
+/// main RAM before the menu music takes the drive.
+pub const MAX_SHOTS: usize = 16;
+
+const HEADER_BYTES: usize = 0x16C;
 const SPECTRUM_LBA_AT: usize = 0x144;
 const SPECTRUM_FRAMES_AT: usize = 0x148;
+const SHOTS_LBA_AT: usize = 0x168;
 const CREDIT_AT: usize = 0x14;
 const BEATS_AT: usize = 0x44;
 const TITLES_AT: usize = 0x84;
@@ -134,6 +153,11 @@ pub struct Entry {
     pub version: [u8; VERSION_BYTES],
     /// [`FLAG_HIDDEN`] and room for whatever comes after it.
     pub flags: u32,
+    /// This entry's first screenshot, as an index into the shot region, and
+    /// how many consecutive shots are its. Zero count means the menu shows
+    /// no backdrop for it.
+    pub shot_first: u8,
+    pub shot_count: u8,
 }
 
 fn fixed<const N: usize>(text: &str) -> [u8; N] {
@@ -165,7 +189,17 @@ impl Entry {
             desc_it: [0; DESC_BYTES],
             version: [0; VERSION_BYTES],
             flags: 0,
+            shot_first: 0,
+            shot_count: 0,
         }
+    }
+
+    /// Attach this entry's screenshots: `first` shots into the region, `count`
+    /// of them in a row.
+    pub fn with_shots(mut self, first: u8, count: u8) -> Self {
+        self.shot_first = first;
+        self.shot_count = count;
+        self
     }
 
     /// Keep this entry off the carousel until the cheat code reveals it.
@@ -246,6 +280,9 @@ pub struct Header {
     /// Frames of spectrum per menu track, in track order. They sit end to end
     /// from `spectrum_lba`, so a track's offset is the sum of the ones before.
     pub spectrum_frames: [u32; MAX_MENU_TRACKS],
+    /// Where the screenshot region starts, or 0 if the disc carries none.
+    /// Shot `i` sits `i * SHOT_SECTORS` sectors in.
+    pub shots_lba: u32,
 }
 
 impl Header {
@@ -299,6 +336,7 @@ pub fn encode(
     titles: &[&str],
     spectrum_lba: u32,
     spectrum_frames: &[u32],
+    shots_lba: u32,
 ) -> Option<[u8; TOC_BYTES]> {
     if entries.len() > MAX_ENTRIES
         || beats.len() > MAX_MENU_TRACKS
@@ -314,6 +352,7 @@ pub fn encode(
     out[16..20].copy_from_slice(&menu_track_count.to_le_bytes());
     out[CREDIT_AT..CREDIT_AT + CREDIT_BYTES].copy_from_slice(&fixed::<CREDIT_BYTES>(credit));
     out[SPECTRUM_LBA_AT..SPECTRUM_LBA_AT + 4].copy_from_slice(&spectrum_lba.to_le_bytes());
+    out[SHOTS_LBA_AT..SHOTS_LBA_AT + 4].copy_from_slice(&shots_lba.to_le_bytes());
     for (i, frames) in spectrum_frames.iter().enumerate() {
         let at = SPECTRUM_FRAMES_AT + i * 4;
         out[at..at + 4].copy_from_slice(&frames.to_le_bytes());
@@ -342,6 +381,8 @@ pub fn encode(
         out[v..v + VERSION_BYTES].copy_from_slice(&entry.version);
         let f = v + VERSION_BYTES;
         out[f..f + 4].copy_from_slice(&entry.flags.to_le_bytes());
+        out[f + 4] = entry.shot_first;
+        out[f + 5] = entry.shot_count;
     }
     Some(out)
 }
@@ -382,6 +423,7 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         titles,
         spectrum_lba: word(SPECTRUM_LBA_AT),
         spectrum_frames,
+        shots_lba: word(SHOTS_LBA_AT),
         menu_track: u32::from_le_bytes([sector[12], sector[13], sector[14], sector[15]]),
         menu_track_count: u32::from_le_bytes([sector[16], sector[17], sector[18], sector[19]]),
         credit,
@@ -405,6 +447,8 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         let v = d + 2 * DESC_BYTES;
         slot.version.copy_from_slice(&sector[v..v + VERSION_BYTES]);
         slot.flags = word(v + VERSION_BYTES);
+        slot.shot_first = sector[v + VERSION_BYTES + 4];
+        slot.shot_count = sector[v + VERSION_BYTES + 5];
     }
     Some(header)
 }
@@ -422,7 +466,8 @@ mod tests {
         let entries = [
             Entry::new("CORTEX IGNITION", 4096, 4074, 0)
                 .described("Original 3D action game", "Gioco d'azione 3D originale")
-            .versioned("0.1.0"),
+                .versioned("0.1.0")
+                .with_shots(3, 2),
             Entry::new("HALF-LIFE", 40960, 40938, 1),
         ];
         let sector = encode(
@@ -434,6 +479,7 @@ mod tests {
             &["KNUCKLE DUST", "RUSTED HAMMER"],
             700,
             &[4590, 7260],
+            1400,
         )
         .expect("fits");
         let mut out = blank();
@@ -457,6 +503,9 @@ mod tests {
             "the next follows it"
         );
         assert_eq!(header.spectrum_span(2), None, "no data, no meter");
+        assert_eq!(header.shots_lba, 1400);
+        assert_eq!((out[0].shot_first, out[0].shot_count), (3, 2));
+        assert_eq!(out[1].shot_count, 0, "an entry may have no screenshots");
         assert_eq!(out[0], entries[0]);
         assert_eq!(out[1], entries[1]);
         assert_eq!(out[0].name_str(), "CORTEX IGNITION");
@@ -475,7 +524,7 @@ mod tests {
             Entry::new("CORTEX IGNITION", 4096, 4074, 0).gated(),
             Entry::new("VOXIDE", 8192, 8170, 0),
         ];
-        let sector = encode(&entries, 0, 0, "", &[], &[], 0, &[]).expect("fits");
+        let sector = encode(&entries, 0, 0, "", &[], &[], 0, &[], 0).expect("fits");
         let mut out = blank();
         decode(&sector, &mut out).expect("decodes");
         assert!(out[0].is_hidden(), "the gate survives the disc");
@@ -484,7 +533,7 @@ mod tests {
 
     #[test]
     fn rejects_a_sector_that_is_not_a_toc() {
-        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[], &[], 0, &[]).expect("fits");
+        let mut sector = encode(&[Entry::new("X", 1, 0, 0)], 0, 0, "", &[], &[], 0, &[], 0).expect("fits");
         sector[0] ^= 0xFF;
         assert_eq!(decode(&sector, &mut blank()), None);
     }
@@ -492,7 +541,7 @@ mod tests {
     #[test]
     fn rejects_more_entries_than_fit() {
         let too_many = [Entry::new("X", 1, 0, 0); MAX_ENTRIES + 1];
-        assert!(encode(&too_many, 0, 0, "", &[], &[], 0, &[]).is_none());
+        assert!(encode(&too_many, 0, 0, "", &[], &[], 0, &[], 0).is_none());
     }
 
     #[test]
