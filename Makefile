@@ -264,10 +264,14 @@ release-web:
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
+	python3 tools/web-delivery.py "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
+		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
+		"CORTEX IGNITION" "GH-PSX" "HARDWARE TESTS"
 	gh release view web-disc >/dev/null 2>&1 || gh release create web-disc \
-		--title "Browser emulator disc" \
-		--notes "Rolling backing store for the browser emulator's streamed demo disc. For the packaged download, use itch.io."
-	gh release upload web-disc "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" --clobber
+		--title "PSoXide Demo Disc (disc image)" \
+		--notes "The public pressing as a raw disc image plus the browser emulator's split delivery."
+	gh release upload web-disc "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" \
+		"$(BUILD)/web/web-manifest.txt" "$(BUILD)/web/demo-data.bin.gz" $(BUILD)/web/track-*.flac --clobber
 
 # Push the public pressing to itch.io from this machine: the ~200 MB bin is
 # too big for GitHub, so CI cannot carry it. Needs butler on PATH and a
