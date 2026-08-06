@@ -77,11 +77,13 @@ pub const VERSION_BYTES: usize = 16;
 /// them to [`DESC_LINES`] lines of [`DESC_COLUMNS`] at the 8-pixel font.
 pub const DESC_BYTES: usize = 224;
 
-/// Widest line the menu draws a description at, in characters. Narrow
-/// because the text shares its panel with the screenshot beside it.
-pub const DESC_COLUMNS: usize = 21;
-/// Lines it has room for, between the header above and the carousel below.
-pub const DESC_LINES: usize = 12;
+/// Widest line the menu draws a description at, in characters of the small
+/// 5x8 font. Its box matches the screenshot's box beside it exactly, and
+/// this is what fits inside.
+pub const DESC_COLUMNS: usize = 23;
+/// Lines the box has room for, between the header above and the carousel
+/// below.
+pub const DESC_LINES: usize = 10;
 
 /// Bytes reserved for the music credit the menu prints. A licence that asks
 /// for attribution is only satisfied if the attribution ships with the disc,
@@ -100,8 +102,8 @@ pub const SPECTRUM_BANDS: usize = 16;
 pub const SPECTRUM_FRAME_RATE: u32 = 30;
 
 /// A screenshot as pressed: 8bpp indexed, its 256-colour RGB555 palette in
-/// front of the pixels. 120x90 keeps the game's 4:3 shape and is what fits
-/// beside [`DESC_COLUMNS`] of text in the menu's panel.
+/// front of the pixels. 120x90 keeps the game's 4:3 exactly and fills its
+/// menu box edge to edge inside the one-pixel border.
 pub const SHOT_W: usize = 120;
 pub const SHOT_H: usize = 90;
 /// 256 CLUT entries of 2 bytes, then one byte per pixel.
@@ -111,8 +113,10 @@ pub const SHOT_BYTES: usize = SHOT_CLUT_BYTES + SHOT_W * SHOT_H;
 /// boundaries so the launcher can address them by index alone.
 pub const SHOT_SECTORS: u32 = SHOT_BYTES.div_ceil(2048) as u32;
 /// Screenshots the whole disc may carry: the launcher caches every one in
-/// main RAM before the menu music takes the drive.
-pub const MAX_SHOTS: usize = 16;
+/// main RAM before the menu music takes the drive. 32 costs ~400 KiB of
+/// its RAM and about a second of boot-time reading at 2x; the format's own
+/// ceiling is the per-entry u8 at 255.
+pub const MAX_SHOTS: usize = 32;
 
 const HEADER_BYTES: usize = 0x16C;
 const SPECTRUM_LBA_AT: usize = 0x144;
