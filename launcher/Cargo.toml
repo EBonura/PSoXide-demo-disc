@@ -1,0 +1,32 @@
+[package]
+name    = "launcher"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+# Outside any workspace: this links for the PS1 with psoxide.ld.
+[workspace]
+
+[[bin]]
+name = "launcher"
+path = "src/main.rs"
+
+[profile.release]
+panic         = "abort"
+codegen-units = 1
+lto           = true
+
+[dependencies]
+psx-font = { path = "../games/PSoXide/sdk/crates/psx-font" }
+psx-gpu  = { path = "../games/PSoXide/sdk/crates/psx-gpu" }
+psx-pack = { path = "../games/PSoXide/sdk/crates/psx-pack" }
+psx-pad  = { path = "../games/PSoXide/sdk/crates/psx-pad" }
+psx-rt   = { path = "../games/PSoXide/sdk/crates/psx-rt" }
+psx-vram = { path = "../games/PSoXide/sdk/crates/psx-vram" }
+psx-math = { path = "../games/PSoXide/sdk/crates/psx-math" }
+carousel = { path = "../carousel" }
+psx-io   = { path = "../games/PSoXide/sdk/crates/psx-io" }
+psx-spu  = { path = "../games/PSoXide/sdk/crates/psx-spu" }
+psx-asset = { path = "../games/PSoXide/sdk/crates/psx-asset" }
+psx-sfx  = { path = "../games/PSoXide/sdk/crates/psx-sfx" }
+disc-toc = { path = "../disc-toc" }

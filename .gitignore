@@ -1,0 +1,11 @@
+build/
+dist/
+target/
+*.bin
+*.cue
+
+# Local planning and knowledge-graph output, never shipped.
+PLAN.md
+SESSION.md
+SECOND_PASS_CONSOLIDATION_PLAN.md
+graphify-out/
