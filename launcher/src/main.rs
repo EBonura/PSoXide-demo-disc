@@ -80,6 +80,33 @@ const ERROR: (u8, u8, u8) = (255, 214, 90);
 /// The carousel entry that shows the credits instead of running something.
 const CREDITS_NAME: &str = "CREDITS";
 
+/// The reveal sequence for gated entries: up, up, down, down, left, right,
+/// left, right, circle, cross. Konami's, because a demo disc hiding builds
+/// behind anything else would be missing the point.
+const KONAMI: [u16; 10] = [
+    button::UP,
+    button::UP,
+    button::DOWN,
+    button::DOWN,
+    button::LEFT,
+    button::RIGHT,
+    button::LEFT,
+    button::RIGHT,
+    button::CIRCLE,
+    button::CROSS,
+];
+
+/// Buttons the sequence tracker watches. Anything else a player presses is
+/// none of its business and does not reset progress.
+const KONAMI_BUTTONS: [u16; 6] = [
+    button::UP,
+    button::DOWN,
+    button::LEFT,
+    button::RIGHT,
+    button::CIRCLE,
+    button::CROSS,
+];
+
 const STARS: u32 = 120;
 
 /// Turns per frame the ring eases toward its target, as a fraction: the gap
@@ -252,18 +279,18 @@ fn main() {
         BANNER_CLUT,
     );
 
-    let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
+    let mut all_entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
     // Read the table before a note of music plays: a data read while the
     // drive is playing CD-DA is the one thing this hardware is worst at.
-    let header = read_toc(&mut entries);
-    // Credits ride the carousel like everything else, with no program behind
-    // them. A zero LBA is what marks an entry as nothing to boot.
-    let mut count = header.map_or(0, |h| h.count);
-    if count > 0 && count < MAX_ENTRIES {
-        entries[count] = Entry::new(CREDITS_NAME, 0, 0, 0);
-        count += 1;
-    }
-    let count = count;
+    let header = read_toc(&mut all_entries);
+    let all_count = header.map_or(0, |h| h.count);
+    // What the carousel actually shows. Gated entries stay out of it until
+    // the cheat code below rebuilds it with `unlocked` set; the credits ride
+    // at the end like everything else, with no program behind them (a zero
+    // LBA is what marks an entry as nothing to boot).
+    let mut unlocked = false;
+    let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
+    let mut count = visible_entries(&all_entries, all_count, unlocked, &mut entries);
     if count == 0 {
         tty::println("launcher: no table of contents on this disc");
     }
@@ -344,6 +371,8 @@ fn main() {
     const SFX_LAUNCH_SLOT: usize = 2;
 
     let mut selected: i32 = 0;
+    // How far into KONAMI the pad has come.
+    let mut konami: u8 = 0;
     // Frames into the launch warp, or -1 while the menu is just a menu.
     let mut warp: i32 = -1;
     let mut launch_index = 0usize;
@@ -466,6 +495,33 @@ fn main() {
 
         let pad = poll_port1().buttons;
         let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
+        // The oldest trick in the book, on press edges: a wrong button starts
+        // the sequence over (or counts as its first UP). The final CROSS is
+        // swallowed below so completing the code cannot double as "launch
+        // whatever the carousel happens to be resting on". The side effects
+        // along the way -- four language flips, four browse chirps -- cancel
+        // out or read as the console noticing something is up.
+        let mut code_cross = false;
+        if !unlocked && warp < 0 {
+            for &b in &KONAMI_BUTTONS {
+                if pressed(b) {
+                    konami = if b == KONAMI[konami as usize] {
+                        konami + 1
+                    } else if b == KONAMI[0] {
+                        1
+                    } else {
+                        0
+                    };
+                    if konami as usize == KONAMI.len() {
+                        unlocked = true;
+                        count = visible_entries(&all_entries, all_count, unlocked, &mut entries);
+                        selected = 0;
+                        code_cross = true;
+                        sfx.play_on(SFX_SELECT_SLOT, &sfx_select, tick);
+                    }
+                }
+            }
+        }
         let touched = [
             button::LEFT,
             button::RIGHT,
@@ -539,7 +595,7 @@ fn main() {
                     pitch_rate -= browse * ((SPHERE_KICK * dy) >> 12);
                     sfx.play_on(SFX_BROWSE_SLOT, &sfx_browse, tick);
                 }
-                if pressed(button::CROSS) || pressed(button::START) {
+                if (pressed(button::CROSS) && !code_cross) || pressed(button::START) {
                     let index = selected.rem_euclid(count as i32) as usize;
                     // Nothing behind the credits entry to chain-load.
                     if entries[index].exe_lba != 0 {
@@ -1202,6 +1258,29 @@ fn spectrum_frame(header: &Header, track: u8, song_ms: u32, loaded_frames: u32) 
 }
 
 /// Read the table of contents. `None` if the disc has none.
+/// Copy the entries the carousel should show into `out` and append the
+/// credits card: everything when `unlocked`, everything but the gated ones
+/// before then. Returns how many cards that is.
+fn visible_entries(
+    all: &[Entry; MAX_ENTRIES],
+    all_count: usize,
+    unlocked: bool,
+    out: &mut [Entry; MAX_ENTRIES],
+) -> usize {
+    let mut n = 0;
+    for entry in all.iter().take(all_count) {
+        if (unlocked || !entry.is_hidden()) && n < MAX_ENTRIES {
+            out[n] = *entry;
+            n += 1;
+        }
+    }
+    if n > 0 && n < MAX_ENTRIES {
+        out[n] = Entry::new(CREDITS_NAME, 0, 0, 0);
+        n += 1;
+    }
+    n
+}
+
 fn read_toc(entries: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
     // SAFETY: single-threaded, polled; `main` runs once and nothing else
     // touches these statics.

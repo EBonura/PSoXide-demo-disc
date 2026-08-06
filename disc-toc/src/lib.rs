@@ -26,6 +26,7 @@
 //!         0x20  u32 CD-DA tracks belonging to programs ahead of this one
 //!         0x24  English description, NUL-padded ASCII
 //!         0x64  Italian description, NUL-padded ASCII
+//!         (after the version) u32 flags, bit 0 = hidden until the cheat code
 //! ```
 
 #![no_std]
@@ -41,7 +42,7 @@ pub const TOC_LBA: u32 = 22;
 pub const TOC_FILE_NAME: &str = "DEMOTOC.BIN";
 
 /// Identifies a demo-disc table of contents.
-pub const MAGIC: [u8; 8] = *b"PSXDEMO2";
+pub const MAGIC: [u8; 8] = *b"PSXDEMO3";
 
 /// Sectors the table occupies. Four: two descriptions of [`DESC_BYTES`] per
 /// program is most of an entry, and there are ten of them.
@@ -50,8 +51,14 @@ pub const TOC_SECTORS: u32 = 4;
 /// The whole table.
 pub const TOC_BYTES: usize = 2048 * TOC_SECTORS as usize;
 
-/// Bytes per entry.
-pub const ENTRY_BYTES: usize = 504;
+/// Bytes per entry. Grew from 504 when the flags word landed: the old layout
+/// had no spare byte, so the format bumped its magic instead of squeezing.
+pub const ENTRY_BYTES: usize = 512;
+
+/// Entry flag: pressed on the disc but absent from the carousel until the
+/// cheat code reveals it. A velvet rope for builds that are not ready to be
+/// found, not a secret -- the launcher source is public.
+pub const FLAG_HIDDEN: u32 = 1;
 
 /// Bytes reserved for an entry's display name.
 pub const NAME_BYTES: usize = 24;
@@ -125,6 +132,8 @@ pub struct Entry {
     /// The program's own version, as its source declares it. Empty when the
     /// program does not report one.
     pub version: [u8; VERSION_BYTES],
+    /// [`FLAG_HIDDEN`] and room for whatever comes after it.
+    pub flags: u32,
 }
 
 fn fixed<const N: usize>(text: &str) -> [u8; N] {
@@ -155,7 +164,19 @@ impl Entry {
             desc_en: [0; DESC_BYTES],
             desc_it: [0; DESC_BYTES],
             version: [0; VERSION_BYTES],
+            flags: 0,
         }
+    }
+
+    /// Keep this entry off the carousel until the cheat code reveals it.
+    pub fn gated(mut self) -> Self {
+        self.flags |= FLAG_HIDDEN;
+        self
+    }
+
+    /// Whether the carousel should hold this entry back.
+    pub fn is_hidden(&self) -> bool {
+        self.flags & FLAG_HIDDEN != 0
     }
 
     /// Attach the payload checksum mkdisc computed from the disc layout.
@@ -319,6 +340,8 @@ pub fn encode(
         out[d + DESC_BYTES..d + 2 * DESC_BYTES].copy_from_slice(&entry.desc_it);
         let v = d + 2 * DESC_BYTES;
         out[v..v + VERSION_BYTES].copy_from_slice(&entry.version);
+        let f = v + VERSION_BYTES;
+        out[f..f + 4].copy_from_slice(&entry.flags.to_le_bytes());
     }
     Some(out)
 }
@@ -381,6 +404,7 @@ pub fn decode(sector: &[u8; TOC_BYTES], into: &mut [Entry; MAX_ENTRIES]) -> Opti
         slot.desc_it.copy_from_slice(&sector[d + DESC_BYTES..d + 2 * DESC_BYTES]);
         let v = d + 2 * DESC_BYTES;
         slot.version.copy_from_slice(&sector[v..v + VERSION_BYTES]);
+        slot.flags = word(v + VERSION_BYTES);
     }
     Some(header)
 }
@@ -442,6 +466,20 @@ mod tests {
         assert_eq!(out[0].desc_it_str(), "Gioco d'azione 3D originale");
         assert_eq!(out[0].version_str(), "0.1.0");
         assert_eq!(out[1].desc_en_str(), "", "an entry may have no description");
+        assert!(!out[0].is_hidden(), "entries are visible unless gated");
+    }
+
+    #[test]
+    fn round_trips_the_hidden_flag() {
+        let entries = [
+            Entry::new("CORTEX IGNITION", 4096, 4074, 0).gated(),
+            Entry::new("VOXIDE", 8192, 8170, 0),
+        ];
+        let sector = encode(&entries, 0, 0, "", &[], &[], 0, &[]).expect("fits");
+        let mut out = blank();
+        decode(&sector, &mut out).expect("decodes");
+        assert!(out[0].is_hidden(), "the gate survives the disc");
+        assert!(!out[1].is_hidden(), "and does not leak onto neighbours");
     }
 
     #[test]
