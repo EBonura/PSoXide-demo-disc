@@ -3,8 +3,14 @@
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
+The pressed disc is on
+[itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc), and the
+[PSoXide page](https://bonnie-studios.itch.io/psoxide) runs this exact image
+in your browser, menu music and all: the emulator streams the data track
+first and pulls the CD audio in behind it.
+
 ```bash
-make disc      # -> dist/demo.{bin,cue}
+make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
 make check     # host tests
 ```
 
