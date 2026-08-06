@@ -73,6 +73,9 @@ fn fnv1a32(bytes: &[u8]) -> u32 {
 /// Pre-analysed level-meter data for every menu track, end to end.
 const SPECTRUM_FILE_NAME: &str = "SPECTRUM.BIN";
 
+/// Cooked menu-backdrop screenshots, one after another on sector boundaries.
+const SHOTS_FILE_NAME: &str = "SHOTS.BIN";
+
 enum Source {
     /// A bare PSX-EXE, embedded as an ISO file.
     Exe(PathBuf),
@@ -111,6 +114,8 @@ struct Args {
     /// Display names pressed onto the disc but held off the carousel until
     /// the cheat code reveals them.
     gates: Vec<String>,
+    /// `(name, cooked blob)` menu backdrops, in slideshow order per name.
+    shots: Vec<(String, PathBuf)>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -126,6 +131,7 @@ fn parse_args() -> Result<Args, String> {
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
     let mut menu_titles: Vec<String> = Vec::new();
     let mut gates: Vec<String> = Vec::new();
+    let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -178,6 +184,10 @@ fn parse_args() -> Result<Args, String> {
             }
             "--gate" => {
                 gates.push(it.next().ok_or("--gate takes a display NAME".to_string())?)
+            }
+            "--shot" => {
+                let (name, path) = split(&it.next().ok_or("--shot takes NAME=path")?, "--shot")?;
+                shots.push((name, path));
             }
             "--describe" => {
                 let spec = it.next().ok_or("--describe takes NAME=ENGLISH|ITALIAN")?;
@@ -232,6 +242,7 @@ fn parse_args() -> Result<Args, String> {
         menu_beats,
         menu_titles,
         gates,
+        shots,
     })
 }
 
@@ -246,6 +257,8 @@ fn print_usage() {
         \x20             two programs both use is only burned once\n\
          --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
          --gate        NAME stays off the carousel until the cheat code\n\
+         --shot        NAME=<blob> adds a menu backdrop for the program; repeat\n\
+        \x20             for a slideshow (cook the blob with tools/cook-shots.py)\n\
          --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
         \x20             menu cycles through the tracks in order\n\
          --credit      attribution the menu prints for that track\n\
@@ -529,6 +542,22 @@ fn apply_gates(entries: &mut [Entry], names: &[&str], gates: &[String]) -> Resul
     Ok(())
 }
 
+/// Point each entry at its slice of the shot region.
+fn apply_shots(
+    entries: &mut [Entry],
+    names: &[&str],
+    spans: &[(String, u8, u8)],
+) -> Result<(), String> {
+    for (name, first, count) in spans {
+        let at = names
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| format!("--shot names {name:?}, which is not on this disc"))?;
+        entries[at] = entries[at].with_shots(*first, *count);
+    }
+    Ok(())
+}
+
 fn apply_descriptions(
     entries: &mut [Entry],
     names: &[&str],
@@ -611,10 +640,53 @@ fn run() -> Result<(), String> {
     }
 
 
+    // Screenshots, cooked by tools/cook-shots.py. Grouped by program (in
+    // first-appearance order, keeping each program's own slideshow order) and
+    // padded to sector boundaries, so the launcher addresses shot `i` as
+    // `shots_lba + i * SHOT_SECTORS` with nothing but the table in hand.
+    let mut shot_groups: Vec<(String, Vec<Vec<u8>>)> = Vec::new();
+    for (name, path) in &args.shots {
+        let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        if bytes.len() != disc_toc::SHOT_BYTES {
+            return Err(format!(
+                "--shot {}: {} bytes, but a cooked shot is exactly {} (CLUT then {}x{} \
+                 pixels). Cook it with tools/cook-shots.py.",
+                path.display(),
+                bytes.len(),
+                disc_toc::SHOT_BYTES,
+                disc_toc::SHOT_W,
+                disc_toc::SHOT_H
+            ));
+        }
+        match shot_groups.iter_mut().find(|(n, _)| n == name) {
+            Some((_, group)) => group.push(bytes),
+            None => shot_groups.push((name.clone(), vec![bytes])),
+        }
+    }
+    let total_shots: usize = shot_groups.iter().map(|(_, g)| g.len()).sum();
+    if total_shots > disc_toc::MAX_SHOTS {
+        return Err(format!(
+            "{total_shots} --shot blobs is more than the {} the launcher's RAM cache holds",
+            disc_toc::MAX_SHOTS
+        ));
+    }
+    let mut shots_bin = Vec::new();
+    let mut shot_spans: Vec<(String, u8, u8)> = Vec::new();
+    for (name, group) in &shot_groups {
+        let first = (shots_bin.len() / (disc_toc::SHOT_SECTORS as usize * SECTOR_SIZE)) as u8;
+        shot_spans.push((name.clone(), first, group.len() as u8));
+        for shot in group {
+            shots_bin.extend_from_slice(shot);
+            shots_bin.resize(shots_bin.len().next_multiple_of(SECTOR_SIZE), 0);
+        }
+    }
+
     let spectrum_lba = toc_lba + disc_toc::TOC_SECTORS;
     let spectrum_sectors = sectors_for(spectrum_data.len());
+    let shots_lba = spectrum_lba + spectrum_sectors;
+    let shots_sectors = sectors_for(shots_bin.len());
     let mut next_lba =
-        spectrum_lba + spectrum_sectors + sectors_for(launcher.len());
+        shots_lba + shots_sectors + sectors_for(launcher.len());
     let mut entries: Vec<Option<Entry>> = vec![None; args.programs.len()];
     let mut iso_files = Vec::new();
     let mut map = Vec::new();
@@ -701,6 +773,9 @@ fn run() -> Result<(), String> {
         if !spectrum_data.is_empty() {
             builder.add_file(SPECTRUM_FILE_NAME, spectrum_data.clone());
         }
+        if !shots_bin.is_empty() {
+            builder.add_file(SHOTS_FILE_NAME, shots_bin.clone());
+        }
         builder.add_file("PSX.EXE", launcher.clone());
         for (name, bytes) in &iso_files {
             builder.add_file(name, bytes.clone());
@@ -756,6 +831,7 @@ fn run() -> Result<(), String> {
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
     apply_versions(&mut entries, &names, &args.versions)?;
     apply_gates(&mut entries, &names, &args.gates)?;
+    apply_shots(&mut entries, &names, &shot_spans)?;
     // The menu's tracks come FIRST among the audio, immediately after the
     // data. They used to go last so adding one could not shift a game's
     // base, but last physically means the outer edge of the burn, and the
@@ -823,6 +899,7 @@ fn run() -> Result<(), String> {
             .collect::<Vec<_>>(),
         if spectrum_data.is_empty() { 0 } else { spectrum_lba },
         &spectrum_frames,
+        if shots_bin.is_empty() { 0 } else { shots_lba },
     )
     .ok_or_else(|| {
         format!(
@@ -897,6 +974,13 @@ fn run() -> Result<(), String> {
             spectrum_frames.iter().sum::<u32>(),
             spectrum_frames.len(),
             spectrum_data.len() / 1024
+        );
+    }
+    if !shots_bin.is_empty() {
+        println!(
+            "backdrops: {total_shots} shot(s) over {} program(s) at LBA {shots_lba} ({} KiB)",
+            shot_spans.len(),
+            shots_bin.len() / 1024
         );
     }
     if menu_track != 0 {

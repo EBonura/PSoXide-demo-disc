@@ -7,7 +7,7 @@
 use carousel::{Bead, Placed, TURN};
 use psx_gpu::framebuf::FrameBuffer;
 use psx_gpu::material::{BlendMode, TextureMaterial};
-use psx_vram::{Clut, Color555, TexDepth, Tpage};
+use psx_vram::{Clut, Color555, TexDepth, Tpage, VramRect};
 use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
 
@@ -339,27 +339,24 @@ pub fn flag_it(x: i16, y: i16) {
 
 /// A block of text rendered once into spare VRAM and then blitted.
 ///
-/// Drawing a description a glyph at a time costs 216 textured quads a frame,
-/// which measured at roughly a whole vblank: as much as the entire carousel.
-/// The text only changes when the selection or the language does, so it is
-/// rendered into an off-screen rect on those frames and drawn as two quads on
-/// every other one.
-///
-/// Two rather than one because UVs are bytes: a page is 256 texels and the
-/// block is wider than that, so it straddles a page boundary.
+/// Drawing a description a glyph at a time costs hundreds of textured quads
+/// a frame, which measured at roughly a whole vblank: as much as the entire
+/// carousel. The text only changes when the selection or the language does,
+/// so it is rendered into an off-screen rect on those frames and drawn as
+/// one sprite on every other one.
 pub struct TextCache {
     /// What is currently rendered, so a frame that would draw the same thing
     /// again can skip it.
     key: u32,
 }
 
-/// Spare VRAM, clear of both framebuffers and of every font page.
+/// Spare VRAM, clear of both framebuffers and of every font page. The
+/// column is a page wide at most, so the blit no longer straddles a page
+/// boundary the way the old full-width block did.
 const CACHE_X: u16 = 512;
 const CACHE_Y: u16 = 0;
-pub const CACHE_W: i16 = 288;
-pub const CACHE_H: i16 = 56;
-/// Where the block splits across the page boundary at VRAM x 768.
-const CACHE_SPLIT: i16 = 256;
+pub const CACHE_W: i16 = 168;
+pub const CACHE_H: i16 = 110;
 
 impl TextCache {
     /// A cache holding nothing. Any key re-renders it.
@@ -396,33 +393,63 @@ impl TextCache {
 
     /// Blit the block with its top-left at `x, y`.
     ///
-    /// Textured rectangles, not textured polygons. A rectangle takes its page
-    /// from the current draw mode, which is how the font draws every glyph;
-    /// the polygon path carries the page in a vertex instead and drew nothing
-    /// here, including when pointed at the framebuffer itself.
-    ///
-    /// Two of them because a page is 256 texels and the block is wider.
+    /// A textured rectangle, not a textured polygon. A rectangle takes its
+    /// page from the current draw mode, which is how the font draws every
+    /// glyph; the polygon path carries the page in a vertex instead and drew
+    /// nothing here, including when pointed at the framebuffer itself.
     pub fn draw(&self, x: i16, y: i16) {
-        let halves = [
-            (0i16, CACHE_SPLIT, CACHE_X),
-            (CACHE_SPLIT, CACHE_W - CACHE_SPLIT, CACHE_X + CACHE_SPLIT as u16),
-        ];
-        for (offset, width, page_x) in halves {
-            if width <= 0 {
-                continue;
-            }
-            let tpage = Tpage::new(page_x, CACHE_Y, TexDepth::Bit15);
-            gpu::draw_sprite_material(
-                x + offset,
-                y,
-                width as u16,
-                CACHE_H as u16,
-                (0, 0),
-                // Neutral tint: 128 is "as the texture is". A texel of
-                // 0x0000 is transparent on this hardware, which is what
-                // lets the panel show through around the letterforms.
-                TextureMaterial::opaque(0, tpage.uv_tpage_word(0), (128, 128, 128)),
-            );
-        }
+        let tpage = Tpage::new(CACHE_X, CACHE_Y, TexDepth::Bit15);
+        gpu::draw_sprite_material(
+            x,
+            y,
+            CACHE_W as u16,
+            CACHE_H as u16,
+            (0, 0),
+            // Neutral tint: 128 is "as the texture is". A texel of
+            // 0x0000 is transparent on this hardware, which is what
+            // lets the panel show through around the letterforms.
+            TextureMaterial::opaque(0, tpage.uv_tpage_word(0), (128, 128, 128)),
+        );
     }
+}
+
+// ======================================================================
+// The screenshot beside the description
+// ======================================================================
+
+/// Where the selected game's screenshot sits in VRAM: one 8bpp 120x90
+/// frame at (512,256), 60x90 halfwords -- clear of both framebuffers,
+/// every font page, the text cache above it and its CLUT row below it.
+const SHOT_TPAGE: Tpage = Tpage::new(512, 256, TexDepth::Bit8);
+const SHOT_CLUT: Clut = Clut::new(512, 508);
+const SHOT_RECT: VramRect =
+    VramRect::new(512, 256, (disc_toc::SHOT_W / 2) as u16, disc_toc::SHOT_H as u16);
+
+/// Send one cooked shot (CLUT then pixels, `disc_toc::SHOT_BYTES` of it)
+/// into the screenshot's VRAM slot. Only call while the shot is faded to
+/// black: there is a single slot, and swapping it mid-view would tear.
+pub fn upload_shot(shot: &[u8]) {
+    let clut = &shot[..disc_toc::SHOT_CLUT_BYTES];
+    let pixels = &shot[disc_toc::SHOT_CLUT_BYTES..disc_toc::SHOT_BYTES];
+    psx_vram::upload_bytes(VramRect::new(SHOT_CLUT.x(), SHOT_CLUT.y(), 256, 1), clut);
+    psx_vram::upload_bytes(SHOT_RECT, pixels);
+}
+
+/// The screenshot itself, with its top-left at `x, y`, faded up through
+/// `level` (128 is full brightness). A sprite rather than a quad: a sprite
+/// steps one texel per pixel from its start, which keeps the frame
+/// pixel-exact instead of trusting interpolated UVs.
+pub fn draw_shot(x: i16, y: i16, level: u8) {
+    gpu::draw_sprite_material(
+        x,
+        y,
+        disc_toc::SHOT_W as u16,
+        disc_toc::SHOT_H as u16,
+        (0, 0),
+        TextureMaterial::opaque(
+            SHOT_CLUT.uv_clut_word(),
+            SHOT_TPAGE.uv_tpage_word(0),
+            (level, level, level),
+        ),
+    );
 }
