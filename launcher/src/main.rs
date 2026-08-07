@@ -297,9 +297,10 @@ const SHOT_FULL: i32 = 128;
 const SHOT_FADE_IN: i32 = 10;
 const SHOT_FADE_OUT: i32 = 16;
 /// Frames a shot rests before a multi-shot entry moves to its next one.
-/// Seven seconds read as a stall on the console: the fade itself is fine,
-/// but the hold after it outlasts the browsing it is meant to accompany.
-const SHOT_SLIDE_FRAMES: u32 = 60 * 3;
+/// Seven seconds read as a stall on the console and three still lingered:
+/// the fade carries the transition, so the hold only has to be long enough
+/// to take the image in.
+const SHOT_SLIDE_FRAMES: u32 = 90;
 
 #[no_mangle]
 fn main() {
