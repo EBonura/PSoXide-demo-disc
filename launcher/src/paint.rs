@@ -419,9 +419,27 @@ impl TextCache {
 
 /// Where the selected game's screenshot sits in VRAM: one 8bpp 120x90
 /// frame at (512,256), 60x90 halfwords -- clear of both framebuffers,
-/// every font page, the text cache above it and its CLUT row below it.
+/// every font page, the text cache above it and its CLUT rows below it.
 const SHOT_TPAGE: Tpage = Tpage::new(512, 256, TexDepth::Bit8);
-const SHOT_CLUT: Clut = Clut::new(512, 508);
+/// TWO CLUT rows, ping-ponged per upload. The GPU's 240-entry CLUT cache
+/// line (8bpp colors 16-255) reloads only when a primitive's clut WORD
+/// changes; rewriting the data under a constant clut address left every
+/// shot after the first wearing the first shot's palette on real hardware
+/// (console footage 2026-08-07, reproduced in PSoXide once the per-line
+/// cache landed). Alternating rows makes the word change with the data.
+const SHOT_CLUTS: [Clut; 2] = [Clut::new(512, 508), Clut::new(512, 509)];
+/// Which of the two rows holds the CURRENT image's palette. MIPS-I has no
+/// atomics and this hardware is single threaded; a static mut behind raw
+/// pointer accessors is the whole synchronisation story.
+static mut SHOT_CLUT_BANK: usize = 0;
+
+fn shot_clut_bank() -> usize {
+    unsafe { core::ptr::read(&raw const SHOT_CLUT_BANK) }
+}
+
+fn set_shot_clut_bank(bank: usize) {
+    unsafe { core::ptr::write(&raw mut SHOT_CLUT_BANK, bank) }
+}
 const SHOT_RECT: VramRect =
     VramRect::new(512, 256, (disc_toc::SHOT_W / 2) as u16, disc_toc::SHOT_H as u16);
 
@@ -431,8 +449,11 @@ const SHOT_RECT: VramRect =
 pub fn upload_shot(shot: &[u8]) {
     let clut = &shot[..disc_toc::SHOT_CLUT_BYTES];
     let pixels = &shot[disc_toc::SHOT_CLUT_BYTES..disc_toc::SHOT_BYTES];
-    psx_vram::upload_bytes(VramRect::new(SHOT_CLUT.x(), SHOT_CLUT.y(), 256, 1), clut);
+    let bank = shot_clut_bank() ^ 1;
+    let target = SHOT_CLUTS[bank];
+    psx_vram::upload_bytes(VramRect::new(target.x(), target.y(), 256, 1), clut);
     psx_vram::upload_bytes(SHOT_RECT, pixels);
+    set_shot_clut_bank(bank);
 }
 
 /// The screenshot itself, with its top-left at `x, y`, faded up through
@@ -441,6 +462,7 @@ pub fn upload_shot(shot: &[u8]) {
 /// pixel-exact instead of trusting interpolated UVs. Its box supplies the
 /// border, so the image draws bare.
 pub fn draw_shot(x: i16, y: i16, level: u8) {
+    let clut = SHOT_CLUTS[shot_clut_bank()];
     gpu::draw_sprite_material(
         x,
         y,
@@ -448,7 +470,7 @@ pub fn draw_shot(x: i16, y: i16, level: u8) {
         disc_toc::SHOT_H as u16,
         (0, 0),
         TextureMaterial::opaque(
-            SHOT_CLUT.uv_clut_word(),
+            clut.uv_clut_word(),
             SHOT_TPAGE.uv_tpage_word(0),
             (level, level, level),
         ),
