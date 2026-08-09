@@ -68,6 +68,29 @@ const BANNER_H: i16 = 19;
 static BANNER_TEX: &[u8] = include_bytes!("../assets/banner.tex");
 static BANNER_CLUT_DATA: &[u8] = include_bytes!("../assets/banner.clut");
 
+/// The link marks ride the banner's page, below the mark: a 4bpp page is 256
+/// rows deep and the banner uses nineteen. Their own CLUT, because the ramp
+/// they need is grey and the banner's sixteen colours are the logo's.
+const ICONS_V: u8 = 24;
+const ICONS_CLUT: Clut = Clut::new(400, 257);
+const ICONS_CELL: i16 = 12;
+const ICONS_SIZE: i16 = 12;
+static ICONS_TEX: &[u8] = include_bytes!("../assets/icons.tex");
+static ICONS_CLUT_DATA: &[u8] = include_bytes!("../assets/icons.clut");
+
+/// Which mark, and the part of the link the mark's domain leaves over. The
+/// full URLs run to thirty characters and the box holds twenty-one, so the
+/// domain is drawn rather than written. `bonnie-games.itch.io` redirects to
+/// `bonnie-studios.itch.io`, path and all, and is eight characters shorter.
+const LINKS: [(i16, &str); 6] = [
+    (0, "EBonura/PSoXide"),
+    (1, "bonnie-games/psoxide"),
+    (1, "bonnie-games"),
+    (2, "_bonniestudios"),
+    (3, "izzy88izzy"),
+    (4, "bonniestudios"),
+];
+
 const TITLE: (u8, u8, u8) = (255, 84, 62);
 const HINT: (u8, u8, u8) = (168, 44, 40);
 const NOW_PLAYING: (u8, u8, u8) = (172, 40, 34);
@@ -78,7 +101,9 @@ const FAR_LABEL: (u8, u8, u8) = (215, 78, 62);
 const ERROR: (u8, u8, u8) = (255, 214, 90);
 
 /// The carousel entry that shows the credits instead of running something.
-const CREDITS_NAME: &str = "CREDITS";
+/// `split_title` breaks it at the space nearest the middle, so the pill
+/// reads CREDITS over AND LINKS.
+const CREDITS_NAME: &str = "CREDITS AND LINKS";
 
 /// The reveal sequence for gated entries: up, up, down, down, left, right,
 /// left, right, circle, cross. Konami's, because a demo disc hiding builds
@@ -169,6 +194,19 @@ const DESC_LEADING: i16 = 9;
 /// The screenshot, flush inside its border.
 const SHOT_X: i16 = SHOT_BOX_X + 1;
 const SHOT_Y: i16 = PANEL_Y + 1;
+
+/// The credits card has no screenshot, so its right box holds the links
+/// instead of standing empty. Its own cache, on the row below the
+/// description's in the same page.
+const LINKS_CACHE_V: u16 = 96;
+const LINKS_W: i16 = PANEL_W - 2;
+const LINKS_H: i16 = PANEL_H - 2;
+/// A mark and the line beside it, then the gap to the next pair.
+const LINKS_PITCH: i16 = 14;
+/// The text starts clear of the mark; the eight-pixel font centres against
+/// the twelve-pixel mark two rows down.
+const LINKS_TEXT_X: i16 = ICONS_SIZE + 2;
+const LINKS_TEXT_DY: i16 = 2;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -320,6 +358,16 @@ fn main() {
         BANNER_TPAGE,
         BANNER_CLUT,
     );
+    let icons = paint::Icons::upload(
+        ICONS_TEX,
+        ICONS_CLUT_DATA,
+        ICONS_CELL * LINKS.len() as i16,
+        ICONS_SIZE,
+        BANNER_TPAGE,
+        ICONS_V,
+        ICONS_CLUT,
+        ICONS_CELL,
+    );
 
     let mut all_entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
     // Read the table before a note of music plays: a data read while the
@@ -438,6 +486,9 @@ fn main() {
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
     let mut text_cache = paint::TextCache::new();
+    // The links never change, so this one renders once and is blitted for
+    // the rest of the run. Key 0 is as good as any: there is only ever one.
+    let mut links_cache = paint::TextCache::at(LINKS_CACHE_V, LINKS_W, LINKS_H);
     // The backdrop: which cached shot is in VRAM, how bright it is drawn,
     // and the slideshow clock. -1 means the single VRAM slot holds nothing
     // worth showing.
@@ -787,6 +838,11 @@ fn main() {
                 }
                 text_cache.end(&fb);
             }
+            if !hide_text && entries[index].exe_lba == 0 && !links_cache.holds(0) {
+                links_cache.begin(0);
+                render_links(&small, &icons);
+                links_cache.end(&fb);
+            }
             // The screenshot rides the panel's visibility. Its one VRAM slot
             // only changes at black: ease the old image out, swap while
             // nothing shows, ease the new one in. A browse, the slideshow
@@ -827,7 +883,12 @@ fn main() {
             }
             if !hide_text {
                 draw_text_block(&font, &text_cache, italian);
-                if shot_level > 0 && shot_shown >= 0 {
+                if entries[index].exe_lba == 0 {
+                    // The credits card runs nothing, so it has no screenshot
+                    // and its right box would otherwise sit empty.
+                    paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
+                    links_cache.draw(SHOT_BOX_X + 1, PANEL_Y + 1);
+                } else if shot_level > 0 && shot_shown >= 0 {
                     paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
                     paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
                 }
@@ -1181,6 +1242,21 @@ fn render_credits(font: &FontAtlas, header: &Header) {
             cached_line(font, line, title, TRACK_NAME);
             line += 1;
         }
+    }
+}
+
+/// Draw the links into their cache. Coordinates are local to it.
+///
+/// One mark and one line each, centred as a block the way the description
+/// is. Nothing here depends on the disc, so the cache never needs rebuilding
+/// after the first time.
+fn render_links(font: &FontAtlas, icons: &paint::Icons) {
+    let block = LINKS.len() as i16 * LINKS_PITCH;
+    let top = (LINKS_H - block) / 2;
+    for (row, (slot, text)) in LINKS.iter().enumerate() {
+        let y = top + row as i16 * LINKS_PITCH;
+        icons.draw(*slot, 0, y, BLURB);
+        font.draw_text(LINKS_TEXT_X, y + LINKS_TEXT_DY, text, BLURB);
     }
 }
 

@@ -233,6 +233,72 @@ impl Banner {
     }
 }
 
+/// A horizontal strip of small marks sharing one page and one palette.
+///
+/// The credits card writes `EBonura/PSoXide`, not the whole URL, because the
+/// box is twenty-odd characters wide and every real link overflows it. These
+/// carry the domain the text drops.
+pub struct Icons {
+    tpage: Tpage,
+    clut: Clut,
+    /// Row of the page the strip starts at: it shares the banner's page and
+    /// sits below the mark, so this is not zero.
+    v: u8,
+    /// Cell pitch and the mark inside it. The cell is padded to a multiple
+    /// of four texels; at 4bpp anything else starts a later mark mid-nibble.
+    cell: i16,
+    size: i16,
+}
+
+impl Icons {
+    /// Push the strip into `tpage` at page row `v`, and its palette to `clut`.
+    pub fn upload(
+        pixels: &[u8],
+        palette: &[u8],
+        w: i16,
+        h: i16,
+        tpage: Tpage,
+        v: u8,
+        clut: Clut,
+        cell: i16,
+    ) -> Self {
+        // Four texels a halfword, as with the banner.
+        let halfwords_per_row = (w as u16).div_ceil(4);
+        psx_vram::upload_bytes(
+            psx_vram::VramRect::new(tpage.x(), tpage.y() + v as u16, halfwords_per_row, h as u16),
+            pixels,
+        );
+        let entries: [Color555; 16] = core::array::from_fn(|i| {
+            Color555::raw(u16::from_le_bytes([palette[i * 2], palette[i * 2 + 1]]))
+        });
+        psx_vram::upload_clut(clut, &entries);
+        Icons {
+            tpage,
+            clut,
+            v,
+            cell,
+            size: h,
+        }
+    }
+
+    /// Draw mark `slot` with its top-left at `x, y`, tinted like the text
+    /// beside it. The texture is a grey ramp, so the tint is the colour.
+    /// A sprite rather than a textured polygon, for the reason spelled out on
+    /// [`TextCache::draw`]: the polygon path carries its page in a vertex and
+    /// draws nothing into an off-screen rect, which is exactly where these go.
+    pub fn draw(&self, slot: i16, x: i16, y: i16, tint: (u8, u8, u8)) {
+        let s = self.size as u16;
+        gpu::draw_sprite_material(
+            x,
+            y,
+            s,
+            s,
+            ((slot * self.cell) as u8, self.v),
+            TextureMaterial::opaque(self.clut.uv_clut_word(), self.tpage.uv_tpage_word(0), tint),
+        );
+    }
+}
+
 /// One step of a fade to black: halve whatever is in the buffer.
 pub fn fade_step() {
     for tri in [
@@ -348,6 +414,13 @@ pub struct TextCache {
     /// What is currently rendered, so a frame that would draw the same thing
     /// again can skip it.
     key: u32,
+    /// Row of the shared page this instance owns, and its extent. A second
+    /// cache costs nothing but rows: at 15bpp a texel is a halfword, so the
+    /// page at `CACHE_X` runs 256 rows deep and the description block only
+    /// uses the top 92 of them.
+    y: u16,
+    w: i16,
+    h: i16,
 }
 
 /// Spare VRAM, clear of both framebuffers and of every font page. The
@@ -361,7 +434,18 @@ pub const CACHE_H: i16 = 92;
 impl TextCache {
     /// A cache holding nothing. Any key re-renders it.
     pub const fn new() -> Self {
-        TextCache { key: u32::MAX }
+        Self::at(CACHE_Y, CACHE_W, CACHE_H)
+    }
+
+    /// A second cache further down the same page. `y` is a texture V, so it
+    /// has to stay inside a byte.
+    pub const fn at(y: u16, w: i16, h: i16) -> Self {
+        TextCache {
+            key: u32::MAX,
+            y,
+            w,
+            h,
+        }
     }
 
     /// Whether `key` is already rendered.
@@ -374,14 +458,14 @@ impl TextCache {
     /// contributes nothing and the panel behind shows through.
     pub fn begin(&mut self, key: u32) {
         self.key = key;
-        gpu::fill_rect(CACHE_X, CACHE_Y, CACHE_W as u16, CACHE_H as u16, 0, 0, 0);
+        gpu::fill_rect(CACHE_X, self.y, self.w as u16, self.h as u16, 0, 0, 0);
         gpu::set_draw_area(
             CACHE_X,
-            CACHE_Y,
-            CACHE_X + CACHE_W as u16 - 1,
-            CACHE_Y + CACHE_H as u16 - 1,
+            self.y,
+            CACHE_X + self.w as u16 - 1,
+            self.y + self.h as u16 - 1,
         );
-        gpu::set_draw_offset(CACHE_X as i16, CACHE_Y as i16);
+        gpu::set_draw_offset(CACHE_X as i16, self.y as i16);
     }
 
     /// Point it back at the buffer being drawn this frame.
@@ -402,9 +486,9 @@ impl TextCache {
         gpu::draw_sprite_material(
             x,
             y,
-            CACHE_W as u16,
-            CACHE_H as u16,
-            (0, 0),
+            self.w as u16,
+            self.h as u16,
+            (0, self.y as u8),
             // Neutral tint: 128 is "as the texture is". A texel of
             // 0x0000 is transparent on this hardware, which is what
             // lets the panel show through around the letterforms.
