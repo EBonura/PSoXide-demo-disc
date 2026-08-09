@@ -75,20 +75,23 @@ const ICONS_V: u8 = 24;
 const ICONS_CLUT: Clut = Clut::new(400, 257);
 const ICONS_CELL: i16 = 12;
 const ICONS_SIZE: i16 = 12;
+/// Cells in the cooked strip. Not `LINKS.len()`: the strip carries every
+/// mark tools/icons.py cooks (YouTube included, currently undrawn), and the
+/// upload must match the file or `upload_bytes` panics at boot.
+const ICONS_COUNT: i16 = 6;
 static ICONS_TEX: &[u8] = include_bytes!("../assets/icons.tex");
 static ICONS_CLUT_DATA: &[u8] = include_bytes!("../assets/icons.clut");
 
-/// Which mark, and the part of the link the mark's domain leaves over. The
-/// full URLs run to thirty characters and the box holds twenty-one, so the
-/// domain is drawn rather than written. `bonnie-games.itch.io` redirects to
-/// `bonnie-studios.itch.io`, path and all, and is eight characters shorter.
-const LINKS: [(i16, &str); 6] = [
-    (0, "EBonura/PSoXide"),
-    (1, "bonnie-games/psoxide"),
-    (1, "bonnie-games"),
-    (2, "_bonniestudios"),
-    (3, "izzy88izzy"),
-    (4, "bonniestudios"),
+/// Which mark leads the row, and the URL written out in full. Full because
+/// the whole point of the card is that someone photographs or retypes these;
+/// the first cut showed only the part after the slash and read as "which
+/// site is this?".
+const LINKS: [(i16, &str); 5] = [
+    (0, "github.com/EBonura/PSoXide"),
+    (1, "bonnie-studios.itch.io"),
+    (2, "x.com/_bonniestudios"),
+    (3, "instagram.com/izzy88izzy"),
+    (4, "buymeacoffee.com/bonniestudios"),
 ];
 
 const TITLE: (u8, u8, u8) = (255, 84, 62);
@@ -195,18 +198,27 @@ const DESC_LEADING: i16 = 9;
 const SHOT_X: i16 = SHOT_BOX_X + 1;
 const SHOT_Y: i16 = PANEL_Y + 1;
 
-/// The credits card has no screenshot, so its right box holds the links
-/// instead of standing empty. Its own cache, on the row below the
-/// description's in the same page.
-const LINKS_CACHE_V: u16 = 96;
-const LINKS_W: i16 = PANEL_W - 2;
-const LINKS_H: i16 = PANEL_H - 2;
-/// A mark and the line beside it, then the gap to the next pair.
-const LINKS_PITCH: i16 = 14;
-/// The text starts clear of the mark; the eight-pixel font centres against
-/// the twelve-pixel mark two rows down.
-const LINKS_TEXT_X: i16 = ICONS_SIZE + 2;
+/// The credits card stacks two centred boxes in the band instead of the twin
+/// description/screenshot pair: CREDITS on top, LINKS below. Wide enough that
+/// the Just Music credit and every full URL fit on one line.
+const CARD_W: i16 = 212;
+const CARD_X: i16 = (320 - CARD_W) / 2;
+/// Characters a card line holds at the 5-pixel font.
+const CARD_COLS: usize = ((CARD_W - 8) / 5) as usize;
+/// Rows the credits box holds at the description leading.
+const CRED_ROWS: i16 = 5;
+const CRED_Y: i16 = HEADER_H + 2;
+const CRED_H: i16 = CRED_ROWS * DESC_LEADING + 7;
+const LINKS_Y: i16 = CRED_Y + CRED_H + 2;
+/// A links row is a 12px mark with the URL's 8px font centred beside it.
+const LINKS_PITCH: i16 = 12;
+const LINKS_H: i16 = LINKS.len() as i16 * LINKS_PITCH + 6;
 const LINKS_TEXT_DY: i16 = 2;
+/// Rows of the cache page the two card caches render into: the description
+/// cache owns 0..92, these sit below it, all inside the u8 V a sprite UV
+/// can address.
+const CRED_CACHE_V: u16 = 96;
+const LINKS_CACHE_V: u16 = 152;
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -361,7 +373,7 @@ fn main() {
     let icons = paint::Icons::upload(
         ICONS_TEX,
         ICONS_CLUT_DATA,
-        ICONS_CELL * LINKS.len() as i16,
+        ICONS_CELL * ICONS_COUNT,
         ICONS_SIZE,
         BANNER_TPAGE,
         ICONS_V,
@@ -486,9 +498,10 @@ fn main() {
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
     let mut text_cache = paint::TextCache::new();
-    // The links never change, so this one renders once and is blitted for
-    // the rest of the run. Key 0 is as good as any: there is only ever one.
-    let mut links_cache = paint::TextCache::at(LINKS_CACHE_V, LINKS_W, LINKS_H);
+    // The credits card's two boxes never change, so these render once and
+    // are blitted for the rest of the run. Key 0 is as good as any.
+    let mut credits_cache = paint::TextCache::at(CRED_CACHE_V, CARD_W - 2, CRED_H - 2);
+    let mut links_cache = paint::TextCache::at(LINKS_CACHE_V, CARD_W - 2, LINKS_H - 2);
     // The backdrop: which cached shot is in VRAM, how bright it is drawn,
     // and the slideshow clock. -1 means the single VRAM slot holds nothing
     // worth showing.
@@ -829,19 +842,21 @@ fn main() {
             let hide_text = attract || warp >= 0 || debug;
             if hide_text {
                 // Nothing but the ball turning over the carousel.
+            } else if entries[index].exe_lba == 0 {
+                if !credits_cache.holds(0) {
+                    credits_cache.begin(0);
+                    render_credits(&small, &header.expect("count came from it"));
+                    credits_cache.end(&fb);
+                }
+                if !links_cache.holds(0) {
+                    links_cache.begin(0);
+                    render_links(&small, &icons);
+                    links_cache.end(&fb);
+                }
             } else if !text_cache.holds(key) {
                 text_cache.begin(key);
-                if entries[index].exe_lba == 0 {
-                    render_credits(&small, &header.expect("count came from it"));
-                } else {
-                    render_description(&small, &entries[index], italian);
-                }
+                render_description(&small, &entries[index], italian);
                 text_cache.end(&fb);
-            }
-            if !hide_text && entries[index].exe_lba == 0 && !links_cache.holds(0) {
-                links_cache.begin(0);
-                render_links(&small, &icons);
-                links_cache.end(&fb);
             }
             // The screenshot rides the panel's visibility. Its one VRAM slot
             // only changes at black: ease the old image out, swap while
@@ -882,15 +897,24 @@ fn main() {
                 shot_dwell += 1;
             }
             if !hide_text {
-                draw_text_block(&font, &text_cache, italian);
                 if entries[index].exe_lba == 0 {
-                    // The credits card runs nothing, so it has no screenshot
-                    // and its right box would otherwise sit empty.
-                    paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
-                    links_cache.draw(SHOT_BOX_X + 1, PANEL_Y + 1);
-                } else if shot_level > 0 && shot_shown >= 0 {
-                    paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
-                    paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
+                    // The credits card: two stacked centred boxes where the
+                    // description/screenshot pair normally sits.
+                    paint::text_panel(CARD_X, CRED_Y, CARD_W, CRED_H);
+                    credits_cache.draw(CARD_X + 1, CRED_Y + 1);
+                    paint::text_panel(CARD_X, LINKS_Y, CARD_W, LINKS_H);
+                    links_cache.draw(CARD_X + 1, LINKS_Y + 1);
+                    if italian {
+                        paint::flag_it(320 - paint::FLAG_W - 5, 4);
+                    } else {
+                        paint::flag_uk(320 - paint::FLAG_W - 5, 4);
+                    }
+                } else {
+                    draw_text_block(&font, &text_cache, italian);
+                    if shot_level > 0 && shot_shown >= 0 {
+                        paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
+                        paint::draw_shot(SHOT_X, SHOT_Y, shot_level as u8);
+                    }
                 }
                 // The program's own version, right-aligned just below the
                 // screenshot's box. The header already says which pressing
@@ -1207,39 +1231,46 @@ fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
     cache.draw(TEXT_X, TEXT_Y);
 }
 
-/// Draw the credits into the cache. Coordinates are local to it.
+/// One centred line of the credits card's wide box. Coordinates are local
+/// to its cache.
+fn card_line(font: &FontAtlas, line: i16, text: &str, tint: (u8, u8, u8)) {
+    if text.is_empty() {
+        return;
+    }
+    let x = (CARD_W - 2) / 2 - (font.text_width(text) as i16) / 2;
+    font.draw_text(x, line * DESC_LEADING + 2, text, tint);
+}
+
+/// Draw the credits into their cache. The card is wide enough that the
+/// artist credit sits on one line, with the four track titles under it.
 fn render_credits(font: &FontAtlas, header: &Header) {
-    // The same font and the same wrap as a description, because this is one:
-    // an entry on the carousel that happens to have no program behind it.
-    // The artist takes a line or two and the tracks take one each; count
-    // them first so the block sits centred in its box.
     let mut lines = 0i16;
     let mut rest = header.credit_str();
     while !rest.is_empty() && lines < 2 {
-        let (_, tail) = wrap(rest, WRAP_CHARS);
+        let (_, tail) = wrap(rest, CARD_COLS);
         lines += 1;
         rest = tail;
     }
     let titled = (0..header.menu_track_count as usize)
         .filter(|&t| !header.title(t).is_empty())
         .count() as i16;
-    let total = (lines + titled).min(disc_toc::DESC_LINES as i16);
-    let mut line = (disc_toc::DESC_LINES as i16 - total) / 2;
+    let total = (lines + titled).min(CRED_ROWS);
+    let mut line = (CRED_ROWS - total) / 2;
     let mut rest = header.credit_str();
     let credit_end = line + lines;
     while !rest.is_empty() && line < credit_end {
-        let (head, tail) = wrap(rest, WRAP_CHARS);
-        cached_line(font, line, head, BLURB);
+        let (head, tail) = wrap(rest, CARD_COLS);
+        card_line(font, line, head, BLURB);
         line += 1;
         rest = tail;
     }
     for track in 0..header.menu_track_count as usize {
-        if line >= disc_toc::DESC_LINES as i16 {
+        if line >= CRED_ROWS {
             break;
         }
         let title = header.title(track);
         if !title.is_empty() {
-            cached_line(font, line, title, TRACK_NAME);
+            card_line(font, line, title, TRACK_NAME);
             line += 1;
         }
     }
@@ -1247,16 +1278,21 @@ fn render_credits(font: &FontAtlas, header: &Header) {
 
 /// Draw the links into their cache. Coordinates are local to it.
 ///
-/// One mark and one line each, centred as a block the way the description
-/// is. Nothing here depends on the disc, so the cache never needs rebuilding
-/// after the first time.
+/// One mark and one full URL each. The rows left-align as a block, and the
+/// block centres on the widest URL, so the domains line up under each other
+/// the way a list should. Nothing here depends on the disc, so the cache
+/// never needs rebuilding after the first time.
 fn render_links(font: &FontAtlas, icons: &paint::Icons) {
-    let block = LINKS.len() as i16 * LINKS_PITCH;
-    let top = (LINKS_H - block) / 2;
-    for (row, (slot, text)) in LINKS.iter().enumerate() {
-        let y = top + row as i16 * LINKS_PITCH;
-        icons.draw(*slot, 0, y, BLURB);
-        font.draw_text(LINKS_TEXT_X, y + LINKS_TEXT_DY, text, BLURB);
+    let widest = LINKS
+        .iter()
+        .map(|(_, url)| font.text_width(url) as i16)
+        .max()
+        .unwrap_or(0);
+    let x0 = ((CARD_W - 2) - (ICONS_SIZE + 2 + widest)) / 2;
+    for (row, (slot, url)) in LINKS.iter().enumerate() {
+        let y = 2 + row as i16 * LINKS_PITCH;
+        icons.draw(*slot, x0, y, BLURB);
+        font.draw_text(x0 + ICONS_SIZE + 2, y + LINKS_TEXT_DY, url, BLURB);
     }
 }
 
