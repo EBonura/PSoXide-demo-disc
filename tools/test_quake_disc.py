@@ -208,6 +208,23 @@ class VerifyQuakeTests(unittest.TestCase):
             with self.assertRaisesRegex(quake_disc.VerificationError, "differs outside"):
                 quake_disc.write_receipt(args, verified)
 
+    def test_receipt_rejects_mode_byte_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = QuakeFixture(root)
+            verified = fixture.verify()
+            demo_cue, demo_bin = self.make_demo(root, fixture)
+            with demo_bin.open("r+b") as stream:
+                stream.seek(30 * quake_disc.SECTOR_BYTES + 15)
+                stream.write(b"\x01")
+            args = type(
+                "Args",
+                (),
+                {"demo_cue": str(demo_cue), "demo_bin": str(demo_bin), "out": str(root / "x.json")},
+            )()
+            with self.assertRaisesRegex(quake_disc.VerificationError, "differs outside"):
+                quake_disc.write_receipt(args, verified)
+
 
 class MakeVariantContractTests(unittest.TestCase):
     def dry_run(self, *assignments: str) -> subprocess.CompletedProcess[str]:
