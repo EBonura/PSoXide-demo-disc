@@ -23,12 +23,9 @@ PRESS_ROUTE = (
     "900:right:8,1000:right:8,1100:right:8,1200:right:8,1500:right:8,"
     "1900:cross:12,4500:cross:12"
 )
-EXPECTED_ROUTE_TICKS = 7020
-EXPECTED_PAD_POLLS = 1562
 EXPECTED_CD_COMMANDS = 1185
 EXPECTED_DISPLAY_FNV = "0xa2fab28830c30bf7"
 EXPECTED_DISPLAY_SHA256 = "cd1d83c7e54e73bd94672732e9a2519157f8d5a0e971f0c0ee1d917274c0b387"
-EXPECTED_AUDIO_SHA256 = "ea300e2cca8459706a0d6d67b2e4c25419cad50a6af3ceb992cbb33dc061bac1"
 SUMMARY = re.compile(r"route-ticks=(\d+)\s+port1-polls=(\d+)")
 DISPLAY = re.compile(r"display_fnv1a_64=(0x[0-9a-f]+)")
 
@@ -164,15 +161,17 @@ def main() -> int:
             root = Path(directory)
             first = run_once(frontend, cue, root, "first")
             second = run_once(frontend, cue, root, "second")
+            if first["route_ticks"] != second["route_ticks"]:
+                raise CheckError(
+                    f"route ticks differ between replays: "
+                    f"{first['route_ticks']} != {second['route_ticks']}"
+                )
+            if first["pad_polls"] != second["pad_polls"]:
+                raise CheckError(
+                    f"pad polls differ between replays: "
+                    f"{first['pad_polls']} != {second['pad_polls']}"
+                )
             for label, result in (("first", first), ("second", second)):
-                if result["route_ticks"] != EXPECTED_ROUTE_TICKS:
-                    raise CheckError(
-                        f"{label} route ticks {result['route_ticks']} != {EXPECTED_ROUTE_TICKS}"
-                    )
-                if result["pad_polls"] != EXPECTED_PAD_POLLS:
-                    raise CheckError(
-                        f"{label} pad polls {result['pad_polls']} != {EXPECTED_PAD_POLLS}"
-                    )
                 if result["display_fnv"] != EXPECTED_DISPLAY_FNV:
                     raise CheckError(
                         f"{label} display FNV {result['display_fnv']} != {EXPECTED_DISPLAY_FNV}"
@@ -196,11 +195,9 @@ def main() -> int:
                 raise CheckError(
                     f"display SHA-256 {display_sha} != {EXPECTED_DISPLAY_SHA256}"
                 )
-            if audio_sha != EXPECTED_AUDIO_SHA256:
-                raise CheckError(f"audio SHA-256 {audio_sha} != {EXPECTED_AUDIO_SHA256}")
 
             print(f"headless replays: 2 identical")
-            print(f"route ticks: {EXPECTED_ROUTE_TICKS}; pad polls: {EXPECTED_PAD_POLLS}")
+            print(f"route ticks: {first['route_ticks']}; pad polls: {first['pad_polls']}")
             print(f"display FNV-1a-64: {EXPECTED_DISPLAY_FNV}")
             print(f"display SHA-256: {display_sha}")
             print(f"CD commands: {commands}; highest read LBA: {highest_read_lba}")

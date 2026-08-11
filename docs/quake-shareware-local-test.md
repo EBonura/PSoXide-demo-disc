@@ -115,8 +115,9 @@ make quake-headless-check FRONTEND=/absolute/path/to/PSoXide/target/release/fron
 
 It replays the exact launcher navigation and starts a new Quake game twice. It
 requires identical route logs, CD command logs, rendered display, and audio;
-pins the final display hashes, route ticks, pad polls, and CD command count;
-requires relocated reads within the Quake image; and rejects silent audio.
+requires route ticks and pad polls to agree across both runs; pins the final
+display hashes and CD command count; requires relocated reads within the Quake
+image; and rejects silent audio.
 
 ## Runtime verification boundary
 
