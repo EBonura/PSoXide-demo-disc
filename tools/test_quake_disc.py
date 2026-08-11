@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -880,6 +881,51 @@ class FailClosedDefaultTests(unittest.TestCase):
                 failed = self.verify(fixture, **overrides)
                 self.assertNotEqual(failed.returncode, 0, failed.stdout)
                 self.assertIn(error, failed.stderr)
+
+    def test_repin_prints_the_pins_a_built_tree_implies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            printed = run(
+                "make",
+                "--no-print-directory",
+                "quake-repin",
+                f"QUAKE_SRC={fixture.source}",
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(printed.returncode, 0, printed.stderr)
+            expected = {
+                "QUAKE_EXPECTED_REV": fixture.revision,
+                "QUAKE_EXPECTED_PSOXIDE_REV": fixture.psoxide_revision,
+                "QUAKE_EXPECTED_PROVENANCE_SHA256": digest(fixture.provenance),
+                "QUAKE_EXPECTED_CUE_SHA256": digest(fixture.cue),
+                "QUAKE_EXPECTED_BIN_SHA256": digest(fixture.bin),
+                "QUAKE_EXPECTED_EXE_SHA256": digest(fixture.exe),
+            }
+            for name, value in expected.items():
+                with self.subTest(pin=name):
+                    self.assertIn(f"{name} ?= {value}", printed.stdout)
+            # Every pin the Makefile holds is a pin the repin prints.
+            makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+            for name in re.findall(r"^(QUAKE_EXPECTED_\w+) \?=", makefile, re.MULTILINE):
+                with self.subTest(pin=name):
+                    self.assertIn(f"{name} ?= ", printed.stdout)
+            self.assertNotIn("WARNING", printed.stdout)
+
+    def test_repin_refuses_to_speak_for_a_dirty_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            (fixture.source / "tracked.txt").write_text("changed\n", encoding="ascii")
+            printed = run(
+                "make",
+                "--no-print-directory",
+                "quake-repin",
+                f"QUAKE_SRC={fixture.source}",
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(printed.returncode, 0, printed.stderr)
+            self.assertIn("WARNING: the Quake tree is dirty", printed.stdout)
 
     def test_the_ordinary_check_runs_the_quake_pin_check(self) -> None:
         checked = run(
