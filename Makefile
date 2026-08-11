@@ -8,7 +8,7 @@
 # music live outside Git. Cortex Ignition is staged from PSoXide's tracked,
 # miniaturized editor sample so the disc no longer depends on editor/projects/.
 
-.PHONY: help disc disc-only quake-disc quake-disc-only quake-verify quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    ?= $(ROOT)/games/PSoXide
@@ -30,25 +30,40 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # than looped: make's foreach splits on whitespace, which takes the titles
 # apart at their spaces.
 
-# Two pressings. The public download must not carry Half-Life, and the menu
-# music permission is scoped to the disc without it, so HL is opt-in:
-#   make disc        -> "PSoXide Demo Disc"     (public, no Half-Life)
-#   make disc HL=1   -> "PSoXide Demo Disc HL"  (Palermo Comicon pressing)
-# The names differ so the two bins cannot be mistaken for each other.
+# Two pressings. The menu music permission is scoped to the disc without
+# Half-Life, and hl-psx is private until its own release, so HL is opt-in:
+#   make disc        -> "PSoXide Demo Disc"     (the default pressing)
+#   make disc HL=1   -> "PSoXide Demo Disc HL"  (the same disc plus Half-Life)
+# The names differ so the two bins cannot be mistaken for each other. Both
+# carry Quake shareware; HL=1 adds to the default disc, it does not replace it.
+#
+# Adding Quake to the Half-Life pressing was the size question. Measured
+# 2026-08-11 from one tree with one set of inputs, in 2352-byte sectors:
+#
+#   default, no Quake   86928   19:19:03   195.0 MiB
+#   default             96393   21:25:18   216.2 MiB
+#   HL, no Quake       291416   64:45:41   653.7 MiB
+#   HL                 300881   66:51:56   674.9 MiB
+#
+# Quake costs 9465 sectors either way. The HL pressing lands at 83.6% of an
+# 80-minute CD-R (359999 sectors), 59118 spare, and still fits a 74-minute
+# blank with 32119 to spare. Nothing had to be dropped to make room.
 HL ?=
 # HL=0 means off, not "0 is a non-empty string, so on".
 override HL := $(filter-out 0,$(HL))
 
-# Quake shareware is a separate local/test pressing. It is intentionally not
-# part of either the public or Half-Life variants. The source revision,
-# shipping provenance, and all artifact hashes are checked before layout. The
-# combined image gets a machine-readable provenance receipt beside it.
+# Quake 1.06 shareware Episode 1 is on every pressing. The source revision,
+# shipping provenance, and all artifact hashes are checked before layout, and
+# the combined image gets a machine-readable provenance receipt beside it, so
+# a disc that carries Quake cannot stop saying exactly which Quake it carries.
+#
+# Building it locally is not permission to publish it. release-web and itch
+# are blocked below, and stay blocked until the owner decides the shareware
+# redistribution question.
 #
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
 # and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE ?=
-override QUAKE := $(filter-out 0,$(QUAKE))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-build-provenance)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
@@ -61,17 +76,9 @@ QUAKE_EXPECTED_EXE_SHA256 ?= ad4464f6dd64b1132cded9fd5d539724d7c2805b54a5c4ea05e
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
-ifneq ($(QUAKE),)
-ifneq ($(HL),)
-$(error QUAKE and HL are mutually exclusive local/test pressings)
-endif
-endif
-
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
-ifneq ($(QUAKE),)
-DISC_NAME ?= PSoXide Demo Disc Quake Shareware
-else ifneq ($(HL),)
+ifneq ($(HL),)
 DISC_NAME ?= PSoXide Demo Disc HL
 else
 DISC_NAME ?= PSoXide Demo Disc
@@ -102,13 +109,13 @@ NITROXIDE_BUILD := $(BUILD)/nitroxide
 NITROXIDE       := $(NITROXIDE_BUILD)/NitroXide/NitroXide.cue
 
 help:
-	@echo "make disc             - build everything into \"$(DIST)\" (public pressing, no Half-Life)"
-	@echo "make disc HL=1        - the Palermo Comicon pressing, with Half-Life"
-	@echo "make quake-disc       - local/test pressing with pinned Quake shareware"
-	@echo "make quake-disc-only  - relay the local/test Quake pressing from built inputs"
-	@echo "make quake-headless-check - build and prove Quake chain-load twice without images"
+	@echo "make disc             - build everything into \"$(DIST)\" (the default pressing, Quake shareware included)"
+	@echo "make disc HL=1        - the same disc plus Half-Life, for the Palermo Comicon"
 	@echo "make disc-only        - relay out the disc without rebuilding the programs"
-	@echo "make check            - host tests (disc-toc, mkdisc)"
+	@echo "make check            - host tests (disc-toc, mkdisc) and the Quake pin check"
+	@echo "make quake-verify     - check the pinned Quake input on its own"
+	@echo "make quake-repin      - print the pin values a built Quake tree implies"
+	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
 
@@ -193,10 +200,14 @@ ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
 endif
 
-# A full Quake build must establish that its ordinary demo-disc programs were
+# Every disc build must establish that its ordinary demo-disc programs were
 # rebuilt from the same clean PSoXide revision the Quake source declares.
 # Remove the prior stamp before rebuilding, check the hydration markers after
 # every program recipe finishes, then write the exact clean checkout revision.
+#
+# The name is historical: this was the Quake lane's extra step back when Quake
+# was opt-in. Quake ships on every pressing now, so it is simply how the disc's
+# programs get built, and the stamp is what binds them to one clean SDK.
 quake-programs:
 	@rm -f "$(QUAKE_PROGRAMS_STAMP)"
 	$(MAKE) programs
@@ -212,12 +223,12 @@ quake-programs:
 	printf '%s\n' "$$revision" > "$$temporary" || exit 1; \
 	mv "$$temporary" "$(QUAKE_PROGRAMS_STAMP)"
 
-# disc-only deliberately reuses binaries. For Quake, that is permitted only
-# after quake-programs recorded this checkout's full revision. This also makes
+# disc-only deliberately reuses binaries. That is permitted only after
+# quake-programs recorded this checkout's full revision. This also makes
 # quake-headless-check fail closed instead of replaying stale ordinary games.
 quake-programs-verify:
 	@if [ ! -f "$(QUAKE_PROGRAMS_STAMP)" ]; then \
-		echo "quake-programs: missing $(QUAKE_PROGRAMS_STAMP); run 'make quake-disc'"; \
+		echo "quake-programs: missing $(QUAKE_PROGRAMS_STAMP); run 'make disc'"; \
 		exit 1; \
 	fi; \
 	lines=$$(wc -l < "$(QUAKE_PROGRAMS_STAMP)" | tr -d '[:space:]'); \
@@ -228,7 +239,7 @@ quake-programs-verify:
 	fi; \
 	current=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
 	if [ "$$stamped" != "$$current" ]; then \
-		echo "quake-programs: SDK revision stamp is $$stamped, but PSoXide is $$current; run 'make quake-disc'"; \
+		echo "quake-programs: SDK revision stamp is $$stamped, but PSoXide is $$current; run 'make disc'"; \
 		exit 1; \
 	fi
 
@@ -285,34 +296,44 @@ HL_ARGS = --image "HALF-LIFE=$(HLPSX)" \
 	--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine."
 endif
 
-ifneq ($(QUAKE),)
+# The three QUAKE SHAREWARE arguments travel together for the same reason the
+# HALF-LIFE ones do, and they are not conditional: there is no pressing without
+# Quake on it. QUAKE_PREREQS is what stops a disc being laid out around an
+# unverified payload -- disc-only cannot run until the stamp and the pins check.
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
-	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1 on the original PlayStation. This local test checkpoint cooks all Episode 1 maps and streams them from the embedded Quake disc image; runtime work is still in progress.|Quake 1.06 shareware Episodio 1 sulla PlayStation originale. Questo checkpoint di test locale converte tutte le mappe e le carica dal disco Quake incorporato; il runtime e ancora in sviluppo."
+	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1, rebuilt from scratch for the original PlayStation. The single-player episode is complete: every level plays start to finish, streamed off this disc.|Quake 1.06 shareware Episodio 1, riscritto da zero per la prima PlayStation. L'episodio single player e completo: i livelli si giocano dall'inizio alla fine, letti da questo disco."
 QUAKE_PREREQS = quake-programs-verify quake-verify
-DISC_PROGRAMS = quake-programs
-else
-DISC_PROGRAMS = programs
-endif
 
-disc: launcher $(DISC_PROGRAMS) mkdisc
+disc: launcher quake-programs mkdisc
 	$(MAKE) disc-only
 
-quake-disc:
-	$(MAKE) disc QUAKE=1
-
-quake-disc-only:
-	$(MAKE) disc-only QUAKE=1
-
 quake-headless-check:
-	$(MAKE) quake-disc-only
-	$(MAKE) _quake-headless-check QUAKE=1
+	$(MAKE) disc-only
+	$(MAKE) _quake-headless-check
 
 _quake-headless-check:
 	python3 tools/check_quake_headless.py \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json"
+
+# Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
+# pointer are the whole contract, and they all come out of a built Quake tree:
+#
+#   make quake-repin                          # from the default QUAKE_SRC
+#   make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
+#
+# It prints the six lines to paste over the ones above, plus the commands that
+# follow them, and writes nothing. Editing by hand is the point: the diff then
+# shows exactly which contract moved, and a repin that rewrote the pins itself
+# would be a verifier agreeing with whatever it was handed. README.md has the
+# full procedure, including the two FNV pins in tools/check_quake_headless.py.
+quake-repin:
+	@python3 tools/quake_disc.py repin \
+		--source "$(QUAKE_SRC)" \
+		--cue "$(QUAKE_CUE)" \
+		--provenance "$(QUAKE_PROVENANCE)"
 
 quake-verify:
 	python3 tools/quake_disc.py verify \
@@ -410,7 +431,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--describe "MAGIKAAAAARP PONG=Pong with a live CD-audio visualizer. The game is complete and playable: music streams from the disc while pre-analysed frequency bands drive the bars in sync.|Pong con un visualizzatore audio dal vivo. Il gioco e completo: la musica arriva dal CD mentre le frequenze analizzate in anticipo muovono le barre a tempo." \
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 
-	$(if $(QUAKE),python3 tools/quake_disc.py receipt \
+	python3 tools/quake_disc.py receipt \
 		--source "$(QUAKE_SRC)" \
 		--psoxide "$(PSOXIDE)" \
 		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
@@ -424,8 +445,23 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--expected-exe-sha256 "$(QUAKE_EXPECTED_EXE_SHA256)" \
 		--demo-cue "$(DIST)/$(DISC_NAME).cue" \
 		--demo-bin "$(DIST)/$(DISC_NAME).bin" \
-		--out "$(DIST)/$(DISC_NAME).quake-provenance.json")
+		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
 
+
+# Every pressing carries Quake 1.06 shareware data now, so both distribution
+# paths stop before they build anything. Redistributing that data is a separate
+# owner decision and it has not been made.
+#
+# This is a prerequisite rather than a line inside each recipe so it cannot be
+# reached around: `make itch` fails before butler is even looked for. When the
+# owner grants redistribution, drop the prerequisite from the two targets.
+# Local builds and burns are unaffected -- `make disc` is the supported path.
+.PHONY: publication-block
+publication-block:
+	@echo "publication is blocked: every pressing carries Quake 1.06 shareware data,"
+	@echo "and redistributing it needs a separate owner decision that has not been"
+	@echo "made. Build and burn locally with 'make disc'."
+	@exit 1
 
 # Keep the browser emulator's copy current. PSoXide's Pages deploy stages
 # these files from the rolling `web-disc` release next to the wasm, and the
@@ -438,9 +474,8 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 # runs in.
 WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
-release-web:
+release-web: publication-block
 	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
-	@test -z "$(QUAKE)" || { echo "release-web: Quake shareware needs separate legal and release approval"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
@@ -460,16 +495,20 @@ release-web:
 # one-time `butler login`. The HL pressing is never distributed -- the music
 # permission is scoped to the disc without it.
 .PHONY: itch
-itch:
+itch: publication-block
 	@test -z "$(HL)" || { echo "itch: the HL pressing is never distributed"; exit 1; }
-	@test -z "$(QUAKE)" || { echo "itch: Quake shareware needs separate legal and release approval"; exit 1; }
 	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/itch" && mkdir -p "$(BUILD)/itch"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(DIST)/$(DISC_NAME).cue" release/README.txt "$(BUILD)/itch/"
 	butler push --userversion "$(DISC_VERSION)" "$(BUILD)/itch" bonnie-studios/psoxide-demo-disc:psx
 
-check: sdk-coherence check-locks
+# The Quake pin check is part of the ordinary check, not a lane of its own: a
+# tree whose pinned Quake payload is missing, stale, dirty, or built against a
+# different PSoXide cannot press a disc, so it should not pass its tests either.
+# The chain-load half of the proof needs a built disc and lives in
+# `make quake-headless-check`.
+check: sdk-coherence check-locks quake-verify
 	cd carousel && cargo test
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test

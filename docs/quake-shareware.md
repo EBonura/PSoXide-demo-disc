@@ -1,8 +1,12 @@
-# Quake shareware local/test demo disc
+# Quake shareware on the demo disc
 
-This flow adds the validated Quake-PSX whole image to a separate PSoXide demo
-disc variant. It does not alter the default public disc or the Half-Life
-pressing, and it does not publish anything.
+Quake 1.06 shareware Episode 1 is a default program on the demo disc. `make
+disc` builds it, verifies it against the pins below, and writes a provenance
+receipt beside the image; the Half-Life pressing carries it too. There is no
+switch that leaves it off.
+
+Building it is local. Publishing it is a separate owner decision that has not
+been made, and `release-web` and `itch` are blocked until it is.
 
 ## Pinned input
 
@@ -30,6 +34,8 @@ EXE, BIN, CUE, and sidecar outputs at this pin.
 Any later Quake checkpoint must update the full revision and every pinned hash
 together, rebuild the combined image, regenerate the receipt, and rerun the
 two-pass headless gate before the demo-disc payload is called current.
+`make quake-repin` measures all six from a built tree; README.md has the
+procedure.
 
 The demo-disc PSoXide submodule, Quake's source declaration, and Quake's
 shipping sidecar all name `f9f83c35b140560c123771893a1fc3e426814550`.
@@ -53,13 +59,13 @@ disc images remain untracked. The demo-disc repository commits none of them.
 
 ## Build
 
-To rebuild the normal demo-disc programs before layout:
+The ordinary full build:
 
 ```bash
-make quake-disc
+make disc
 ```
 
-The full target removes any prior ordinary-program revision stamp, rebuilds
+Its `quake-programs` stage removes any prior ordinary-program revision stamp, rebuilds
 the programs with `PSOXIDE`, runs `sdk-coherence`, verifies that PSoXide is
 still clean, and atomically writes its full HEAD to
 `build/programs.psoxide-revision` before layout. Cortex Ignition is copied from
@@ -69,7 +75,7 @@ is baked, so generated project output does not dirty the PSoXide checkout.
 To reuse already-built demo-disc programs:
 
 ```bash
-make quake-disc-only
+make disc-only
 ```
 
 This reuse path, and therefore `quake-headless-check`, requires the stamp from
@@ -77,13 +83,13 @@ a completed `quake-programs` stage in the full build. A missing, malformed, or
 revision-mismatched stamp stops the build. It cannot silently assemble or
 replay ordinary program artifacts left over from another PSoXide revision.
 
-The output is separate from both release variants:
+The output is the ordinary disc, with the receipt beside it:
 
 ```text
-PSoXide Demo Disc Quake Shareware/
-  PSoXide Demo Disc Quake Shareware.bin
-  PSoXide Demo Disc Quake Shareware.cue
-  PSoXide Demo Disc Quake Shareware.quake-provenance.json
+PSoXide Demo Disc/
+  PSoXide Demo Disc.bin
+  PSoXide Demo Disc.cue
+  PSoXide Demo Disc.quake-provenance.json
 ```
 
 Receipt schema 3 records the exact clean Quake and PSoXide revisions, Quake's
@@ -99,7 +105,7 @@ must travel with it. The sidecar must remain beside the cue and be named from
 the cue stem exactly as shown:
 
 ```bash
-make quake-disc-only \
+make disc-only \
   PSOXIDE=/absolute/path/to/PSoXide \
   QUAKE_SRC=/absolute/path/to/quake-psx \
   QUAKE_CUE=/absolute/path/to/quake-psx.cue \
@@ -119,18 +125,20 @@ build configuration, a changed artifact name/size/hash, an unsafe cue path, a
 malformed disc image, a missing menu entry, or embedded payload drift stops the
 build.
 
-## Variant isolation and release gate
+## Default inclusion and release gate
 
-- `QUAKE` defaults off. `QUAKE=0` expands to the same dry-run recipe as an
-  unset value for both default and Half-Life builds.
-- Quake and Half-Life flags are mutually exclusive.
+- There is no opt-in switch. `make disc` and `make disc-only` carry Quake, and
+  so does `make disc HL=1`.
 - The Quake image is appended after all existing programs, preserving their
-  program order and CD-DA ownership.
-- The Quake output has a distinct disc name and destination.
-- `release-web` and `itch` explicitly reject `QUAKE=1`.
+  program order and CD-DA ownership. It owns no CD-DA track.
+- `disc-only` will not lay out a sector until `quake-programs-verify` and
+  `quake-verify` have passed, and `make check` runs `quake-verify` too.
+- `release-web` and `itch` depend on `publication-block`, which always fails.
+  They stop before they build anything.
 - Public redistribution requires a separate legal and release decision. The
-  presence of id Software's shareware data and the ability to build a local
-  test disc do not authorize this repository to publish the combined image.
+  presence of id Software's shareware data and the ability to build the disc
+  locally do not authorize this repository to publish the combined image. That
+  decision has not been made here.
 
 ## Automated checks
 
@@ -145,9 +153,16 @@ test suites. The tests cover:
   cross-revision mismatch, changed bin, and unsafe cue rejection;
 - receipt schema 3, shipping-build facts, hashes, and legal gate;
 - table-entry and embedded-sector verification;
-- unchanged default and Half-Life dry-run recipes when Quake is off;
-- Quake-only metadata, whole-image argument, verifier, receipt, separate name,
-  and Half-Life incompatibility.
+- the default and Half-Life dry-run recipes both carrying the Quake image,
+  its metadata, the verifier and the receipt, and the opt-in switch being gone;
+- every way the payload can be wrong stopping `make quake-verify`: absent,
+  stale Quake pin, wrong PSoXide pin, stale artifact hash, either checkout
+  dirty, stamp stale, stamp missing;
+- `make check` reaching the verifier, layout not starting before it passes,
+  and the publication block failing before either upload path builds;
+- the carousel's entry count and Quake's position in it, a hidden or absent
+  Quake entry failing, and payload identity against the receipt;
+- `make quake-repin` printing every pin the Makefile holds.
 - post-program SDK coherence, missing/malformed/stale SDK stamp rejection, and
   tracked Cortex staging.
 
@@ -170,14 +185,25 @@ chain-load TTY markers followed by Quake's own entry-point and successful Start
 map residency markers.
 
 No screenshot, PPM, frame dump, WAV, or instrumented guest is involved. Both
-runs must have byte-identical route, CD command, GPU command census, aggregate
-PC, PC callsite, and windowed PC logs. Their hashes, route ticks, pad polls, CD
-command count, final PC, cycles, and final VRAM/display hashes are pinned. The
-CD log must seek and read the Quake EXE header and payload at the table's exact
-relocated LBA, while the final PC must be inside the embedded Quake payload and
-the out-of-band sampler must observe that address range. This is the durable
-proof that the menu selected Quake, the loader verified and entered it, and
-Quake reached its own runtime.
+runs must have byte-identical stdout, summaries, and route, CD command, GPU
+command census, aggregate PC, PC callsite, and windowed PC logs.
+
+Two absolute pins remain: the final VRAM and display FNV-1a-64. Those are
+Quake's output and hold across a launcher rebuilt from another path, a changed
+`DISC_VERSION`, and a renamed pressing. Cycles, route ticks, pad polls, CD
+command totals, the final PC and the six log digests are NOT pinned: they move
+with the launcher binary, which changes on every commit here, so pinning them
+made the gate fail on unrelated work. They are held to run-to-run equality
+instead.
+
+Structurally, the carousel must have its expected number of visible entries
+with `QUAKE SHAREWARE` visible at the position the route lands on, the table's
+record of the payload must match the receipt, the CD log must seek and read the
+Quake EXE header and payload at the table's exact relocated LBA, both replays
+must end with the PC inside the embedded Quake payload, and the out-of-band
+sampler must observe that address range. This is the durable proof that the
+menu selected Quake, the loader verified and entered it, and Quake reached its
+own runtime.
 
 ## Runtime verification boundary
 
