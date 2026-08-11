@@ -639,46 +639,39 @@ class MakeVariantContractTests(unittest.TestCase):
             check=False,
         )
 
-    def test_default_and_zero_do_not_add_quake(self) -> None:
+    def test_default_disc_carries_quake_with_metadata_verifier_and_receipt(
+        self,
+    ) -> None:
         default = self.dry_run()
-        zero = self.dry_run("QUAKE=0")
         self.assertEqual(default.returncode, 0, default.stderr)
-        self.assertEqual(zero.returncode, 0, zero.stderr)
-        self.assertEqual(default.stdout, zero.stdout)
-        self.assertNotIn('--image "QUAKE SHAREWARE=', default.stdout)
-        self.assertNotIn("tools/quake_disc.py", default.stdout)
+        self.assertIn('--image "QUAKE SHAREWARE=', default.stdout)
+        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', default.stdout)
+        self.assertIn('--describe "QUAKE SHAREWARE=', default.stdout)
+        self.assertIn("tools/quake_disc.py verify", default.stdout)
+        self.assertIn("tools/quake_disc.py receipt", default.stdout)
+        self.assertIn('--psoxide "', default.stdout)
+        self.assertIn('--programs-psoxide-stamp "', default.stdout)
+        self.assertIn('--expected-psoxide-revision "', default.stdout)
+        self.assertIn('--provenance "', default.stdout)
+        self.assertIn('--expected-provenance-sha256 "', default.stdout)
+        self.assertIn('--expected-exe-sha256 "', default.stdout)
+        self.assertIn("PSoXide Demo Disc.bin", default.stdout)
+        self.assertNotIn("PSoXide Demo Disc Quake Shareware.bin", default.stdout)
 
-    def test_half_life_and_zero_do_not_add_quake(self) -> None:
-        half_life = self.dry_run("HL=1")
-        zero = self.dry_run("HL=1", "QUAKE=0")
-        self.assertEqual(half_life.returncode, 0, half_life.stderr)
-        self.assertEqual(zero.returncode, 0, zero.stderr)
-        self.assertEqual(half_life.stdout, zero.stdout)
-        self.assertIn('--image "HALF-LIFE=', half_life.stdout)
-        self.assertNotIn('--image "QUAKE SHAREWARE=', half_life.stdout)
+    def test_the_opt_in_switch_is_gone(self) -> None:
+        default = self.dry_run()
+        for assignment in ("QUAKE=", "QUAKE=0", "QUAKE=1"):
+            with self.subTest(assignment=assignment):
+                other = self.dry_run(assignment)
+                self.assertEqual(other.returncode, 0, other.stderr)
+                self.assertEqual(default.stdout, other.stdout)
 
-    def test_opt_in_adds_whole_image_metadata_verifier_and_receipt(self) -> None:
-        quake = self.dry_run("QUAKE=1")
-        self.assertEqual(quake.returncode, 0, quake.stderr)
-        self.assertIn('--image "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', quake.stdout)
-        self.assertIn('--describe "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn("tools/quake_disc.py verify", quake.stdout)
-        self.assertIn("tools/quake_disc.py receipt", quake.stdout)
-        self.assertIn('--psoxide "', quake.stdout)
-        self.assertIn('--programs-psoxide-stamp "', quake.stdout)
-        self.assertIn('--expected-psoxide-revision "', quake.stdout)
-        self.assertIn('--provenance "', quake.stdout)
-        self.assertIn('--expected-provenance-sha256 "', quake.stdout)
-        self.assertIn('--expected-exe-sha256 "', quake.stdout)
-        self.assertIn("PSoXide Demo Disc Quake Shareware.bin", quake.stdout)
-
-    def test_full_quake_build_checks_sdk_coherence_after_programs(self) -> None:
+    def test_full_disc_build_checks_sdk_coherence_after_programs(self) -> None:
         quake = run(
             "make",
             "-n",
             "--no-print-directory",
-            "quake-disc",
+            "disc",
             "DIST=/tmp/psoxide-quake-contract",
             cwd=ROOT,
             check=False,
@@ -751,11 +744,6 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn("$(PSOXIDE)/editor/samples/cortex_v1", makefile)
         self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
         self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
-
-    def test_half_life_and_quake_fail_closed(self) -> None:
-        mixed = self.dry_run("HL=1", "QUAKE=1")
-        self.assertNotEqual(mixed.returncode, 0)
-        self.assertIn("QUAKE and HL are mutually exclusive", mixed.stderr)
 
     def test_distribution_targets_contain_explicit_quake_guards(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")

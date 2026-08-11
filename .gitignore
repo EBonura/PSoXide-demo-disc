@@ -1,6 +1,7 @@
 build/
 dist/
 target/
+__pycache__/
 *.bin
 *.cue
 

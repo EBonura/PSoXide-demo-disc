@@ -230,7 +230,7 @@ def verify_programs_revision_stamp(stamp: Path, expected_revision: str) -> str:
     except FileNotFoundError as error:
         raise VerificationError(
             f"ordinary-program SDK revision stamp does not exist: {stamp}; "
-            "run 'make quake-disc'"
+            "run 'make disc'"
         ) from error
     except (OSError, UnicodeDecodeError) as error:
         raise VerificationError(
@@ -247,7 +247,7 @@ def verify_programs_revision_stamp(stamp: Path, expected_revision: str) -> str:
     if revision != expected_revision:
         raise VerificationError(
             f"ordinary-program SDK revision mismatch: stamp has {revision}, "
-            f"but PSoXide checkout is {expected_revision}; run 'make quake-disc'"
+            f"but PSoXide checkout is {expected_revision}; run 'make disc'"
         )
     return revision
 
