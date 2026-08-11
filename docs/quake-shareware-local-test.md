@@ -10,18 +10,16 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `8d5a6815091adfa6abc597d14843fce8d4938879` |
+| Quake source revision | `396b861b3f8d293bbaf61775252df684ffb6aed4` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
-| Input bin SHA-256 | `ac1109b6e172ee157e601563b34b4bd1e236ecba4131f7c4029327b1029021c4` |
-| Default source checkout | sibling `quake-psx-convergence` |
+| Input bin SHA-256 | `039ac161d6e3a8b6c9fcca2887f2e1e5ee2153f2772ca8001c302428d919dab4` |
+| Default source checkout | sibling `quake-psx-episode1-next-gate` |
 | Default input cue | `dist/quake-psx.cue` in that checkout |
 
-This is the validated integration pin available while the Episode 1 runtime
-lane continues. It is not a promise that `8d5a681` is the final Quake payload.
-After that lane produces its next clean checkpoint, update the full revision
-and both input hashes together, rebuild the combined image, regenerate the
-receipt, and rerun the two-pass headless gate before calling the demo-disc
-payload current.
+This pin contains the first real-map Episode 1 combat checkpoint. Any later
+Quake checkpoint must update the full revision and both input hashes together,
+rebuild the combined image, regenerate the receipt, and rerun the two-pass
+headless gate before the demo-disc payload is called current.
 
 The verifier requires the source checkout to be clean and at the full pinned
 revision. It requires the cue and bin hashes to match, the cue to describe one
