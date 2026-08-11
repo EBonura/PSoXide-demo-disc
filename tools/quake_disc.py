@@ -223,7 +223,7 @@ def verify_embedded_image(demo_bin: Path, quake_bin: Path, lba_offset: int) -> i
                 raise VerificationError(
                     f"{demo_bin}: embedded Quake image ends at sector {sector} of {sectors}"
                 )
-            if expected[:12] != actual[:12] or expected[16:] != actual[16:]:
+            if expected[:12] != actual[:12] or expected[15:] != actual[15:]:
                 raise VerificationError(
                     f"{demo_bin}: embedded Quake sector {sector} differs outside relocated MSF bytes"
                 )

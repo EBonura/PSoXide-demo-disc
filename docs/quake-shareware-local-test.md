@@ -16,6 +16,13 @@ The default contract is:
 | Default source checkout | sibling `quake-psx-convergence` |
 | Default input cue | `dist/quake-psx.cue` in that checkout |
 
+This is the validated integration pin available while the Episode 1 runtime
+lane continues. It is not a promise that `8d5a681` is the final Quake payload.
+After that lane produces its next clean checkpoint, update the full revision
+and both input hashes together, rebuild the combined image, regenerate the
+receipt, and rerun the two-pass headless gate before calling the demo-disc
+payload current.
+
 The verifier requires the source checkout to be clean and at the full pinned
 revision. It requires the cue and bin hashes to match, the cue to describe one
 Mode 2 data track, the bin to use whole 2,352-byte sectors, and a PS-X EXE to
@@ -50,7 +57,7 @@ PSoXide Demo Disc Quake Shareware/
 The JSON receipt records the exact Quake source revision, input cue/bin hashes,
 combined cue/bin hashes, Quake table entry and LBA relocation, and the number of
 embedded Quake data sectors. Receipt generation also compares every embedded
-Quake sector against the pinned input. Only the four BCD MSF address bytes that
+Quake sector against the pinned input. Only the three BCD MSF address bytes that
 `mkdisc` must relocate may differ.
 
 An explicit checkout and image can be supplied, but all expected provenance
