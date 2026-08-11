@@ -36,6 +36,18 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 #   make disc HL=1   -> "PSoXide Demo Disc HL"  (the same disc plus Half-Life)
 # The names differ so the two bins cannot be mistaken for each other. Both
 # carry Quake shareware; HL=1 adds to the default disc, it does not replace it.
+#
+# Adding Quake to the Half-Life pressing was the size question. Measured
+# 2026-08-11 from one tree with one set of inputs, in 2352-byte sectors:
+#
+#   default, no Quake   86928   19:19:03   195.0 MiB
+#   default             96393   21:25:18   216.2 MiB
+#   HL, no Quake       291416   64:45:41   653.7 MiB
+#   HL                 300881   66:51:56   674.9 MiB
+#
+# Quake costs 9465 sectors either way. The HL pressing lands at 83.6% of an
+# 80-minute CD-R (359999 sectors), 59118 spare, and still fits a 74-minute
+# blank with 32119 to spare. Nothing had to be dropped to make room.
 HL ?=
 # HL=0 means off, not "0 is a non-empty string, so on".
 override HL := $(filter-out 0,$(HL))
