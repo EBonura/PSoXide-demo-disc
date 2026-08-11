@@ -745,15 +745,149 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
         self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
 
-    def test_distribution_targets_contain_explicit_quake_guards(self) -> None:
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn(
-            "release-web: Quake shareware needs separate legal and release approval",
-            makefile,
+    def test_distribution_targets_are_blocked_before_they_build_anything(self) -> None:
+        blocked = run(
+            "make", "--no-print-directory", "publication-block", cwd=ROOT, check=False
         )
-        self.assertIn(
-            "itch: Quake shareware needs separate legal and release approval", makefile
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("publication is blocked", blocked.stdout)
+        self.assertIn("Quake 1.06 shareware data", blocked.stdout)
+
+        for target, upload in (("release-web", "gh release"), ("itch", "butler push")):
+            with self.subTest(target=target):
+                dry = run(
+                    "make",
+                    "-n",
+                    "--no-print-directory",
+                    target,
+                    "DIST=/tmp/psoxide-quake-contract",
+                    cwd=ROOT,
+                    check=False,
+                )
+                block_at = dry.stdout.index("publication is blocked")
+                self.assertLess(block_at, dry.stdout.index("exit 1"))
+                self.assertLess(block_at, dry.stdout.index(upload))
+
+
+class FailClosedDefaultTests(unittest.TestCase):
+    """Every way a Quake payload can be wrong has to stop the default path."""
+
+    def verify(
+        self, fixture: QuakeFixture, **overrides: str
+    ) -> subprocess.CompletedProcess[str]:
+        assignments = {
+            "PSOXIDE": str(fixture.psoxide),
+            "BUILD": str(fixture.programs_stamp.parent),
+            "QUAKE_SRC": str(fixture.source),
+            "QUAKE_EXPECTED_REV": fixture.revision,
+            "QUAKE_EXPECTED_PSOXIDE_REV": fixture.psoxide_revision,
+            "QUAKE_EXPECTED_PROVENANCE_SHA256": digest(fixture.provenance),
+            "QUAKE_EXPECTED_CUE_SHA256": digest(fixture.cue),
+            "QUAKE_EXPECTED_BIN_SHA256": digest(fixture.bin),
+            "QUAKE_EXPECTED_EXE_SHA256": digest(fixture.exe),
+        }
+        assignments.update(overrides)
+        return run(
+            "make",
+            "--no-print-directory",
+            "quake-verify",
+            *(f"{key}={value}" for key, value in assignments.items()),
+            cwd=ROOT,
+            check=False,
         )
+
+    def test_a_correct_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            passing = self.verify(fixture)
+            self.assertEqual(passing.returncode, 0, passing.stdout + passing.stderr)
+
+    def test_absent_stale_dirty_and_mispinned_payloads_all_fail(self) -> None:
+        cases = (
+            ("absent", {"QUAKE_SRC": "/nonexistent/quake"}, None, "does not exist"),
+            (
+                "stale quake pin",
+                {"QUAKE_EXPECTED_REV": "0" * 40},
+                None,
+                "Quake source checkout revision mismatch",
+            ),
+            (
+                "wrong psoxide pin",
+                {"QUAKE_EXPECTED_PSOXIDE_REV": "0" * 40},
+                None,
+                "PSoXide checkout revision mismatch",
+            ),
+            (
+                "stale artifact hash",
+                {"QUAKE_EXPECTED_BIN_SHA256": "0" * 64},
+                None,
+                "bin SHA-256 mismatch",
+            ),
+            (
+                "dirty quake checkout",
+                {},
+                lambda fixture: (fixture.source / "tracked.txt").write_text(
+                    "changed\n", encoding="ascii"
+                ),
+                "Quake source checkout is dirty",
+            ),
+            (
+                "dirty psoxide checkout",
+                {},
+                lambda fixture: (fixture.psoxide / "sdk.txt").write_text(
+                    "changed\n", encoding="ascii"
+                ),
+                "PSoXide checkout is dirty",
+            ),
+            (
+                "stale ordinary programs",
+                {},
+                lambda fixture: fixture.programs_stamp.write_text(
+                    "0" * 40 + "\n", encoding="ascii"
+                ),
+                "ordinary-program SDK revision mismatch",
+            ),
+            (
+                "missing program stamp",
+                {},
+                lambda fixture: fixture.programs_stamp.unlink(),
+                "revision stamp does not exist",
+            ),
+        )
+        for label, overrides, mutate, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                if mutate is not None:
+                    mutate(fixture)
+                failed = self.verify(fixture, **overrides)
+                self.assertNotEqual(failed.returncode, 0, failed.stdout)
+                self.assertIn(error, failed.stderr)
+
+    def test_the_ordinary_check_runs_the_quake_pin_check(self) -> None:
+        checked = run(
+            "make", "-n", "--no-print-directory", "check", cwd=ROOT, check=False
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertIn("tools/quake_disc.py verify", checked.stdout)
+
+    def test_layout_cannot_start_before_the_payload_is_verified(self) -> None:
+        laid_out = run(
+            "make",
+            "-n",
+            "--no-print-directory",
+            "disc-only",
+            "DIST=/tmp/psoxide-quake-contract",
+            cwd=ROOT,
+            check=False,
+        )
+        self.assertEqual(laid_out.returncode, 0, laid_out.stderr)
+        stamp_at = laid_out.stdout.index("programs.psoxide-revision")
+        verify_at = laid_out.stdout.index("tools/quake_disc.py verify")
+        layout_at = laid_out.stdout.index('--image "QUAKE SHAREWARE=')
+        receipt_at = laid_out.stdout.index("tools/quake_disc.py receipt")
+        self.assertLess(stamp_at, verify_at)
+        self.assertLess(verify_at, layout_at)
+        self.assertLess(layout_at, receipt_at)
 
 
 class HeadlessChainloadTests(unittest.TestCase):

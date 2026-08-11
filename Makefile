@@ -418,6 +418,21 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
 
 
+# Every pressing carries Quake 1.06 shareware data now, so both distribution
+# paths stop before they build anything. Redistributing that data is a separate
+# owner decision and it has not been made.
+#
+# This is a prerequisite rather than a line inside each recipe so it cannot be
+# reached around: `make itch` fails before butler is even looked for. When the
+# owner grants redistribution, drop the prerequisite from the two targets.
+# Local builds and burns are unaffected -- `make disc` is the supported path.
+.PHONY: publication-block
+publication-block:
+	@echo "publication is blocked: every pressing carries Quake 1.06 shareware data,"
+	@echo "and redistributing it needs a separate owner decision that has not been"
+	@echo "made. Build and burn locally with 'make disc'."
+	@exit 1
+
 # Keep the browser emulator's copy current. PSoXide's Pages deploy stages
 # these files from the rolling `web-disc` release next to the wasm, and the
 # frontend streams them on demand; the cue's FILE line is rewritten to the
@@ -429,9 +444,8 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 # runs in.
 WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
-release-web:
+release-web: publication-block
 	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
-	@test -z "$(QUAKE)" || { echo "release-web: Quake shareware needs separate legal and release approval"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
@@ -451,16 +465,20 @@ release-web:
 # one-time `butler login`. The HL pressing is never distributed -- the music
 # permission is scoped to the disc without it.
 .PHONY: itch
-itch:
+itch: publication-block
 	@test -z "$(HL)" || { echo "itch: the HL pressing is never distributed"; exit 1; }
-	@test -z "$(QUAKE)" || { echo "itch: Quake shareware needs separate legal and release approval"; exit 1; }
 	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/itch" && mkdir -p "$(BUILD)/itch"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(DIST)/$(DISC_NAME).cue" release/README.txt "$(BUILD)/itch/"
 	butler push --userversion "$(DISC_VERSION)" "$(BUILD)/itch" bonnie-studios/psoxide-demo-disc:psx
 
-check: sdk-coherence check-locks
+# The Quake pin check is part of the ordinary check, not a lane of its own: a
+# tree whose pinned Quake payload is missing, stale, dirty, or built against a
+# different PSoXide cannot press a disc, so it should not pass its tests either.
+# The chain-load half of the proof needs a built disc and lives in
+# `make quake-headless-check`.
+check: sdk-coherence check-locks quake-verify
 	cd carousel && cargo test
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
