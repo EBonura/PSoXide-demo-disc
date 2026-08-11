@@ -73,6 +73,8 @@ class QuakeFixture:
         dist.mkdir()
         self.cue = dist / "quake-psx.cue"
         self.bin = dist / "quake-psx.bin"
+        self.exe = dist / "quake-psx.exe"
+        self.provenance = dist / "quake-psx.provenance.json"
         image = bytearray(24 * quake_disc.SECTOR_BYTES)
         boot_at = quake_disc.BOOT_EXE_LBA * quake_disc.SECTOR_BYTES + 24
         image[boot_at : boot_at + len(quake_disc.PSX_EXE_MAGIC)] = (
@@ -85,6 +87,57 @@ class QuakeFixture:
             "    INDEX 01 00:00:00\n",
             encoding="ascii",
         )
+        self.exe.write_bytes(b"PS-X EXE\0fixture")
+        self.write_provenance()
+        self.provenance_sha256 = digest(self.provenance)
+
+    def provenance_document(self) -> dict[str, object]:
+        return {
+            "schema": quake_disc.QUAKE_PROVENANCE_SCHEMA,
+            "quake_source": {"revision": self.revision, "tree_clean": True},
+            "psoxide": {
+                "revision": self.psoxide_revision,
+                "tree_clean": True,
+                "source_kind": quake_disc.PSOXIDE_SOURCE_KIND,
+            },
+            "shareware": {
+                "pak0_sha256": quake_disc.SHAREWARE_PAK_SHA256,
+                "pak0_bytes": quake_disc.SHAREWARE_PAK_BYTES,
+            },
+            "build": {
+                "guest_stage_schema": quake_disc.GUEST_STAGE_SCHEMA,
+                "guest_recipe_sha256": "1" * 64,
+                "rust_toolchain_sha256": "2" * 64,
+                "rustc_version": "rustc fixture\nrelease: fixture",
+                "cargo_version": "cargo fixture\nrelease: fixture",
+                "profile": quake_disc.BUILD_PROFILE,
+                "features": [],
+            },
+            "artifacts": {
+                "cue": {
+                    "file": self.cue.name,
+                    "sha256": digest(self.cue),
+                    "bytes": self.cue.stat().st_size,
+                },
+                "bin": {
+                    "file": self.bin.name,
+                    "sha256": digest(self.bin),
+                    "bytes": self.bin.stat().st_size,
+                },
+                "exe": {
+                    "file": self.exe.name,
+                    "sha256": digest(self.exe),
+                    "bytes": self.exe.stat().st_size,
+                },
+            },
+        }
+
+    def write_provenance(self, document: dict[str, object] | None = None) -> None:
+        if document is None:
+            document = self.provenance_document()
+        self.provenance.write_text(
+            json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="ascii"
+        )
 
     def verify(self) -> quake_disc.VerifiedQuake:
         return quake_disc.verify_quake(
@@ -92,10 +145,13 @@ class QuakeFixture:
             self.psoxide,
             self.programs_stamp,
             self.cue,
+            self.provenance,
             self.revision,
             self.psoxide_revision,
+            self.provenance_sha256,
             digest(self.cue),
             digest(self.bin),
+            digest(self.exe),
         )
 
     def commit_quake_declaration(self, declaration: str) -> None:
@@ -182,10 +238,13 @@ class VerifyQuakeTests(unittest.TestCase):
                     fixture.psoxide,
                     fixture.programs_stamp,
                     fixture.cue,
+                    fixture.provenance,
                     "0" * 40,
                     fixture.psoxide_revision,
+                    fixture.provenance_sha256,
                     digest(fixture.cue),
                     digest(fixture.bin),
+                    digest(fixture.exe),
                 )
 
     def test_rejects_dirty_source(self) -> None:
@@ -261,10 +320,13 @@ class VerifyQuakeTests(unittest.TestCase):
                     fixture.psoxide,
                     fixture.programs_stamp,
                     fixture.cue,
+                    fixture.provenance,
                     fixture.revision,
                     fixture.psoxide_revision,
+                    fixture.provenance_sha256,
                     digest(fixture.cue),
                     expected_bin_hash,
+                    digest(fixture.exe),
                 )
 
     def test_rejects_cue_that_escapes_its_directory(self) -> None:
@@ -278,6 +340,170 @@ class VerifyQuakeTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(quake_disc.VerificationError, "beside the cue"):
                 fixture.verify()
+
+    def test_rejects_missing_malformed_and_duplicate_key_sidecars(self) -> None:
+        cases = (
+            ("missing", None, "sidecar does not exist"),
+            ("malformed", "{", "cannot parse"),
+            ("duplicate", '{"schema": 1, "schema": 1}', "duplicate key"),
+        )
+        for label, contents, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                if contents is None:
+                    fixture.provenance.unlink()
+                else:
+                    fixture.provenance.write_text(contents, encoding="ascii")
+                with self.assertRaisesRegex(quake_disc.VerificationError, error):
+                    fixture.verify()
+
+    def test_rejects_sidecar_not_beside_cue_with_exact_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            alternate = fixture.cue.parent / "shipping.json"
+            fixture.provenance.replace(alternate)
+            fixture.provenance = alternate
+            with self.assertRaisesRegex(
+                quake_disc.VerificationError, "must be beside the cue and named"
+            ):
+                fixture.verify()
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = QuakeFixture(root)
+            elsewhere = root / "elsewhere"
+            elsewhere.mkdir()
+            alternate = elsewhere / fixture.provenance.name
+            fixture.provenance.replace(alternate)
+            fixture.provenance = alternate
+            with self.assertRaisesRegex(
+                quake_disc.VerificationError, "must be beside the cue and named"
+            ):
+                fixture.verify()
+
+    def test_rejects_stale_sidecar_revisions_and_source_kind(self) -> None:
+        cases = (
+            (
+                "quake revision",
+                lambda document: document["quake_source"].__setitem__(
+                    "revision", "0" * 40
+                ),
+                "provenance Quake revision mismatch",
+            ),
+            (
+                "psoxide revision",
+                lambda document: document["psoxide"].__setitem__("revision", "0" * 40),
+                "provenance PSoXide revision mismatch",
+            ),
+            (
+                "source kind",
+                lambda document: document["psoxide"].__setitem__(
+                    "source_kind", "remote"
+                ),
+                "source kind",
+            ),
+            (
+                "dirty claim",
+                lambda document: document["quake_source"].__setitem__(
+                    "tree_clean", False
+                ),
+                "clean Quake source tree",
+            ),
+        )
+        for label, mutate, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                document = fixture.provenance_document()
+                mutate(document)
+                fixture.write_provenance(document)
+                with self.assertRaisesRegex(quake_disc.VerificationError, error):
+                    fixture.verify()
+
+    def test_rejects_wrong_shareware_and_nonshipping_build_contracts(self) -> None:
+        cases = (
+            (
+                "pak hash",
+                lambda document: document["shareware"].__setitem__(
+                    "pak0_sha256", "0" * 64
+                ),
+                "canonical Quake 1.06 shareware",
+            ),
+            (
+                "pak size",
+                lambda document: document["shareware"].__setitem__("pak0_bytes", 1),
+                "canonical Quake 1.06 shareware",
+            ),
+            (
+                "recipe missing",
+                lambda document: document["build"].pop("guest_recipe_sha256"),
+                "missing required field",
+            ),
+            (
+                "toolchain malformed",
+                lambda document: document["build"].__setitem__(
+                    "rust_toolchain_sha256", "not-a-hash"
+                ),
+                "Rust toolchain SHA-256",
+            ),
+            (
+                "profile",
+                lambda document: document["build"].__setitem__("profile", "dev"),
+                "release profile",
+            ),
+            (
+                "features",
+                lambda document: document["build"].__setitem__(
+                    "features", ["emulator-telemetry"]
+                ),
+                "release profile",
+            ),
+        )
+        for label, mutate, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                document = fixture.provenance_document()
+                mutate(document)
+                fixture.write_provenance(document)
+                with self.assertRaisesRegex(quake_disc.VerificationError, error):
+                    fixture.verify()
+
+    def test_rejects_artifact_name_size_hash_and_byte_drift(self) -> None:
+        cases = (
+            (
+                "exe basename",
+                lambda fixture, document: document["artifacts"]["exe"].__setitem__(
+                    "file", fixture.bin.name
+                ),
+                "names .* expected",
+            ),
+            (
+                "cue size",
+                lambda fixture, document: document["artifacts"]["cue"].__setitem__(
+                    "bytes", fixture.cue.stat().st_size + 1
+                ),
+                "byte-size mismatch",
+            ),
+            (
+                "bin sidecar hash",
+                lambda fixture, document: document["artifacts"]["bin"].__setitem__(
+                    "sha256", "0" * 64
+                ),
+                "artifacts.bin SHA-256 mismatch",
+            ),
+            (
+                "exe bytes",
+                lambda fixture, document: fixture.exe.write_bytes(b"changed"),
+                "artifacts.exe.*mismatch",
+            ),
+        )
+        for label, mutate, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                document = fixture.provenance_document()
+                mutate(fixture, document)
+                fixture.write_provenance(document)
+                with self.assertRaisesRegex(quake_disc.VerificationError, error):
+                    fixture.verify()
 
     def test_receipt_hashes_input_and_output_and_keeps_legal_gate(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -319,13 +545,21 @@ class VerifyQuakeTests(unittest.TestCase):
             )
             self.assertEqual(
                 receipt["quake_artifact_sdk_provenance"]["status"],
-                "source-contract-only",
+                "sidecar-bound",
             )
-            self.assertIn(
-                "build sidecar",
-                receipt["quake_artifact_sdk_provenance"]["required_follow_up"],
+            self.assertEqual(receipt["schema"], 3)
+            self.assertEqual(
+                receipt["quake_artifact_sdk_provenance"]["build"][
+                    "guest_recipe_sha256"
+                ],
+                "1" * 64,
             )
             self.assertEqual(receipt["quake_input"]["bin_sha256"], digest(fixture.bin))
+            self.assertEqual(receipt["quake_input"]["exe_sha256"], digest(fixture.exe))
+            self.assertEqual(
+                receipt["quake_input"]["provenance_sha256"],
+                digest(fixture.provenance),
+            )
             self.assertEqual(
                 receipt["demo_disc_output"]["bin_sha256"], digest(demo_bin)
             )
@@ -419,13 +653,16 @@ class MakeVariantContractTests(unittest.TestCase):
         quake = self.dry_run("QUAKE=1")
         self.assertEqual(quake.returncode, 0, quake.stderr)
         self.assertIn('--image "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn('--version-of "QUAKE SHAREWARE=q1fd5173"', quake.stdout)
+        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', quake.stdout)
         self.assertIn('--describe "QUAKE SHAREWARE=', quake.stdout)
         self.assertIn("tools/quake_disc.py verify", quake.stdout)
         self.assertIn("tools/quake_disc.py receipt", quake.stdout)
         self.assertIn('--psoxide "', quake.stdout)
         self.assertIn('--programs-psoxide-stamp "', quake.stdout)
         self.assertIn('--expected-psoxide-revision "', quake.stdout)
+        self.assertIn('--provenance "', quake.stdout)
+        self.assertIn('--expected-provenance-sha256 "', quake.stdout)
+        self.assertIn('--expected-exe-sha256 "', quake.stdout)
         self.assertIn("PSoXide Demo Disc Quake Shareware.bin", quake.stdout)
 
     def test_full_quake_build_checks_sdk_coherence_after_programs(self) -> None:
@@ -443,6 +680,8 @@ class MakeVariantContractTests(unittest.TestCase):
         coherence_at = quake.stdout.index('expected="local:')
         stamp_at = quake.stdout.index("programs.psoxide-revision.tmp")
         verify_at = quake.stdout.index("tools/quake_disc.py verify")
+        self.assertIn(f"DIST={ROOT}/games/voxide/dist", quake.stdout)
+        self.assertIn(f"DIST={ROOT}/games/gh-psx/dist", quake.stdout)
         self.assertLess(programs_at, coherence_at)
         self.assertLess(coherence_at, stamp_at)
         self.assertLess(stamp_at, verify_at)

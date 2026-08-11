@@ -40,21 +40,24 @@ HL ?=
 override HL := $(filter-out 0,$(HL))
 
 # Quake shareware is a separate local/test pressing. It is intentionally not
-# part of either the public or Half-Life variants. The source revision and both
-# input hashes are checked before layout, and the combined image gets a
-# machine-readable provenance receipt beside it.
+# part of either the public or Half-Life variants. The source revision,
+# shipping provenance, and all artifact hashes are checked before layout. The
+# combined image gets a machine-readable provenance receipt beside it.
 #
 # The default paths name the validated convergence checkout. A caller can use
-# another checkout or cue, but must also state the revision and hashes expected
-# from it. The verifier fails closed if any one of them differs.
+# another checkout or artifact set, but must also state the revision, sidecar,
+# and hashes expected from it. The verifier fails closed if any one differs.
 QUAKE ?=
 override QUAKE := $(filter-out 0,$(QUAKE))
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-combat-adversarial-review)
-QUAKE_CUE ?= $(QUAKE_SRC)/build-psoxide/quake-psx.cue
-QUAKE_EXPECTED_REV ?= 1fd5173a656cb209b4a10bcbb37d34cc4a0650b0
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-build-provenance)
+QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
+QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
+QUAKE_EXPECTED_REV ?= 2d26f9eeb624a562ba00f4ced121b740fd61d4bf
 QUAKE_EXPECTED_PSOXIDE_REV ?= f9f83c35b140560c123771893a1fc3e426814550
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= f3f1cf7a837b640af3efba22dee505f581cfea91eb21b6795af734d8dacebc31
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 5f5316381763ca54783818097e228762667d6d99e70dd42af04cddd1216c21c1
+QUAKE_EXPECTED_BIN_SHA256 ?= 76cb839698d69c697116d4ab65112869d80c2d959b53ef40c09479a6490d00b8
+QUAKE_EXPECTED_EXE_SHA256 ?= ad4464f6dd64b1132cded9fd5d539724d7c2805b54a5c4ea05e183657049fc56
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
@@ -180,11 +183,11 @@ examples:
 # pin is overridden here and all eleven programs come off the submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
-	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PSOXIDE)
+	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PSOXIDE) DIST=$(GAMES)/voxide/dist
 	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
 	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PSOXIDE)
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PSOXIDE)
-	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PSOXIDE)
+	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PSOXIDE) DIST=$(GAMES)/gh-psx/dist
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
@@ -317,10 +320,13 @@ quake-verify:
 		--psoxide "$(PSOXIDE)" \
 		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
+		--provenance "$(QUAKE_PROVENANCE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
 		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
+		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
-		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)"
+		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
+		--expected-exe-sha256 "$(QUAKE_EXPECTED_EXE_SHA256)"
 
 # Menu backdrops: the same in-game captures the itch pages use, cooked from
 # assets/shots into the 8bpp CLUT blobs the launcher uploads to VRAM.
@@ -409,10 +415,13 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--psoxide "$(PSOXIDE)" \
 		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
+		--provenance "$(QUAKE_PROVENANCE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
 		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
+		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
 		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
+		--expected-exe-sha256 "$(QUAKE_EXPECTED_EXE_SHA256)" \
 		--demo-cue "$(DIST)/$(DISC_NAME).cue" \
 		--demo-bin "$(DIST)/$(DISC_NAME).bin" \
 		--out "$(DIST)/$(DISC_NAME).quake-provenance.json")

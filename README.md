@@ -24,7 +24,10 @@ make quake-disc-only  # reuse built programs and add the pinned Quake image
 It writes `PSoXide Demo Disc Quake Shareware.{bin,cue}` to a separate library
 directory, so it cannot overwrite either release pressing. It is not a public
 release target. The reuse and headless paths require a full-build PSoXide
-revision stamp, so stale ordinary-program artifacts fail closed. See
+revision stamp, so stale ordinary-program artifacts fail closed. The Quake
+input also requires its schema-1 shipping sidecar, which binds the clean Quake
+and PSoXide revisions, canonical shareware PAK, guest recipe and toolchain, and
+actual cue/bin/EXE bytes. See
 [the Quake local/test runbook](docs/quake-shareware-local-test.md).
 
 ## How it boots

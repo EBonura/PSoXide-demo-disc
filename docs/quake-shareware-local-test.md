@@ -10,33 +10,43 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `1fd5173a656cb209b4a10bcbb37d34cc4a0650b0` |
+| Quake source revision | `2d26f9eeb624a562ba00f4ced121b740fd61d4bf` |
 | Quake-declared PSoXide revision | `f9f83c35b140560c123771893a1fc3e426814550` |
+| Shipping provenance sidecar | `dist/quake-psx.provenance.json` |
+| Sidecar SHA-256 | `f3f1cf7a837b640af3efba22dee505f581cfea91eb21b6795af734d8dacebc31` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
-| Input bin SHA-256 | `5f5316381763ca54783818097e228762667d6d99e70dd42af04cddd1216c21c1` |
-| Default source checkout | sibling `quake-psx-combat-adversarial-review` |
-| Default input cue | `build-psoxide/quake-psx.cue` in that checkout |
+| Input bin SHA-256 | `76cb839698d69c697116d4ab65112869d80c2d959b53ef40c09479a6490d00b8` |
+| Input EXE SHA-256 | `ad4464f6dd64b1132cded9fd5d539724d7c2805b54a5c4ea05e183657049fc56` |
+| Guest recipe SHA-256 | `45bbc05f57cb18100c5061b9f9f8b7a1827bedd1134ff7698c2ad5aca9cc4676` |
+| Default source checkout | sibling `quake-psx-build-provenance` |
+| Default input cue | `dist/quake-psx.cue` in that checkout |
 
 This pin contains the adversarially reviewed real-map Episode 1 combat
-checkpoint. It corrects canonical monster profile bounds and mover broadphase
-culling, and adds hostile-map regressions before recording the final validation.
-Any later Quake checkpoint must update the full revision and both input hashes
+checkpoint and its reproducible shipping builder. The builder projects the
+guest source into a content-addressed canonical stage, isolates shipping Cargo
+inputs, rejects ambient build overrides, and emits the schema-1 sidecar consumed
+here. Two clean checkouts at different absolute paths produced byte-identical
+EXE, BIN, CUE, and sidecar outputs at this pin.
+Any later Quake checkpoint must update the full revision and every pinned hash
 together, rebuild the combined image, regenerate the receipt, and rerun the
 two-pass headless gate before the demo-disc payload is called current.
 
-The PSoXide value above records this Quake checkpoint's existing declaration;
-it is not a choice of the eventual convergence pin. This demo-disc checkout's
-PSoXide submodule is still at `f9f520e1e7ce7d3553ecb3e83f6b66219468f5da`,
-so the opt-in verifier intentionally fails until the Quake declaration, its
-artifact hashes, and the demo-disc submodule are repinned as one reviewed set.
+The demo-disc PSoXide submodule, Quake's source declaration, and Quake's
+shipping sidecar all name `f9f83c35b140560c123771893a1fc3e426814550`.
+The ordinary demo-disc programs must be rebuilt from that same clean revision
+before the Quake layout step records its revision stamp.
 
 The verifier requires both the Quake source and the explicitly supplied
 PSoXide checkout to be clean repository roots at their full expected
 revisions. It reads the single `PSOXIDE_REV` declaration from Quake's build
 driver and requires that declaration to equal the PSoXide checkout's exact
-HEAD. It also requires the cue and bin hashes to match, the cue to describe one
-Mode 2 data track, the bin to use whole 2,352-byte sectors, and a PS-X EXE to
-exist at the boot LBA expected by `mkdisc`.
+HEAD. The sidecar must then repeat both clean revisions, identify a local
+PSoXide checkout and the canonical Quake 1.06 shareware PAK, record the
+content-addressed guest recipe and Rust/Cargo identities, and declare a release
+build with no extra features. Its cue, bin, and EXE basenames, byte sizes, and
+SHA-256 values are checked against the actual files. The cue must describe one
+Mode 2 data track, the bin must use whole 2,352-byte sectors, and a PS-X EXE
+must exist at the boot LBA expected by `mkdisc`.
 
 Quake's downloaded `quake106.zip`, `PAK0.PAK`, cooked `WORLD.PAK`, and generated
 disc images remain untracked. The demo-disc repository commits none of them.
@@ -76,40 +86,38 @@ PSoXide Demo Disc Quake Shareware/
   PSoXide Demo Disc Quake Shareware.quake-provenance.json
 ```
 
-The JSON receipt records the exact clean Quake and PSoXide revisions, Quake's
-declared PSoXide revision, the ordinary-program revision stamp, input cue/bin
-hashes, combined cue/bin hashes, Quake table entry and LBA relocation, and the
-number of embedded Quake data sectors. Receipt generation also compares every
+Receipt schema 3 records the exact clean Quake and PSoXide revisions, Quake's
+declared PSoXide revision, the ordinary-program revision stamp, the complete
+shipping-build contract, input provenance/cue/bin/EXE hashes and sizes,
+combined cue/bin hashes, Quake table entry and LBA relocation, and the number
+of embedded Quake data sectors. Receipt generation also compares every
 embedded Quake sector against the pinned input. Only the three BCD MSF address
 bytes that `mkdisc` must relocate may differ.
 
-This cross-revision gate proves that Quake's source contract matches the clean
-PSoXide checkout used to rebuild the rest of the disc. It does not prove that
-the already-generated Quake cue was built from that checkout. The current
-Quake builder persists a hydration stamp, but it does not emit a sidecar bound
-to the cue and bin hashes. Receipt schema 2 records that boundary explicitly.
-Before the eventual pin can be called artifact-complete, the Quake build must
-emit and this verifier must consume a sidecar binding the Quake source
-revision, PSoXide revision, and cue/bin hashes.
-
 An explicit checkout and image can be supplied, but all expected provenance
-must travel with it:
+must travel with it. The sidecar must remain beside the cue and be named from
+the cue stem exactly as shown:
 
 ```bash
 make quake-disc-only \
   PSOXIDE=/absolute/path/to/PSoXide \
   QUAKE_SRC=/absolute/path/to/quake-psx \
   QUAKE_CUE=/absolute/path/to/quake-psx.cue \
+  QUAKE_PROVENANCE=/absolute/path/to/quake-psx.provenance.json \
   QUAKE_EXPECTED_REV=<full-40-character-git-revision> \
   QUAKE_EXPECTED_PSOXIDE_REV=<full-40-character-git-revision> \
+  QUAKE_EXPECTED_PROVENANCE_SHA256=<64-character-sha256> \
   QUAKE_EXPECTED_CUE_SHA256=<64-character-sha256> \
-  QUAKE_EXPECTED_BIN_SHA256=<64-character-sha256>
+  QUAKE_EXPECTED_BIN_SHA256=<64-character-sha256> \
+  QUAKE_EXPECTED_EXE_SHA256=<64-character-sha256>
 ```
 
-Missing files, either dirty or different source revision, a missing or
-malformed Quake `PSOXIDE_REV`, cross-revision mismatch, a changed hash, an
-unsafe cue path, a malformed disc image, a missing menu entry, or embedded
-payload drift stops the build.
+Missing or malformed sidecars, duplicate JSON keys, unsupported schemas,
+either dirty or different source revision, a missing or malformed Quake
+`PSOXIDE_REV`, cross-revision mismatch, noncanonical shareware, a nonshipping
+build configuration, a changed artifact name/size/hash, an unsafe cue path, a
+malformed disc image, a missing menu entry, or embedded payload drift stops the
+build.
 
 ## Variant isolation and release gate
 
@@ -129,10 +137,13 @@ payload drift stops the build.
 `make check` runs the Quake verifier tests in addition to the existing Rust
 test suites. The tests cover:
 
-- exact revision and image acceptance;
+- exact revision, sidecar, build recipe, shareware, and artifact acceptance;
+- missing/malformed/duplicate-key/stale sidecars;
+- wrong source kind, shareware identity, build profile/features, guest recipe,
+  toolchain identity, artifact basename, size, hash, and bytes;
 - wrong revision, dirty Quake or PSoXide source, malformed declaration,
   cross-revision mismatch, changed bin, and unsafe cue rejection;
-- receipt hashes and legal gate;
+- receipt schema 3, shipping-build facts, hashes, and legal gate;
 - table-entry and embedded-sector verification;
 - unchanged default and Half-Life dry-run recipes when Quake is off;
 - Quake-only metadata, whole-image argument, verifier, receipt, separate name,
