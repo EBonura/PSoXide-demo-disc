@@ -3,60 +3,22 @@
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
-The pressed disc is on
-[itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc), and the
-[PSoXide page](https://bonnie-studios.itch.io/psoxide) runs this exact image
-in your browser, menu music and all: the emulator streams the data track
-first and pulls the CD audio in behind it.
-
 ```bash
 make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
-make check     # host tests
+make check     # host tests, including the Quake pin check
 ```
 
-## Repinning Quake
+## Publication is blocked
 
-Six values in the Makefile and one submodule pointer are the whole Quake
-contract. They all come out of a built Quake tree, and `make quake-repin`
-measures them:
+The disc carries Quake 1.06 shareware data, so building it and publishing it
+are now different questions. Building it locally, and burning it, is what this
+repo does. Publishing or redistributing the combined image is a separate owner
+decision that has **not** been made, and `make release-web` and `make itch`
+fail before they build anything until it is.
 
-```bash
-make quake-repin                          # from the default QUAKE_SRC
-make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
-```
-
-It prints, and writes nothing:
-
-```
-QUAKE_EXPECTED_REV ?= <the Quake tree's HEAD>
-QUAKE_EXPECTED_PSOXIDE_REV ?= <the PSOXIDE_REV that tree declares>
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= <dist/quake-psx.provenance.json>
-QUAKE_EXPECTED_CUE_SHA256 ?= <dist/quake-psx.cue>
-QUAKE_EXPECTED_BIN_SHA256 ?= <dist/quake-psx.bin>
-QUAKE_EXPECTED_EXE_SHA256 ?= <dist/quake-psx.exe>
-```
-
-Paste those six lines over the ones near the top of the `Makefile`, then:
-
-1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
-   games/PSoXide` -- the Quake tree names the SDK it was built against, and
-   the disc has to be on that same revision or `quake-verify` refuses.
-2. `make disc` -- rebuilds every program against that SDK, re-verifies the
-   Quake input, and writes the provenance receipt beside the image.
-3. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
-   `EXPECTED_DISPLAY_FNV` in `tools/check_quake_headless.py` fail, the error
-   prints the values the new build produced. Those two are the only pins
-   outside the Makefile. Paste them in and run it again, so a green run is
-   the proof rather than the edit.
-
-Nothing rewrites a pin on your behalf. A repin that edited its own contract
-would be a verifier that agrees with whatever it is handed, and the diff is
-what tells a reviewer which contract moved.
-
-The Quake input also requires its schema-1 shipping sidecar, which binds the
-clean Quake and PSoXide revisions, canonical shareware PAK, guest recipe and
-toolchain, and actual cue/bin/EXE bytes. See
-[the Quake runbook](docs/quake-shareware-local-test.md).
+The copies on [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and
+in the [browser emulator](https://bonnie-studios.itch.io/psoxide) predate this
+and carry no Quake. Nothing here updates them.
 
 ## How it boots
 
@@ -102,13 +64,15 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-All eleven, each verified booting from the built disc. 521 MiB, 51 minutes, 30
-CD-DA tracks, comfortably inside an 80-minute CD-R.
+Eleven programs on the default pressing, twelve with Half-Life, each verified
+booting from the built disc. The default disc is 96393 sectors (21:25, 216
+MiB, 7 CD-DA tracks); the Half-Life pressing is 300881 (66:52, 675 MiB, 34
+CD-DA tracks), which is 84% of an 80-minute CD-R.
 
 | Program | How it ships |
 | --- | --- |
 | Cortex Ignition | whole image, 1 CD-DA track |
-| Half-Life | whole image, 27 CD-DA tracks |
+| Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
 | Voxide | whole image, WORLD.PAK assets |
 | NitroXide | whole image, WORLD.PAK arena atlas |
 | Celeste Classic Collection | bare EXE |
@@ -118,6 +82,7 @@ CD-DA tracks, comfortably inside an 80-minute CD-R.
 | Space Invaders | bare EXE |
 | Magikaaaaarp Pong | bare EXE, plays GH-PSX's track |
 | Hardware Tests | whole image, 1 CD-DA track |
+| Quake shareware | whole image, no CD-DA track |
 
 Celeste and PSXcel never read the disc after boot, so they ride as bare EXEs
 and do not care which SDK built them: a `_start` that ignores the loader's
@@ -125,10 +90,12 @@ arguments is still a correct `_start`. Voxide and NitroXide load `WORLD.PAK`
 at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
-The opt-in local/test variant adds `QUAKE SHAREWARE` as one more whole image.
-Quake streams `WORLD.PAK`, so a bare executable is not sufficient. The entry
-uses the same caller-provided LBA offset that relocates Voxide, NitroXide, and
-the other streaming programs.
+`QUAKE SHAREWARE` is the last entry on the carousel, and a default program
+rather than a variant. Quake streams `WORLD.PAK`, so a bare executable is not
+sufficient; the entry uses the same caller-provided LBA offset that relocates
+Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
+revision and by four artifact hashes, and `disc-only` refuses to lay out a
+sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
 ## The menu
 
@@ -213,8 +180,57 @@ outside the PSoXide worktree. gh-psx keeps its audio in a gitignored
 `data/audio/`, so a fresh clone needs that dropped in before `make disc` will
 get past it.
 
-Two release pressings exist: `make disc` builds the public one, and `make disc
-HL=1` adds Half-Life for show-floor demos. The `games/hl-psx` submodule is
-private until its own release, so a fresh clone should init the other
-submodules selectively and stick to the default pressing. `make quake-disc`
-is a separate local/test artifact and cannot be combined with `HL=1`.
+Two pressings exist. `make disc` builds the default one; `make disc HL=1`
+builds the same disc plus Half-Life, for show-floor demos, under a different
+name so the two bins cannot be confused. Both carry Quake shareware. The
+`games/hl-psx` submodule is private until its own release, so a fresh clone
+should init the other submodules selectively and stick to the default pressing.
+
+`make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, a
+sibling `quake-psx-build-provenance` by default) and will not build without
+it. `make quake-headless-check` is the gate to run before a burn: it chain-
+loads Quake off the built disc twice and requires the two replays to agree.
+
+## Repinning Quake
+
+Six values in the Makefile and one submodule pointer are the whole Quake
+contract. They all come out of a built Quake tree, and `make quake-repin`
+measures them:
+
+```bash
+make quake-repin                          # from the default QUAKE_SRC
+make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
+```
+
+It prints, and writes nothing:
+
+```
+QUAKE_EXPECTED_REV ?= <the Quake tree's HEAD>
+QUAKE_EXPECTED_PSOXIDE_REV ?= <the PSOXIDE_REV that tree declares>
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= <dist/quake-psx.provenance.json>
+QUAKE_EXPECTED_CUE_SHA256 ?= <dist/quake-psx.cue>
+QUAKE_EXPECTED_BIN_SHA256 ?= <dist/quake-psx.bin>
+QUAKE_EXPECTED_EXE_SHA256 ?= <dist/quake-psx.exe>
+```
+
+Paste those six lines over the ones near the top of the `Makefile`, then:
+
+1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
+   games/PSoXide` -- the Quake tree names the SDK it was built against, and
+   the disc has to be on that same revision or `quake-verify` refuses.
+2. `make disc` -- rebuilds every program against that SDK, re-verifies the
+   Quake input, and writes the provenance receipt beside the image.
+3. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
+   `EXPECTED_DISPLAY_FNV` in `tools/check_quake_headless.py` fail, the error
+   prints the values the new build produced. Those two are the only pins
+   outside the Makefile. Paste them in and run it again, so a green run is
+   the proof rather than the edit.
+
+Nothing rewrites a pin on your behalf. A repin that edited its own contract
+would be a verifier that agrees with whatever it is handed, and the diff is
+what tells a reviewer which contract moved.
+
+The Quake input also requires its schema-1 shipping sidecar, which binds the
+clean Quake and PSoXide revisions, canonical shareware PAK, guest recipe and
+toolchain, and actual cue/bin/EXE bytes. See
+[the Quake runbook](docs/quake-shareware.md).
