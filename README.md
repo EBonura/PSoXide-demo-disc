@@ -14,21 +14,49 @@ make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
 make check     # host tests
 ```
 
-The Quake shareware build is a third, deliberately local/test-only variant:
+## Repinning Quake
+
+Six values in the Makefile and one submodule pointer are the whole Quake
+contract. They all come out of a built Quake tree, and `make quake-repin`
+measures them:
 
 ```bash
-make quake-disc       # rebuild programs, then add the pinned Quake image
-make quake-disc-only  # reuse built programs and add the pinned Quake image
+make quake-repin                          # from the default QUAKE_SRC
+make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
 ```
 
-It writes `PSoXide Demo Disc Quake Shareware.{bin,cue}` to a separate library
-directory, so it cannot overwrite either release pressing. It is not a public
-release target. The reuse and headless paths require a full-build PSoXide
-revision stamp, so stale ordinary-program artifacts fail closed. The Quake
-input also requires its schema-1 shipping sidecar, which binds the clean Quake
-and PSoXide revisions, canonical shareware PAK, guest recipe and toolchain, and
-actual cue/bin/EXE bytes. See
-[the Quake local/test runbook](docs/quake-shareware-local-test.md).
+It prints, and writes nothing:
+
+```
+QUAKE_EXPECTED_REV ?= <the Quake tree's HEAD>
+QUAKE_EXPECTED_PSOXIDE_REV ?= <the PSOXIDE_REV that tree declares>
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= <dist/quake-psx.provenance.json>
+QUAKE_EXPECTED_CUE_SHA256 ?= <dist/quake-psx.cue>
+QUAKE_EXPECTED_BIN_SHA256 ?= <dist/quake-psx.bin>
+QUAKE_EXPECTED_EXE_SHA256 ?= <dist/quake-psx.exe>
+```
+
+Paste those six lines over the ones near the top of the `Makefile`, then:
+
+1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
+   games/PSoXide` -- the Quake tree names the SDK it was built against, and
+   the disc has to be on that same revision or `quake-verify` refuses.
+2. `make disc` -- rebuilds every program against that SDK, re-verifies the
+   Quake input, and writes the provenance receipt beside the image.
+3. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
+   `EXPECTED_DISPLAY_FNV` in `tools/check_quake_headless.py` fail, the error
+   prints the values the new build produced. Those two are the only pins
+   outside the Makefile. Paste them in and run it again, so a green run is
+   the proof rather than the edit.
+
+Nothing rewrites a pin on your behalf. A repin that edited its own contract
+would be a verifier that agrees with whatever it is handed, and the diff is
+what tells a reviewer which contract moved.
+
+The Quake input also requires its schema-1 shipping sidecar, which binds the
+clean Quake and PSoXide revisions, canonical shareware PAK, guest recipe and
+toolchain, and actual cue/bin/EXE bytes. See
+[the Quake runbook](docs/quake-shareware-local-test.md).
 
 ## How it boots
 

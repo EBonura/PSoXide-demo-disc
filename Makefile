@@ -8,7 +8,7 @@
 # music live outside Git. Cortex Ignition is staged from PSoXide's tracked,
 # miniaturized editor sample so the disc no longer depends on editor/projects/.
 
-.PHONY: help disc disc-only quake-verify quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    ?= $(ROOT)/games/PSoXide
@@ -114,6 +114,7 @@ help:
 	@echo "make disc-only        - relay out the disc without rebuilding the programs"
 	@echo "make check            - host tests (disc-toc, mkdisc) and the Quake pin check"
 	@echo "make quake-verify     - check the pinned Quake input on its own"
+	@echo "make quake-repin      - print the pin values a built Quake tree implies"
 	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
@@ -316,6 +317,23 @@ _quake-headless-check:
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json"
+
+# Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
+# pointer are the whole contract, and they all come out of a built Quake tree:
+#
+#   make quake-repin                          # from the default QUAKE_SRC
+#   make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
+#
+# It prints the six lines to paste over the ones above, plus the commands that
+# follow them, and writes nothing. Editing by hand is the point: the diff then
+# shows exactly which contract moved, and a repin that rewrote the pins itself
+# would be a verifier agreeing with whatever it was handed. README.md has the
+# full procedure, including the two FNV pins in tools/check_quake_headless.py.
+quake-repin:
+	@python3 tools/quake_disc.py repin \
+		--source "$(QUAKE_SRC)" \
+		--cue "$(QUAKE_CUE)" \
+		--provenance "$(QUAKE_PROVENANCE)"
 
 quake-verify:
 	python3 tools/quake_disc.py verify \
