@@ -106,7 +106,7 @@ help:
 	@echo "make disc HL=1        - the Palermo Comicon pressing, with Half-Life"
 	@echo "make quake-disc       - local/test pressing with pinned Quake shareware"
 	@echo "make quake-disc-only  - relay the local/test Quake pressing from built inputs"
-	@echo "make quake-headless-check - build, launch, and replay the Quake pressing twice"
+	@echo "make quake-headless-check - build and prove Quake chain-load twice without images"
 	@echo "make disc-only        - relay out the disc without rebuilding the programs"
 	@echo "make check            - host tests (disc-toc, mkdisc)"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"

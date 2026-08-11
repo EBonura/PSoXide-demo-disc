@@ -19,6 +19,14 @@ quake_disc = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = quake_disc
 SPEC.loader.exec_module(quake_disc)
 
+HEADLESS_SPEC = importlib.util.spec_from_file_location(
+    "check_quake_headless", ROOT / "tools" / "check_quake_headless.py"
+)
+assert HEADLESS_SPEC is not None and HEADLESS_SPEC.loader is not None
+check_quake_headless = importlib.util.module_from_spec(HEADLESS_SPEC)
+sys.modules[HEADLESS_SPEC.name] = check_quake_headless
+HEADLESS_SPEC.loader.exec_module(check_quake_headless)
+
 
 def run(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -758,6 +766,127 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "itch: Quake shareware needs separate legal and release approval", makefile
         )
+
+
+class HeadlessChainloadTests(unittest.TestCase):
+    @staticmethod
+    def make_disc_image(root: Path) -> Path:
+        image = bytearray(42 * check_quake_headless.SECTOR_BYTES)
+        toc = bytearray(
+            check_quake_headless.TOC_SECTORS
+            * check_quake_headless.USER_DATA_BYTES
+        )
+        toc[:8] = check_quake_headless.TOC_MAGIC
+        toc[8:12] = (3).to_bytes(4, "little")
+        entries = (
+            ("FIRST", 30, 0),
+            ("HIDDEN", 31, check_quake_headless.FLAG_HIDDEN),
+            ("QUAKE SHAREWARE", 40, 0),
+        )
+        for index, (name, lba, flags) in enumerate(entries):
+            at = (
+                check_quake_headless.TOC_HEADER_BYTES
+                + index * check_quake_headless.TOC_ENTRY_BYTES
+            )
+            encoded = name.encode("ascii")
+            toc[at : at + len(encoded)] = encoded
+            toc[
+                at
+                + check_quake_headless.TOC_NAME_BYTES : at
+                + check_quake_headless.TOC_NAME_BYTES
+                + 4
+            ] = lba.to_bytes(4, "little")
+            toc[
+                at
+                + check_quake_headless.TOC_FLAGS_AT : at
+                + check_quake_headless.TOC_FLAGS_AT
+                + 4
+            ] = flags.to_bytes(4, "little")
+        for sector in range(check_quake_headless.TOC_SECTORS):
+            source = sector * check_quake_headless.USER_DATA_BYTES
+            target = (
+                (check_quake_headless.TOC_LBA + sector)
+                * check_quake_headless.SECTOR_BYTES
+                + check_quake_headless.USER_DATA_AT
+            )
+            image[target : target + check_quake_headless.USER_DATA_BYTES] = toc[
+                source : source + check_quake_headless.USER_DATA_BYTES
+            ]
+
+        header = bytearray(check_quake_headless.USER_DATA_BYTES)
+        header[:8] = check_quake_headless.PSX_EXE_MAGIC
+        header[0x10:0x14] = (0x8001_0000).to_bytes(4, "little")
+        header[0x18:0x1C] = (0x8001_0000).to_bytes(4, "little")
+        header[0x1C:0x20] = (4_096).to_bytes(4, "little")
+        target = (
+            40 * check_quake_headless.SECTOR_BYTES
+            + check_quake_headless.USER_DATA_AT
+        )
+        image[target : target + check_quake_headless.USER_DATA_BYTES] = header
+        path = root / "disc.bin"
+        path.write_bytes(image)
+        return path
+
+    def test_route_selects_visible_quake_and_embedded_exe_is_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            image = self.make_disc_image(Path(directory))
+            self.assertEqual(
+                check_quake_headless.menu_route_evidence(image, 40), (1, 3)
+            )
+            self.assertEqual(
+                check_quake_headless.embedded_exe_evidence(image, 40),
+                (0x8001_0000, 0x8001_0000, 4_096),
+            )
+
+    def test_cd_evidence_requires_header_and_payload_read_sequences(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "cd.csv"
+            log.write_text(
+                "cycle,command,param_len,params\n"
+                "1,0x02,3,00 02 40\n"
+                "2,0x15,0,\n"
+                "3,0x06,0,\n"
+                "4,0x02,3,00 02 41\n"
+                "5,0x15,0,\n"
+                "6,0x06,0,\n"
+                "7,0x02,3,00 02 45\n"
+                "8,0x15,0,\n"
+                "9,0x06,0,\n",
+                encoding="ascii",
+            )
+            self.assertEqual(
+                check_quake_headless.cd_evidence(log, 40, 4_096, 20, 100),
+                (9, 2, 45),
+            )
+            log.write_text(
+                "cycle,command,param_len,params\n"
+                "1,0x02,3,00 02 40\n"
+                "2,0x15,0,\n"
+                "3,0x06,0,\n",
+                encoding="ascii",
+            )
+            with self.assertRaises(check_quake_headless.CheckError):
+                check_quake_headless.cd_evidence(log, 40, 4_096, 20, 100)
+
+    def test_runtime_markers_are_ordered_and_fail_closed(self) -> None:
+        output = "\n".join(check_quake_headless.MARKERS)
+        check_quake_headless.require_runtime_markers(output)
+        with self.assertRaises(check_quake_headless.CheckError):
+            check_quake_headless.require_runtime_markers(
+                "\n".join(reversed(check_quake_headless.MARKERS))
+            )
+        with self.assertRaises(check_quake_headless.CheckError):
+            check_quake_headless.require_runtime_markers(
+                output + "\nquake-psx: Rust initial level load failed"
+            )
+
+    def test_headless_gate_cannot_create_media_dumps(self) -> None:
+        source = (ROOT / "tools" / "check_quake_headless.py").read_text(
+            encoding="ascii"
+        )
+        self.assertIn('"--embedded-playtest"', source)
+        for flag in ("--dump-display", "--dump-vram", "--dump-hw", "--dump-audio"):
+            self.assertNotIn(flag, source)
 
 
 if __name__ == "__main__":
