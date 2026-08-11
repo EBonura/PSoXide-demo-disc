@@ -10,16 +10,18 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `396b861b3f8d293bbaf61775252df684ffb6aed4` |
+| Quake source revision | `1fd5173a656cb209b4a10bcbb37d34cc4a0650b0` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
-| Input bin SHA-256 | `039ac161d6e3a8b6c9fcca2887f2e1e5ee2153f2772ca8001c302428d919dab4` |
-| Default source checkout | sibling `quake-psx-episode1-next-gate` |
-| Default input cue | `dist/quake-psx.cue` in that checkout |
+| Input bin SHA-256 | `5f5316381763ca54783818097e228762667d6d99e70dd42af04cddd1216c21c1` |
+| Default source checkout | sibling `quake-psx-combat-adversarial-review` |
+| Default input cue | `build-psoxide/quake-psx.cue` in that checkout |
 
-This pin contains the first real-map Episode 1 combat checkpoint. Any later
-Quake checkpoint must update the full revision and both input hashes together,
-rebuild the combined image, regenerate the receipt, and rerun the two-pass
-headless gate before the demo-disc payload is called current.
+This pin contains the adversarially reviewed real-map Episode 1 combat
+checkpoint. It corrects canonical monster profile bounds and mover broadphase
+culling, and adds hostile-map regressions before recording the final validation.
+Any later Quake checkpoint must update the full revision and both input hashes
+together, rebuild the combined image, regenerate the receipt, and rerun the
+two-pass headless gate before the demo-disc payload is called current.
 
 The verifier requires the source checkout to be clean and at the full pinned
 revision. It requires the cue and bin hashes to match, the cue to describe one
