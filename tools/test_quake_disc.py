@@ -745,6 +745,24 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
         self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
 
+    def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
+        default = self.dry_run()
+        half_life = self.dry_run("HL=1")
+        self.assertEqual(half_life.returncode, 0, half_life.stderr)
+        self.assertIn('--image "HALF-LIFE=', half_life.stdout)
+        self.assertNotIn('--image "HALF-LIFE=', default.stdout)
+        # Everything the default pressing carries, the HL pressing carries too.
+        for argument in (
+            '--image "QUAKE SHAREWARE=',
+            '--version-of "QUAKE SHAREWARE=q2d26f9e"',
+            "tools/quake_disc.py verify",
+            "tools/quake_disc.py receipt",
+        ):
+            with self.subTest(argument=argument):
+                self.assertIn(argument, default.stdout)
+                self.assertIn(argument, half_life.stdout)
+        self.assertIn("PSoXide Demo Disc HL.bin", half_life.stdout)
+
     def test_distribution_targets_are_blocked_before_they_build_anything(self) -> None:
         blocked = run(
             "make", "--no-print-directory", "publication-block", cwd=ROOT, check=False
