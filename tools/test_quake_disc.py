@@ -772,8 +772,10 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn("publication is blocked", blocked.stdout)
         self.assertIn("Quake 1.06 shareware data", blocked.stdout)
 
-        for target, upload in (("release-web", "gh release"), ("itch", "butler push")):
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        for target in ("release-web", "itch"):
             with self.subTest(target=target):
+                self.assertIn(f"\n{target}: publication-block\n", makefile)
                 dry = run(
                     "make",
                     "-n",
@@ -783,9 +785,11 @@ class MakeVariantContractTests(unittest.TestCase):
                     cwd=ROOT,
                     check=False,
                 )
+                # The block has to come out before the target's own first line,
+                # which is as far as this can read: `make -n` recurses into the
+                # $(MAKE) disc below it, and that needs the submodules.
                 block_at = dry.stdout.index("publication is blocked")
-                self.assertLess(block_at, dry.stdout.index("exit 1"))
-                self.assertLess(block_at, dry.stdout.index(upload))
+                self.assertLess(block_at, dry.stdout.index('test -z "'))
 
 
 class FailClosedDefaultTests(unittest.TestCase):
