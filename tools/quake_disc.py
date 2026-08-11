@@ -51,6 +51,14 @@ INDEX_LINE = re.compile(
 REDISTRIBUTION_GATE = (
     "blocked pending separate Quake shareware legal and release approval"
 )
+QUAKE_PROVENANCE_SCHEMA = 1
+GUEST_STAGE_SCHEMA = 1
+SHAREWARE_PAK_SHA256 = (
+    "35a9c55e5e5a284a159ad2a62e0e8def23d829561fe2f54eb402dbc0a9a946af"
+)
+SHAREWARE_PAK_BYTES = 18_689_235
+PSOXIDE_SOURCE_KIND = "local_checkout"
+BUILD_PROFILE = "release"
 
 
 class VerificationError(RuntimeError):
@@ -63,11 +71,27 @@ class VerifiedQuake:
     declared_psoxide_revision: str
     psoxide_revision: str
     programs_psoxide_revision: str
+    provenance: Path
+    provenance_sha256: str
     cue: Path
     bin: Path
+    exe: Path
     cue_sha256: str
     bin_sha256: str
+    exe_sha256: str
+    cue_bytes: int
     bin_bytes: int
+    exe_bytes: int
+    psoxide_source_kind: str
+    pak0_sha256: str
+    pak0_bytes: int
+    guest_stage_schema: int
+    guest_recipe_sha256: str
+    rust_toolchain_sha256: str
+    rustc_version: str
+    cargo_version: str
+    profile: str
+    features: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -93,6 +117,48 @@ def require_hex(value: str, pattern: re.Pattern[str], label: str) -> str:
     if not pattern.fullmatch(normal):
         raise VerificationError(f"{label} must be a full lowercase hexadecimal value")
     return normal
+
+
+def require_object(value: object, label: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise VerificationError(f"{label} must be a JSON object")
+    return value
+
+
+def require_string(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise VerificationError(f"{label} must be a non-empty string")
+    return value
+
+
+def require_integer(value: object, label: str) -> int:
+    if type(value) is not int:
+        raise VerificationError(f"{label} must be an integer")
+    return value
+
+
+def member(container: dict[str, object], key: str, label: str) -> object:
+    try:
+        return container[key]
+    except KeyError as error:
+        raise VerificationError(f"{label} is missing required field {key!r}") from error
+
+
+def artifact_file(value: object, label: str) -> str:
+    name = require_string(value, f"{label}.file")
+    path = Path(name)
+    if path.is_absolute() or len(path.parts) != 1 or name in {".", ".."}:
+        raise VerificationError(f"{label}.file must be one basename")
+    return name
+
+
+def json_without_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise VerificationError(f"provenance JSON contains duplicate key {key!r}")
+        result[key] = value
+    return result
 
 
 def git(source: Path, *args: str) -> str:
@@ -335,15 +401,269 @@ def verify_embedded_image(demo_bin: Path, quake_bin: Path, lba_offset: int) -> i
     return sectors
 
 
+def verify_artifact(
+    artifacts: dict[str, object],
+    key: str,
+    artifact_dir: Path,
+    expected_path: Path | None,
+    expected_sha256: str,
+) -> tuple[Path, str, int]:
+    label = f"provenance artifacts.{key}"
+    record = require_object(member(artifacts, key, "provenance artifacts"), label)
+    filename = artifact_file(member(record, "file", label), label)
+    candidate = artifact_dir / filename
+    try:
+        path = candidate.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise VerificationError(f"{label} does not exist: {candidate}") from error
+    if path.parent != artifact_dir or not path.is_file():
+        raise VerificationError(f"{label}.file must resolve beside the Quake cue")
+    if expected_path is not None and path != expected_path:
+        raise VerificationError(
+            f"{label}.file names {path.name!r}, expected {expected_path.name!r}"
+        )
+
+    recorded_sha256 = require_hex(
+        require_string(member(record, "sha256", label), f"{label}.sha256"),
+        SHA256,
+        f"{label}.sha256",
+    )
+    recorded_bytes = require_integer(member(record, "bytes", label), f"{label}.bytes")
+    actual_bytes = path.stat().st_size
+    if recorded_bytes != actual_bytes:
+        raise VerificationError(
+            f"{label} byte-size mismatch: sidecar has {recorded_bytes}, actual is {actual_bytes}"
+        )
+    actual_sha256 = sha256(path)
+    if recorded_sha256 != actual_sha256:
+        raise VerificationError(
+            f"{label} SHA-256 mismatch: sidecar has {recorded_sha256}, actual is {actual_sha256}"
+        )
+    if actual_sha256 != expected_sha256:
+        raise VerificationError(
+            f"Quake {key} SHA-256 mismatch: expected {expected_sha256}, got {actual_sha256}"
+        )
+    return path, actual_sha256, actual_bytes
+
+
+def verify_provenance(
+    provenance: Path,
+    cue: Path,
+    bin_path: Path,
+    source_revision: str,
+    psoxide_revision: str,
+    expected_provenance_sha256: str,
+    expected_cue_sha256: str,
+    expected_bin_sha256: str,
+    expected_exe_sha256: str,
+) -> dict[str, object]:
+    try:
+        resolved = provenance.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise VerificationError(
+            f"Quake provenance sidecar does not exist: {provenance}"
+        ) from error
+    if not resolved.is_file():
+        raise VerificationError(f"Quake provenance sidecar is not a file: {resolved}")
+    expected_sidecar = cue.with_suffix(".provenance.json")
+    if resolved != expected_sidecar:
+        raise VerificationError(
+            "Quake provenance sidecar must be beside the cue and named "
+            f"{expected_sidecar.name!r}"
+        )
+    try:
+        document = json.loads(
+            resolved.read_text(encoding="ascii"),
+            object_pairs_hook=json_without_duplicate_keys,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise VerificationError(
+            f"cannot parse Quake provenance sidecar {resolved}: {error}"
+        ) from error
+    root = require_object(document, "Quake provenance")
+    schema = require_integer(
+        member(root, "schema", "Quake provenance"), "provenance schema"
+    )
+    if schema != QUAKE_PROVENANCE_SCHEMA:
+        raise VerificationError(
+            f"unsupported Quake provenance schema {schema}; expected {QUAKE_PROVENANCE_SCHEMA}"
+        )
+
+    quake_source = require_object(
+        member(root, "quake_source", "Quake provenance"), "provenance quake_source"
+    )
+    recorded_quake_revision = require_hex(
+        require_string(
+            member(quake_source, "revision", "provenance quake_source"),
+            "provenance quake_source.revision",
+        ),
+        FULL_REVISION,
+        "provenance Quake revision",
+    )
+    if recorded_quake_revision != source_revision:
+        raise VerificationError(
+            "provenance Quake revision mismatch: "
+            f"expected {source_revision}, got {recorded_quake_revision}"
+        )
+    if member(quake_source, "tree_clean", "provenance quake_source") is not True:
+        raise VerificationError("provenance must record a clean Quake source tree")
+
+    psoxide = require_object(
+        member(root, "psoxide", "Quake provenance"), "provenance psoxide"
+    )
+    recorded_psoxide_revision = require_hex(
+        require_string(
+            member(psoxide, "revision", "provenance psoxide"),
+            "provenance psoxide.revision",
+        ),
+        FULL_REVISION,
+        "provenance PSoXide revision",
+    )
+    if recorded_psoxide_revision != psoxide_revision:
+        raise VerificationError(
+            "provenance PSoXide revision mismatch: "
+            f"expected {psoxide_revision}, got {recorded_psoxide_revision}"
+        )
+    if member(psoxide, "tree_clean", "provenance psoxide") is not True:
+        raise VerificationError("provenance must record a clean PSoXide source tree")
+    source_kind = require_string(
+        member(psoxide, "source_kind", "provenance psoxide"),
+        "provenance psoxide.source_kind",
+    )
+    if source_kind != PSOXIDE_SOURCE_KIND:
+        raise VerificationError(
+            f"provenance PSoXide source kind must be {PSOXIDE_SOURCE_KIND!r}, got {source_kind!r}"
+        )
+
+    shareware = require_object(
+        member(root, "shareware", "Quake provenance"), "provenance shareware"
+    )
+    pak0_sha256 = require_hex(
+        require_string(
+            member(shareware, "pak0_sha256", "provenance shareware"),
+            "provenance shareware.pak0_sha256",
+        ),
+        SHA256,
+        "provenance shareware PAK0 SHA-256",
+    )
+    pak0_bytes = require_integer(
+        member(shareware, "pak0_bytes", "provenance shareware"),
+        "provenance shareware.pak0_bytes",
+    )
+    if pak0_sha256 != SHAREWARE_PAK_SHA256 or pak0_bytes != SHAREWARE_PAK_BYTES:
+        raise VerificationError(
+            "provenance does not identify the canonical Quake 1.06 shareware PAK0"
+        )
+
+    build = require_object(
+        member(root, "build", "Quake provenance"), "provenance build"
+    )
+    guest_stage_schema = require_integer(
+        member(build, "guest_stage_schema", "provenance build"),
+        "provenance build.guest_stage_schema",
+    )
+    if guest_stage_schema != GUEST_STAGE_SCHEMA:
+        raise VerificationError(
+            f"unsupported guest-stage schema {guest_stage_schema}; expected {GUEST_STAGE_SCHEMA}"
+        )
+    guest_recipe_sha256 = require_hex(
+        require_string(
+            member(build, "guest_recipe_sha256", "provenance build"),
+            "provenance build.guest_recipe_sha256",
+        ),
+        SHA256,
+        "provenance guest recipe SHA-256",
+    )
+    rust_toolchain_sha256 = require_hex(
+        require_string(
+            member(build, "rust_toolchain_sha256", "provenance build"),
+            "provenance build.rust_toolchain_sha256",
+        ),
+        SHA256,
+        "provenance Rust toolchain SHA-256",
+    )
+    rustc_version = require_string(
+        member(build, "rustc_version", "provenance build"),
+        "provenance build.rustc_version",
+    )
+    cargo_version = require_string(
+        member(build, "cargo_version", "provenance build"),
+        "provenance build.cargo_version",
+    )
+    if not rustc_version.startswith("rustc ") or not cargo_version.startswith("cargo "):
+        raise VerificationError(
+            "provenance build must contain verbose rustc and cargo identities"
+        )
+    profile = require_string(
+        member(build, "profile", "provenance build"), "provenance build.profile"
+    )
+    features_value = member(build, "features", "provenance build")
+    if not isinstance(features_value, list) or any(
+        not isinstance(feature, str) for feature in features_value
+    ):
+        raise VerificationError("provenance build.features must be a string array")
+    features = tuple(features_value)
+    if profile != BUILD_PROFILE or features:
+        raise VerificationError(
+            "shipping provenance must record release profile with no Cargo features"
+        )
+
+    artifacts = require_object(
+        member(root, "artifacts", "Quake provenance"), "provenance artifacts"
+    )
+    artifact_dir = cue.parent.resolve()
+    cue_path, cue_sha256, cue_bytes = verify_artifact(
+        artifacts, "cue", artifact_dir, cue, expected_cue_sha256
+    )
+    verified_bin, bin_sha256, bin_bytes = verify_artifact(
+        artifacts, "bin", artifact_dir, bin_path, expected_bin_sha256
+    )
+    exe, exe_sha256, exe_bytes = verify_artifact(
+        artifacts, "exe", artifact_dir, cue.with_suffix(".exe"), expected_exe_sha256
+    )
+    provenance_sha256 = sha256(resolved)
+    if provenance_sha256 != expected_provenance_sha256:
+        raise VerificationError(
+            "Quake provenance SHA-256 mismatch: "
+            f"expected {expected_provenance_sha256}, got {provenance_sha256}"
+        )
+    return {
+        "path": resolved,
+        "sha256": provenance_sha256,
+        "cue": cue_path,
+        "bin": verified_bin,
+        "exe": exe,
+        "cue_sha256": cue_sha256,
+        "bin_sha256": bin_sha256,
+        "exe_sha256": exe_sha256,
+        "cue_bytes": cue_bytes,
+        "bin_bytes": bin_bytes,
+        "exe_bytes": exe_bytes,
+        "source_kind": source_kind,
+        "pak0_sha256": pak0_sha256,
+        "pak0_bytes": pak0_bytes,
+        "guest_stage_schema": guest_stage_schema,
+        "guest_recipe_sha256": guest_recipe_sha256,
+        "rust_toolchain_sha256": rust_toolchain_sha256,
+        "rustc_version": rustc_version,
+        "cargo_version": cargo_version,
+        "profile": profile,
+        "features": features,
+    }
+
+
 def verify_quake(
     source: Path,
     psoxide: Path,
     programs_psoxide_stamp: Path,
     cue: Path,
+    provenance: Path,
     expected_revision: str,
     expected_psoxide_revision: str,
+    expected_provenance_sha256: str,
     expected_cue_sha256: str,
     expected_bin_sha256: str,
+    expected_exe_sha256: str,
 ) -> VerifiedQuake:
     expected_revision = require_hex(
         expected_revision, FULL_REVISION, "expected revision"
@@ -351,11 +671,17 @@ def verify_quake(
     expected_psoxide_revision = require_hex(
         expected_psoxide_revision, FULL_REVISION, "expected PSoXide revision"
     )
+    expected_provenance_sha256 = require_hex(
+        expected_provenance_sha256, SHA256, "expected provenance SHA-256"
+    )
     expected_cue_sha256 = require_hex(
         expected_cue_sha256, SHA256, "expected cue SHA-256"
     )
     expected_bin_sha256 = require_hex(
         expected_bin_sha256, SHA256, "expected bin SHA-256"
+    )
+    expected_exe_sha256 = require_hex(
+        expected_exe_sha256, SHA256, "expected exe SHA-256"
     )
 
     source, revision = verify_clean_checkout(source, expected_revision, "Quake source")
@@ -377,10 +703,10 @@ def verify_quake(
     except FileNotFoundError as error:
         raise VerificationError(f"cue does not exist: {cue}") from error
     resolved_bin = cue_bin(resolved_cue, data_only=True)
-    size = resolved_bin.stat().st_size
-    if size == 0 or size % SECTOR_BYTES != 0:
+    bin_bytes = resolved_bin.stat().st_size
+    if bin_bytes == 0 or bin_bytes % SECTOR_BYTES != 0:
         raise VerificationError(
-            f"Quake bin is {size} bytes, not a non-empty whole number of {SECTOR_BYTES}-byte sectors"
+            f"Quake bin is {bin_bytes} bytes, not a non-empty whole number of {SECTOR_BYTES}-byte sectors"
         )
     boot_at = BOOT_EXE_LBA * SECTOR_BYTES + 24
     with resolved_bin.open("rb") as stream:
@@ -391,26 +717,43 @@ def verify_quake(
             f"Quake bin has no PS-X EXE at the mkdisc boot LBA {BOOT_EXE_LBA}"
         )
 
-    cue_hash = sha256(resolved_cue)
-    bin_hash = sha256(resolved_bin)
-    if cue_hash != expected_cue_sha256:
-        raise VerificationError(
-            f"Quake cue SHA-256 mismatch: expected {expected_cue_sha256}, got {cue_hash}"
-        )
-    if bin_hash != expected_bin_sha256:
-        raise VerificationError(
-            f"Quake bin SHA-256 mismatch: expected {expected_bin_sha256}, got {bin_hash}"
-        )
+    verified_provenance = verify_provenance(
+        provenance,
+        resolved_cue,
+        resolved_bin,
+        revision,
+        psoxide_revision,
+        expected_provenance_sha256,
+        expected_cue_sha256,
+        expected_bin_sha256,
+        expected_exe_sha256,
+    )
     return VerifiedQuake(
         source_revision=revision,
         declared_psoxide_revision=declared_revision,
         psoxide_revision=psoxide_revision,
         programs_psoxide_revision=programs_psoxide_revision,
-        cue=resolved_cue,
-        bin=resolved_bin,
-        cue_sha256=cue_hash,
-        bin_sha256=bin_hash,
-        bin_bytes=size,
+        provenance=verified_provenance["path"],
+        provenance_sha256=verified_provenance["sha256"],
+        cue=verified_provenance["cue"],
+        bin=verified_provenance["bin"],
+        exe=verified_provenance["exe"],
+        cue_sha256=verified_provenance["cue_sha256"],
+        bin_sha256=verified_provenance["bin_sha256"],
+        exe_sha256=verified_provenance["exe_sha256"],
+        cue_bytes=verified_provenance["cue_bytes"],
+        bin_bytes=verified_provenance["bin_bytes"],
+        exe_bytes=verified_provenance["exe_bytes"],
+        psoxide_source_kind=verified_provenance["source_kind"],
+        pak0_sha256=verified_provenance["pak0_sha256"],
+        pak0_bytes=verified_provenance["pak0_bytes"],
+        guest_stage_schema=verified_provenance["guest_stage_schema"],
+        guest_recipe_sha256=verified_provenance["guest_recipe_sha256"],
+        rust_toolchain_sha256=verified_provenance["rust_toolchain_sha256"],
+        rustc_version=verified_provenance["rustc_version"],
+        cargo_version=verified_provenance["cargo_version"],
+        profile=verified_provenance["profile"],
+        features=verified_provenance["features"],
     )
 
 
@@ -420,10 +763,13 @@ def verify_from_args(args: argparse.Namespace) -> VerifiedQuake:
         Path(args.psoxide),
         Path(args.programs_psoxide_stamp),
         Path(args.cue),
+        Path(args.provenance),
         args.expected_revision,
         args.expected_psoxide_revision,
+        args.expected_provenance_sha256,
         args.expected_cue_sha256,
         args.expected_bin_sha256,
+        args.expected_exe_sha256,
     )
 
 
@@ -432,9 +778,13 @@ def print_verification(verified: VerifiedQuake) -> None:
     print(f"quake declared PSoXide revision: {verified.declared_psoxide_revision}")
     print(f"disc PSoXide revision: {verified.psoxide_revision}")
     print(f"ordinary-program PSoXide revision: {verified.programs_psoxide_revision}")
+    print(f"quake provenance SHA-256: {verified.provenance_sha256}")
+    print(f"quake guest recipe SHA-256: {verified.guest_recipe_sha256}")
     print(f"quake cue SHA-256: {verified.cue_sha256}")
     print(f"quake bin SHA-256: {verified.bin_sha256}")
     print(f"quake bin bytes: {verified.bin_bytes}")
+    print(f"quake exe SHA-256: {verified.exe_sha256}")
+    print(f"quake exe bytes: {verified.exe_bytes}")
 
 
 def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
@@ -456,18 +806,24 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
     )
 
     receipt = {
-        "schema": 2,
+        "schema": 3,
         "variant": "quake-shareware-local-test",
         "redistribution": REDISTRIBUTION_GATE,
         "quake_input": {
             "source_revision": verified.source_revision,
             "source_tree_clean": True,
             "declared_psoxide_revision": verified.declared_psoxide_revision,
+            "provenance_file": verified.provenance.name,
+            "provenance_sha256": verified.provenance_sha256,
             "cue_file": verified.cue.name,
             "cue_sha256": verified.cue_sha256,
+            "cue_bytes": verified.cue_bytes,
             "bin_file": verified.bin.name,
             "bin_sha256": verified.bin_sha256,
             "bin_bytes": verified.bin_bytes,
+            "exe_file": verified.exe.name,
+            "exe_sha256": verified.exe_sha256,
+            "exe_bytes": verified.exe_bytes,
         },
         "psoxide_input": {
             "revision": verified.psoxide_revision,
@@ -477,12 +833,26 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
             "ordinary_programs_match_checkout": True,
         },
         "quake_artifact_sdk_provenance": {
-            "status": "source-contract-only",
-            "proved": "Quake PSOXIDE_REV matches the clean demo-disc PSoXide checkout",
-            "not_proved": "the pinned Quake cue was built from that checkout",
-            "required_follow_up": (
-                "consume a Quake build sidecar binding source revision, PSoXide revision, "
-                "and cue/bin hashes"
+            "status": "sidecar-bound",
+            "schema": QUAKE_PROVENANCE_SCHEMA,
+            "psoxide_source_kind": verified.psoxide_source_kind,
+            "shareware": {
+                "pak0_sha256": verified.pak0_sha256,
+                "pak0_bytes": verified.pak0_bytes,
+            },
+            "build": {
+                "guest_stage_schema": verified.guest_stage_schema,
+                "guest_recipe_sha256": verified.guest_recipe_sha256,
+                "rust_toolchain_sha256": verified.rust_toolchain_sha256,
+                "rustc_version": verified.rustc_version,
+                "cargo_version": verified.cargo_version,
+                "profile": verified.profile,
+                "features": list(verified.features),
+            },
+            "proved": (
+                "the clean Quake and PSoXide revisions, canonical shareware PAK, "
+                "guest build recipe, toolchain identities, and actual cue/bin/exe "
+                "bytes match the shipping sidecar"
             ),
         },
         "demo_disc_output": {
@@ -517,10 +887,13 @@ def add_verification_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--psoxide", required=True)
     parser.add_argument("--programs-psoxide-stamp", required=True)
     parser.add_argument("--cue", required=True)
+    parser.add_argument("--provenance", required=True)
     parser.add_argument("--expected-revision", required=True)
     parser.add_argument("--expected-psoxide-revision", required=True)
+    parser.add_argument("--expected-provenance-sha256", required=True)
     parser.add_argument("--expected-cue-sha256", required=True)
     parser.add_argument("--expected-bin-sha256", required=True)
+    parser.add_argument("--expected-exe-sha256", required=True)
 
 
 def parse_args() -> argparse.Namespace:
