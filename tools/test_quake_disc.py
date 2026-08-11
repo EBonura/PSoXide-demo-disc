@@ -261,7 +261,7 @@ class MakeVariantContractTests(unittest.TestCase):
         quake = self.dry_run("QUAKE=1")
         self.assertEqual(quake.returncode, 0, quake.stderr)
         self.assertIn('--image "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn('--version-of "QUAKE SHAREWARE=q8d5a681"', quake.stdout)
+        self.assertIn('--version-of "QUAKE SHAREWARE=q396b861"', quake.stdout)
         self.assertIn('--describe "QUAKE SHAREWARE=', quake.stdout)
         self.assertIn("tools/quake_disc.py verify", quake.stdout)
         self.assertIn("tools/quake_disc.py receipt", quake.stdout)

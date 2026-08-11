@@ -49,11 +49,11 @@ override HL := $(filter-out 0,$(HL))
 # from it. The verifier fails closed if any one of them differs.
 QUAKE ?=
 override QUAKE := $(filter-out 0,$(QUAKE))
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-convergence)
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-episode1-next-gate)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
-QUAKE_EXPECTED_REV ?= 8d5a6815091adfa6abc597d14843fce8d4938879
+QUAKE_EXPECTED_REV ?= 396b861b3f8d293bbaf61775252df684ffb6aed4
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= ac1109b6e172ee157e601563b34b4bd1e236ecba4131f7c4029327b1029021c4
+QUAKE_EXPECTED_BIN_SHA256 ?= 039ac161d6e3a8b6c9fcca2887f2e1e5ee2153f2772ca8001c302428d919dab4
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
