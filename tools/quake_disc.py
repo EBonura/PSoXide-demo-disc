@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify and record the opt-in Quake shareware demo-disc input."""
+"""Verify and record the Quake shareware payload every disc carries."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ BUILD_PROFILE = "release"
 
 
 class VerificationError(RuntimeError):
-    """An input cannot prove the pinned local/test Quake contract."""
+    """An input cannot prove the pinned Quake contract."""
 
 
 @dataclass(frozen=True)
@@ -376,9 +376,9 @@ def quake_toc_entry(demo_bin: Path, expected_revision: str) -> QuakeTocEntry:
         )
     if entry.payload_fnv == 0:
         raise VerificationError(f"{demo_bin}: Quake loader payload checksum is zero")
-    if "local test" not in entry.description.lower():
+    if "shareware" not in entry.description.lower():
         raise VerificationError(
-            f"{demo_bin}: Quake description does not identify a local test build"
+            f"{demo_bin}: Quake description does not identify the shareware release"
         )
     return entry
 
@@ -807,7 +807,7 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
 
     receipt = {
         "schema": 3,
-        "variant": "quake-shareware-local-test",
+        "variant": "quake-shareware-default",
         "redistribution": REDISTRIBUTION_GATE,
         "quake_input": {
             "source_revision": verified.source_revision,

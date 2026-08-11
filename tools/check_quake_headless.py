@@ -435,7 +435,7 @@ def main() -> int:
         cue = args.cue.resolve(strict=True)
         receipt_path = args.receipt.resolve(strict=True)
         receipt = json.loads(receipt_path.read_text(encoding="ascii"))
-        if receipt.get("variant") != "quake-shareware-local-test":
+        if receipt.get("variant") != "quake-shareware-default":
             raise CheckError(f"wrong or missing Quake receipt: {receipt_path}")
         output = receipt["demo_disc_output"]
         quake_lba = output["quake_toc"]["exe_lba"]

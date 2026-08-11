@@ -199,7 +199,7 @@ class VerifyQuakeTests(unittest.TestCase):
         toc[numbers + 8 : numbers + 12] = (4).to_bytes(4, "little")
         toc[numbers + 12 : numbers + 16] = (0x12345678).to_bytes(4, "little")
         description_at = numbers + 16
-        description = b"Pinned local test build"
+        description = b"Pinned Quake shareware Episode 1"
         toc[description_at : description_at + len(description)] = description
         version_at = description_at + 2 * quake_disc.TOC_DESC_BYTES
         version = ("q" + fixture.revision[:7]).encode("ascii")

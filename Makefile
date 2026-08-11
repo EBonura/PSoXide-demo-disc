@@ -301,7 +301,7 @@ endif
 # unverified payload -- disc-only cannot run until the stamp and the pins check.
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
-	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1 on the original PlayStation. This local test checkpoint cooks all Episode 1 maps and streams them from the embedded Quake disc image; runtime work is still in progress.|Quake 1.06 shareware Episodio 1 sulla PlayStation originale. Questo checkpoint di test locale converte tutte le mappe e le carica dal disco Quake incorporato; il runtime e ancora in sviluppo."
+	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1, rebuilt from scratch for the original PlayStation. The single-player episode is complete: every level plays start to finish, streamed off this disc.|Quake 1.06 shareware Episodio 1, riscritto da zero per la prima PlayStation. L'episodio single player e completo: i livelli si giocano dall'inizio alla fine, letti da questo disco."
 QUAKE_PREREQS = quake-programs-verify quake-verify
 
 disc: launcher quake-programs mkdisc
