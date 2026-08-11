@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify and record the opt-in Quake shareware demo-disc input."""
+"""Verify and record the Quake shareware payload every disc carries."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ BUILD_PROFILE = "release"
 
 
 class VerificationError(RuntimeError):
-    """An input cannot prove the pinned local/test Quake contract."""
+    """An input cannot prove the pinned Quake contract."""
 
 
 @dataclass(frozen=True)
@@ -230,7 +230,7 @@ def verify_programs_revision_stamp(stamp: Path, expected_revision: str) -> str:
     except FileNotFoundError as error:
         raise VerificationError(
             f"ordinary-program SDK revision stamp does not exist: {stamp}; "
-            "run 'make quake-disc'"
+            "run 'make disc'"
         ) from error
     except (OSError, UnicodeDecodeError) as error:
         raise VerificationError(
@@ -247,7 +247,7 @@ def verify_programs_revision_stamp(stamp: Path, expected_revision: str) -> str:
     if revision != expected_revision:
         raise VerificationError(
             f"ordinary-program SDK revision mismatch: stamp has {revision}, "
-            f"but PSoXide checkout is {expected_revision}; run 'make quake-disc'"
+            f"but PSoXide checkout is {expected_revision}; run 'make disc'"
         )
     return revision
 
@@ -376,9 +376,9 @@ def quake_toc_entry(demo_bin: Path, expected_revision: str) -> QuakeTocEntry:
         )
     if entry.payload_fnv == 0:
         raise VerificationError(f"{demo_bin}: Quake loader payload checksum is zero")
-    if "local test" not in entry.description.lower():
+    if "shareware" not in entry.description.lower():
         raise VerificationError(
-            f"{demo_bin}: Quake description does not identify a local test build"
+            f"{demo_bin}: Quake description does not identify the shareware release"
         )
     return entry
 
@@ -807,7 +807,7 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
 
     receipt = {
         "schema": 3,
-        "variant": "quake-shareware-local-test",
+        "variant": "quake-shareware-default",
         "redistribution": REDISTRIBUTION_GATE,
         "quake_input": {
             "source_revision": verified.source_revision,
@@ -882,6 +882,44 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
     return out
 
 
+def print_repin(args: argparse.Namespace) -> None:
+    """Print what a built Quake tree implies, as the lines to paste into the Makefile.
+
+    Deliberately writes nothing. The pins are edited by hand so the diff shows
+    which contract moved, and a repin that silently rewrote them would be a
+    verifier that agrees with whatever it is given.
+    """
+    source = Path(args.source)
+    try:
+        source = source.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise VerificationError(f"Quake source does not exist: {source}") from error
+    revision = git(source, "rev-parse", "--verify", "HEAD^{commit}").lower()
+    dirty = git(source, "status", "--porcelain=v1", "--untracked-files=normal")
+    declared = declared_psoxide_revision(source)
+    cue = Path(args.cue).resolve(strict=True)
+    bin_path = cue_bin(cue, data_only=True)
+    exe = cue.with_suffix(".exe")
+    provenance = Path(args.provenance).resolve(strict=True)
+
+    print(f"# measured from {source}")
+    print(f"QUAKE_EXPECTED_REV ?= {revision}")
+    print(f"QUAKE_EXPECTED_PSOXIDE_REV ?= {declared}")
+    print(f"QUAKE_EXPECTED_PROVENANCE_SHA256 ?= {sha256(provenance)}")
+    print(f"QUAKE_EXPECTED_CUE_SHA256 ?= {sha256(cue)}")
+    print(f"QUAKE_EXPECTED_BIN_SHA256 ?= {sha256(bin_path)}")
+    print(f"QUAKE_EXPECTED_EXE_SHA256 ?= {sha256(exe)}")
+    print()
+    print("# then, in this order:")
+    print(f"#   git -C games/PSoXide checkout {declared} && git add games/PSoXide")
+    print("#   make disc")
+    print("#   make quake-headless-check   (recompute the two FNV pins it prints)")
+    if dirty:
+        print()
+        print("# WARNING: the Quake tree is dirty, so these values name no revision.")
+        print("# Commit or clean it and measure again; quake-verify will reject them.")
+
+
 def add_verification_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source", required=True)
     parser.add_argument("--psoxide", required=True)
@@ -910,12 +948,21 @@ def parse_args() -> argparse.Namespace:
     receipt.add_argument("--demo-cue", required=True)
     receipt.add_argument("--demo-bin", required=True)
     receipt.add_argument("--out", required=True)
+    repin = commands.add_parser(
+        "repin", help="print the pin values a built Quake tree implies"
+    )
+    repin.add_argument("--source", required=True)
+    repin.add_argument("--cue", required=True)
+    repin.add_argument("--provenance", required=True)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
+        if args.command == "repin":
+            print_repin(args)
+            return 0
         verified = verify_from_args(args)
         print_verification(verified)
         if args.command == "receipt":

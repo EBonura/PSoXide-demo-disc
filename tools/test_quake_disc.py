@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -199,7 +200,7 @@ class VerifyQuakeTests(unittest.TestCase):
         toc[numbers + 8 : numbers + 12] = (4).to_bytes(4, "little")
         toc[numbers + 12 : numbers + 16] = (0x12345678).to_bytes(4, "little")
         description_at = numbers + 16
-        description = b"Pinned local test build"
+        description = b"Pinned Quake shareware Episode 1"
         toc[description_at : description_at + len(description)] = description
         version_at = description_at + 2 * quake_disc.TOC_DESC_BYTES
         version = ("q" + fixture.revision[:7]).encode("ascii")
@@ -639,46 +640,39 @@ class MakeVariantContractTests(unittest.TestCase):
             check=False,
         )
 
-    def test_default_and_zero_do_not_add_quake(self) -> None:
+    def test_default_disc_carries_quake_with_metadata_verifier_and_receipt(
+        self,
+    ) -> None:
         default = self.dry_run()
-        zero = self.dry_run("QUAKE=0")
         self.assertEqual(default.returncode, 0, default.stderr)
-        self.assertEqual(zero.returncode, 0, zero.stderr)
-        self.assertEqual(default.stdout, zero.stdout)
-        self.assertNotIn('--image "QUAKE SHAREWARE=', default.stdout)
-        self.assertNotIn("tools/quake_disc.py", default.stdout)
+        self.assertIn('--image "QUAKE SHAREWARE=', default.stdout)
+        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', default.stdout)
+        self.assertIn('--describe "QUAKE SHAREWARE=', default.stdout)
+        self.assertIn("tools/quake_disc.py verify", default.stdout)
+        self.assertIn("tools/quake_disc.py receipt", default.stdout)
+        self.assertIn('--psoxide "', default.stdout)
+        self.assertIn('--programs-psoxide-stamp "', default.stdout)
+        self.assertIn('--expected-psoxide-revision "', default.stdout)
+        self.assertIn('--provenance "', default.stdout)
+        self.assertIn('--expected-provenance-sha256 "', default.stdout)
+        self.assertIn('--expected-exe-sha256 "', default.stdout)
+        self.assertIn("PSoXide Demo Disc.bin", default.stdout)
+        self.assertNotIn("PSoXide Demo Disc Quake Shareware.bin", default.stdout)
 
-    def test_half_life_and_zero_do_not_add_quake(self) -> None:
-        half_life = self.dry_run("HL=1")
-        zero = self.dry_run("HL=1", "QUAKE=0")
-        self.assertEqual(half_life.returncode, 0, half_life.stderr)
-        self.assertEqual(zero.returncode, 0, zero.stderr)
-        self.assertEqual(half_life.stdout, zero.stdout)
-        self.assertIn('--image "HALF-LIFE=', half_life.stdout)
-        self.assertNotIn('--image "QUAKE SHAREWARE=', half_life.stdout)
+    def test_the_opt_in_switch_is_gone(self) -> None:
+        default = self.dry_run()
+        for assignment in ("QUAKE=", "QUAKE=0", "QUAKE=1"):
+            with self.subTest(assignment=assignment):
+                other = self.dry_run(assignment)
+                self.assertEqual(other.returncode, 0, other.stderr)
+                self.assertEqual(default.stdout, other.stdout)
 
-    def test_opt_in_adds_whole_image_metadata_verifier_and_receipt(self) -> None:
-        quake = self.dry_run("QUAKE=1")
-        self.assertEqual(quake.returncode, 0, quake.stderr)
-        self.assertIn('--image "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', quake.stdout)
-        self.assertIn('--describe "QUAKE SHAREWARE=', quake.stdout)
-        self.assertIn("tools/quake_disc.py verify", quake.stdout)
-        self.assertIn("tools/quake_disc.py receipt", quake.stdout)
-        self.assertIn('--psoxide "', quake.stdout)
-        self.assertIn('--programs-psoxide-stamp "', quake.stdout)
-        self.assertIn('--expected-psoxide-revision "', quake.stdout)
-        self.assertIn('--provenance "', quake.stdout)
-        self.assertIn('--expected-provenance-sha256 "', quake.stdout)
-        self.assertIn('--expected-exe-sha256 "', quake.stdout)
-        self.assertIn("PSoXide Demo Disc Quake Shareware.bin", quake.stdout)
-
-    def test_full_quake_build_checks_sdk_coherence_after_programs(self) -> None:
+    def test_full_disc_build_checks_sdk_coherence_after_programs(self) -> None:
         quake = run(
             "make",
             "-n",
             "--no-print-directory",
-            "quake-disc",
+            "disc",
             "DIST=/tmp/psoxide-quake-contract",
             cwd=ROOT,
             check=False,
@@ -752,37 +746,248 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
         self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
 
-    def test_half_life_and_quake_fail_closed(self) -> None:
-        mixed = self.dry_run("HL=1", "QUAKE=1")
-        self.assertNotEqual(mixed.returncode, 0)
-        self.assertIn("QUAKE and HL are mutually exclusive", mixed.stderr)
+    def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
+        default = self.dry_run()
+        half_life = self.dry_run("HL=1")
+        self.assertEqual(half_life.returncode, 0, half_life.stderr)
+        self.assertIn('--image "HALF-LIFE=', half_life.stdout)
+        self.assertNotIn('--image "HALF-LIFE=', default.stdout)
+        # Everything the default pressing carries, the HL pressing carries too.
+        for argument in (
+            '--image "QUAKE SHAREWARE=',
+            '--version-of "QUAKE SHAREWARE=q2d26f9e"',
+            "tools/quake_disc.py verify",
+            "tools/quake_disc.py receipt",
+        ):
+            with self.subTest(argument=argument):
+                self.assertIn(argument, default.stdout)
+                self.assertIn(argument, half_life.stdout)
+        self.assertIn("PSoXide Demo Disc HL.bin", half_life.stdout)
 
-    def test_distribution_targets_contain_explicit_quake_guards(self) -> None:
+    def test_distribution_targets_are_blocked_before_they_build_anything(self) -> None:
+        blocked = run(
+            "make", "--no-print-directory", "publication-block", cwd=ROOT, check=False
+        )
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("publication is blocked", blocked.stdout)
+        self.assertIn("Quake 1.06 shareware data", blocked.stdout)
+
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn(
-            "release-web: Quake shareware needs separate legal and release approval",
-            makefile,
+        for target in ("release-web", "itch"):
+            with self.subTest(target=target):
+                self.assertIn(f"\n{target}: publication-block\n", makefile)
+                dry = run(
+                    "make",
+                    "-n",
+                    "--no-print-directory",
+                    target,
+                    "DIST=/tmp/psoxide-quake-contract",
+                    cwd=ROOT,
+                    check=False,
+                )
+                # The block has to come out before the target's own first line,
+                # which is as far as this can read: `make -n` recurses into the
+                # $(MAKE) disc below it, and that needs the submodules.
+                block_at = dry.stdout.index("publication is blocked")
+                self.assertLess(block_at, dry.stdout.index('test -z "'))
+
+
+class FailClosedDefaultTests(unittest.TestCase):
+    """Every way a Quake payload can be wrong has to stop the default path."""
+
+    def verify(
+        self, fixture: QuakeFixture, **overrides: str
+    ) -> subprocess.CompletedProcess[str]:
+        assignments = {
+            "PSOXIDE": str(fixture.psoxide),
+            "BUILD": str(fixture.programs_stamp.parent),
+            "QUAKE_SRC": str(fixture.source),
+            "QUAKE_EXPECTED_REV": fixture.revision,
+            "QUAKE_EXPECTED_PSOXIDE_REV": fixture.psoxide_revision,
+            "QUAKE_EXPECTED_PROVENANCE_SHA256": digest(fixture.provenance),
+            "QUAKE_EXPECTED_CUE_SHA256": digest(fixture.cue),
+            "QUAKE_EXPECTED_BIN_SHA256": digest(fixture.bin),
+            "QUAKE_EXPECTED_EXE_SHA256": digest(fixture.exe),
+        }
+        assignments.update(overrides)
+        return run(
+            "make",
+            "--no-print-directory",
+            "quake-verify",
+            *(f"{key}={value}" for key, value in assignments.items()),
+            cwd=ROOT,
+            check=False,
         )
-        self.assertIn(
-            "itch: Quake shareware needs separate legal and release approval", makefile
+
+    def test_a_correct_payload_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            passing = self.verify(fixture)
+            self.assertEqual(passing.returncode, 0, passing.stdout + passing.stderr)
+
+    def test_absent_stale_dirty_and_mispinned_payloads_all_fail(self) -> None:
+        cases = (
+            ("absent", {"QUAKE_SRC": "/nonexistent/quake"}, None, "does not exist"),
+            (
+                "stale quake pin",
+                {"QUAKE_EXPECTED_REV": "0" * 40},
+                None,
+                "Quake source checkout revision mismatch",
+            ),
+            (
+                "wrong psoxide pin",
+                {"QUAKE_EXPECTED_PSOXIDE_REV": "0" * 40},
+                None,
+                "PSoXide checkout revision mismatch",
+            ),
+            (
+                "stale artifact hash",
+                {"QUAKE_EXPECTED_BIN_SHA256": "0" * 64},
+                None,
+                "bin SHA-256 mismatch",
+            ),
+            (
+                "dirty quake checkout",
+                {},
+                lambda fixture: (fixture.source / "tracked.txt").write_text(
+                    "changed\n", encoding="ascii"
+                ),
+                "Quake source checkout is dirty",
+            ),
+            (
+                "dirty psoxide checkout",
+                {},
+                lambda fixture: (fixture.psoxide / "sdk.txt").write_text(
+                    "changed\n", encoding="ascii"
+                ),
+                "PSoXide checkout is dirty",
+            ),
+            (
+                "stale ordinary programs",
+                {},
+                lambda fixture: fixture.programs_stamp.write_text(
+                    "0" * 40 + "\n", encoding="ascii"
+                ),
+                "ordinary-program SDK revision mismatch",
+            ),
+            (
+                "missing program stamp",
+                {},
+                lambda fixture: fixture.programs_stamp.unlink(),
+                "revision stamp does not exist",
+            ),
         )
+        for label, overrides, mutate, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                fixture = QuakeFixture(Path(directory))
+                if mutate is not None:
+                    mutate(fixture)
+                failed = self.verify(fixture, **overrides)
+                self.assertNotEqual(failed.returncode, 0, failed.stdout)
+                self.assertIn(error, failed.stderr)
+
+    def test_repin_prints_the_pins_a_built_tree_implies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            printed = run(
+                "make",
+                "--no-print-directory",
+                "quake-repin",
+                f"QUAKE_SRC={fixture.source}",
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(printed.returncode, 0, printed.stderr)
+            expected = {
+                "QUAKE_EXPECTED_REV": fixture.revision,
+                "QUAKE_EXPECTED_PSOXIDE_REV": fixture.psoxide_revision,
+                "QUAKE_EXPECTED_PROVENANCE_SHA256": digest(fixture.provenance),
+                "QUAKE_EXPECTED_CUE_SHA256": digest(fixture.cue),
+                "QUAKE_EXPECTED_BIN_SHA256": digest(fixture.bin),
+                "QUAKE_EXPECTED_EXE_SHA256": digest(fixture.exe),
+            }
+            for name, value in expected.items():
+                with self.subTest(pin=name):
+                    self.assertIn(f"{name} ?= {value}", printed.stdout)
+            # Every pin the Makefile holds is a pin the repin prints.
+            makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+            for name in re.findall(r"^(QUAKE_EXPECTED_\w+) \?=", makefile, re.MULTILINE):
+                with self.subTest(pin=name):
+                    self.assertIn(f"{name} ?= ", printed.stdout)
+            self.assertNotIn("WARNING", printed.stdout)
+
+    def test_repin_refuses_to_speak_for_a_dirty_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            (fixture.source / "tracked.txt").write_text("changed\n", encoding="ascii")
+            printed = run(
+                "make",
+                "--no-print-directory",
+                "quake-repin",
+                f"QUAKE_SRC={fixture.source}",
+                cwd=ROOT,
+                check=False,
+            )
+            self.assertEqual(printed.returncode, 0, printed.stderr)
+            self.assertIn("WARNING: the Quake tree is dirty", printed.stdout)
+
+    def test_the_ordinary_check_runs_the_quake_pin_check(self) -> None:
+        checked = run(
+            "make", "-n", "--no-print-directory", "check", cwd=ROOT, check=False
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertIn("tools/quake_disc.py verify", checked.stdout)
+
+    def test_layout_cannot_start_before_the_payload_is_verified(self) -> None:
+        laid_out = run(
+            "make",
+            "-n",
+            "--no-print-directory",
+            "disc-only",
+            "DIST=/tmp/psoxide-quake-contract",
+            cwd=ROOT,
+            check=False,
+        )
+        self.assertEqual(laid_out.returncode, 0, laid_out.stderr)
+        stamp_at = laid_out.stdout.index("programs.psoxide-revision")
+        verify_at = laid_out.stdout.index("tools/quake_disc.py verify")
+        layout_at = laid_out.stdout.index('--image "QUAKE SHAREWARE=')
+        receipt_at = laid_out.stdout.index("tools/quake_disc.py receipt")
+        self.assertLess(stamp_at, verify_at)
+        self.assertLess(verify_at, layout_at)
+        self.assertLess(layout_at, receipt_at)
 
 
 class HeadlessChainloadTests(unittest.TestCase):
-    @staticmethod
-    def make_disc_image(root: Path) -> Path:
+    QUAKE_LBA = 40
+    PAYLOAD_FNV = 0x1234_5678
+    MENU_VERSION = "q2d26f9e"
+
+    @classmethod
+    def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
+        """The default pressing's shape: one gated entry, nine, then Quake.
+
+        Ten visible programs plus the launcher's CREDITS card is eleven, and
+        the headless route's two RIGHT presses land on the tenth.
+        """
+        hidden = (("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),)
+        filler = tuple(
+            (f"PROGRAM {index}", 31 + index, 0) for index in range(9)
+        )
+        return hidden + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
+
+    @classmethod
+    def make_disc_image(
+        cls, root: Path, entries: tuple[tuple[str, int, int], ...] | None = None
+    ) -> Path:
+        entries = cls.default_entries() if entries is None else entries
         image = bytearray(42 * check_quake_headless.SECTOR_BYTES)
         toc = bytearray(
             check_quake_headless.TOC_SECTORS
             * check_quake_headless.USER_DATA_BYTES
         )
         toc[:8] = check_quake_headless.TOC_MAGIC
-        toc[8:12] = (3).to_bytes(4, "little")
-        entries = (
-            ("FIRST", 30, 0),
-            ("HIDDEN", 31, check_quake_headless.FLAG_HIDDEN),
-            ("QUAKE SHAREWARE", 40, 0),
-        )
+        toc[8:12] = len(entries).to_bytes(4, "little")
         for index, (name, lba, flags) in enumerate(entries):
             at = (
                 check_quake_headless.TOC_HEADER_BYTES
@@ -802,6 +1007,21 @@ class HeadlessChainloadTests(unittest.TestCase):
                 + check_quake_headless.TOC_FLAGS_AT
                 + 4
             ] = flags.to_bytes(4, "little")
+            if name != check_quake_headless.QUAKE_ENTRY:
+                continue
+            toc[
+                at
+                + check_quake_headless.TOC_PAYLOAD_FNV_AT : at
+                + check_quake_headless.TOC_PAYLOAD_FNV_AT
+                + 4
+            ] = cls.PAYLOAD_FNV.to_bytes(4, "little")
+            version = cls.MENU_VERSION.encode("ascii")
+            toc[
+                at
+                + check_quake_headless.TOC_VERSION_AT : at
+                + check_quake_headless.TOC_VERSION_AT
+                + len(version)
+            ] = version
         for sector in range(check_quake_headless.TOC_SECTORS):
             source = sector * check_quake_headless.USER_DATA_BYTES
             target = (
@@ -827,16 +1047,156 @@ class HeadlessChainloadTests(unittest.TestCase):
         path.write_bytes(image)
         return path
 
-    def test_route_selects_visible_quake_and_embedded_exe_is_valid(self) -> None:
+    def receipt_output(self, **overrides: object) -> dict[str, object]:
+        output = {
+            "quake_toc": {
+                "exe_lba": self.QUAKE_LBA,
+                "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+                "menu_version": self.MENU_VERSION,
+            },
+            "embedded_quake_data_sectors": 9_465,
+            "embedded_quake_matches_input_except_msf": True,
+        }
+        output.update(overrides)
+        return output
+
+    def test_route_selects_visible_quake_on_the_default_carousel(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             image = self.make_disc_image(Path(directory))
+            selected, menu, payload = check_quake_headless.quake_menu_entry(
+                image, self.QUAKE_LBA
+            )
+            self.assertEqual(len(menu), check_quake_headless.EXPECTED_MENU_ENTRIES)
             self.assertEqual(
-                check_quake_headless.menu_route_evidence(image, 40), (1, 3)
+                selected + 1, check_quake_headless.EXPECTED_MENU_POSITION
+            )
+            self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
+            self.assertEqual(menu[-1], "CREDITS")
+            self.assertNotIn("CORTEX IGNITION", menu)
+            self.assertEqual(
+                payload,
+                {
+                    "exe_lba": self.QUAKE_LBA,
+                    "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+                    "menu_version": self.MENU_VERSION,
+                },
             )
             self.assertEqual(
-                check_quake_headless.embedded_exe_evidence(image, 40),
+                check_quake_headless.embedded_exe_evidence(image, self.QUAKE_LBA),
                 (0x8001_0000, 0x8001_0000, 4_096),
             )
+
+    def test_a_disc_without_a_visible_quake_entry_fails(self) -> None:
+        cases = (
+            (
+                "absent",
+                tuple(
+                    entry
+                    for entry in self.default_entries()
+                    if entry[0] != check_quake_headless.QUAKE_ENTRY
+                )
+                + (("TENTH", 41, 0),),
+                "no QUAKE SHAREWARE entry",
+            ),
+            (
+                "hidden",
+                tuple(
+                    (name, lba, check_quake_headless.FLAG_HIDDEN)
+                    if name == check_quake_headless.QUAKE_ENTRY
+                    else (name, lba, flags)
+                    for name, lba, flags in self.default_entries()
+                ),
+                "hidden from the carousel",
+            ),
+            (
+                "wrong entry count",
+                self.default_entries() + (("EXTRA", 41, 0),),
+                "visible entries, expected",
+            ),
+        )
+        for label, entries, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                image = self.make_disc_image(Path(directory), entries)
+                with self.assertRaisesRegex(check_quake_headless.CheckError, error):
+                    check_quake_headless.quake_menu_entry(image, self.QUAKE_LBA)
+
+    def test_payload_identity_is_held_against_the_receipt(self) -> None:
+        payload = {
+            "exe_lba": self.QUAKE_LBA,
+            "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+            "menu_version": self.MENU_VERSION,
+        }
+        check_quake_headless.require_payload_identity(payload, self.receipt_output())
+        cases = (
+            ({"exe_lba": 41}, "exe_lba"),
+            ({"payload_fnv1a32": "0xdeadbeef"}, "payload_fnv1a32"),
+            ({"menu_version": "q0000000"}, "menu_version"),
+        )
+        for drift, error in cases:
+            with self.subTest(field=error):
+                toc = dict(self.receipt_output()["quake_toc"])
+                toc.update(drift)
+                with self.assertRaisesRegex(check_quake_headless.CheckError, error):
+                    check_quake_headless.require_payload_identity(
+                        payload, self.receipt_output(quake_toc=toc)
+                    )
+        with self.assertRaisesRegex(check_quake_headless.CheckError, "embedded Quake"):
+            check_quake_headless.require_payload_identity(
+                payload,
+                self.receipt_output(embedded_quake_matches_input_except_msf=False),
+            )
+
+    def test_replays_must_agree_on_everything_they_observed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            logs = {}
+            for kind in check_quake_headless.LOG_KINDS:
+                path = root / f"{kind}.csv"
+                path.write_text(f"{kind}\n", encoding="ascii")
+                logs[kind] = path
+            base = {"stdout_core": "same", **logs}
+            for field in check_quake_headless.DETERMINISTIC_FIELDS:
+                base[field] = 1
+            check_quake_headless.require_identical_replays(base, dict(base))
+
+            for field in check_quake_headless.DETERMINISTIC_FIELDS:
+                with self.subTest(field=field):
+                    drifted = dict(base)
+                    drifted[field] = 2
+                    with self.assertRaisesRegex(
+                        check_quake_headless.CheckError, field
+                    ):
+                        check_quake_headless.require_identical_replays(base, drifted)
+
+            other = dict(base)
+            other["stdout_core"] = "different"
+            with self.assertRaisesRegex(check_quake_headless.CheckError, "stdout"):
+                check_quake_headless.require_identical_replays(base, other)
+
+            second = root / "second-route.csv"
+            second.write_text("elsewhere\n", encoding="ascii")
+            drifted_log = dict(base)
+            drifted_log["route"] = second
+            with self.assertRaisesRegex(check_quake_headless.CheckError, "route"):
+                check_quake_headless.require_identical_replays(base, drifted_log)
+
+    def test_only_build_independent_values_are_pinned(self) -> None:
+        source = (ROOT / "tools" / "check_quake_headless.py").read_text(
+            encoding="ascii"
+        )
+        # These moved with the launcher binary, which changes on every commit
+        # here, so they are held to run-to-run equality and nothing more.
+        for pin in (
+            "EXPECTED_CYCLES",
+            "EXPECTED_PC ",
+            "EXPECTED_ROUTE_TICKS",
+            "EXPECTED_PAD_POLLS",
+            "EXPECTED_CD_COMMANDS",
+            "EXPECTED_LOG_SHA256",
+        ):
+            self.assertNotIn(pin, source)
+        for field in ("cycles", "route_ticks", "pad_polls"):
+            self.assertIn(field, check_quake_headless.DETERMINISTIC_FIELDS)
 
     def test_cd_evidence_requires_header_and_payload_read_sequences(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
