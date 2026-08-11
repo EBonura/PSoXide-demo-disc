@@ -162,17 +162,34 @@ After a build, run the two-pass headless gate with a release frontend:
 make quake-headless-check FRONTEND=/absolute/path/to/PSoXide/target/release/frontend
 ```
 
-It replays the exact launcher navigation and starts a new Quake game twice. It
-requires identical route logs, CD command logs, rendered display, and audio;
-requires route ticks and pad polls to agree across both runs; pins the final
-display hashes and CD command count; requires relocated reads within the Quake
-image; and rejects silent audio.
+It fast-boots this combined disc's real launcher through the frontend's HLE disc
+path, then replays two RIGHT presses and CROSS twice. The checker reads the
+pressed `PSXDEMO4` table first, so it fails if that exact route no longer lands
+on `QUAKE SHAREWARE`. It then requires, in order, the launcher's boot and
+chain-load TTY markers followed by Quake's own entry-point and successful Start
+map residency markers.
+
+No screenshot, PPM, frame dump, WAV, or instrumented guest is involved. Both
+runs must have byte-identical route, CD command, GPU command census, aggregate
+PC, PC callsite, and windowed PC logs. Their hashes, route ticks, pad polls, CD
+command count, final PC, cycles, and final VRAM/display hashes are pinned. The
+CD log must seek and read the Quake EXE header and payload at the table's exact
+relocated LBA, while the final PC must be inside the embedded Quake payload and
+the out-of-band sampler must observe that address range. This is the durable
+proof that the menu selected Quake, the loader verified and entered it, and
+Quake reached its own runtime.
 
 ## Runtime verification boundary
 
-Headless emulator evidence can prove that the demo launcher displays and
-chain-loads the Quake entry, and that Quake reaches its own rendered runtime.
-It cannot prove original-console CD timing, sustained `WORLD.PAK` streaming,
-DMA interaction, or drive behaviour. Those remain hardware gates. Do not call
-this release-ready until the combined cue has been burned and exercised on an
-original PlayStation.
+The regular BIOS-backed frontend path does not surface SDK TTY output, so a
+display hash on that path cannot identify which executable owns the pixels.
+The gate deliberately uses `--embedded-playtest`: only the first disc EXE boot
+is HLE; the launcher still reads the pressed table, handles the menu input, and
+runs the same high-RAM CD loader against the combined image. This makes the
+shipping launcher and Quake TTY markers capturable without changing either
+guest.
+
+Headless emulator evidence cannot prove original-console BIOS startup, CD
+timing, sustained `WORLD.PAK` streaming, DMA interaction, or drive behaviour.
+Those remain hardware gates. Do not call this release-ready until the combined
+cue has been burned and exercised on an original PlayStation.
