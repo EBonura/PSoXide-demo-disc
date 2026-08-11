@@ -23,7 +23,9 @@ make quake-disc-only  # reuse built programs and add the pinned Quake image
 
 It writes `PSoXide Demo Disc Quake Shareware.{bin,cue}` to a separate library
 directory, so it cannot overwrite either release pressing. It is not a public
-release target. See [the Quake local/test runbook](docs/quake-shareware-local-test.md).
+release target. The reuse and headless paths require a full-build PSoXide
+revision stamp, so stale ordinary-program artifacts fail closed. See
+[the Quake local/test runbook](docs/quake-shareware-local-test.md).
 
 ## How it boots
 
@@ -173,8 +175,12 @@ emulator next to everything else:
 ```
 
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
-different library. gh-psx keeps its audio in a gitignored `data/audio/`, so a
-fresh clone needs that dropped in before `make disc` will get past it.
+different library. `PSOXIDE=/absolute/path/to/PSoXide` selects the checkout
+used for every rebuilt program. Cortex is staged from that checkout's tracked
+`editor/samples/cortex_v1` sample into `build/`, keeping generated bake output
+outside the PSoXide worktree. gh-psx keeps its audio in a gitignored
+`data/audio/`, so a fresh clone needs that dropped in before `make disc` will
+get past it.
 
 Two release pressings exist: `make disc` builds the public one, and `make disc
 HL=1` adds Half-Life for show-floor demos. The `games/hl-psx` submodule is

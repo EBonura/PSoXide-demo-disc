@@ -29,7 +29,18 @@ TOC_DESC_BYTES = 224
 TOC_VERSION_BYTES = 16
 FULL_REVISION = re.compile(r"[0-9a-f]{40}\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-FILE_LINE = re.compile(r'^\s*FILE\s+"([^"]+)"\s+BINARY\s*$', re.IGNORECASE | re.MULTILINE)
+PSOXIDE_REV_FILE = Path("host/quake-build/main.rs")
+PSOXIDE_REV_LINE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?const\s+PSOXIDE_REV\b[^\n]*$", re.MULTILINE
+)
+PSOXIDE_REV_DECLARATION = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?const\s+PSOXIDE_REV\s*:\s*&str\s*=\s*"
+    r'"([^"]*)"\s*;\s*$',
+    re.MULTILINE,
+)
+FILE_LINE = re.compile(
+    r'^\s*FILE\s+"([^"]+)"\s+BINARY\s*$', re.IGNORECASE | re.MULTILINE
+)
 TRACK_LINE = re.compile(
     r"^\s*TRACK\s+([0-9]{2})\s+([^\s]+)\s*$", re.IGNORECASE | re.MULTILINE
 )
@@ -49,6 +60,9 @@ class VerificationError(RuntimeError):
 @dataclass(frozen=True)
 class VerifiedQuake:
     source_revision: str
+    declared_psoxide_revision: str
+    psoxide_revision: str
+    programs_psoxide_revision: str
     cue: Path
     bin: Path
     cue_sha256: str
@@ -75,7 +89,7 @@ def sha256(path: Path) -> str:
 
 
 def require_hex(value: str, pattern: re.Pattern[str], label: str) -> str:
-    normal = value.strip().lower()
+    normal = value.strip()
     if not pattern.fullmatch(normal):
         raise VerificationError(f"{label} must be a full lowercase hexadecimal value")
     return normal
@@ -93,6 +107,83 @@ def git(source: Path, *args: str) -> str:
         detail = result.stderr.strip() or result.stdout.strip()
         raise VerificationError(f"git {' '.join(args)} failed for {source}: {detail}")
     return result.stdout.strip()
+
+
+def verify_clean_checkout(
+    source: Path, expected_revision: str, label: str
+) -> tuple[Path, str]:
+    try:
+        source = source.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise VerificationError(f"{label} checkout does not exist: {source}") from error
+    if not source.is_dir():
+        raise VerificationError(f"{label} checkout is not a directory: {source}")
+    top = Path(git(source, "rev-parse", "--show-toplevel")).resolve()
+    if top != source:
+        raise VerificationError(
+            f"{label} checkout must name the repository root: {source} != {top}"
+        )
+    revision = git(source, "rev-parse", "--verify", "HEAD^{commit}").lower()
+    if revision != expected_revision:
+        raise VerificationError(
+            f"{label} checkout revision mismatch: expected {expected_revision}, got {revision}"
+        )
+    dirty = git(source, "status", "--porcelain=v1", "--untracked-files=normal")
+    if dirty:
+        raise VerificationError(
+            f"{label} checkout is dirty; exact revision provenance is false"
+        )
+    return source, revision
+
+
+def declared_psoxide_revision(source: Path) -> str:
+    declaration_path = source / PSOXIDE_REV_FILE
+    try:
+        text = declaration_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise VerificationError(
+            f"cannot read Quake PSOXIDE_REV declaration {declaration_path}: {error}"
+        ) from error
+    lines = PSOXIDE_REV_LINE.findall(text)
+    if len(lines) != 1:
+        raise VerificationError(
+            f"{declaration_path}: expected exactly one PSOXIDE_REV const declaration, "
+            f"found {len(lines)}"
+        )
+    match = PSOXIDE_REV_DECLARATION.fullmatch(lines[0])
+    if match is None:
+        raise VerificationError(
+            f"{declaration_path}: malformed PSOXIDE_REV const declaration"
+        )
+    return require_hex(match.group(1), FULL_REVISION, "Quake PSOXIDE_REV")
+
+
+def verify_programs_revision_stamp(stamp: Path, expected_revision: str) -> str:
+    try:
+        text = stamp.read_text(encoding="ascii")
+    except FileNotFoundError as error:
+        raise VerificationError(
+            f"ordinary-program SDK revision stamp does not exist: {stamp}; "
+            "run 'make quake-disc'"
+        ) from error
+    except (OSError, UnicodeDecodeError) as error:
+        raise VerificationError(
+            f"cannot read ordinary-program SDK revision stamp {stamp}: {error}"
+        ) from error
+    lines = text.splitlines()
+    if len(lines) != 1 or text != lines[0] + "\n":
+        raise VerificationError(
+            f"ordinary-program SDK revision stamp is malformed: {stamp}"
+        )
+    revision = require_hex(
+        lines[0], FULL_REVISION, "ordinary-program SDK revision stamp"
+    )
+    if revision != expected_revision:
+        raise VerificationError(
+            f"ordinary-program SDK revision mismatch: stamp has {revision}, "
+            f"but PSoXide checkout is {expected_revision}; run 'make quake-disc'"
+        )
+    return revision
 
 
 def cue_bin(cue: Path, *, data_only: bool) -> Path:
@@ -113,7 +204,11 @@ def cue_bin(cue: Path, *, data_only: bool) -> Path:
             f"{cue}: expected exactly one quoted FILE ... BINARY line, found {len(files)}"
         )
     relative = Path(files[0])
-    if relative.is_absolute() or len(relative.parts) != 1 or relative.name in {".", ".."}:
+    if (
+        relative.is_absolute()
+        or len(relative.parts) != 1
+        or relative.name in {".", ".."}
+    ):
         raise VerificationError(f"{cue}: FILE must name one bin beside the cue")
     bin_path = cue.parent / relative
     try:
@@ -121,13 +216,17 @@ def cue_bin(cue: Path, *, data_only: bool) -> Path:
     except FileNotFoundError as error:
         raise VerificationError(f"cue bin does not exist: {bin_path}") from error
     if resolved_bin.parent != cue.parent or not resolved_bin.is_file():
-        raise VerificationError(f"{cue}: FILE must resolve to a regular bin beside the cue")
+        raise VerificationError(
+            f"{cue}: FILE must resolve to a regular bin beside the cue"
+        )
 
     tracks = [(number, mode.upper()) for number, mode in TRACK_LINE.findall(text)]
     if not tracks or tracks[0] != ("01", "MODE2/2352"):
         raise VerificationError(f"{cue}: first track must be TRACK 01 MODE2/2352")
     if data_only and tracks != [("01", "MODE2/2352")]:
-        raise VerificationError(f"{cue}: pinned Quake input must contain one data track only")
+        raise VerificationError(
+            f"{cue}: pinned Quake input must contain one data track only"
+        )
     indices = [(number, time) for number, time in INDEX_LINE.findall(text)]
     if data_only and indices != [("01", "00:00:00")]:
         raise VerificationError(
@@ -157,7 +256,9 @@ def read_user_sectors(image: Path, lba: int, count: int) -> bytes:
 def quake_toc_entry(demo_bin: Path, expected_revision: str) -> QuakeTocEntry:
     toc = read_user_sectors(demo_bin, TOC_LBA, TOC_SECTORS)
     if toc[:8] != TOC_MAGIC:
-        raise VerificationError(f"{demo_bin}: no {TOC_MAGIC.decode()} table at LBA {TOC_LBA}")
+        raise VerificationError(
+            f"{demo_bin}: no {TOC_MAGIC.decode()} table at LBA {TOC_LBA}"
+        )
     count = int.from_bytes(toc[8:12], "little")
     if count == 0 or count > TOC_MAX_ENTRIES:
         raise VerificationError(f"{demo_bin}: invalid demo table entry count {count}")
@@ -175,7 +276,9 @@ def quake_toc_entry(demo_bin: Path, expected_revision: str) -> QuakeTocEntry:
         cdda_track_base = int.from_bytes(entry[numbers + 8 : numbers + 12], "little")
         payload_fnv = int.from_bytes(entry[numbers + 12 : numbers + 16], "little")
         description_at = numbers + 16
-        description = text_field(entry[description_at : description_at + TOC_DESC_BYTES])
+        description = text_field(
+            entry[description_at : description_at + TOC_DESC_BYTES]
+        )
         version_at = description_at + 2 * TOC_DESC_BYTES
         version = text_field(entry[version_at : version_at + TOC_VERSION_BYTES])
         matches.append(
@@ -208,7 +311,9 @@ def quake_toc_entry(demo_bin: Path, expected_revision: str) -> QuakeTocEntry:
     if entry.payload_fnv == 0:
         raise VerificationError(f"{demo_bin}: Quake loader payload checksum is zero")
     if "local test" not in entry.description.lower():
-        raise VerificationError(f"{demo_bin}: Quake description does not identify a local test build")
+        raise VerificationError(
+            f"{demo_bin}: Quake description does not identify a local test build"
+        )
     return entry
 
 
@@ -232,32 +337,40 @@ def verify_embedded_image(demo_bin: Path, quake_bin: Path, lba_offset: int) -> i
 
 def verify_quake(
     source: Path,
+    psoxide: Path,
+    programs_psoxide_stamp: Path,
     cue: Path,
     expected_revision: str,
+    expected_psoxide_revision: str,
     expected_cue_sha256: str,
     expected_bin_sha256: str,
 ) -> VerifiedQuake:
-    expected_revision = require_hex(expected_revision, FULL_REVISION, "expected revision")
-    expected_cue_sha256 = require_hex(expected_cue_sha256, SHA256, "expected cue SHA-256")
-    expected_bin_sha256 = require_hex(expected_bin_sha256, SHA256, "expected bin SHA-256")
+    expected_revision = require_hex(
+        expected_revision, FULL_REVISION, "expected revision"
+    )
+    expected_psoxide_revision = require_hex(
+        expected_psoxide_revision, FULL_REVISION, "expected PSoXide revision"
+    )
+    expected_cue_sha256 = require_hex(
+        expected_cue_sha256, SHA256, "expected cue SHA-256"
+    )
+    expected_bin_sha256 = require_hex(
+        expected_bin_sha256, SHA256, "expected bin SHA-256"
+    )
 
-    try:
-        source = source.resolve(strict=True)
-    except FileNotFoundError as error:
-        raise VerificationError(f"Quake source checkout does not exist: {source}") from error
-    if not source.is_dir():
-        raise VerificationError(f"Quake source checkout is not a directory: {source}")
-    top = Path(git(source, "rev-parse", "--show-toplevel")).resolve()
-    if top != source:
-        raise VerificationError(f"Quake source must name the repository root: {source} != {top}")
-    revision = git(source, "rev-parse", "--verify", "HEAD^{commit}").lower()
-    if revision != expected_revision:
+    source, revision = verify_clean_checkout(source, expected_revision, "Quake source")
+    declared_revision = declared_psoxide_revision(source)
+    _, psoxide_revision = verify_clean_checkout(
+        psoxide, expected_psoxide_revision, "PSoXide"
+    )
+    if declared_revision != psoxide_revision:
         raise VerificationError(
-            f"Quake source revision mismatch: expected {expected_revision}, got {revision}"
+            f"Quake PSOXIDE_REV mismatch: source declares {declared_revision}, "
+            f"but disc checkout is {psoxide_revision}"
         )
-    dirty = git(source, "status", "--porcelain=v1", "--untracked-files=normal")
-    if dirty:
-        raise VerificationError("Quake source checkout is dirty; exact revision provenance is false")
+    programs_psoxide_revision = verify_programs_revision_stamp(
+        programs_psoxide_stamp, psoxide_revision
+    )
 
     try:
         resolved_cue = cue.resolve(strict=True)
@@ -290,6 +403,9 @@ def verify_quake(
         )
     return VerifiedQuake(
         source_revision=revision,
+        declared_psoxide_revision=declared_revision,
+        psoxide_revision=psoxide_revision,
+        programs_psoxide_revision=programs_psoxide_revision,
         cue=resolved_cue,
         bin=resolved_bin,
         cue_sha256=cue_hash,
@@ -301,8 +417,11 @@ def verify_quake(
 def verify_from_args(args: argparse.Namespace) -> VerifiedQuake:
     return verify_quake(
         Path(args.source),
+        Path(args.psoxide),
+        Path(args.programs_psoxide_stamp),
         Path(args.cue),
         args.expected_revision,
+        args.expected_psoxide_revision,
         args.expected_cue_sha256,
         args.expected_bin_sha256,
     )
@@ -310,6 +429,9 @@ def verify_from_args(args: argparse.Namespace) -> VerifiedQuake:
 
 def print_verification(verified: VerifiedQuake) -> None:
     print(f"quake source revision: {verified.source_revision}")
+    print(f"quake declared PSoXide revision: {verified.declared_psoxide_revision}")
+    print(f"disc PSoXide revision: {verified.psoxide_revision}")
+    print(f"ordinary-program PSoXide revision: {verified.programs_psoxide_revision}")
     print(f"quake cue SHA-256: {verified.cue_sha256}")
     print(f"quake bin SHA-256: {verified.bin_sha256}")
     print(f"quake bin bytes: {verified.bin_bytes}")
@@ -329,20 +451,39 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
             f"demo bin is {demo_size} bytes, not a non-empty whole number of {SECTOR_BYTES}-byte sectors"
         )
     toc_entry = quake_toc_entry(demo_bin, verified.source_revision)
-    embedded_sectors = verify_embedded_image(demo_bin, verified.bin, toc_entry.lba_offset)
+    embedded_sectors = verify_embedded_image(
+        demo_bin, verified.bin, toc_entry.lba_offset
+    )
 
     receipt = {
-        "schema": 1,
+        "schema": 2,
         "variant": "quake-shareware-local-test",
         "redistribution": REDISTRIBUTION_GATE,
         "quake_input": {
             "source_revision": verified.source_revision,
             "source_tree_clean": True,
+            "declared_psoxide_revision": verified.declared_psoxide_revision,
             "cue_file": verified.cue.name,
             "cue_sha256": verified.cue_sha256,
             "bin_file": verified.bin.name,
             "bin_sha256": verified.bin_sha256,
             "bin_bytes": verified.bin_bytes,
+        },
+        "psoxide_input": {
+            "revision": verified.psoxide_revision,
+            "tree_clean": True,
+            "matches_quake_declared_revision": True,
+            "ordinary_programs_revision": verified.programs_psoxide_revision,
+            "ordinary_programs_match_checkout": True,
+        },
+        "quake_artifact_sdk_provenance": {
+            "status": "source-contract-only",
+            "proved": "Quake PSOXIDE_REV matches the clean demo-disc PSoXide checkout",
+            "not_proved": "the pinned Quake cue was built from that checkout",
+            "required_follow_up": (
+                "consume a Quake build sidecar binding source revision, PSoXide revision, "
+                "and cue/bin hashes"
+            ),
         },
         "demo_disc_output": {
             "cue_file": demo_cue.name,
@@ -364,15 +505,20 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     temporary = out.with_name(out.name + ".tmp")
-    temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    temporary.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="ascii"
+    )
     temporary.replace(out)
     return out
 
 
 def add_verification_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source", required=True)
+    parser.add_argument("--psoxide", required=True)
+    parser.add_argument("--programs-psoxide-stamp", required=True)
     parser.add_argument("--cue", required=True)
     parser.add_argument("--expected-revision", required=True)
+    parser.add_argument("--expected-psoxide-revision", required=True)
     parser.add_argument("--expected-cue-sha256", required=True)
     parser.add_argument("--expected-bin-sha256", required=True)
 
@@ -380,9 +526,13 @@ def add_verification_args(parser: argparse.ArgumentParser) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    verify = commands.add_parser("verify", help="verify the pinned Quake source and image")
+    verify = commands.add_parser(
+        "verify", help="verify the pinned Quake source and image"
+    )
     add_verification_args(verify)
-    receipt = commands.add_parser("receipt", help="verify again and hash the combined output")
+    receipt = commands.add_parser(
+        "receipt", help="verify again and hash the combined output"
+    )
     add_verification_args(receipt)
     receipt.add_argument("--demo-cue", required=True)
     receipt.add_argument("--demo-bin", required=True)

@@ -4,16 +4,16 @@
 # them out into the PSoXide game library as one disc. `make check` runs the
 # host tests.
 #
-# Two of the eleven cannot be rebuilt from a fresh clone: Cortex Ignition's
-# project lives under editor/projects/, which PSoXide gitignores, and hl-psx
-# keeps its cooked assets and music outside git too. Both are staged from the
-# sibling working trees. See PLAN.md.
+# Half-Life cannot be rebuilt from a fresh clone because its cooked assets and
+# music live outside Git. Cortex Ignition is staged from PSoXide's tracked,
+# miniaturized editor sample so the disc no longer depends on editor/projects/.
 
-.PHONY: help disc disc-only quake-disc quake-disc-only quake-verify quake-headless-check _quake-headless-check programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-disc quake-disc-only quake-verify quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
-PSOXIDE    := $(ROOT)/games/PSoXide
+PSOXIDE    ?= $(ROOT)/games/PSoXide
 BUILD      := $(ROOT)/build
+QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
 EXAMPLES   := $(PSOXIDE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
@@ -52,6 +52,7 @@ override QUAKE := $(filter-out 0,$(QUAKE))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-combat-adversarial-review)
 QUAKE_CUE ?= $(QUAKE_SRC)/build-psoxide/quake-psx.cue
 QUAKE_EXPECTED_REV ?= 1fd5173a656cb209b4a10bcbb37d34cc4a0650b0
+QUAKE_EXPECTED_PSOXIDE_REV ?= f9f83c35b140560c123771893a1fc3e426814550
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
 QUAKE_EXPECTED_BIN_SHA256 ?= 5f5316381763ca54783818097e228762667d6d99e70dd42af04cddd1216c21c1
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
@@ -87,7 +88,10 @@ PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX   := $(PSOXIDE)/editor/projects/cortex_v1/baked/cortex_v1.cue
+CORTEX_SOURCE := $(PSOXIDE)/editor/samples/cortex_v1
+CORTEX_PROJECT := $(BUILD)/cortex_v1
+CORTEX := $(CORTEX_PROJECT)/baked/cortex_v1.cue
+CORTEX_REV_STAMP := $(CORTEX_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
 NITROXIDE_SRC ?= $(GAMES)/nitroxide
@@ -186,31 +190,75 @@ ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
 endif
 
-# Bake Cortex Ignition only when its project has actually changed.
+# A full Quake build must establish that its ordinary demo-disc programs were
+# rebuilt from the same clean PSoXide revision the Quake source declares.
+# Remove the prior stamp before rebuilding, check the hydration markers after
+# every program recipe finishes, then write the exact clean checkout revision.
+quake-programs:
+	@rm -f "$(QUAKE_PROGRAMS_STAMP)"
+	$(MAKE) programs
+	$(MAKE) sdk-coherence
+	@revision=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	dirty=$$(git -C "$(PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
+	if [ -n "$$dirty" ]; then \
+		echo "quake-programs: PSoXide checkout is dirty; refusing SDK stamp"; \
+		exit 1; \
+	fi; \
+	mkdir -p "$(BUILD)" || exit 1; \
+	temporary="$(QUAKE_PROGRAMS_STAMP).tmp"; \
+	printf '%s\n' "$$revision" > "$$temporary" || exit 1; \
+	mv "$$temporary" "$(QUAKE_PROGRAMS_STAMP)"
+
+# disc-only deliberately reuses binaries. For Quake, that is permitted only
+# after quake-programs recorded this checkout's full revision. This also makes
+# quake-headless-check fail closed instead of replaying stale ordinary games.
+quake-programs-verify:
+	@if [ ! -f "$(QUAKE_PROGRAMS_STAMP)" ]; then \
+		echo "quake-programs: missing $(QUAKE_PROGRAMS_STAMP); run 'make quake-disc'"; \
+		exit 1; \
+	fi; \
+	lines=$$(wc -l < "$(QUAKE_PROGRAMS_STAMP)" | tr -d '[:space:]'); \
+	stamped=$$(sed -n '1p' "$(QUAKE_PROGRAMS_STAMP)"); \
+	if [ "$$lines" != 1 ] || ! printf '%s\n' "$$stamped" | grep -Eq '^[0-9a-f]{40}$$'; then \
+		echo "quake-programs: malformed SDK revision stamp $(QUAKE_PROGRAMS_STAMP)"; \
+		exit 1; \
+	fi; \
+	current=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	if [ "$$stamped" != "$$current" ]; then \
+		echo "quake-programs: SDK revision stamp is $$stamped, but PSoXide is $$current; run 'make quake-disc'"; \
+		exit 1; \
+	fi
+
+# Bake Cortex Ignition only when its tracked sample or PSoXide revision changed.
 #
 # The bake shells out to the PSoXide frontend, which is built with the
 # editor feature by default -- so re-baking compiles the whole host
 # editor, including crates that have nothing to do with the disc. The
 # project itself changes rarely (it is authored content, not code), so
-# every other build was paying for a rebuild that produced identical
-# bytes, and coupling the disc to whatever state the editor happened to
-# be in. Now the bake runs only if a project file is newer than the
-# baked cue, and `make disc CORTEX_FORCE=1` overrides. find needs -L and
-# a trailing slash: cortex_v1 is a symlink into the sibling PSoXide
-# checkout, and find will not descend one otherwise -- which silently
-# made the check answer "unchanged" no matter what.
+# every other build was paying for a rebuild that produced identical bytes.
+# The authored editor/projects copy is untracked, so it cannot support a clean
+# checkout provenance claim. Stage the tracked editor/samples project under
+# build/ before baking. Generated output then stays out of PSoXide, and the
+# revision stamp forces a rebuild when the SDK/editor checkout advances.
 #
 # The proper fix is to split the frontend's `editor` feature so the
 # authoring CLI does not drag the GUI in with it. That is a bigger job;
 # this removes the coupling in the meantime.
-CORTEX_PROJECT := $(PSOXIDE)/editor/projects/cortex_v1
 CORTEX_FORCE   ?=
 
 .PHONY: cortex-if-stale
 cortex-if-stale:
-	@if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX)" ] || [ -n "$$(find -L "$(CORTEX_PROJECT)/" -type f -newer "$(CORTEX)" -not -path '*/baked/*' -print -quit 2>/dev/null)" ]; then \
-		echo "cortex: project changed (or forced) -- baking"; \
-		$(MAKE) -C $(PSOXIDE) cortex-ignition-v1-project-disc; \
+	@current_rev=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	stamped_rev=$$(sed -n '1p' "$(CORTEX_REV_STAMP)" 2>/dev/null || true); \
+	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_SOURCE)/" -type f -newer "$(CORTEX)" -print -quit 2>/dev/null)" ]; then \
+		echo "cortex: tracked sample or PSoXide revision changed (or forced) -- baking"; \
+		case "$(BUILD)" in ""|"/") echo "cortex: unsafe build root $(BUILD)"; exit 1 ;; esac; \
+		case "$(CORTEX_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex: unsafe staging path $(CORTEX_PROJECT)"; exit 1 ;; esac; \
+		rm -rf "$(CORTEX_PROJECT)" || exit 1; \
+		mkdir -p "$(CORTEX_PROJECT)" || exit 1; \
+		cp -R "$(CORTEX_SOURCE)/." "$(CORTEX_PROJECT)/" || exit 1; \
+		(cd "$(PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_PROJECT)") || exit 1; \
+		printf '%s\n' "$$current_rev" > "$(CORTEX_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex: project unchanged -- reusing $(CORTEX)"; \
 	fi
@@ -238,10 +286,13 @@ ifneq ($(QUAKE),)
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1 on the original PlayStation. This local test checkpoint cooks all Episode 1 maps and streams them from the embedded Quake disc image; runtime work is still in progress.|Quake 1.06 shareware Episodio 1 sulla PlayStation originale. Questo checkpoint di test locale converte tutte le mappe e le carica dal disco Quake incorporato; il runtime e ancora in sviluppo."
-QUAKE_PREREQS = quake-verify
+QUAKE_PREREQS = quake-programs-verify quake-verify
+DISC_PROGRAMS = quake-programs
+else
+DISC_PROGRAMS = programs
 endif
 
-disc: launcher programs mkdisc
+disc: launcher $(DISC_PROGRAMS) mkdisc
 	$(MAKE) disc-only
 
 quake-disc:
@@ -263,8 +314,11 @@ _quake-headless-check:
 quake-verify:
 	python3 tools/quake_disc.py verify \
 		--source "$(QUAKE_SRC)" \
+		--psoxide "$(PSOXIDE)" \
+		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
+		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
 		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)"
 
@@ -352,8 +406,11 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 
 	$(if $(QUAKE),python3 tools/quake_disc.py receipt \
 		--source "$(QUAKE_SRC)" \
+		--psoxide "$(PSOXIDE)" \
+		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
+		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
 		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
 		--demo-cue "$(DIST)/$(DISC_NAME).cue" \
