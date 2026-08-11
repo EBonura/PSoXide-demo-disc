@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chain-load Quake twice and require deterministic, no-image runtime proof."""
+"""Chain-load Quake twice off the default disc, with no-image runtime proof."""
 
 from __future__ import annotations
 
@@ -17,21 +17,37 @@ from pathlib import Path
 STEPS = "500000000"
 PRESS_ROUTE = "400:right:8,600:right:8,1000:cross:12"
 EXPECTED_TICK = 500_000_000
-EXPECTED_CYCLES = 1_481_482_337
-EXPECTED_PC = 0x8002_BAEC
-EXPECTED_ROUTE_TICKS = 2_593
-EXPECTED_PAD_POLLS = 963
-EXPECTED_CD_COMMANDS = 628
+EXPECTED_DISPLAY = (320, 240)
+# The default pressing's carousel: ten programs plus the CREDITS card. Cortex
+# Ignition is on the disc but gated behind the Konami code, so it is not one of
+# them. If this number moves, the disc gained or lost a program and the route
+# below no longer lands where it thinks it does.
+EXPECTED_MENU_ENTRIES = 11
+EXPECTED_MENU_POSITION = 10
+# The frame both replays end on, hashed by the emulator. This pair is Quake's
+# output, and it survives things that move every cycle count on the disc: a
+# launcher rebuilt from a different absolute path, a different DISC_VERSION
+# string, a renamed pressing. Recompute it when the Quake or PSoXide pin moves.
+#
+# Absolute cycle counts, route ticks, pad polls, CD command totals and log
+# digests are deliberately NOT pinned here. They shift with the launcher binary,
+# which changes on every commit to this repo (DISC_VERSION is `git describe`),
+# so pinning them would have made the default gate fail on unrelated work. They
+# are held to run-to-run equality instead, which is what determinism means.
 EXPECTED_VRAM_FNV = "0x241697c63ac089f8"
 EXPECTED_DISPLAY_FNV = "0x0b71dc6a3eb2f462"
-EXPECTED_LOG_SHA256 = {
-    "route": "ae24ff07aa1ea72359e5c31e194bb4326d806cff2715cb3f545865625489be61",
-    "cd": "f74b90314d1641351e7c4b9af1a2206f6e1cc6314b432fdfc2cc4ceac3a60ae6",
-    "gpu": "5b7dcbf2d646c77cb874a8d4a17e984a000076ebafe9b1b05723ba532abc8c44",
-    "pc": "53a5702c80411460e220338f8cc44704d0b01f95de8bed2ca6daca7d6baa9296",
-    "pc_callsite": "59c583e2017ae49d1154b69dd16e70ba3dc947e044ba9a7e42441933c622652a",
-    "pc_window": "7a662b8fcb0d90a2605c8d2301431f363effabb3b813b43c9bf460490ffd82fc",
-}
+DETERMINISTIC_FIELDS = (
+    "tick",
+    "cycles",
+    "pc_final",
+    "route_ticks",
+    "pad_polls",
+    "vram_fnv",
+    "display_fnv",
+    "display_width",
+    "display_height",
+)
+LOG_KINDS = ("route", "cd", "gpu", "pc", "pc_callsite", "pc_window")
 MARKERS = (
     "launcher: booted",
     "launcher: chain-loading",
@@ -62,9 +78,14 @@ TOC_MAGIC = b"PSXDEMO4"
 TOC_HEADER_BYTES = 0x16C
 TOC_ENTRY_BYTES = 512
 TOC_NAME_BYTES = 24
+TOC_PAYLOAD_FNV_AT = 36
+TOC_DESC_BYTES = 224
+TOC_VERSION_AT = 40 + 2 * TOC_DESC_BYTES
+TOC_VERSION_BYTES = 16
 TOC_FLAGS_AT = 504
 TOC_MAX_ENTRIES = (TOC_SECTORS * USER_DATA_BYTES - TOC_HEADER_BYTES) // TOC_ENTRY_BYTES
 FLAG_HIDDEN = 1
+QUAKE_ENTRY = "QUAKE SHAREWARE"
 PSX_EXE_MAGIC = b"PS-X EXE"
 
 
@@ -102,7 +123,12 @@ def route_button_count(button: str) -> int:
     )
 
 
-def menu_route_evidence(image: Path, quake_lba: int) -> tuple[int, int]:
+def quake_menu_entry(image: Path, quake_lba: int) -> tuple[int, list[str], dict]:
+    """Where QUAKE SHAREWARE sits in the carousel, and what the table says it is.
+
+    Returns the selected index, the visible entry names, and the table's own
+    record of the payload, so the caller can hold both against the receipt.
+    """
     toc = read_user_sectors(image, TOC_LBA, TOC_SECTORS)
     if toc[:8] != TOC_MAGIC:
         raise CheckError(f"{image}: missing {TOC_MAGIC.decode()} at LBA {TOC_LBA}")
@@ -111,16 +137,41 @@ def menu_route_evidence(image: Path, quake_lba: int) -> tuple[int, int]:
         raise CheckError(f"{image}: invalid demo table entry count {count}")
 
     visible: list[tuple[str, int]] = []
+    payload: dict | None = None
     for index in range(count):
         at = TOC_HEADER_BYTES + index * TOC_ENTRY_BYTES
         entry = toc[at : at + TOC_ENTRY_BYTES]
         name = entry[:TOC_NAME_BYTES].split(b"\0", 1)[0].decode("ascii")
         exe_lba = int.from_bytes(entry[TOC_NAME_BYTES : TOC_NAME_BYTES + 4], "little")
         flags = int.from_bytes(entry[TOC_FLAGS_AT : TOC_FLAGS_AT + 4], "little")
+        if name == QUAKE_ENTRY:
+            if payload is not None:
+                raise CheckError(f"{image}: more than one {QUAKE_ENTRY} table entry")
+            if flags & FLAG_HIDDEN:
+                raise CheckError(f"{image}: {QUAKE_ENTRY} is hidden from the carousel")
+            payload = {
+                "exe_lba": exe_lba,
+                "payload_fnv1a32": "0x{:08x}".format(
+                    int.from_bytes(
+                        entry[TOC_PAYLOAD_FNV_AT : TOC_PAYLOAD_FNV_AT + 4], "little"
+                    )
+                ),
+                "menu_version": entry[TOC_VERSION_AT : TOC_VERSION_AT + TOC_VERSION_BYTES]
+                .split(b"\0", 1)[0]
+                .decode("ascii"),
+            }
         if flags & FLAG_HIDDEN == 0:
             visible.append((name, exe_lba))
+    if payload is None:
+        raise CheckError(f"{image}: no {QUAKE_ENTRY} entry in the disc table")
     if visible and len(visible) < TOC_MAX_ENTRIES:
         visible.append(("CREDITS", 0))
+    if len(visible) != EXPECTED_MENU_ENTRIES:
+        raise CheckError(
+            f"{image}: carousel has {len(visible)} visible entries, "
+            f"expected {EXPECTED_MENU_ENTRIES}: "
+            + ", ".join(name for name, _ in visible)
+        )
 
     right_presses = route_button_count("right")
     cross_presses = route_button_count("cross")
@@ -128,12 +179,32 @@ def menu_route_evidence(image: Path, quake_lba: int) -> tuple[int, int]:
         raise CheckError("headless route no longer has two RIGHT presses and one CROSS")
     selected = (-right_presses) % len(visible)
     selected_name, selected_lba = visible[selected]
-    if selected_name != "QUAKE SHAREWARE" or selected_lba != quake_lba:
+    if selected_name != QUAKE_ENTRY or selected_lba != quake_lba:
         raise CheckError(
             f"menu route selects {selected_name!r} at LBA {selected_lba}, "
             f"not Quake at LBA {quake_lba}"
         )
-    return selected, len(visible)
+    if selected + 1 != EXPECTED_MENU_POSITION:
+        raise CheckError(
+            f"{QUAKE_ENTRY} is carousel entry {selected + 1}, "
+            f"expected {EXPECTED_MENU_POSITION}"
+        )
+    return selected, [name for name, _ in visible], payload
+
+
+def require_payload_identity(payload: dict, output: dict) -> None:
+    """The disc the emulator just ran has to be the one the receipt describes."""
+    recorded = output["quake_toc"]
+    for field in ("exe_lba", "payload_fnv1a32", "menu_version"):
+        if payload[field] != recorded[field]:
+            raise CheckError(
+                f"disc table {field} {payload[field]!r} does not match the "
+                f"receipt's {recorded[field]!r}"
+            )
+    if output.get("embedded_quake_matches_input_except_msf") is not True:
+        raise CheckError("receipt does not claim the embedded Quake image is the pinned one")
+    if not output["embedded_quake_data_sectors"] > 0:
+        raise CheckError("receipt records no embedded Quake data sectors")
 
 
 def embedded_exe_evidence(image: Path, quake_lba: int) -> tuple[int, int, int]:
@@ -324,18 +395,29 @@ def same(first: Path, second: Path, label: str) -> str:
 def require_pins(result: dict[str, object], label: str) -> None:
     expected = {
         "tick": EXPECTED_TICK,
-        "cycles": EXPECTED_CYCLES,
-        "pc_final": EXPECTED_PC,
-        "route_ticks": EXPECTED_ROUTE_TICKS,
-        "pad_polls": EXPECTED_PAD_POLLS,
         "vram_fnv": EXPECTED_VRAM_FNV,
         "display_fnv": EXPECTED_DISPLAY_FNV,
-        "display_width": 320,
-        "display_height": 240,
+        "display_width": EXPECTED_DISPLAY[0],
+        "display_height": EXPECTED_DISPLAY[1],
     }
     for key, value in expected.items():
         if result[key] != value:
             raise CheckError(f"{label} {key} {result[key]!r} != {value!r}")
+
+
+def require_identical_replays(first: dict, second: dict) -> dict[str, str]:
+    """Two replays of one disc have to agree on everything they observed."""
+    if first["stdout_core"] != second["stdout_core"]:
+        raise CheckError("programmatic stdout differs between replays")
+    for field in DETERMINISTIC_FIELDS:
+        if first[field] != second[field]:
+            raise CheckError(
+                f"{field} differs between replays: {first[field]!r} != {second[field]!r}"
+            )
+    return {
+        kind: same(first[kind], second[kind], kind.replace("_", " "))
+        for kind in LOG_KINDS
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -374,60 +456,67 @@ def main() -> int:
         if cue_files != [image.name]:
             raise CheckError("cue does not point to the receipt BIN beside it")
 
-        selected, menu_count = menu_route_evidence(image, quake_lba)
+        selected, menu, payload = quake_menu_entry(image, quake_lba)
+        require_payload_identity(payload, output)
         entry_pc, load_addr, payload_bytes = embedded_exe_evidence(image, quake_lba)
         with tempfile.TemporaryDirectory(prefix="psoxide-quake-chainload-") as directory:
             root = Path(directory)
-            first = run_once(frontend, cue, root, "first")
-            second = run_once(frontend, cue, root, "second")
-            require_pins(first, "first")
-            require_pins(second, "second")
-            if first["stdout_core"] != second["stdout_core"]:
-                raise CheckError("programmatic stdout differs between replays")
-
-            hashes: dict[str, str] = {}
-            for key in EXPECTED_LOG_SHA256:
-                hashes[key] = same(first[key], second[key], key.replace("_", " "))
-                if hashes[key] != EXPECTED_LOG_SHA256[key]:
+            replays = {
+                name: run_once(frontend, cue, root, name)
+                for name in ("first", "second")
+            }
+            for name, replay in replays.items():
+                require_pins(replay, name)
+                if not load_addr <= replay["pc_final"] < load_addr + payload_bytes:
                     raise CheckError(
-                        f"{key} SHA-256 {hashes[key]} != {EXPECTED_LOG_SHA256[key]}"
+                        f"{name} final PC {replay['pc_final']:#010x} is outside "
+                        "the Quake payload"
                     )
+            first, second = replays["first"], replays["second"]
+            require_identical_replays(first, second)
 
-            commands, payload_sectors, runtime_read_lba = cd_evidence(
-                first["cd"],
-                quake_lba,
-                payload_bytes,
-                image_lba,
-                image_sectors,
-            )
-            if commands != EXPECTED_CD_COMMANDS:
-                raise CheckError(f"CD command count {commands} != {EXPECTED_CD_COMMANDS}")
-            if not load_addr <= first["pc_final"] < load_addr + payload_bytes:
-                raise CheckError(
-                    f"final PC {first['pc_final']:#010x} is outside Quake payload"
+            evidence = {
+                name: cd_evidence(
+                    replay["cd"], quake_lba, payload_bytes, image_lba, image_sectors
                 )
-            pc_samples = pc_evidence(first["pc"], load_addr, payload_bytes)
+                for name, replay in replays.items()
+            }
+            samples = {
+                name: pc_evidence(replay["pc"], load_addr, payload_bytes)
+                for name, replay in replays.items()
+            }
+            _, payload_sectors, _ = evidence["first"]
 
-            print("headless chainload replays: 2 identical")
+            print(f"disc: {image.name}")
             print(
-                f"menu: entry {selected + 1}/{menu_count} selects QUAKE SHAREWARE; "
-                f"EXE LBA {quake_lba}"
+                f"menu: {len(menu)} visible entries, {QUAKE_ENTRY} at "
+                f"{selected + 1}/{len(menu)}: " + ", ".join(menu)
             )
             print(
-                f"loader: {payload_sectors} payload sectors verified; "
-                f"Quake entry {entry_pc:#010x}; final PC {first['pc_final']:#010x}"
+                f"payload matches receipt: EXE LBA {payload['exe_lba']}, "
+                f"FNV-1a-32 {payload['payload_fnv1a32']}, "
+                f"menu version {payload['menu_version']}, "
+                f"{image_sectors} embedded sectors"
             )
-            print(f"relocated Quake runtime read: LBA {runtime_read_lba}")
-            print("runtime markers: Quake boot and Start map resident")
+            print(f"loader: {payload_sectors} payload sectors; entry {entry_pc:#010x}")
+            for name in ("first", "second"):
+                replay, (replay_commands, _, replay_read) = replays[name], evidence[name]
+                print(
+                    f"chain-load {name}: booted, chain-loaded, Quake Start map "
+                    f"resident; final PC {replay['pc_final']:#010x}; "
+                    f"relocated runtime read LBA {replay_read}; "
+                    f"{replay_commands} CD commands; "
+                    f"{samples[name]} PC samples inside the payload"
+                )
+            print("both replays identical: stdout, summaries and all six logs")
             print(
                 f"route ticks: {first['route_ticks']}; pad polls: {first['pad_polls']}; "
-                f"CD commands: {commands}"
+                f"cycles: {first['cycles']}"
             )
             print(
                 f"VRAM/display FNV-1a-64: {first['vram_fnv']} / "
                 f"{first['display_fnv']}"
             )
-            print(f"PC samples in loaded payload address range: {pc_samples}")
             print("no screenshots, frame dumps, audio dumps, or guest instrumentation used")
         return 0
     except (
