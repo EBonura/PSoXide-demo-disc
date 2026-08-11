@@ -14,6 +14,17 @@ make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
 make check     # host tests
 ```
 
+The Quake shareware build is a third, deliberately local/test-only variant:
+
+```bash
+make quake-disc       # rebuild programs, then add the pinned Quake image
+make quake-disc-only  # reuse built programs and add the pinned Quake image
+```
+
+It writes `PSoXide Demo Disc Quake Shareware.{bin,cue}` to a separate library
+directory, so it cannot overwrite either release pressing. It is not a public
+release target. See [the Quake local/test runbook](docs/quake-shareware-local-test.md).
+
 ## How it boots
 
 The BIOS reads `SYSTEM.CNF`, loads `PSX.EXE` (the launcher), and runs it. The
@@ -80,6 +91,11 @@ and do not care which SDK built them: a `_start` that ignores the loader's
 arguments is still a correct `_start`. Voxide and NitroXide load `WORLD.PAK`
 at startup, so their complete images ride the same relocation path as the
 larger streaming games.
+
+The opt-in local/test variant adds `QUAKE SHAREWARE` as one more whole image.
+Quake streams `WORLD.PAK`, so a bare executable is not sufficient. The entry
+uses the same caller-provided LBA offset that relocates Voxide, NitroXide, and
+the other streaming programs.
 
 ## The menu
 
@@ -160,7 +176,8 @@ Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
 different library. gh-psx keeps its audio in a gitignored `data/audio/`, so a
 fresh clone needs that dropped in before `make disc` will get past it.
 
-Two pressings exist: `make disc` builds the public one, and `make disc HL=1`
-adds Half-Life for show-floor demos. The `games/hl-psx` submodule is private
-until its own release, so a fresh clone should init the other submodules
-selectively and stick to the default pressing.
+Two release pressings exist: `make disc` builds the public one, and `make disc
+HL=1` adds Half-Life for show-floor demos. The `games/hl-psx` submodule is
+private until its own release, so a fresh clone should init the other
+submodules selectively and stick to the default pressing. `make quake-disc`
+is a separate local/test artifact and cannot be combined with `HL=1`.
