@@ -5,6 +5,12 @@ __pycache__/
 *.bin
 *.cue
 
+# id Software's shareware data never belongs here. It lives in the Quake tree
+# that builds the image, and this repo only ever holds hashes of the result.
+*.PAK
+*.pak
+quake106.zip
+
 # Local planning and knowledge-graph output, never shipped.
 PLAN.md
 SESSION.md
