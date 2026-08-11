@@ -909,20 +909,35 @@ class FailClosedDefaultTests(unittest.TestCase):
 
 
 class HeadlessChainloadTests(unittest.TestCase):
-    @staticmethod
-    def make_disc_image(root: Path) -> Path:
+    QUAKE_LBA = 40
+    PAYLOAD_FNV = 0x1234_5678
+    MENU_VERSION = "q2d26f9e"
+
+    @classmethod
+    def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
+        """The default pressing's shape: one gated entry, nine, then Quake.
+
+        Ten visible programs plus the launcher's CREDITS card is eleven, and
+        the headless route's two RIGHT presses land on the tenth.
+        """
+        hidden = (("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),)
+        filler = tuple(
+            (f"PROGRAM {index}", 31 + index, 0) for index in range(9)
+        )
+        return hidden + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
+
+    @classmethod
+    def make_disc_image(
+        cls, root: Path, entries: tuple[tuple[str, int, int], ...] | None = None
+    ) -> Path:
+        entries = cls.default_entries() if entries is None else entries
         image = bytearray(42 * check_quake_headless.SECTOR_BYTES)
         toc = bytearray(
             check_quake_headless.TOC_SECTORS
             * check_quake_headless.USER_DATA_BYTES
         )
         toc[:8] = check_quake_headless.TOC_MAGIC
-        toc[8:12] = (3).to_bytes(4, "little")
-        entries = (
-            ("FIRST", 30, 0),
-            ("HIDDEN", 31, check_quake_headless.FLAG_HIDDEN),
-            ("QUAKE SHAREWARE", 40, 0),
-        )
+        toc[8:12] = len(entries).to_bytes(4, "little")
         for index, (name, lba, flags) in enumerate(entries):
             at = (
                 check_quake_headless.TOC_HEADER_BYTES
@@ -942,6 +957,21 @@ class HeadlessChainloadTests(unittest.TestCase):
                 + check_quake_headless.TOC_FLAGS_AT
                 + 4
             ] = flags.to_bytes(4, "little")
+            if name != check_quake_headless.QUAKE_ENTRY:
+                continue
+            toc[
+                at
+                + check_quake_headless.TOC_PAYLOAD_FNV_AT : at
+                + check_quake_headless.TOC_PAYLOAD_FNV_AT
+                + 4
+            ] = cls.PAYLOAD_FNV.to_bytes(4, "little")
+            version = cls.MENU_VERSION.encode("ascii")
+            toc[
+                at
+                + check_quake_headless.TOC_VERSION_AT : at
+                + check_quake_headless.TOC_VERSION_AT
+                + len(version)
+            ] = version
         for sector in range(check_quake_headless.TOC_SECTORS):
             source = sector * check_quake_headless.USER_DATA_BYTES
             target = (
@@ -967,16 +997,156 @@ class HeadlessChainloadTests(unittest.TestCase):
         path.write_bytes(image)
         return path
 
-    def test_route_selects_visible_quake_and_embedded_exe_is_valid(self) -> None:
+    def receipt_output(self, **overrides: object) -> dict[str, object]:
+        output = {
+            "quake_toc": {
+                "exe_lba": self.QUAKE_LBA,
+                "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+                "menu_version": self.MENU_VERSION,
+            },
+            "embedded_quake_data_sectors": 9_465,
+            "embedded_quake_matches_input_except_msf": True,
+        }
+        output.update(overrides)
+        return output
+
+    def test_route_selects_visible_quake_on_the_default_carousel(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             image = self.make_disc_image(Path(directory))
+            selected, menu, payload = check_quake_headless.quake_menu_entry(
+                image, self.QUAKE_LBA
+            )
+            self.assertEqual(len(menu), check_quake_headless.EXPECTED_MENU_ENTRIES)
             self.assertEqual(
-                check_quake_headless.menu_route_evidence(image, 40), (1, 3)
+                selected + 1, check_quake_headless.EXPECTED_MENU_POSITION
+            )
+            self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
+            self.assertEqual(menu[-1], "CREDITS")
+            self.assertNotIn("CORTEX IGNITION", menu)
+            self.assertEqual(
+                payload,
+                {
+                    "exe_lba": self.QUAKE_LBA,
+                    "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+                    "menu_version": self.MENU_VERSION,
+                },
             )
             self.assertEqual(
-                check_quake_headless.embedded_exe_evidence(image, 40),
+                check_quake_headless.embedded_exe_evidence(image, self.QUAKE_LBA),
                 (0x8001_0000, 0x8001_0000, 4_096),
             )
+
+    def test_a_disc_without_a_visible_quake_entry_fails(self) -> None:
+        cases = (
+            (
+                "absent",
+                tuple(
+                    entry
+                    for entry in self.default_entries()
+                    if entry[0] != check_quake_headless.QUAKE_ENTRY
+                )
+                + (("TENTH", 41, 0),),
+                "no QUAKE SHAREWARE entry",
+            ),
+            (
+                "hidden",
+                tuple(
+                    (name, lba, check_quake_headless.FLAG_HIDDEN)
+                    if name == check_quake_headless.QUAKE_ENTRY
+                    else (name, lba, flags)
+                    for name, lba, flags in self.default_entries()
+                ),
+                "hidden from the carousel",
+            ),
+            (
+                "wrong entry count",
+                self.default_entries() + (("EXTRA", 41, 0),),
+                "visible entries, expected",
+            ),
+        )
+        for label, entries, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                image = self.make_disc_image(Path(directory), entries)
+                with self.assertRaisesRegex(check_quake_headless.CheckError, error):
+                    check_quake_headless.quake_menu_entry(image, self.QUAKE_LBA)
+
+    def test_payload_identity_is_held_against_the_receipt(self) -> None:
+        payload = {
+            "exe_lba": self.QUAKE_LBA,
+            "payload_fnv1a32": f"0x{self.PAYLOAD_FNV:08x}",
+            "menu_version": self.MENU_VERSION,
+        }
+        check_quake_headless.require_payload_identity(payload, self.receipt_output())
+        cases = (
+            ({"exe_lba": 41}, "exe_lba"),
+            ({"payload_fnv1a32": "0xdeadbeef"}, "payload_fnv1a32"),
+            ({"menu_version": "q0000000"}, "menu_version"),
+        )
+        for drift, error in cases:
+            with self.subTest(field=error):
+                toc = dict(self.receipt_output()["quake_toc"])
+                toc.update(drift)
+                with self.assertRaisesRegex(check_quake_headless.CheckError, error):
+                    check_quake_headless.require_payload_identity(
+                        payload, self.receipt_output(quake_toc=toc)
+                    )
+        with self.assertRaisesRegex(check_quake_headless.CheckError, "embedded Quake"):
+            check_quake_headless.require_payload_identity(
+                payload,
+                self.receipt_output(embedded_quake_matches_input_except_msf=False),
+            )
+
+    def test_replays_must_agree_on_everything_they_observed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            logs = {}
+            for kind in check_quake_headless.LOG_KINDS:
+                path = root / f"{kind}.csv"
+                path.write_text(f"{kind}\n", encoding="ascii")
+                logs[kind] = path
+            base = {"stdout_core": "same", **logs}
+            for field in check_quake_headless.DETERMINISTIC_FIELDS:
+                base[field] = 1
+            check_quake_headless.require_identical_replays(base, dict(base))
+
+            for field in check_quake_headless.DETERMINISTIC_FIELDS:
+                with self.subTest(field=field):
+                    drifted = dict(base)
+                    drifted[field] = 2
+                    with self.assertRaisesRegex(
+                        check_quake_headless.CheckError, field
+                    ):
+                        check_quake_headless.require_identical_replays(base, drifted)
+
+            other = dict(base)
+            other["stdout_core"] = "different"
+            with self.assertRaisesRegex(check_quake_headless.CheckError, "stdout"):
+                check_quake_headless.require_identical_replays(base, other)
+
+            second = root / "second-route.csv"
+            second.write_text("elsewhere\n", encoding="ascii")
+            drifted_log = dict(base)
+            drifted_log["route"] = second
+            with self.assertRaisesRegex(check_quake_headless.CheckError, "route"):
+                check_quake_headless.require_identical_replays(base, drifted_log)
+
+    def test_only_build_independent_values_are_pinned(self) -> None:
+        source = (ROOT / "tools" / "check_quake_headless.py").read_text(
+            encoding="ascii"
+        )
+        # These moved with the launcher binary, which changes on every commit
+        # here, so they are held to run-to-run equality and nothing more.
+        for pin in (
+            "EXPECTED_CYCLES",
+            "EXPECTED_PC ",
+            "EXPECTED_ROUTE_TICKS",
+            "EXPECTED_PAD_POLLS",
+            "EXPECTED_CD_COMMANDS",
+            "EXPECTED_LOG_SHA256",
+        ):
+            self.assertNotIn(pin, source)
+        for field in ("cycles", "route_ticks", "pad_polls"):
+            self.assertIn(field, check_quake_headless.DETERMINISTIC_FIELDS)
 
     def test_cd_evidence_requires_header_and_payload_read_sequences(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
