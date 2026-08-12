@@ -64,15 +64,15 @@ override HL := $(filter-out 0,$(HL))
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
 # and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-convergence)
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-comicon-final)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= fba7a0c35d1a78fa38624f1e5f1ccf62b3cb4624
+QUAKE_EXPECTED_REV ?= 0ed3619372f837ce2c512a543b9b0945d809eeef
 QUAKE_EXPECTED_PSOXIDE_REV ?= 79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= df8f0c16a3d5308415f8af11b74a3ac6849adb6b8d12a2de1253df47b1b4b902
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= e13d96a4b2e0b2b05b5a23ff83b488ca3fb06bbdb4ab03b4c2a08c35c03651ee
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 2afef2d186fa29c8b928f7ce31178a33e3cd09a4485ef47347aa4450315dc123
-QUAKE_EXPECTED_EXE_SHA256 ?= 521bfd245d767efac753ba7752f33907f0b653594be41d9207ca7a409ecf24db
+QUAKE_EXPECTED_BIN_SHA256 ?= 6ac8a892e2730a62ec1b3ecffc84b6606f1fee0d7f29614c99c724dad92357b6
+QUAKE_EXPECTED_EXE_SHA256 ?= 5b2d496e014ed7a3e457c798612306a949470705093b1913b84a48c4ca5ea779
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
@@ -302,7 +302,7 @@ endif
 # unverified payload -- disc-only cannot run until the stamp and the pins check.
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
-	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1, rebuilt from scratch for the original PlayStation. The single-player episode is complete: every level plays start to finish, streamed off this disc.|Quake 1.06 shareware Episodio 1, riscritto da zero per la prima PlayStation. L'episodio single player e completo: i livelli si giocano dall'inizio alla fine, letti da questo disco."
+	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1, rebuilt from scratch for the original PlayStation. All nine maps load from this disc, with the full arsenal and Chthon. Still in development.|Quake 1.06 shareware Episodio 1, riscritto da zero per la prima PlayStation. Tutte e nove le mappe si caricano dal disco, con l'arsenale completo e Chthon. Ancora in sviluppo."
 QUAKE_PREREQS = quake-programs-verify quake-verify
 
 disc: launcher quake-programs mkdisc
@@ -420,7 +420,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--version-of "BREAKOUT=$(V_BREAKOUT)" \
 		--version-of "SPACE INVADERS=$(V_INVADERS)" \
 		--version-of "MAGIKAAAAARP PONG=$(V_MAGIPONG)" \
-		--describe "CORTEX IGNITION=An original souls-like, built from scratch for the PlayStation. The current build is a PSoXide engine tech demo rather than a complete game, with streamed rooms, combat and animation.|Un souls-like originale, creato da zero per PlayStation. La versione attuale e una tech demo del motore PSoXide, non un gioco completo, con stanze in streaming, combattimento e animazioni." \
+		--describe "CORTEX IGNITION=An original souls-like, built from scratch for the PlayStation. The current build is a PSoXide engine tech demo rather than a complete game: BSP levels, combat, animation and lighting.|Un souls-like originale, creato da zero per PlayStation. La versione attuale e una tech demo del motore PSoXide, non un gioco completo: livelli BSP, combattimento, animazioni e luci." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Play against the CPU or a friend in split screen: drive, boost, jump, dodge and score, with music off the disc.|Un clone di Rocket League per la prima PlayStation. Gioca contro la CPU o in due a schermo diviso: guida, boost, salti, dodge e gol, con la musica del disco." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \
