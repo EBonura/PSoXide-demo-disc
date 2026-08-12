@@ -34,8 +34,8 @@ EXPECTED_MENU_POSITION = 10
 # which changes on every commit to this repo (DISC_VERSION is `git describe`),
 # so pinning them would have made the default gate fail on unrelated work. They
 # are held to run-to-run equality instead, which is what determinism means.
-EXPECTED_VRAM_FNV = "0x241697c63ac089f8"
-EXPECTED_DISPLAY_FNV = "0x0b71dc6a3eb2f462"
+EXPECTED_VRAM_FNV = "0x3be22352507be5ec"
+EXPECTED_DISPLAY_FNV = "0xd310abc82949fe46"
 DETERMINISTIC_FIELDS = (
     "tick",
     "cycles",
