@@ -628,6 +628,19 @@ class VerifyQuakeTests(unittest.TestCase):
 
 
 class MakeVariantContractTests(unittest.TestCase):
+    @staticmethod
+    def pinned_menu_version() -> str:
+        """The menu version the disc derives from the Quake pin.
+
+        Read from the Makefile rather than hard coded: a repin is a routine
+        event, and a literal here turns every repin into a spurious test
+        failure instead of a real one.
+        """
+        for line in (ROOT / "Makefile").read_text().splitlines():
+            if line.startswith("QUAKE_EXPECTED_REV"):
+                return "q" + line.split("=", 1)[1].strip()[:7]
+        raise AssertionError("Makefile has no QUAKE_EXPECTED_REV")
+
     def dry_run(self, *assignments: str) -> subprocess.CompletedProcess[str]:
         return run(
             "make",
@@ -646,7 +659,10 @@ class MakeVariantContractTests(unittest.TestCase):
         default = self.dry_run()
         self.assertEqual(default.returncode, 0, default.stderr)
         self.assertIn('--image "QUAKE SHAREWARE=', default.stdout)
-        self.assertIn('--version-of "QUAKE SHAREWARE=q2d26f9e"', default.stdout)
+        self.assertIn(
+            f'--version-of "QUAKE SHAREWARE={self.pinned_menu_version()}"',
+            default.stdout,
+        )
         self.assertIn('--describe "QUAKE SHAREWARE=', default.stdout)
         self.assertIn("tools/quake_disc.py verify", default.stdout)
         self.assertIn("tools/quake_disc.py receipt", default.stdout)
@@ -755,7 +771,7 @@ class MakeVariantContractTests(unittest.TestCase):
         # Everything the default pressing carries, the HL pressing carries too.
         for argument in (
             '--image "QUAKE SHAREWARE=',
-            '--version-of "QUAKE SHAREWARE=q2d26f9e"',
+            f'--version-of "QUAKE SHAREWARE={self.pinned_menu_version()}"',
             "tools/quake_disc.py verify",
             "tools/quake_disc.py receipt",
         ):
