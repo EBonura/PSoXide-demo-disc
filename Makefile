@@ -280,12 +280,8 @@ cortex-if-stale:
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
-# Cortex Ignition is pressed on the public disc but held off the carousel
-# until the Konami code reveals it: its own release comes later, and this
-# lets friends test ahead of it. The Comicon pressing shows everything.
-ifeq ($(HL),)
-GATE_ARGS = --gate "CORTEX IGNITION"
-endif
+# Cortex Ignition is the PSoXide souls-like technology demo and is visible on
+# every pressing. Half-Life remains the only opt-in program.
 
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
@@ -372,7 +368,6 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX)" \
-		$(GATE_ARGS) \
 		$(HL_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -420,7 +415,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--version-of "BREAKOUT=$(V_BREAKOUT)" \
 		--version-of "SPACE INVADERS=$(V_INVADERS)" \
 		--version-of "MAGIKAAAAARP PONG=$(V_MAGIPONG)" \
-		--describe "CORTEX IGNITION=An original souls-like, built from scratch for the PlayStation. The current build is a PSoXide engine tech demo rather than a complete game: BSP levels, combat, animation and lighting.|Un souls-like originale, creato da zero per PlayStation. La versione attuale e una tech demo del motore PSoXide, non un gioco completo: livelli BSP, combattimento, animazioni e luci." \
+		--describe "CORTEX IGNITION=An original PlayStation souls-like. This legacy PSoXide tech demo has a grid level, combat, skeletal animation and lighting. The new BSP slice remains an editor test.|Souls-like originale per PlayStation. Demo legacy PSoXide con livello a griglia, combattimento, animazioni e luci. La demo BSP resta nell'editor." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Play against the CPU or a friend in split screen: drive, boost, jump, dodge and score, with music off the disc.|Un clone di Rocket League per la prima PlayStation. Gioca contro la CPU o in due a schermo diviso: guida, boost, salti, dodge e gol, con la musica del disco." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \

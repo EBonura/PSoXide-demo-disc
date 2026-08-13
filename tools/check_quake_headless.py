@@ -18,12 +18,12 @@ STEPS = "500000000"
 PRESS_ROUTE = "400:right:8,600:right:8,1000:cross:12"
 EXPECTED_TICK = 500_000_000
 EXPECTED_DISPLAY = (320, 240)
-# The default pressing's carousel: ten programs plus the CREDITS card. Cortex
-# Ignition is on the disc but gated behind the Konami code, so it is not one of
-# them. If this number moves, the disc gained or lost a program and the route
-# below no longer lands where it thinks it does.
-EXPECTED_MENU_ENTRIES = 11
-EXPECTED_MENU_POSITION = 10
+# The default pressing's carousel: eleven programs plus the CREDITS card.
+# Cortex Ignition is visible first and Quake remains the last program before
+# CREDITS. If this number moves, the disc gained or lost a program and the
+# route below no longer lands where it thinks it does.
+EXPECTED_MENU_ENTRIES = 12
+EXPECTED_MENU_POSITION = 11
 # The frame both replays end on, hashed by the emulator. This pair is Quake's
 # output, and it survives things that move every cycle count on the disc: a
 # launcher rebuilt from a different absolute path, a different DISC_VERSION

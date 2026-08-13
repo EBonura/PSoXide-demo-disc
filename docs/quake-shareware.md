@@ -78,6 +78,8 @@ still clean, and atomically writes its full HEAD to
 `build/programs.psoxide-revision` before layout. Cortex Ignition is copied from
 the tracked `editor/samples/cortex_v1` project into `build/cortex_v1` before it
 is baked, so generated project output does not dirty the PSoXide checkout.
+This is the legacy grid fallback, not the new souls BSP vertical slice. The BSP
+candidate stays outside the combined disc until it has a clean chain-load proof.
 
 To reuse already-built demo-disc programs:
 
@@ -162,6 +164,8 @@ test suites. The tests cover:
 - table-entry and embedded-sector verification;
 - the default and Half-Life dry-run recipes both carrying the Quake image,
   its metadata, the verifier and the receipt, and the opt-in switch being gone;
+- the default and Half-Life recipes both carrying visible Cortex Ignition, with
+  neither recipe applying a hidden-entry gate;
 - every way the payload can be wrong stopping `make quake-verify`: absent,
   stale Quake pin, wrong PSoXide pin, stale artifact hash, either checkout
   dirty, stamp stale, stamp missing;
