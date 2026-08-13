@@ -203,7 +203,7 @@ name so the two bins cannot be confused. Both carry Quake shareware. The
 should init the other submodules selectively and stick to the default pressing.
 
 `make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
-sibling `quake-psx-comicon-final` worktree by default) and will not build without
+sibling `quake-psx` checkout by default) and will not build without
 it. `make quake-headless-check` is the gate to run before a burn: it chain-
 loads Quake off the built disc twice and requires the two replays to agree.
 

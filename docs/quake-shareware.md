@@ -22,7 +22,7 @@ The default contract is:
 | Input bin SHA-256 | `50a6a9d792e3ef074dd49e300dcb69fb5f2d84a7d2d053c07ae9c8d473f0b1a2` |
 | Input EXE SHA-256 | `f0b3e7ff814c5eba320ea78bceb6f38bdec1938f971a52a87213dd774ca6de85` |
 | Guest recipe SHA-256 | `3f94b7935843619b24075dbe13514968d7315aa4305afab89e4d2e775c936610` |
-| Default source checkout | sibling `quake-psx-comicon-final` |
+| Default source checkout | sibling `quake-psx` |
 | Default input cue | `dist/quake-psx.cue` in that checkout |
 
 This pin is the Comicon playable-beta candidate. All nine shareware maps cook
