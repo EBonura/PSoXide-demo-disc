@@ -64,8 +64,9 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-Eleven programs on the default pressing, twelve with Half-Life, each verified
-booting from the built disc. The default disc is 96404 sectors (21:25, 216
+Eleven programs ship on the default pressing and Half-Life adds a twelfth.
+Automated evidence is recorded per program and must not be read as an original
+hardware claim. The default disc is 96404 sectors (21:25, 216
 MiB, 7 CD-DA tracks); the Half-Life pressing is 300892 (66:52, 675 MiB, 34
 CD-DA tracks), which is 84% of an 80-minute CD-R.
 
@@ -90,12 +91,22 @@ arguments is still a correct `_start`. Voxide and NitroXide load `WORLD.PAK`
 at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
-`QUAKE SHAREWARE` is the last entry on the carousel, and a default program
-rather than a variant. Quake streams `WORLD.PAK`, so a bare executable is not
-sufficient; the entry uses the same caller-provided LBA offset that relocates
+`CORTEX IGNITION` is the first entry on every pressing. It is the original
+PSoXide souls-like technology demo and is no longer hidden behind the menu's
+unlock code. Its pressed payload deliberately remains the tracked legacy grid
+sample at `editor/samples/cortex_v1`; it is not the new souls BSP vertical
+slice. That BSP candidate stays an editor and standalone test until it has its
+own clean chain-load proof. `QUAKE SHAREWARE` is the last program before
+CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,
+so a bare executable is not sufficient; the entry uses the same caller-provided
+LBA offset that relocates
 Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
+
+The default visible order is Cortex Ignition, Voxide, NitroXide, Celeste
+Collection, PSXcel, GH-PSX, Breakout, Space Invaders, Magikaaaaarp Pong,
+Hardware Tests, Quake Shareware, then Credits.
 
 ## The menu
 
@@ -160,7 +171,7 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the current carousel contains eleven visible entries; focused gates navigate
+- the current carousel contains twelve visible entries; focused gates navigate
   to and chain-load the entries they cover
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
@@ -180,8 +191,8 @@ emulator next to everything else:
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
 different library. `PSOXIDE=/absolute/path/to/PSoXide` selects the checkout
 used for every rebuilt program. Cortex is staged from that checkout's tracked
-`editor/samples/cortex_v1` sample into `build/`, keeping generated bake output
-outside the PSoXide worktree. gh-psx keeps its audio in a gitignored
+`editor/samples/cortex_v1` sample into `build/`, keeping
+generated bake output outside the PSoXide worktree. gh-psx keeps its audio in a gitignored
 `data/audio/`, so a fresh clone needs that dropped in before `make disc` will
 get past it.
 

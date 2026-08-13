@@ -768,6 +768,9 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertEqual(half_life.returncode, 0, half_life.stderr)
         self.assertIn('--image "HALF-LIFE=', half_life.stdout)
         self.assertNotIn('--image "HALF-LIFE=', default.stdout)
+        for pressing in (default, half_life):
+            self.assertIn('--image "CORTEX IGNITION=', pressing.stdout)
+            self.assertNotIn('--gate "CORTEX IGNITION"', pressing.stdout)
         # Everything the default pressing carries, the HL pressing carries too.
         for argument in (
             '--image "QUAKE SHAREWARE=',
@@ -981,16 +984,16 @@ class HeadlessChainloadTests(unittest.TestCase):
 
     @classmethod
     def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
-        """The default pressing's shape: one gated entry, nine, then Quake.
+        """The default pressing's shape: Cortex, nine, then Quake.
 
-        Ten visible programs plus the launcher's CREDITS card is eleven, and
-        the headless route's two RIGHT presses land on the tenth.
+        Eleven visible programs plus the launcher's CREDITS card is twelve,
+        and the headless route's two RIGHT presses land on the eleventh.
         """
-        hidden = (("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),)
+        cortex = (("CORTEX IGNITION", 30, 0),)
         filler = tuple(
             (f"PROGRAM {index}", 31 + index, 0) for index in range(9)
         )
-        return hidden + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
+        return cortex + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
 
     @classmethod
     def make_disc_image(
@@ -1087,8 +1090,8 @@ class HeadlessChainloadTests(unittest.TestCase):
                 selected + 1, check_quake_headless.EXPECTED_MENU_POSITION
             )
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
+            self.assertEqual(menu[0], "CORTEX IGNITION")
             self.assertEqual(menu[-1], "CREDITS")
-            self.assertNotIn("CORTEX IGNITION", menu)
             self.assertEqual(
                 payload,
                 {
