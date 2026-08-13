@@ -65,8 +65,8 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 ## What is on it
 
 Eleven programs on the default pressing, twelve with Half-Life, each verified
-booting from the built disc. The default disc is 96393 sectors (21:25, 216
-MiB, 7 CD-DA tracks); the Half-Life pressing is 300881 (66:52, 675 MiB, 34
+booting from the built disc. The default disc is 96404 sectors (21:25, 216
+MiB, 7 CD-DA tracks); the Half-Life pressing is 300892 (66:52, 675 MiB, 34
 CD-DA tracks), which is 84% of an 80-minute CD-R.
 
 | Program | How it ships |
@@ -154,9 +154,14 @@ depth-sorted back to front.
 
 ## Status
 
-Verified headless against a real BIOS, booting the built `.cue`:
+The combined-disc structural and Quake gates are verified headlessly. The
+Quake gate uses the frontend's embedded-playtest path: the first executable
+boot is HLE, while the launcher still reads the pressed table and chain-loads
+the relocated guest from the built `.cue`. This is emulator evidence, not a
+real-BIOS or original-console claim:
 
-- the menu reads the disc table, navigates, and chain-loads all seven entries
+- the current carousel contains eleven visible entries; focused gates navigate
+  to and chain-load the entries they cover
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
@@ -186,8 +191,8 @@ name so the two bins cannot be confused. Both carry Quake shareware. The
 `games/hl-psx` submodule is private until its own release, so a fresh clone
 should init the other submodules selectively and stick to the default pressing.
 
-`make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, a
-sibling `quake-psx-build-provenance` by default) and will not build without
+`make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
+sibling `quake-psx-comicon-final` worktree by default) and will not build without
 it. `make quake-headless-check` is the gate to run before a burn: it chain-
 loads Quake off the built disc twice and requires the two replays to agree.
 
