@@ -14,23 +14,30 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `2d26f9eeb624a562ba00f4ced121b740fd61d4bf` |
-| Quake-declared PSoXide revision | `f9f83c35b140560c123771893a1fc3e426814550` |
+| Quake source revision | `28507a6dd605730a43909d6b2258f081def68a79` |
+| Quake-declared PSoXide revision | `79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d` |
 | Shipping provenance sidecar | `dist/quake-psx.provenance.json` |
-| Sidecar SHA-256 | `f3f1cf7a837b640af3efba22dee505f581cfea91eb21b6795af734d8dacebc31` |
+| Sidecar SHA-256 | `8560401739d0def8ec08cfafee9ec02ba90dfb3d62933946f8d7198401d5506d` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
-| Input bin SHA-256 | `76cb839698d69c697116d4ab65112869d80c2d959b53ef40c09479a6490d00b8` |
-| Input EXE SHA-256 | `ad4464f6dd64b1132cded9fd5d539724d7c2805b54a5c4ea05e183657049fc56` |
-| Guest recipe SHA-256 | `45bbc05f57cb18100c5061b9f9f8b7a1827bedd1134ff7698c2ad5aca9cc4676` |
-| Default source checkout | sibling `quake-psx-build-provenance` |
+| Input bin SHA-256 | `50a6a9d792e3ef074dd49e300dcb69fb5f2d84a7d2d053c07ae9c8d473f0b1a2` |
+| Input EXE SHA-256 | `f0b3e7ff814c5eba320ea78bceb6f38bdec1938f971a52a87213dd774ca6de85` |
+| Guest recipe SHA-256 | `3f94b7935843619b24075dbe13514968d7315aa4305afab89e4d2e775c936610` |
+| Default source checkout | sibling `quake-psx-comicon-final` |
 | Default input cue | `dist/quake-psx.cue` in that checkout |
 
-This pin contains the adversarially reviewed real-map Episode 1 combat
-checkpoint and its reproducible shipping builder. The builder projects the
-guest source into a content-addressed canonical stage, isolates shipping Cargo
-inputs, rejects ambient build overrides, and emits the schema-1 sidecar consumed
-here. Two clean checkouts at different absolute paths produced byte-identical
-EXE, BIN, CUE, and sidecar outputs at this pin.
+This pin is the Comicon playable-beta candidate. All nine shareware maps cook
+and their indexes validate; the Start-to-E1M1 route and the complete E1M7
+Chthon/intermission route are guest-proven, E1M2 is guest-proven end to end,
+and the previously
+blocking E1M3/E1M4 platform and shootable-button mechanisms have direct guest
+evidence. It is deliberately not a claim that every normal and secret route has
+an automated end-to-end proof; E1M3 through E1M6 and E1M8 still need ordinary
+playthrough coverage and later polish. The reproducible shipping builder
+projects the guest source into a content-addressed canonical stage, isolates
+shipping Cargo inputs, rejects ambient build overrides, and emits the schema-1
+sidecar consumed here. Path-independent byte reproducibility is covered by
+builder tests and was measured at earlier named checkpoints; it has not been
+rerun from two paths at this exact source pin.
 Any later Quake checkpoint must update the full revision and every pinned hash
 together, rebuild the combined image, regenerate the receipt, and rerun the
 two-pass headless gate before the demo-disc payload is called current.
@@ -38,7 +45,7 @@ two-pass headless gate before the demo-disc payload is called current.
 procedure.
 
 The demo-disc PSoXide submodule, Quake's source declaration, and Quake's
-shipping sidecar all name `f9f83c35b140560c123771893a1fc3e426814550`.
+shipping sidecar all name `79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d`.
 The ordinary demo-disc programs must be rebuilt from that same clean revision
 before the Quake layout step records its revision stamp.
 

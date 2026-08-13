@@ -41,13 +41,13 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # 2026-08-11 from one tree with one set of inputs, in 2352-byte sectors:
 #
 #   default, no Quake   86928   19:19:03   195.0 MiB
-#   default             96393   21:25:18   216.2 MiB
+#   default             96404   21:25:29   216.2 MiB
 #   HL, no Quake       291416   64:45:41   653.7 MiB
-#   HL                 300881   66:51:56   674.9 MiB
+#   HL                 300892   66:51:67   674.9 MiB
 #
-# Quake costs 9465 sectors either way. The HL pressing lands at 83.6% of an
-# 80-minute CD-R (359999 sectors), 59118 spare, and still fits a 74-minute
-# blank with 32119 to spare. Nothing had to be dropped to make room.
+# Quake costs 9476 sectors either way. The HL pressing lands at 83.6% of an
+# 80-minute CD-R (359999 sectors), 59107 spare, and still fits a 74-minute
+# blank with 32108 to spare. Nothing had to be dropped to make room.
 HL ?=
 # HL=0 means off, not "0 is a non-empty string, so on".
 override HL := $(filter-out 0,$(HL))
@@ -67,12 +67,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-comicon-final)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 0ed3619372f837ce2c512a543b9b0945d809eeef
+QUAKE_EXPECTED_REV ?= 28507a6dd605730a43909d6b2258f081def68a79
 QUAKE_EXPECTED_PSOXIDE_REV ?= 79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= e13d96a4b2e0b2b05b5a23ff83b488ca3fb06bbdb4ab03b4c2a08c35c03651ee
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 8560401739d0def8ec08cfafee9ec02ba90dfb3d62933946f8d7198401d5506d
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 6ac8a892e2730a62ec1b3ecffc84b6606f1fee0d7f29614c99c724dad92357b6
-QUAKE_EXPECTED_EXE_SHA256 ?= 5b2d496e014ed7a3e457c798612306a949470705093b1913b84a48c4ca5ea779
+QUAKE_EXPECTED_BIN_SHA256 ?= 50a6a9d792e3ef074dd49e300dcb69fb5f2d84a7d2d053c07ae9c8d473f0b1a2
+QUAKE_EXPECTED_EXE_SHA256 ?= f0b3e7ff814c5eba320ea78bceb6f38bdec1938f971a52a87213dd774ca6de85
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
