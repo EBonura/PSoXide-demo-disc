@@ -12,6 +12,8 @@
 
 ROOT       := $(CURDIR)
 PSOXIDE    ?= $(ROOT)/games/PSoXide
+CORTEX_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
+CORTEX_EXPECTED_PSOXIDE_REV ?= 687d2ae7681f9de3090dc89635beac99d1654c93
 BUILD      := $(ROOT)/build
 QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
@@ -98,7 +100,7 @@ PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX_SOURCE := $(PSOXIDE)/editor/samples/cortex_v1
+CORTEX_SOURCE := $(CORTEX_PSOXIDE)/editor/samples/cortex_v1
 CORTEX_PROJECT := $(BUILD)/cortex_v1
 CORTEX := $(CORTEX_PROJECT)/baked/cortex_v1.cue
 CORTEX_REV_STAMP := $(CORTEX_PROJECT)/baked/.psoxide-revision
@@ -262,7 +264,16 @@ CORTEX_FORCE   ?=
 
 .PHONY: cortex-if-stale
 cortex-if-stale:
-	@current_rev=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	@current_rev=$$(git -C "$(CORTEX_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	dirty=$$(git -C "$(CORTEX_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
+	if [ "$$current_rev" != "$(CORTEX_EXPECTED_PSOXIDE_REV)" ]; then \
+		echo "cortex: PSoXide pin is $$current_rev, expected $(CORTEX_EXPECTED_PSOXIDE_REV)"; \
+		exit 1; \
+	fi; \
+	if [ -n "$$dirty" ]; then \
+		echo "cortex: pinned PSoXide checkout is dirty"; \
+		exit 1; \
+	fi; \
 	stamped_rev=$$(sed -n '1p' "$(CORTEX_REV_STAMP)" 2>/dev/null || true); \
 	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_SOURCE)/" -type f -newer "$(CORTEX)" -print -quit 2>/dev/null)" ]; then \
 		echo "cortex: tracked sample or PSoXide revision changed (or forced) -- baking"; \
@@ -271,7 +282,7 @@ cortex-if-stale:
 		rm -rf "$(CORTEX_PROJECT)" || exit 1; \
 		mkdir -p "$(CORTEX_PROJECT)" || exit 1; \
 		cp -R "$(CORTEX_SOURCE)/." "$(CORTEX_PROJECT)/" || exit 1; \
-		(cd "$(PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_PROJECT)") || exit 1; \
+		(cd "$(CORTEX_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_PROJECT)") || exit 1; \
 		printf '%s\n' "$$current_rev" > "$(CORTEX_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex: project unchanged -- reusing $(CORTEX)"; \
