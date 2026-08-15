@@ -428,6 +428,15 @@ class VerifyQuakeTests(unittest.TestCase):
                 with self.assertRaisesRegex(quake_disc.VerificationError, error):
                     fixture.verify()
 
+    def test_accepts_pinned_psoxide_hydration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            document = fixture.provenance_document()
+            document["psoxide"]["source_kind"] = "pinned_hydration"
+            fixture.write_provenance(document)
+            fixture.provenance_sha256 = digest(fixture.provenance)
+            fixture.verify()
+
     def test_rejects_wrong_shareware_and_nonshipping_build_contracts(self) -> None:
         cases = (
             (
@@ -758,7 +767,7 @@ class MakeVariantContractTests(unittest.TestCase):
 
     def test_cortex_bakes_a_staged_copy_of_the_tracked_sample(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn("$(PSOXIDE)/editor/samples/cortex_v1", makefile)
+        self.assertIn("$(CORTEX_PSOXIDE)/editor/samples/cortex_v1", makefile)
         self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
         self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
 
