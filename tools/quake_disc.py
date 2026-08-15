@@ -58,6 +58,7 @@ SHAREWARE_PAK_SHA256 = (
 )
 SHAREWARE_PAK_BYTES = 18_689_235
 PSOXIDE_SOURCE_KIND = "local_checkout"
+PSOXIDE_SOURCE_KINDS = frozenset((PSOXIDE_SOURCE_KIND, "pinned_hydration"))
 BUILD_PROFILE = "release"
 
 
@@ -530,9 +531,10 @@ def verify_provenance(
         member(psoxide, "source_kind", "provenance psoxide"),
         "provenance psoxide.source_kind",
     )
-    if source_kind != PSOXIDE_SOURCE_KIND:
+    if source_kind not in PSOXIDE_SOURCE_KINDS:
         raise VerificationError(
-            f"provenance PSoXide source kind must be {PSOXIDE_SOURCE_KIND!r}, got {source_kind!r}"
+            "provenance PSoXide source kind must describe a clean reproducible "
+            f"checkout ({', '.join(sorted(PSOXIDE_SOURCE_KINDS))}), got {source_kind!r}"
         )
 
     shareware = require_object(
