@@ -66,15 +66,15 @@ override HL := $(filter-out 0,$(HL))
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
 # and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-rust-rebuilt)
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 0838f614ec3570691f808f198b0741b03191f8d5
+QUAKE_EXPECTED_REV ?= 2221bfbe76d6f0f7913e33c726feb798162acb54
 QUAKE_EXPECTED_PSOXIDE_REV ?= 5c45d8b57884ad26c769219205d5094861536910
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 5ce102906715c13aaabfaa29ab0839e165148404e3d131e3fb712233474a3629
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= cb2c35dc5d3181c10ce2036a40be3d31414bd2d4715454232b02cdb1b0925fd5
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= e819a53b51092d3438e52a3b0cc7e402c886f399a7be6293de04314cc570b1e7
-QUAKE_EXPECTED_EXE_SHA256 ?= add242f2fa485ec656182b06760b32c9045b6b7556b1bf01975c3d8457ee05e2
+QUAKE_EXPECTED_BIN_SHA256 ?= 7323418e381c7817ce0f90d3b19481ae5ef9f72da02a9886c9ed2e68a669b187
+QUAKE_EXPECTED_EXE_SHA256 ?= f937d4b5f906f96ab3b6b466d248f12b20e1e7d5de37f3bb5062dfb19766ae74
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
