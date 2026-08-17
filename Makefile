@@ -514,7 +514,7 @@ itch: publication-block
 # different PSoXide cannot press a disc, so it should not pass its tests either.
 # The chain-load half of the proof needs a built disc and lives in
 # `make quake-headless-check`.
-check: sdk-coherence check-locks quake-verify
+check: sdk-on-main sdk-coherence check-locks quake-verify
 	cd carousel && cargo test
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
@@ -540,6 +540,27 @@ check: sdk-coherence check-locks quake-verify
 .PHONY: check-locks
 check-locks:
 	@./tools/check-locks.sh
+
+# The shared SDK (the games/PSoXide submodule) and Quake's declared PSoXide
+# revision must both be on PSoXide main. Quake's SDK work once lived on a side
+# branch that this disc pinned as the SDK while main moved on; the split cost a
+# reconciliation merge. GitHub's compare API answers "identical" or "ahead"
+# when main contains the revision. DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 skips the
+# check for a deliberate side-branch pressing and says so.
+.PHONY: sdk-on-main
+sdk-on-main:
+	@if [ -n "$(DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN)" ]; then \
+		echo "sdk-on-main: SKIPPED by request"; exit 0; \
+	fi; \
+	sub=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	for rev in "$$sub" "$(QUAKE_EXPECTED_PSOXIDE_REV)"; do \
+		status=$$(gh api "repos/EBonura/PSoXide/compare/$$rev...main" --jq .status 2>/dev/null) || { \
+			echo "sdk-on-main: cannot compare $$rev with PSoXide main via gh api (offline or unauthenticated); set DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 only for a deliberate side-branch pressing"; exit 1; }; \
+		case "$$status" in \
+			identical|ahead) echo "sdk-on-main: $$rev is on PSoXide main ($$status)";; \
+			*) echo "sdk-on-main: $$rev is NOT on PSoXide main ($$status); merge it before pressing"; exit 1;; \
+		esac; \
+	done
 
 .PHONY: sdk-coherence
 sdk-coherence:
