@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chain-load Quake twice off the default disc, with no-image runtime proof."""
+"""Chain-load Quake twice off a combined disc, with no-image runtime proof."""
 
 from __future__ import annotations
 
@@ -18,12 +18,10 @@ STEPS = "500000000"
 PRESS_ROUTE = "400:right:8,600:right:8,1000:cross:12"
 EXPECTED_TICK = 500_000_000
 EXPECTED_DISPLAY = (320, 240)
-# The default pressing's carousel: eleven programs plus the CREDITS card.
-# Cortex Ignition is visible first and Quake remains the last program before
-# CREDITS. If this number moves, the disc gained or lost a program and the
-# route below no longer lands where it thinks it does.
-EXPECTED_MENU_ENTRIES = 12
-EXPECTED_MENU_POSITION = 11
+# The default pressing has eleven programs plus CREDITS. The HL pressing adds
+# Half-Life, so its caller explicitly raises this to thirteen. Cortex Ignition
+# stays first and Quake stays immediately before CREDITS in both layouts.
+DEFAULT_MENU_ENTRIES = 12
 # The frame both replays end on, hashed by the emulator. This pair is Quake's
 # output, and it survives things that move every cycle count on the disc: a
 # launcher rebuilt from a different absolute path, a different DISC_VERSION
@@ -34,8 +32,8 @@ EXPECTED_MENU_POSITION = 11
 # which changes on every commit to this repo (DISC_VERSION is `git describe`),
 # so pinning them would have made the default gate fail on unrelated work. They
 # are held to run-to-run equality instead, which is what determinism means.
-EXPECTED_VRAM_FNV = "0x05d0a6e304b17c6e"
-EXPECTED_DISPLAY_FNV = "0xc82e1c4184f55c65"
+EXPECTED_VRAM_FNV = "0xc1b8bd84c6e1944b"
+EXPECTED_DISPLAY_FNV = "0x7af4d851d8c26de2"
 DETERMINISTIC_FIELDS = (
     "tick",
     "cycles",
@@ -123,7 +121,9 @@ def route_button_count(button: str) -> int:
     )
 
 
-def quake_menu_entry(image: Path, quake_lba: int) -> tuple[int, list[str], dict]:
+def quake_menu_entry(
+    image: Path, quake_lba: int, expected_menu_entries: int = DEFAULT_MENU_ENTRIES
+) -> tuple[int, list[str], dict]:
     """Where QUAKE SHAREWARE sits in the carousel, and what the table says it is.
 
     Returns the selected index, the visible entry names, and the table's own
@@ -166,10 +166,10 @@ def quake_menu_entry(image: Path, quake_lba: int) -> tuple[int, list[str], dict]
         raise CheckError(f"{image}: no {QUAKE_ENTRY} entry in the disc table")
     if visible and len(visible) < TOC_MAX_ENTRIES:
         visible.append(("CREDITS", 0))
-    if len(visible) != EXPECTED_MENU_ENTRIES:
+    if len(visible) != expected_menu_entries:
         raise CheckError(
             f"{image}: carousel has {len(visible)} visible entries, "
-            f"expected {EXPECTED_MENU_ENTRIES}: "
+            f"expected {expected_menu_entries}: "
             + ", ".join(name for name, _ in visible)
         )
 
@@ -184,10 +184,11 @@ def quake_menu_entry(image: Path, quake_lba: int) -> tuple[int, list[str], dict]
             f"menu route selects {selected_name!r} at LBA {selected_lba}, "
             f"not Quake at LBA {quake_lba}"
         )
-    if selected + 1 != EXPECTED_MENU_POSITION:
+    expected_position = expected_menu_entries - 1
+    if selected + 1 != expected_position:
         raise CheckError(
             f"{QUAKE_ENTRY} is carousel entry {selected + 1}, "
-            f"expected {EXPECTED_MENU_POSITION}"
+            f"expected {expected_position}"
         )
     return selected, [name for name, _ in visible], payload
 
@@ -425,6 +426,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frontend", required=True, type=Path)
     parser.add_argument("--cue", required=True, type=Path)
     parser.add_argument("--receipt", required=True, type=Path)
+    parser.add_argument(
+        "--expected-menu-entries", type=int, default=DEFAULT_MENU_ENTRIES
+    )
     return parser.parse_args()
 
 
@@ -456,7 +460,9 @@ def main() -> int:
         if cue_files != [image.name]:
             raise CheckError("cue does not point to the receipt BIN beside it")
 
-        selected, menu, payload = quake_menu_entry(image, quake_lba)
+        selected, menu, payload = quake_menu_entry(
+            image, quake_lba, args.expected_menu_entries
+        )
         require_payload_identity(payload, output)
         entry_pc, load_addr, payload_bytes = embedded_exe_evidence(image, quake_lba)
         with tempfile.TemporaryDirectory(prefix="psoxide-quake-chainload-") as directory:

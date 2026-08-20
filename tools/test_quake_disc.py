@@ -1094,9 +1094,9 @@ class HeadlessChainloadTests(unittest.TestCase):
             selected, menu, payload = check_quake_headless.quake_menu_entry(
                 image, self.QUAKE_LBA
             )
-            self.assertEqual(len(menu), check_quake_headless.EXPECTED_MENU_ENTRIES)
+            self.assertEqual(len(menu), check_quake_headless.DEFAULT_MENU_ENTRIES)
             self.assertEqual(
-                selected + 1, check_quake_headless.EXPECTED_MENU_POSITION
+                selected + 1, check_quake_headless.DEFAULT_MENU_ENTRIES - 1
             )
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
             self.assertEqual(menu[0], "CORTEX IGNITION")
@@ -1113,6 +1113,22 @@ class HeadlessChainloadTests(unittest.TestCase):
                 check_quake_headless.embedded_exe_evidence(image, self.QUAKE_LBA),
                 (0x8001_0000, 0x8001_0000, 4_096),
             )
+
+    def test_route_selects_visible_quake_on_the_half_life_carousel(self) -> None:
+        entries = (
+            self.default_entries()[:1]
+            + (("HALF-LIFE", 41, 0),)
+            + self.default_entries()[1:]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            image = self.make_disc_image(Path(directory), entries)
+            selected, menu, _ = check_quake_headless.quake_menu_entry(
+                image, self.QUAKE_LBA, 13
+            )
+            self.assertEqual(len(menu), 13)
+            self.assertEqual(selected + 1, 12)
+            self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
+            self.assertEqual(menu[-1], "CREDITS")
 
     def test_a_disc_without_a_visible_quake_entry_fails(self) -> None:
         cases = (

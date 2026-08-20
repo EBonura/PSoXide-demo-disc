@@ -69,12 +69,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 56ee7b554a244714f34d729b502fe29fb913326b
+QUAKE_EXPECTED_REV ?= e32f6f66cff1759954f224846ce0b326c3d55d30
 QUAKE_EXPECTED_PSOXIDE_REV ?= 9c298d83909fe5c74ac44870d45afb8227b30a63
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= dd7571854b50019ce62432abccff35c3ed9e9f8ac66773cd46e7475ff0143c5a
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 6e84a35648d210353461441ec03052036fc29d4126e8f0af0a0d894ab44d7422
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 73ebf2dea8f011bc9c1ff03ae05a512bc174122f439d5a0eafbb565c8bcdc1e0
-QUAKE_EXPECTED_EXE_SHA256 ?= 0b15b82bf7bb588ca8e11d5461d5c9fbec868a035fe81ab0b6ac02d52fb802e6
+QUAKE_EXPECTED_BIN_SHA256 ?= 9351bc959004887f0e74b9100a02375aeb9c29755cfbe49037b15ab2f3be991b
+QUAKE_EXPECTED_EXE_SHA256 ?= 6696f75aa71f14f33e62c54ec2e685fa3f02feea6f7bb441c2c37b39230bb8bc
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PSOXIDE)/target/release/frontend
 
@@ -323,7 +323,8 @@ _quake-headless-check:
 	python3 tools/check_quake_headless.py \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
-		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json"
+		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
+		--expected-menu-entries "$(if $(HL),13,12)"
 
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
