@@ -765,11 +765,25 @@ class MakeVariantContractTests(unittest.TestCase):
         replay_at = headless.stdout.index("tools/check_quake_headless.py")
         self.assertLess(stamp_at, replay_at)
 
-    def test_cortex_bakes_a_staged_copy_of_the_tracked_sample(self) -> None:
+    def test_cortex_bakes_separate_current_and_legacy_projects(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn("$(CORTEX_PSOXIDE)/editor/samples/cortex_v1", makefile)
-        self.assertNotIn("$(PSOXIDE)/editor/projects/cortex_v1", makefile)
-        self.assertIn("CORTEX_PROJECT := $(BUILD)/cortex_v1", makefile)
+        self.assertIn(
+            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/default", makefile
+        )
+        self.assertIn(
+            "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current", makefile
+        )
+        self.assertIn(
+            "$(CORTEX_LEGACY_PSOXIDE)/editor/samples/cortex_v1", makefile
+        )
+        self.assertIn(
+            "CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy", makefile
+        )
+        self.assertIn("ded86107538cbf53b952dda75973780c3fd1b48f", makefile)
+        self.assertIn("687d2ae7681f9de3090dc89635beac99d1654c93", makefile)
+        self.assertNotIn(
+            "$(CORTEX_CURRENT_PSOXIDE)/editor/samples/cortex_v1", makefile
+        )
 
     def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
         default = self.dry_run()
@@ -779,7 +793,16 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertNotIn('--image "HALF-LIFE=', default.stdout)
         for pressing in (default, half_life):
             self.assertIn('--image "CORTEX IGNITION=', pressing.stdout)
-            self.assertNotIn('--gate "CORTEX IGNITION"', pressing.stdout)
+            self.assertIn('--image "CORTEX IGNITION LEGACY=', pressing.stdout)
+        self.assertIn('--gate "CORTEX IGNITION"', default.stdout)
+        self.assertIn('--gate "CORTEX IGNITION LEGACY"', default.stdout)
+        self.assertNotIn('--gate "CORTEX IGNITION"', half_life.stdout)
+        self.assertNotIn('--gate "CORTEX IGNITION LEGACY"', half_life.stdout)
+        current_at = half_life.stdout.index('--image "CORTEX IGNITION=')
+        legacy_at = half_life.stdout.index('--image "CORTEX IGNITION LEGACY=')
+        half_life_at = half_life.stdout.index('--image "HALF-LIFE=')
+        self.assertLess(current_at, legacy_at)
+        self.assertLess(legacy_at, half_life_at)
         # Everything the default pressing carries, the HL pressing carries too.
         for argument in (
             '--image "QUAKE SHAREWARE=',
@@ -987,20 +1010,23 @@ class FailClosedDefaultTests(unittest.TestCase):
 
 
 class HeadlessChainloadTests(unittest.TestCase):
-    QUAKE_LBA = 40
+    QUAKE_LBA = 50
     PAYLOAD_FNV = 0x1234_5678
     MENU_VERSION = "q2d26f9e"
 
     @classmethod
     def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
-        """The default pressing's shape: Cortex, nine, then Quake.
+        """The standard pressing's locked shape: two hidden, nine, Quake.
 
-        Eleven visible programs plus the launcher's CREDITS card is twelve,
-        and the headless route's two RIGHT presses land on the eleventh.
+        Ten visible programs plus the launcher's CREDITS card is eleven, and
+        the headless route's two RIGHT presses still land on Quake.
         """
-        cortex = (("CORTEX IGNITION", 30, 0),)
+        cortex = (
+            ("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),
+            ("CORTEX IGNITION LEGACY", 31, check_quake_headless.FLAG_HIDDEN),
+        )
         filler = tuple(
-            (f"PROGRAM {index}", 31 + index, 0) for index in range(9)
+            (f"PROGRAM {index}", 32 + index, 0) for index in range(9)
         )
         return cortex + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
 
@@ -1009,7 +1035,7 @@ class HeadlessChainloadTests(unittest.TestCase):
         cls, root: Path, entries: tuple[tuple[str, int, int], ...] | None = None
     ) -> Path:
         entries = cls.default_entries() if entries is None else entries
-        image = bytearray(42 * check_quake_headless.SECTOR_BYTES)
+        image = bytearray((cls.QUAKE_LBA + 2) * check_quake_headless.SECTOR_BYTES)
         toc = bytearray(
             check_quake_headless.TOC_SECTORS
             * check_quake_headless.USER_DATA_BYTES
@@ -1067,7 +1093,7 @@ class HeadlessChainloadTests(unittest.TestCase):
         header[0x18:0x1C] = (0x8001_0000).to_bytes(4, "little")
         header[0x1C:0x20] = (4_096).to_bytes(4, "little")
         target = (
-            40 * check_quake_headless.SECTOR_BYTES
+            cls.QUAKE_LBA * check_quake_headless.SECTOR_BYTES
             + check_quake_headless.USER_DATA_AT
         )
         image[target : target + check_quake_headless.USER_DATA_BYTES] = header
@@ -1099,7 +1125,9 @@ class HeadlessChainloadTests(unittest.TestCase):
                 selected + 1, check_quake_headless.DEFAULT_MENU_ENTRIES - 1
             )
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
-            self.assertEqual(menu[0], "CORTEX IGNITION")
+            self.assertEqual(menu[0], "PROGRAM 0")
+            self.assertNotIn("CORTEX IGNITION", menu)
+            self.assertNotIn("CORTEX IGNITION LEGACY", menu)
             self.assertEqual(menu[-1], "CREDITS")
             self.assertEqual(
                 payload,
@@ -1115,18 +1143,24 @@ class HeadlessChainloadTests(unittest.TestCase):
             )
 
     def test_route_selects_visible_quake_on_the_half_life_carousel(self) -> None:
+        default = self.default_entries()
         entries = (
-            self.default_entries()[:1]
+            tuple((name, lba, 0) for name, lba, _ in default[:2])
             + (("HALF-LIFE", 41, 0),)
-            + self.default_entries()[1:]
+            + default[2:]
         )
         with tempfile.TemporaryDirectory() as directory:
             image = self.make_disc_image(Path(directory), entries)
             selected, menu, _ = check_quake_headless.quake_menu_entry(
-                image, self.QUAKE_LBA, 13
+                image, self.QUAKE_LBA, 14
             )
-            self.assertEqual(len(menu), 13)
-            self.assertEqual(selected + 1, 12)
+            self.assertEqual(len(menu), 14)
+            self.assertEqual(selected + 1, 13)
+            self.assertEqual(menu[:3], [
+                "CORTEX IGNITION",
+                "CORTEX IGNITION LEGACY",
+                "HALF-LIFE",
+            ])
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
             self.assertEqual(menu[-1], "CREDITS")
 

@@ -5,15 +5,18 @@
 # host tests.
 #
 # Half-Life cannot be rebuilt from a fresh clone because its cooked assets and
-# music live outside Git. Cortex Ignition is staged from PSoXide's tracked,
-# miniaturized editor sample so the disc no longer depends on editor/projects/.
+# music live outside Git. The current and legacy Cortex builds have separate,
+# exact PSoXide pins so the old engine remains reproducible while the active
+# editor project advances on the new engine.
 
 .PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 PSOXIDE    ?= $(ROOT)/games/PSoXide
-CORTEX_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
-CORTEX_EXPECTED_PSOXIDE_REV ?= 687d2ae7681f9de3090dc89635beac99d1654c93
+CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= ded86107538cbf53b952dda75973780c3fd1b48f
+CORTEX_LEGACY_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
+CORTEX_LEGACY_EXPECTED_PSOXIDE_REV ?= 687d2ae7681f9de3090dc89635beac99d1654c93
 BUILD      := $(ROOT)/build
 QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
@@ -100,10 +103,14 @@ PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX_SOURCE := $(CORTEX_PSOXIDE)/editor/samples/cortex_v1
-CORTEX_PROJECT := $(BUILD)/cortex_v1
-CORTEX := $(CORTEX_PROJECT)/baked/cortex_v1.cue
-CORTEX_REV_STAMP := $(CORTEX_PROJECT)/baked/.psoxide-revision
+CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
+CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
+CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/quake_units_arena.cue
+CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
+CORTEX_LEGACY_SOURCE := $(CORTEX_LEGACY_PSOXIDE)/editor/samples/cortex_v1
+CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy
+CORTEX_LEGACY := $(CORTEX_LEGACY_PROJECT)/baked/cortex_v1.cue
+CORTEX_LEGACY_REV_STAMP := $(CORTEX_LEGACY_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
 NITROXIDE_SRC ?= $(GAMES)/nitroxide
@@ -128,9 +135,9 @@ loader:
 
 # Each program's own version, read from the source that declares it rather than
 # restated here. The disc could always say which pressing it was, but not which
-# build of anything it carried: eleven programs come from eight repositories at
-# eight different moments, so the header's tag answered a question nobody was
-# asking when one game looked wrong.
+# build of anything it carried: the programs come from several repositories at
+# different moments, so the header's tag answered a question nobody was asking
+# when one game looked wrong.
 #
 # The manifest is the source, which took a correction to be true. VoXide's tag
 # and its on-screen string both said 0.1.9 while its Cargo.toml still carried
@@ -156,10 +163,11 @@ V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PSOX
 V_BREAKOUT  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-breakout/Cargo.toml)
 V_INVADERS  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-invaders/Cargo.toml)
 V_MAGIPONG  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-magikaaaaaarp-pong/Cargo.toml)
-# Cortex Ignition has no version to read. It is an authored editor project
-# rather than a Cargo package, and project.ron declares a name and no version,
-# so the disc simply does not claim one for it. Give it a version there and add
-# a --version-of line here.
+# Authored projects do not declare semantic versions. The exact engine pins
+# are their useful identities, and make the new/legacy distinction visible on
+# camera without inventing a project version.
+V_CORTEX_CURRENT := new-$(shell printf '%.7s' '$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)')
+V_CORTEX_LEGACY  := old-$(shell printf '%.7s' '$(CORTEX_LEGACY_EXPECTED_PSOXIDE_REV)')
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
@@ -189,7 +197,8 @@ examples:
 # rev for its standalone build, and those revs drift -- three of them sat eight
 # commits behind a measured SPU fix and nothing said so. A disc built from
 # whatever each game happened to pin would press several different SDKs, so the
-# pin is overridden here and all eleven programs come off the submodule.
+# pin is overridden here and all ordinary non-Cortex programs come off the
+# shared submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
 	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PSOXIDE) DIST=$(GAMES)/voxide/dist
@@ -245,54 +254,75 @@ quake-programs-verify:
 		exit 1; \
 	fi
 
-# Bake Cortex Ignition only when its tracked sample or PSoXide revision changed.
-#
-# The bake shells out to the PSoXide frontend, which is built with the
-# editor feature by default -- so re-baking compiles the whole host
-# editor, including crates that have nothing to do with the disc. The
-# project itself changes rarely (it is authored content, not code), so
-# every other build was paying for a rebuild that produced identical bytes.
-# The authored editor/projects copy is untracked, so it cannot support a clean
-# checkout provenance claim. Stage the tracked editor/samples project under
-# build/ before baking. Generated output then stays out of PSoXide, and the
-# revision stamp forces a rebuild when the SDK/editor checkout advances.
-#
-# The proper fix is to split the frontend's `editor` feature so the
-# authoring CLI does not drag the GUI in with it. That is a bigger job;
-# this removes the coupling in the meantime.
+# Bake both Cortex images only when their tracked project or exact engine pin
+# changed. Each project is copied under build/ before cooking, so generated
+# packs and baked images never dirty either PSoXide submodule. The complete
+# image is what mkdisc consumes: UI pack, world pack, CDDA and scene-residency
+# layout all remain exactly as build-project-disc authored them.
 CORTEX_FORCE   ?=
 
-.PHONY: cortex-if-stale
-cortex-if-stale:
-	@current_rev=$$(git -C "$(CORTEX_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	dirty=$$(git -C "$(CORTEX_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
-	if [ "$$current_rev" != "$(CORTEX_EXPECTED_PSOXIDE_REV)" ]; then \
-		echo "cortex: PSoXide pin is $$current_rev, expected $(CORTEX_EXPECTED_PSOXIDE_REV)"; \
+.PHONY: cortex-if-stale cortex-current-if-stale cortex-legacy-if-stale
+cortex-if-stale: cortex-current-if-stale cortex-legacy-if-stale
+
+cortex-current-if-stale:
+	@current_rev=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	dirty=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
+	if [ "$$current_rev" != "$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)" ]; then \
+		echo "cortex-current: PSoXide pin is $$current_rev, expected $(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)"; \
 		exit 1; \
 	fi; \
 	if [ -n "$$dirty" ]; then \
-		echo "cortex: pinned PSoXide checkout is dirty"; \
+		echo "cortex-current: pinned PSoXide checkout is dirty"; \
 		exit 1; \
 	fi; \
-	stamped_rev=$$(sed -n '1p' "$(CORTEX_REV_STAMP)" 2>/dev/null || true); \
-	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_SOURCE)/" -type f -newer "$(CORTEX)" -print -quit 2>/dev/null)" ]; then \
-		echo "cortex: tracked sample or PSoXide revision changed (or forced) -- baking"; \
-		case "$(BUILD)" in ""|"/") echo "cortex: unsafe build root $(BUILD)"; exit 1 ;; esac; \
-		case "$(CORTEX_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex: unsafe staging path $(CORTEX_PROJECT)"; exit 1 ;; esac; \
-		rm -rf "$(CORTEX_PROJECT)" || exit 1; \
-		mkdir -p "$(CORTEX_PROJECT)" || exit 1; \
-		cp -R "$(CORTEX_SOURCE)/." "$(CORTEX_PROJECT)/" || exit 1; \
-		(cd "$(CORTEX_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_PROJECT)") || exit 1; \
-		printf '%s\n' "$$current_rev" > "$(CORTEX_REV_STAMP)" || exit 1; \
+	stamped_rev=$$(sed -n '1p' "$(CORTEX_CURRENT_REV_STAMP)" 2>/dev/null || true); \
+	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX_CURRENT)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_CURRENT_SOURCE)/" -type f -newer "$(CORTEX_CURRENT)" -print -quit 2>/dev/null)" ]; then \
+		echo "cortex-current: project or PSoXide revision changed (or forced) -- baking"; \
+		case "$(BUILD)" in ""|"/") echo "cortex-current: unsafe build root $(BUILD)"; exit 1 ;; esac; \
+		case "$(CORTEX_CURRENT_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex-current: unsafe staging path $(CORTEX_CURRENT_PROJECT)"; exit 1 ;; esac; \
+		rm -rf "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
+		mkdir -p "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
+		cp -R "$(CORTEX_CURRENT_SOURCE)/." "$(CORTEX_CURRENT_PROJECT)/" || exit 1; \
+		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
+		printf '%s\n' "$$current_rev" > "$(CORTEX_CURRENT_REV_STAMP)" || exit 1; \
 	else \
-		echo "cortex: project unchanged -- reusing $(CORTEX)"; \
+		echo "cortex-current: project unchanged -- reusing $(CORTEX_CURRENT)"; \
+	fi
+
+cortex-legacy-if-stale:
+	@current_rev=$$(git -C "$(CORTEX_LEGACY_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	dirty=$$(git -C "$(CORTEX_LEGACY_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
+	if [ "$$current_rev" != "$(CORTEX_LEGACY_EXPECTED_PSOXIDE_REV)" ]; then \
+		echo "cortex-legacy: PSoXide pin is $$current_rev, expected $(CORTEX_LEGACY_EXPECTED_PSOXIDE_REV)"; \
+		exit 1; \
+	fi; \
+	if [ -n "$$dirty" ]; then \
+		echo "cortex-legacy: pinned PSoXide checkout is dirty"; \
+		exit 1; \
+	fi; \
+	stamped_rev=$$(sed -n '1p' "$(CORTEX_LEGACY_REV_STAMP)" 2>/dev/null || true); \
+	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX_LEGACY)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_LEGACY_SOURCE)/" -type f -newer "$(CORTEX_LEGACY)" -print -quit 2>/dev/null)" ]; then \
+		echo "cortex-legacy: project or PSoXide revision changed (or forced) -- baking"; \
+		case "$(BUILD)" in ""|"/") echo "cortex-legacy: unsafe build root $(BUILD)"; exit 1 ;; esac; \
+		case "$(CORTEX_LEGACY_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex-legacy: unsafe staging path $(CORTEX_LEGACY_PROJECT)"; exit 1 ;; esac; \
+		rm -rf "$(CORTEX_LEGACY_PROJECT)" || exit 1; \
+		mkdir -p "$(CORTEX_LEGACY_PROJECT)" || exit 1; \
+		cp -R "$(CORTEX_LEGACY_SOURCE)/." "$(CORTEX_LEGACY_PROJECT)/" || exit 1; \
+		(cd "$(CORTEX_LEGACY_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_LEGACY_PROJECT)") || exit 1; \
+		printf '%s\n' "$$current_rev" > "$(CORTEX_LEGACY_REV_STAMP)" || exit 1; \
+	else \
+		echo "cortex-legacy: project unchanged -- reusing $(CORTEX_LEGACY)"; \
 	fi
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
-# Cortex Ignition is the PSoXide souls-like technology demo and is visible on
-# every pressing. Half-Life remains the only opt-in program.
+# The standard pressing is the publication-shaped build, so both unfinished
+# Cortex entries stay behind the Konami unlock there. The private Half-Life
+# pressing exposes both cards for direct show-floor and hardware testing.
+ifeq ($(HL),)
+CORTEX_GATE_ARGS = --gate "CORTEX IGNITION" --gate "CORTEX IGNITION LEGACY"
+endif
 
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
@@ -324,7 +354,7 @@ _quake-headless-check:
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
-		--expected-menu-entries "$(if $(HL),13,12)"
+		--expected-menu-entries "$(if $(HL),14,11)"
 
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
@@ -363,7 +393,8 @@ quake-verify:
 # pixels always come from the PNGs actually in the repo.
 SHOTS_SRC := $(ROOT)/assets/shots
 SHOTS_OUT := $(BUILD)/shots
-SHOT_NAMES := cortex cortex2 voxide-day voxide-night nitroxide-boost \
+SHOT_NAMES := cortex-current-menu cortex-current-gameplay cortex cortex2 \
+              voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
               invaders2 pong pong2 hwtests hwtests2 halflife
@@ -379,7 +410,8 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
-		--image "CORTEX IGNITION=$(CORTEX)" \
+		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		--image "CORTEX IGNITION LEGACY=$(CORTEX_LEGACY)" \
 		$(HL_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -396,8 +428,10 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
 		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
 		--credit "$(MENU_CREDIT)" \
-		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex.shot" \
-		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex2.shot" \
+		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-menu.shot" \
+		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-gameplay.shot" \
+		--shot "CORTEX IGNITION LEGACY=$(SHOTS_OUT)/cortex.shot" \
+		--shot "CORTEX IGNITION LEGACY=$(SHOTS_OUT)/cortex2.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-day.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-night.shot" \
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-boost.shot" \
@@ -418,6 +452,8 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
 		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests2.shot" \
 		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
+		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
+		--version-of "CORTEX IGNITION LEGACY=$(V_CORTEX_LEGACY)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
 		--version-of "PSXCEL=$(V_PSXCEL)" \
@@ -427,7 +463,9 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--version-of "BREAKOUT=$(V_BREAKOUT)" \
 		--version-of "SPACE INVADERS=$(V_INVADERS)" \
 		--version-of "MAGIKAAAAARP PONG=$(V_MAGIPONG)" \
-		--describe "CORTEX IGNITION=An original PlayStation souls-like. This legacy PSoXide tech demo has a grid level, combat, skeletal animation and lighting. The new BSP slice remains an editor test.|Souls-like originale per PlayStation. Demo legacy PSoXide con livello a griglia, combattimento, animazioni e luci. La demo BSP resta nell'editor." \
+		$(CORTEX_GATE_ARGS) \
+		--describe "CORTEX IGNITION=An early new-engine Cortex Ignition build. Explore Quake Units Arena, a work-in-progress PXBSP level running on PSoXide's current scene-streaming runtime.|Prima build di Cortex Ignition sul nuovo motore. Esplora Quake Units Arena, un livello PXBSP in sviluppo sul runtime attuale di PSoXide." \
+		--describe "CORTEX IGNITION LEGACY=The original grid-based Cortex Ignition technology demo, preserved on its old PSoXide engine with its original combat, skeletal animation and lighting.|La demo tecnologica originale di Cortex Ignition, conservata sul vecchio motore PSoXide con combattimento, animazioni scheletriche e luci." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Play against the CPU or a friend in split screen: drive, boost, jump, dodge and score, with music off the disc.|Un clone di Rocket League per la prima PlayStation. Gioca contro la CPU o in due a schermo diviso: guida, boost, salti, dodge e gol, con la musica del disco." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \
