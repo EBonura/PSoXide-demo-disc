@@ -64,11 +64,12 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-Twelve programs ship on the default pressing and Half-Life adds a thirteenth.
-Automated evidence is recorded per program and must not be read as an original
-hardware claim. The v0.27 default disc is 99290 sectors (22:03:65, 222.7 MiB,
-8 CD-DA tracks); the Half-Life pressing is 303778 sectors (67:30:28,
-681.4 MiB, 35 CD-DA tracks), which is 84% of an 80-minute CD-R.
+Ten outer programs ship on the default pressing and Half-Life adds an
+eleventh. PSoXide Arcade is one of those programs and contains three games of
+its own. Automated evidence is recorded per program and must not be read as an
+original hardware claim. The current default disc is 99450 sectors (22:06:00,
+223.1 MiB, 8 CD-DA tracks); the Half-Life pressing is 303989 sectors
+(67:33:14, 681.9 MiB, 35 CD-DA tracks), which is 84% of an 80-minute CD-R.
 
 | Program | How it ships |
 | --- | --- |
@@ -79,10 +80,8 @@ hardware claim. The v0.27 default disc is 99290 sectors (22:03:65, 222.7 MiB,
 | NitroXide | whole image, WORLD.PAK arena atlas |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
-| GH-PSX | whole image, 1 CD-DA track |
-| Breakout | bare EXE |
-| Space Invaders | bare EXE |
-| Magikaaaaarp Pong | bare EXE, plays GH-PSX's track |
+| GH-PSX | whole image without duplicated CD-DA; borrows Arcade's track |
+| PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; owns 1 CD-DA track |
 | Hardware Tests | whole image, 1 CD-DA track |
 | Quake shareware | whole image, no CD-DA track |
 
@@ -107,9 +106,10 @@ revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
 After unlocking, the standard order is Cortex Ignition, Cortex Ignition
-Legacy, Voxide, NitroXide, Celeste Collection, PSXcel, GH-PSX, Breakout, Space
-Invaders, Magikaaaaarp Pong, Hardware Tests, Quake Shareware, then Credits. The
-Half-Life pressing inserts Half-Life directly after the two Cortex entries.
+Legacy, Voxide, NitroXide, Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
+Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a second
+carousel for Breakout, Space Invaders and Magikarp Pong. The Half-Life pressing
+inserts Half-Life directly after the two Cortex entries.
 
 ## The menu
 
@@ -174,21 +174,22 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the locked standard carousel contains eleven visible entries including
+- the locked standard carousel contains nine visible entries including
   Credits; the unlock reveals both Cortex entries
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
-- Magikaaaaarp Pong plays audio off Guitar Hero's track, one copy on the disc
+- PSoXide Arcade owns the Goncharov CD-DA track; both Magikarp Pong and GH-PSX
+  relocate to that one physical copy on the combined disc
 
 ## Building
 
 `make disc` writes into PSoXide's game library, so the disc shows up in the
-emulator next to everything else:
+emulator next to everything else. The release files are flat in that directory:
 
 ```
-~/Downloads/ps1 games/PSoXide Demo Disc/PSoXide Demo Disc.{bin,cue}
+~/Downloads/ps1 games/PSoXide Demo Disc.{bin,cue}
 ```
 
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
@@ -199,15 +200,17 @@ cannot silently change the SDK contract of the pinned Quake image. The two
 Cortex projects are staged
 from `games/PSoXide-cortex-current` and `games/PSoXide-cortex` into separate
 directories under `build/`, keeping generated output outside both pinned
-PSoXide worktrees. gh-psx keeps its audio in a gitignored
-`data/audio/`, so a fresh clone needs that dropped in before `make disc` will
-get past it.
+PSoXide worktrees. `games/psoxide-arcade` is the private collection repository
+and the canonical owner of `goncharov.cdda`; the combined-disc GH-PSX image is
+built data-only and borrows Arcade's relocated track instead of carrying a
+second copy.
 
 Two pressings exist. `make disc` builds the default one; `make disc HL=1`
 builds the same disc plus Half-Life, for show-floor demos, under a different
 name so the two bins cannot be confused. Both carry Quake shareware. The
-`games/hl-psx` submodule is private until its own release, so a fresh clone
-should init the other submodules selectively and stick to the default pressing.
+`games/hl-psx` and `games/psoxide-arcade` are private until their own releases,
+so a fresh clone needs access to Arcade even for the default pressing. The
+Half-Life pressing additionally requires access to HL-PSX.
 
 `make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
 sibling `quake-psx` checkout by default) and will not build without
