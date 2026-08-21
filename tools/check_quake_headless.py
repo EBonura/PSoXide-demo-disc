@@ -23,18 +23,22 @@ EXPECTED_DISPLAY = (320, 240)
 # exposes both Cortex cards and adds Half-Life, so its caller raises this to
 # fourteen. Quake stays immediately before CREDITS in both layouts.
 DEFAULT_MENU_ENTRIES = 11
-# The frame both replays end on, hashed by the emulator. This pair is Quake's
-# output, and it survives things that move every cycle count on the disc: a
-# launcher rebuilt from a different absolute path, a different DISC_VERSION
-# string, a renamed pressing. Recompute it when the Quake or PSoXide pin moves.
+# The frame both replays end on, hashed by the emulator. Each pressing needs
+# its own pair because its carousel table gives the launcher a different amount
+# of work before the fixed instruction budget reaches Quake. Recompute these
+# when the Quake, launcher, or ordinary-program PSoXide pin moves.
 #
 # Absolute cycle counts, route ticks, pad polls, CD command totals and log
 # digests are deliberately NOT pinned here. They shift with the launcher binary,
 # which changes on every commit to this repo (DISC_VERSION is `git describe`),
 # so pinning them would have made the default gate fail on unrelated work. They
 # are held to run-to-run equality instead, which is what determinism means.
-EXPECTED_VRAM_FNV = "0x168cb3b9ef701813"
-EXPECTED_DISPLAY_FNV = "0xdc39875b2a7af598"
+EXPECTED_FRAME_FNV_BY_MENU_ENTRIES = {
+    # Public pressing: unfinished Cortex cards are hidden.
+    DEFAULT_MENU_ENTRIES: ("0x4325a1773effa4a7", "0x997d60e18a6b2602"),
+    # Private Half-Life pressing: both Cortex cards and Half-Life are visible.
+    14: ("0x5d0eee3f56c07554", "0x82f6a158cc109522"),
+}
 DETERMINISTIC_FIELDS = (
     "tick",
     "cycles",
@@ -394,11 +398,21 @@ def same(first: Path, second: Path, label: str) -> str:
     return first_hash
 
 
-def require_pins(result: dict[str, object], label: str) -> None:
+def require_pins(
+    result: dict[str, object], label: str, expected_menu_entries: int
+) -> None:
+    try:
+        expected_vram, expected_display = EXPECTED_FRAME_FNV_BY_MENU_ENTRIES[
+            expected_menu_entries
+        ]
+    except KeyError as error:
+        raise CheckError(
+            f"no frame pins for a {expected_menu_entries}-entry pressing"
+        ) from error
     expected = {
         "tick": EXPECTED_TICK,
-        "vram_fnv": EXPECTED_VRAM_FNV,
-        "display_fnv": EXPECTED_DISPLAY_FNV,
+        "vram_fnv": expected_vram,
+        "display_fnv": expected_display,
         "display_width": EXPECTED_DISPLAY[0],
         "display_height": EXPECTED_DISPLAY[1],
     }
@@ -473,7 +487,7 @@ def main() -> int:
                 for name in ("first", "second")
             }
             for name, replay in replays.items():
-                require_pins(replay, name)
+                require_pins(replay, name, args.expected_menu_entries)
                 if not load_addr <= replay["pc_final"] < load_addr + payload_bytes:
                     raise CheckError(
                         f"{name} final PC {replay['pc_final']:#010x} is outside "

@@ -769,6 +769,24 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn("games/PSoXide ", script)
         self.assertIn("games/PSoXide-runtime ", script)
 
+    def test_disc_runtime_crates_do_not_use_quakes_frozen_sdk(self) -> None:
+        paths = (
+            ROOT / "loader" / "Cargo.toml",
+            ROOT / "carousel" / "Cargo.toml",
+            ROOT / "launcher" / "Cargo.toml",
+            ROOT / "tools" / "mkdisc" / "Cargo.toml",
+        )
+        for path in paths:
+            manifest = path.read_text(encoding="utf-8")
+            self.assertNotIn("games/PSoXide/", manifest, path)
+            self.assertIn("games/PSoXide-runtime/", manifest, path)
+
+        launcher = (ROOT / "launcher" / "src" / "main.rs").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("games/PSoXide/assets/", launcher)
+        self.assertIn("games/PSoXide-runtime/assets/", launcher)
+
     def test_quake_program_stamp_rejects_missing_malformed_and_stale(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -895,6 +913,17 @@ class MakeVariantContractTests(unittest.TestCase):
                 self.assertIn(argument, default.stdout)
                 self.assertIn(argument, half_life.stdout)
         self.assertIn("PSoXide Demo Disc HL.bin", half_life.stdout)
+
+    def test_half_life_demo_build_packs_without_installing(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn(
+            "cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)",
+            makefile,
+        )
+        self.assertNotIn(
+            "cargo run --release -- disc --psoxide $(PROGRAMS_PSOXIDE)",
+            makefile,
+        )
 
     def test_distribution_targets_are_blocked_before_they_build_anything(self) -> None:
         blocked = run(
@@ -1358,6 +1387,29 @@ class HeadlessChainloadTests(unittest.TestCase):
             self.assertNotIn(pin, source)
         for field in ("cycles", "route_ticks", "pad_polls"):
             self.assertIn(field, check_quake_headless.DETERMINISTIC_FIELDS)
+
+    def test_each_pressing_has_its_own_visible_frame_pins(self) -> None:
+        self.assertEqual(
+            set(check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES),
+            {check_quake_headless.DEFAULT_MENU_ENTRIES, 14},
+        )
+        for menu_entries, (vram, display) in (
+            check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES.items()
+        ):
+            with self.subTest(menu_entries=menu_entries):
+                result = {
+                    "tick": check_quake_headless.EXPECTED_TICK,
+                    "vram_fnv": vram,
+                    "display_fnv": display,
+                    "display_width": check_quake_headless.EXPECTED_DISPLAY[0],
+                    "display_height": check_quake_headless.EXPECTED_DISPLAY[1],
+                }
+                check_quake_headless.require_pins(
+                    result, "fixture", menu_entries
+                )
+
+        with self.assertRaisesRegex(check_quake_headless.CheckError, "no frame pins"):
+            check_quake_headless.require_pins(result, "fixture", 13)
 
     def test_cd_evidence_requires_header_and_payload_read_sequences(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

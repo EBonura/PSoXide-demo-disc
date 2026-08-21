@@ -208,14 +208,15 @@ examples:
 # shared submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
-	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/voxide/dist
+	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
+		DIST=$(GAMES)/voxide/dist GAMES_DIR=$(BUILD)/game-library
 	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
 	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
-	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PROGRAMS_PSOXIDE)
+	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
 endif
 
 # Every disc build must establish that its ordinary demo-disc programs were
