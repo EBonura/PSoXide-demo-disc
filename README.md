@@ -192,8 +192,11 @@ emulator next to everything else:
 ```
 
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
-different library. `PSOXIDE=/absolute/path/to/PSoXide` selects the checkout
-used for every ordinary rebuilt program. The two Cortex projects are staged
+different library. `PROGRAMS_PSOXIDE=/absolute/path/to/PSoXide` selects the
+checkout used for every ordinary rebuilt program. `PSOXIDE` remains the exact
+checkout named by Quake's artifact provenance, so advancing the shared runtime
+cannot silently change the SDK contract of the pinned Quake image. The two
+Cortex projects are staged
 from `games/PSoXide-cortex-current` and `games/PSoXide-cortex` into separate
 directories under `build/`, keeping generated output outside both pinned
 PSoXide worktrees. gh-psx keeps its audio in a gitignored
@@ -238,9 +241,13 @@ Paste those six lines over the ones near the top of the `Makefile`, then:
 1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
    games/PSoXide` -- the Quake tree names the SDK it was built against, and
    the disc has to be on that same revision or `quake-verify` refuses.
-2. `make disc` -- rebuilds every program against that SDK, re-verifies the
-   Quake input, and writes the provenance receipt beside the image.
-3. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
+2. Update `games/PSoXide-runtime` and `PROGRAMS_EXPECTED_PSOXIDE_REV` together
+   when the ordinary programs advance. The verifier requires that clean exact
+   checkout and its build stamp independently of Quake's frozen SDK.
+3. `make disc` -- rebuilds every ordinary program against the shared runtime,
+   re-verifies both SDK inputs and the Quake image, and writes the provenance
+   receipt beside the image.
+4. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
    `EXPECTED_DISPLAY_FNV` in `tools/check_quake_headless.py` fail, the error
    prints the values the new build produced. Those two are the only pins
    outside the Makefile. Paste them in and run it again, so a green run is

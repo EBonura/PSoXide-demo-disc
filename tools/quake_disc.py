@@ -666,12 +666,23 @@ def verify_quake(
     expected_cue_sha256: str,
     expected_bin_sha256: str,
     expected_exe_sha256: str,
+    programs_psoxide: Path | None = None,
+    expected_programs_psoxide_revision: str | None = None,
 ) -> VerifiedQuake:
     expected_revision = require_hex(
         expected_revision, FULL_REVISION, "expected revision"
     )
     expected_psoxide_revision = require_hex(
         expected_psoxide_revision, FULL_REVISION, "expected PSoXide revision"
+    )
+    if programs_psoxide is None:
+        programs_psoxide = psoxide
+    if expected_programs_psoxide_revision is None:
+        expected_programs_psoxide_revision = expected_psoxide_revision
+    expected_programs_psoxide_revision = require_hex(
+        expected_programs_psoxide_revision,
+        FULL_REVISION,
+        "expected ordinary-program PSoXide revision",
     )
     expected_provenance_sha256 = require_hex(
         expected_provenance_sha256, SHA256, "expected provenance SHA-256"
@@ -696,8 +707,13 @@ def verify_quake(
             f"Quake PSOXIDE_REV mismatch: source declares {declared_revision}, "
             f"but disc checkout is {psoxide_revision}"
         )
+    _, programs_psoxide_revision = verify_clean_checkout(
+        programs_psoxide,
+        expected_programs_psoxide_revision,
+        "ordinary-program PSoXide",
+    )
     programs_psoxide_revision = verify_programs_revision_stamp(
-        programs_psoxide_stamp, psoxide_revision
+        programs_psoxide_stamp, programs_psoxide_revision
     )
 
     try:
@@ -772,6 +788,14 @@ def verify_from_args(args: argparse.Namespace) -> VerifiedQuake:
         args.expected_cue_sha256,
         args.expected_bin_sha256,
         args.expected_exe_sha256,
+        programs_psoxide=(
+            Path(args.programs_psoxide) if args.programs_psoxide else None
+        ),
+        expected_programs_psoxide_revision=(
+            args.expected_programs_psoxide_revision
+            if args.expected_programs_psoxide_revision
+            else None
+        ),
     )
 
 
@@ -833,6 +857,9 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
             "matches_quake_declared_revision": True,
             "ordinary_programs_revision": verified.programs_psoxide_revision,
             "ordinary_programs_match_checkout": True,
+            "ordinary_programs_match_quake_sdk": (
+                verified.programs_psoxide_revision == verified.psoxide_revision
+            ),
         },
         "quake_artifact_sdk_provenance": {
             "status": "sidecar-bound",
@@ -925,11 +952,13 @@ def print_repin(args: argparse.Namespace) -> None:
 def add_verification_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source", required=True)
     parser.add_argument("--psoxide", required=True)
+    parser.add_argument("--programs-psoxide")
     parser.add_argument("--programs-psoxide-stamp", required=True)
     parser.add_argument("--cue", required=True)
     parser.add_argument("--provenance", required=True)
     parser.add_argument("--expected-revision", required=True)
     parser.add_argument("--expected-psoxide-revision", required=True)
+    parser.add_argument("--expected-programs-psoxide-revision")
     parser.add_argument("--expected-provenance-sha256", required=True)
     parser.add_argument("--expected-cue-sha256", required=True)
     parser.add_argument("--expected-bin-sha256", required=True)

@@ -25,3 +25,6 @@
 [submodule "games/nitroxide"]
 	path = games/nitroxide
 	url = https://github.com/EBonura/nitroxide.git
+[submodule "games/PSoXide-runtime"]
+	path = games/PSoXide-runtime
+	url = https://github.com/EBonura/PSoXide.git
