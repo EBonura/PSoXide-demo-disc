@@ -12,15 +12,22 @@
 .PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
+# Quake's independently verified SDK input stays frozen here. Ordinary games
+# advance on their own clean shared-runtime pin below.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
+PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 588d7637a4cb49209d3072438110683b921bb634
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
 CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= ded86107538cbf53b952dda75973780c3fd1b48f
+CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
+CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 CORTEX_LEGACY_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
 CORTEX_LEGACY_EXPECTED_PSOXIDE_REV ?= 687d2ae7681f9de3090dc89635beac99d1654c93
+CORTEX_LEGACY_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-legacy
 BUILD      := $(ROOT)/build
 QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
-EXAMPLES   := $(PSOXIDE)/build/examples/mipsel-sony-psx/release
+EXAMPLES   := $(PROGRAMS_PSOXIDE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 
 # Menu music, used with the artist's permission. The credit ships on the disc
@@ -79,7 +86,7 @@ QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bf
 QUAKE_EXPECTED_BIN_SHA256 ?= 12d8ff24de1c92db197f1c53cf6368286d2b17ee2ed728580db8fa94ec6ee062
 QUAKE_EXPECTED_EXE_SHA256 ?= 5fd0cc8eb4ff5139b3c001c3e3e94e6a8eb9e920730f0cfd7200dd25f848e675
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
-FRONTEND ?= $(PSOXIDE)/target/release/frontend
+FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
@@ -159,10 +166,10 @@ V_GHPSX     := $(call cargo_version,$(GAMES)/gh-psx/game/Cargo.toml)
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 # The hardware suite already versions itself on screen; take that same string so
 # the carousel and the suite header cannot disagree.
-V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
-V_BREAKOUT  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-breakout/Cargo.toml)
-V_INVADERS  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-invaders/Cargo.toml)
-V_MAGIPONG  := $(call cargo_version,$(PSOXIDE)/engine/examples/game-magikaaaaaarp-pong/Cargo.toml)
+V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
+V_BREAKOUT  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-breakout/Cargo.toml)
+V_INVADERS  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-invaders/Cargo.toml)
+V_MAGIPONG  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-magikaaaaaarp-pong/Cargo.toml)
 # Authored projects do not declare semantic versions. The exact engine pins
 # are their useful identities, and make the new/legacy distinction visible on
 # camera without inventing a project version.
@@ -178,12 +185,12 @@ DISC_VERSION := $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) \
-		RUSTFLAGS="-Clink-arg=-T$(PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Clink-arg=-T$(PROGRAMS_PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 examples:
-	$(MAKE) -C $(PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
-	$(MAKE) -C $(PSOXIDE) hardware-tests-disc
+	$(MAKE) -C $(PROGRAMS_PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
+	$(MAKE) -C $(PROGRAMS_PSOXIDE) hardware-tests-disc
 
 # PSXcel and the Celeste collection never read the disc after boot, so they
 # ride as bare EXEs and do not care which SDK they were built against.
@@ -201,18 +208,19 @@ examples:
 # shared submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
 programs: examples
-	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PSOXIDE) DIST=$(GAMES)/voxide/dist
-	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
-	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PSOXIDE)
-	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PSOXIDE)
-	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PSOXIDE) DIST=$(GAMES)/gh-psx/dist
+	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/voxide/dist
+	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
+	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
+	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
+	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
-	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PSOXIDE)
+	cd $(GAMES)/hl-psx && cargo run --release -- disc --psoxide $(PROGRAMS_PSOXIDE)
 endif
 
 # Every disc build must establish that its ordinary demo-disc programs were
-# rebuilt from the same clean PSoXide revision the Quake source declares.
+# rebuilt from their own exact clean shared-runtime revision. Quake's separate
+# artifact pin is verified independently below.
 # Remove the prior stamp before rebuilding, check the hydration markers after
 # every program recipe finishes, then write the exact clean checkout revision.
 #
@@ -223,8 +231,8 @@ quake-programs:
 	@rm -f "$(QUAKE_PROGRAMS_STAMP)"
 	$(MAKE) programs
 	$(MAKE) sdk-coherence
-	@revision=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	dirty=$$(git -C "$(PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
+	@revision=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	dirty=$$(git -C "$(PROGRAMS_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
 	if [ -n "$$dirty" ]; then \
 		echo "quake-programs: PSoXide checkout is dirty; refusing SDK stamp"; \
 		exit 1; \
@@ -248,7 +256,7 @@ quake-programs-verify:
 		echo "quake-programs: malformed SDK revision stamp $(QUAKE_PROGRAMS_STAMP)"; \
 		exit 1; \
 	fi; \
-	current=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	current=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
 	if [ "$$stamped" != "$$current" ]; then \
 		echo "quake-programs: SDK revision stamp is $$stamped, but PSoXide is $$current; run 'make disc'"; \
 		exit 1; \
@@ -283,7 +291,7 @@ cortex-current-if-stale:
 		rm -rf "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		mkdir -p "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		cp -R "$(CORTEX_CURRENT_SOURCE)/." "$(CORTEX_CURRENT_PROJECT)/" || exit 1; \
-		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
+		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
 		printf '%s\n' "$$current_rev" > "$(CORTEX_CURRENT_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex-current: project unchanged -- reusing $(CORTEX_CURRENT)"; \
@@ -308,7 +316,7 @@ cortex-legacy-if-stale:
 		rm -rf "$(CORTEX_LEGACY_PROJECT)" || exit 1; \
 		mkdir -p "$(CORTEX_LEGACY_PROJECT)" || exit 1; \
 		cp -R "$(CORTEX_LEGACY_SOURCE)/." "$(CORTEX_LEGACY_PROJECT)/" || exit 1; \
-		(cd "$(CORTEX_LEGACY_PSOXIDE)/emu" && cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_LEGACY_PROJECT)") || exit 1; \
+		(cd "$(CORTEX_LEGACY_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_LEGACY_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_LEGACY_PROJECT)") || exit 1; \
 		printf '%s\n' "$$current_rev" > "$(CORTEX_LEGACY_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex-legacy: project unchanged -- reusing $(CORTEX_LEGACY)"; \
@@ -377,11 +385,13 @@ quake-verify:
 	python3 tools/quake_disc.py verify \
 		--source "$(QUAKE_SRC)" \
 		--psoxide "$(PSOXIDE)" \
+		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
 		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
 		--provenance "$(QUAKE_PROVENANCE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
 		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
+		--expected-programs-psoxide-revision "$(PROGRAMS_EXPECTED_PSOXIDE_REV)" \
 		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
 		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
@@ -479,11 +489,13 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 	python3 tools/quake_disc.py receipt \
 		--source "$(QUAKE_SRC)" \
 		--psoxide "$(PSOXIDE)" \
+		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
 		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
 		--cue "$(QUAKE_CUE)" \
 		--provenance "$(QUAKE_PROVENANCE)" \
 		--expected-revision "$(QUAKE_EXPECTED_REV)" \
 		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
+		--expected-programs-psoxide-revision "$(PROGRAMS_EXPECTED_PSOXIDE_REV)" \
 		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
 		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
 		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
@@ -580,7 +592,7 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 check-locks:
 	@./tools/check-locks.sh
 
-# The shared SDK (the games/PSoXide submodule) and Quake's declared PSoXide
+# The ordinary-program SDK and Quake's declared PSoXide
 # revision must both be on PSoXide main. Quake's SDK work once lived on a side
 # branch that this disc pinned as the SDK while main moved on; the split cost a
 # reconciliation merge. GitHub's compare API answers "identical" or "ahead"
@@ -591,7 +603,7 @@ sdk-on-main:
 	@if [ -n "$(DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN)" ]; then \
 		echo "sdk-on-main: SKIPPED by request"; exit 0; \
 	fi; \
-	sub=$$(git -C "$(PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
+	sub=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
 	for rev in "$$sub" "$(QUAKE_EXPECTED_PSOXIDE_REV)"; do \
 		status=$$(gh api "repos/EBonura/PSoXide/compare/$$rev...main" --jq .status 2>/dev/null) || { \
 			echo "sdk-on-main: cannot compare $$rev with PSoXide main via gh api (offline or unauthenticated); set DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 only for a deliberate side-branch pressing"; exit 1; }; \
@@ -603,7 +615,7 @@ sdk-on-main:
 
 .PHONY: sdk-coherence
 sdk-coherence:
-	@expected="local:$(PSOXIDE)"; bad=0; seen=0; \
+	@expected="local:$(PROGRAMS_PSOXIDE)"; bad=0; seen=0; \
 	for m in $(GAMES)/*/.psoxide/.psoxide-source; do \
 		[ -f "$$m" ] || continue; \
 		seen=$$((seen+1)); \
@@ -618,7 +630,7 @@ sdk-coherence:
 		echo "sdk-coherence: run 'make programs' to put every game on this tree"; \
 		exit 1; \
 	fi; \
-	echo "sdk-coherence: $$seen game(s) on $(PSOXIDE)"
+	echo "sdk-coherence: $$seen game(s) on $(PROGRAMS_PSOXIDE)"
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its
@@ -626,13 +638,13 @@ sdk-coherence:
 # much, and psx_io::disc_base has to make up the difference. Run the result
 # with the emulator and read the banner.
 relocation-check: launcher mkdisc
-	$(MAKE) -C $(PSOXIDE) hello-pack-disc
+	$(MAKE) -C $(PROGRAMS_PSOXIDE) hello-pack-disc
 	@mkdir -p $(ROOT)/dist
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
 		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
 		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
 	@echo
-	@echo "Now: cd $(PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"
+	@echo "Now: cd $(PROGRAMS_PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
 	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."

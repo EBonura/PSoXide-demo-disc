@@ -236,6 +236,52 @@ class VerifyQuakeTests(unittest.TestCase):
             )
             self.assertEqual(verified.bin_bytes, 24 * quake_disc.SECTOR_BYTES)
 
+    def test_accepts_separate_clean_sdk_for_ordinary_programs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = QuakeFixture(root)
+            programs_psoxide = root / "programs-psoxide"
+            programs_psoxide.mkdir()
+            run("git", "init", "-q", cwd=programs_psoxide)
+            run("git", "config", "user.name", "Test", cwd=programs_psoxide)
+            run(
+                "git",
+                "config",
+                "user.email",
+                "test@example.invalid",
+                cwd=programs_psoxide,
+            )
+            (programs_psoxide / "sdk.txt").write_text(
+                "shared runtime\n", encoding="ascii"
+            )
+            run("git", "add", "sdk.txt", cwd=programs_psoxide)
+            run("git", "commit", "-q", "-m", "fixture", cwd=programs_psoxide)
+            programs_revision = run(
+                "git", "rev-parse", "HEAD", cwd=programs_psoxide
+            ).stdout.strip()
+            fixture.programs_stamp.write_text(
+                programs_revision + "\n", encoding="ascii"
+            )
+
+            verified = quake_disc.verify_quake(
+                fixture.source,
+                fixture.psoxide,
+                fixture.programs_stamp,
+                fixture.cue,
+                fixture.provenance,
+                fixture.revision,
+                fixture.psoxide_revision,
+                fixture.provenance_sha256,
+                digest(fixture.cue),
+                digest(fixture.bin),
+                digest(fixture.exe),
+                programs_psoxide=programs_psoxide,
+                expected_programs_psoxide_revision=programs_revision,
+            )
+
+            self.assertEqual(verified.psoxide_revision, fixture.psoxide_revision)
+            self.assertEqual(verified.programs_psoxide_revision, programs_revision)
+
     def test_rejects_wrong_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = QuakeFixture(Path(directory))
@@ -561,6 +607,9 @@ class VerifyQuakeTests(unittest.TestCase):
             self.assertTrue(
                 receipt["psoxide_input"]["ordinary_programs_match_checkout"]
             )
+            self.assertTrue(
+                receipt["psoxide_input"]["ordinary_programs_match_quake_sdk"]
+            )
             self.assertEqual(
                 receipt["quake_artifact_sdk_provenance"]["status"],
                 "sidecar-bound",
@@ -676,8 +725,10 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn("tools/quake_disc.py verify", default.stdout)
         self.assertIn("tools/quake_disc.py receipt", default.stdout)
         self.assertIn('--psoxide "', default.stdout)
+        self.assertIn('--programs-psoxide "', default.stdout)
         self.assertIn('--programs-psoxide-stamp "', default.stdout)
         self.assertIn('--expected-psoxide-revision "', default.stdout)
+        self.assertIn('--expected-programs-psoxide-revision "', default.stdout)
         self.assertIn('--provenance "', default.stdout)
         self.assertIn('--expected-provenance-sha256 "', default.stdout)
         self.assertIn('--expected-exe-sha256 "', default.stdout)
@@ -713,6 +764,11 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertLess(coherence_at, stamp_at)
         self.assertLess(stamp_at, verify_at)
 
+    def test_lock_audit_includes_both_psoxide_inputs(self) -> None:
+        script = (ROOT / "tools" / "check-locks.sh").read_text(encoding="utf-8")
+        self.assertIn("games/PSoXide ", script)
+        self.assertIn("games/PSoXide-runtime ", script)
+
     def test_quake_program_stamp_rejects_missing_malformed_and_stale(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -726,6 +782,7 @@ class MakeVariantContractTests(unittest.TestCase):
                     "--no-print-directory",
                     "quake-programs-verify",
                     f"PSOXIDE={fixture.psoxide}",
+                    f"PROGRAMS_PSOXIDE={fixture.psoxide}",
                     f"BUILD={build}",
                     cwd=ROOT,
                     check=False,
@@ -783,6 +840,30 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn("687d2ae7681f9de3090dc89635beac99d1654c93", makefile)
         self.assertNotIn(
             "$(CORTEX_CURRENT_PSOXIDE)/editor/samples/cortex_v1", makefile
+        )
+        self.assertIn(
+            "CORTEX_CURRENT_GUEST_STAGE_ROOT ?= "
+            "/tmp/psoxide-psx-guest-v1-cortex-current",
+            makefile,
+        )
+        self.assertIn(
+            "CORTEX_LEGACY_GUEST_STAGE_ROOT ?= "
+            "/tmp/psoxide-psx-guest-v1-cortex-legacy",
+            makefile,
+        )
+        self.assertIn(
+            'PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)"',
+            makefile,
+        )
+        self.assertIn(
+            'PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_LEGACY_GUEST_STAGE_ROOT)"',
+            makefile,
+        )
+        self.assertEqual(
+            makefile.count(
+                'PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)"'
+            ),
+            2,
         )
 
     def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
@@ -851,6 +932,8 @@ class FailClosedDefaultTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         assignments = {
             "PSOXIDE": str(fixture.psoxide),
+            "PROGRAMS_PSOXIDE": str(fixture.psoxide),
+            "PROGRAMS_EXPECTED_PSOXIDE_REV": fixture.psoxide_revision,
             "BUILD": str(fixture.programs_stamp.parent),
             "QUAKE_SRC": str(fixture.source),
             "QUAKE_EXPECTED_REV": fixture.revision,
