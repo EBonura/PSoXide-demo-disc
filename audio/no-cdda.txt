@@ -1,0 +1,2 @@
+# The demo disc presses Goncharov once inside PSoXide Arcade. GH-PSX is built
+# data-only here and receives Arcade's relocated track base from mkdisc.

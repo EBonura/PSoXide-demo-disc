@@ -49,10 +49,10 @@ const LOADER_BASE: u32 = 0x801F_0000;
 /// Lowest legal PSX-EXE load address (`sdk/psoxide.ld`).
 const MIN_LOAD_ADDR: u32 = 0x8001_0000;
 
-/// Every PSoXide disc puts its boot EXE here (`psx_iso::PLAYTEST_BOOT_EXE_START_LBA`).
-/// Checked against the magic when an image is placed, so an image that breaks
-/// the convention fails the build instead of booting into noise.
-const IMAGE_BOOT_EXE_LBA: u32 = psx_iso::PLAYTEST_BOOT_EXE_START_LBA;
+/// A boot EXE must appear near the front of an imported data track. Ordinary
+/// PSoXide images put it at the canonical playtest LBA; collection images may
+/// place cached metadata and screenshots before it.
+const IMAGE_BOOT_SCAN_SECTORS: usize = 4_096;
 
 /// Frames of silence a CUE conventionally puts before an audio track.
 const PREGAP_FRAMES: u32 = 150;
@@ -313,6 +313,36 @@ fn check_fits_below_loader(header: &ExeHeader, what: &Path) -> Result<(), String
         ));
     }
     Ok(())
+}
+
+/// Find the first valid chain-loadable PS-X EXE in an imported data track.
+///
+/// The old packer assumed every image used PSoXide's single-program LBA. A
+/// collection has a table and cached screenshots before its launcher, so its
+/// SYSTEM.CNF boot program legitimately lands later. Scanning raw user-data
+/// sectors keeps both layouts relocatable without teaching the outer disc the
+/// inner ISO directory structure.
+fn find_image_boot_exe(data: &[u8], what: &Path) -> Result<(u32, ExeHeader), String> {
+    for (lba, sector) in data
+        .chunks_exact(SECTOR_BYTES)
+        .take(IMAGE_BOOT_SCAN_SECTORS)
+        .enumerate()
+    {
+        let user = &sector[24..24 + SECTOR_SIZE];
+        if !user.starts_with(EXE_MAGIC) {
+            continue;
+        }
+        let Ok(header) = parse_exe_header(user, what) else {
+            continue;
+        };
+        if check_fits_below_loader(&header, what).is_ok() {
+            return Ok((lba as u32, header));
+        }
+    }
+    Err(format!(
+        "{}: no chain-loadable PSX-EXE in the first {IMAGE_BOOT_SCAN_SECTORS} data sectors",
+        what.display()
+    ))
 }
 
 fn sectors_for(bytes: usize) -> u32 {
@@ -727,24 +757,13 @@ fn run() -> Result<(), String> {
             continue;
         };
         let image = load_image(path)?;
-        let boot_at = IMAGE_BOOT_EXE_LBA as usize * SECTOR_BYTES;
-        let boot_sector = image
-            .data
-            .get(boot_at + 24..boot_at + 24 + SECTOR_SIZE)
-            .ok_or_else(|| format!("{}: data track is too short to hold a boot EXE", path.display()))?;
-        let header = parse_exe_header(boot_sector, path).map_err(|_| {
-            format!(
-                "{}: no PSX-EXE at LBA {IMAGE_BOOT_EXE_LBA}. mkdisc places images \
-                 verbatim and expects PSoXide's boot layout.",
-                path.display()
-            )
-        })?;
+        let (boot_exe_lba, header) = find_image_boot_exe(&image.data, path)?;
         check_fits_below_loader(&header, path)?;
         // Checksum the payload as the loader will read it: the 2048-byte
         // data windows of the raw sectors after the header sector.
         let mut remaining = header.payload_bytes as usize;
         let mut hash: u32 = 0x811C_9DC5;
-        let mut sector = IMAGE_BOOT_EXE_LBA as usize + 1;
+        let mut sector = boot_exe_lba as usize + 1;
         while remaining > 0 {
             let at = sector * SECTOR_BYTES + 24;
             let take = remaining.min(SECTOR_SIZE);
@@ -761,7 +780,7 @@ fn run() -> Result<(), String> {
             remaining -= take;
             sector += 1;
         }
-        images.push((index, path.clone(), image, hash));
+        images.push((index, path.clone(), image, hash, boot_exe_lba));
     }
 
     let build_iso = |toc: Vec<u8>| {
@@ -794,13 +813,13 @@ fn run() -> Result<(), String> {
     // shifts by the menu track count. All of the bases are computed right
     // here and travel through disc_base, so the shift costs nothing.
     let mut cdda_track_base = menu_audio.len() as u32;
-    for (index, path, image, payload_fnv) in &images {
+    for (index, path, image, payload_fnv, boot_exe_lba) in &images {
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
         let program = &args.programs[*index];
         entries[*index] = Some(
             Entry::new(
                 &program.name,
-                image_lba + IMAGE_BOOT_EXE_LBA,
+                image_lba + *boot_exe_lba,
                 image_lba,
                 cdda_track_base,
             )
@@ -915,7 +934,7 @@ fn run() -> Result<(), String> {
     }
 
     let mut lba = iso_frames;
-    for (_, _, image, _) in &images {
+    for (_, _, image, _, _) in &images {
         place_data_track(&mut disc, &image.data, lba)?;
         lba += (image.data.len() / SECTOR_BYTES) as u32;
     }
@@ -938,7 +957,7 @@ fn run() -> Result<(), String> {
         placed_audio.push(PlacedAudio { index00, index01 });
         disc.extend_from_slice(bytes);
     }
-    for (_, _, image, _) in &images {
+    for (_, _, image, _, _) in &images {
         let base = (disc.len() / SECTOR_BYTES) as u32;
         for track in &image.audio {
             placed_audio.push(PlacedAudio {
@@ -1085,6 +1104,20 @@ mod tests {
     fn rejects_a_file_that_is_not_a_psx_exe() {
         let bytes = vec![0u8; SECTOR_SIZE];
         assert!(parse_exe_header(&bytes, Path::new("x")).is_err());
+    }
+
+    #[test]
+    fn finds_a_collection_launcher_after_cached_disc_data() {
+        let boot_lba = 136usize;
+        let mut image = vec![0u8; (boot_lba + 2) * SECTOR_BYTES];
+        let at = boot_lba * SECTOR_BYTES + 24;
+        image[at..at + 8].copy_from_slice(EXE_MAGIC);
+        image[at + 0x18..at + 0x1C].copy_from_slice(&0x8001_0000u32.to_le_bytes());
+        image[at + 0x1C..at + 0x20].copy_from_slice(&4096u32.to_le_bytes());
+        let (found, header) = find_image_boot_exe(&image, Path::new("arcade")).expect("boot");
+        assert_eq!(found, boot_lba as u32);
+        assert_eq!(header.load_addr, 0x8001_0000);
+        assert_eq!(header.payload_bytes, 4096);
     }
 
     #[test]

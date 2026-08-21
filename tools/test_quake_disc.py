@@ -1128,9 +1128,9 @@ class HeadlessChainloadTests(unittest.TestCase):
 
     @classmethod
     def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
-        """The standard pressing's locked shape: two hidden, nine, Quake.
+        """The standard pressing's locked shape: two hidden, seven, Quake.
 
-        Ten visible programs plus the launcher's CREDITS card is eleven, and
+        Eight visible programs plus the launcher's CREDITS card is nine, and
         the headless route's two RIGHT presses still land on Quake.
         """
         cortex = (
@@ -1138,7 +1138,7 @@ class HeadlessChainloadTests(unittest.TestCase):
             ("CORTEX IGNITION LEGACY", 31, check_quake_headless.FLAG_HIDDEN),
         )
         filler = tuple(
-            (f"PROGRAM {index}", 32 + index, 0) for index in range(9)
+            (f"PROGRAM {index}", 32 + index, 0) for index in range(7)
         )
         return cortex + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
 
@@ -1264,10 +1264,10 @@ class HeadlessChainloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             image = self.make_disc_image(Path(directory), entries)
             selected, menu, _ = check_quake_headless.quake_menu_entry(
-                image, self.QUAKE_LBA, 14
+                image, self.QUAKE_LBA, 12
             )
-            self.assertEqual(len(menu), 14)
-            self.assertEqual(selected + 1, 13)
+            self.assertEqual(len(menu), 12)
+            self.assertEqual(selected + 1, 11)
             self.assertEqual(menu[:3], [
                 "CORTEX IGNITION",
                 "CORTEX IGNITION LEGACY",
@@ -1391,7 +1391,7 @@ class HeadlessChainloadTests(unittest.TestCase):
     def test_each_pressing_has_its_own_visible_frame_pins(self) -> None:
         self.assertEqual(
             set(check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES),
-            {check_quake_headless.DEFAULT_MENU_ENTRIES, 14},
+            {check_quake_headless.DEFAULT_MENU_ENTRIES, 12},
         )
         for menu_entries, (vram, display) in (
             check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES.items()

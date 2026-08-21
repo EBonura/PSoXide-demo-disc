@@ -109,6 +109,7 @@ VOXIDE   := $(GAMES)/voxide/dist/voxide.cue
 PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
+ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
@@ -163,13 +164,11 @@ V_NITROXIDE := $(call cargo_version,$(NITROXIDE_SRC)/game/Cargo.toml)
 V_PSXCEL    := $(call cargo_version,$(GAMES)/psxcel/game/Cargo.toml)
 V_CELESTE   := $(call cargo_version,$(GAMES)/pico8-psx/games/celeste-collection/Cargo.toml)
 V_GHPSX     := $(call cargo_version,$(GAMES)/gh-psx/game/Cargo.toml)
+V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arcade/Makefile 2>/dev/null)
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 # The hardware suite already versions itself on screen; take that same string so
 # the carousel and the suite header cannot disagree.
 V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
-V_BREAKOUT  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-breakout/Cargo.toml)
-V_INVADERS  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-invaders/Cargo.toml)
-V_MAGIPONG  := $(call cargo_version,$(PROGRAMS_PSOXIDE)/engine/examples/game-magikaaaaaarp-pong/Cargo.toml)
 # Authored projects do not declare semantic versions. The exact engine pins
 # are their useful identities, and make the new/legacy distinction visible on
 # camera without inventing a project version.
@@ -189,7 +188,6 @@ launcher: loader
 		cargo build $(PSX_FLAGS)
 
 examples:
-	$(MAKE) -C $(PROGRAMS_PSOXIDE) game-breakout game-invaders game-magikaaaaaarp-pong
 	$(MAKE) -C $(PROGRAMS_PSOXIDE) hardware-tests-disc
 
 # PSXcel and the Celeste collection never read the disc after boot, so they
@@ -213,7 +211,9 @@ programs: examples
 	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
 	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
-	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist
+	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist \
+		CDDA_LIST=$(ROOT)/audio/no-cdda.txt
+	$(MAKE) -C $(GAMES)/psoxide-arcade disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
@@ -363,7 +363,7 @@ _quake-headless-check:
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
-		--expected-menu-entries "$(if $(HL),14,11)"
+		--expected-menu-entries "$(if $(HL),12,9)"
 
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
@@ -429,9 +429,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--game "PSXCEL=$(PSXCEL)" \
 		--image "GH-PSX=$(GHPSX)" \
-		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
-		--game "SPACE INVADERS=$(EXAMPLES)/game-invaders.exe" \
-		--game "MAGIKAAAAARP PONG=$(EXAMPLES)/game-magikaaaaaarp-pong.exe" \
+		--image "PSOXIDE ARCADE=$(ARCADE)" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
 		$(QUAKE_ARGS) \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
@@ -454,15 +452,15 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
 		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx.shot" \
 		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx2.shot" \
-		--shot "BREAKOUT=$(SHOTS_OUT)/breakout.shot" \
-		--shot "BREAKOUT=$(SHOTS_OUT)/breakout2.shot" \
-		--shot "SPACE INVADERS=$(SHOTS_OUT)/invaders.shot" \
-		--shot "SPACE INVADERS=$(SHOTS_OUT)/invaders2.shot" \
-		--shot "MAGIKAAAAARP PONG=$(SHOTS_OUT)/pong.shot" \
-		--shot "MAGIKAAAAARP PONG=$(SHOTS_OUT)/pong2.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout2.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
+		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
 		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
 		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests2.shot" \
-		--share-cdda "MAGIKAAAAARP PONG=GH-PSX" \
+		--share-cdda "GH-PSX=PSOXIDE ARCADE" \
 		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 		--version-of "CORTEX IGNITION LEGACY=$(V_CORTEX_LEGACY)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
@@ -470,10 +468,8 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--version-of "PSXCEL=$(V_PSXCEL)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
 		--version-of "GH-PSX=$(V_GHPSX)" \
+		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
 		--version-of "HARDWARE TESTS=$(V_HWTESTS)" \
-		--version-of "BREAKOUT=$(V_BREAKOUT)" \
-		--version-of "SPACE INVADERS=$(V_INVADERS)" \
-		--version-of "MAGIKAAAAARP PONG=$(V_MAGIPONG)" \
 		$(CORTEX_GATE_ARGS) \
 		--describe "CORTEX IGNITION=An early new-engine Cortex Ignition build. Explore Quake Units Arena, a work-in-progress PXBSP level running on PSoXide's current scene-streaming runtime.|Prima build di Cortex Ignition sul nuovo motore. Esplora Quake Units Arena, un livello PXBSP in sviluppo sul runtime attuale di PSoXide." \
 		--describe "CORTEX IGNITION LEGACY=The original grid-based Cortex Ignition technology demo, preserved on its old PSoXide engine with its original combat, skeletal animation and lighting.|La demo tecnologica originale di Cortex Ignition, conservata sul vecchio motore PSoXide con combattimento, animazioni scheletriche e luci." \
@@ -482,9 +478,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt as native PlayStation software with no emulation. The collection is complete: both games and their launcher fit in less than half a megabyte.|I due Celeste Classic riscritti come software nativo PlayStation, senza emulazione. La raccolta e completa: entrambi i giochi e il menu stanno in meno di mezzo megabyte." \
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
 		--describe "GH-PSX=A Guitar Hero-style rhythm game for the original PlayStation. This is a bare-bones, one-song prototype: the full loop works, but sustains, star power and polish are still missing.|Un gioco in stile Guitar Hero per la prima PlayStation. E un prototipo essenziale con una sola canzone: il ciclo completo funziona, ma mancano note lunghe, star power e rifiniture." \
-		--describe "BREAKOUT=A Breakout clone and compact example of the engine used across this disc. This one is complete and fully playable, with input, collision, sound, scoring and a full game loop.|Un clone di Breakout e un esempio compatto del motore usato in questo disco. Il gioco e completo, con input, collisioni, audio, punti e un ciclo di gioco completo." \
-		--describe "SPACE INVADERS=A Space Invaders clone and a second engine example. This one is also complete and fully playable, with formations, shields, scoring and enemy fire.|Un clone di Space Invaders e un secondo esempio del motore. Anche questo e completo e giocabile, con formazioni, scudi, punti e fuoco nemico." \
-		--describe "MAGIKAAAAARP PONG=Pong with a live CD-audio visualizer. The game is complete and playable: music streams from the disc while pre-analysed frequency bands drive the bars in sync.|Pong con un visualizzatore audio dal vivo. Il gioco e completo: la musica arriva dal CD mentre le frequenze analizzate in anticipo muovono le barre a tempo." \
+		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 
 	python3 tools/quake_disc.py receipt \
@@ -639,10 +633,10 @@ sdk-coherence:
 # much, and psx_io::disc_base has to make up the difference. Run the result
 # with the emulator and read the banner.
 relocation-check: launcher mkdisc
-	$(MAKE) -C $(PROGRAMS_PSOXIDE) hello-pack-disc
+	$(MAKE) -C $(PROGRAMS_PSOXIDE) hello-tri hello-pack-disc
 	@mkdir -p $(ROOT)/dist
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
-		--game "BREAKOUT=$(EXAMPLES)/game-breakout.exe" \
+		--game "HELLO TRI=$(EXAMPLES)/hello-tri.exe" \
 		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
 	@echo
 	@echo "Now: cd $(PROGRAMS_PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"

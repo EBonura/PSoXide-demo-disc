@@ -28,3 +28,6 @@
 [submodule "games/PSoXide-runtime"]
 	path = games/PSoXide-runtime
 	url = https://github.com/EBonura/PSoXide.git
+[submodule "games/psoxide-arcade"]
+	path = games/psoxide-arcade
+	url = https://github.com/EBonura/psoxide-arcade.git
