@@ -18,10 +18,11 @@ STEPS = "500000000"
 PRESS_ROUTE = "400:right:8,600:right:8,1000:cross:12"
 EXPECTED_TICK = 500_000_000
 EXPECTED_DISPLAY = (320, 240)
-# The default pressing has eleven programs plus CREDITS. The HL pressing adds
-# Half-Life, so its caller explicitly raises this to thirteen. Cortex Ignition
-# stays first and Quake stays immediately before CREDITS in both layouts.
-DEFAULT_MENU_ENTRIES = 12
+# The standard pressing carries both Cortex images but hides their unfinished
+# cards, leaving ten visible programs plus CREDITS. The private HL pressing
+# exposes both Cortex cards and adds Half-Life, so its caller raises this to
+# fourteen. Quake stays immediately before CREDITS in both layouts.
+DEFAULT_MENU_ENTRIES = 11
 # The frame both replays end on, hashed by the emulator. This pair is Quake's
 # output, and it survives things that move every cycle count on the disc: a
 # launcher rebuilt from a different absolute path, a different DISC_VERSION

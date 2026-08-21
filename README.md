@@ -64,15 +64,16 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-Eleven programs ship on the default pressing and Half-Life adds a twelfth.
+Twelve programs ship on the default pressing and Half-Life adds a thirteenth.
 Automated evidence is recorded per program and must not be read as an original
-hardware claim. The default disc is 96404 sectors (21:25, 216
-MiB, 7 CD-DA tracks); the Half-Life pressing is 300892 (66:52, 675 MiB, 34
-CD-DA tracks), which is 84% of an 80-minute CD-R.
+hardware claim. The v0.27 default disc is 99290 sectors (22:03:65, 222.7 MiB,
+8 CD-DA tracks); the Half-Life pressing is 303778 sectors (67:30:28,
+681.4 MiB, 35 CD-DA tracks), which is 84% of an 80-minute CD-R.
 
 | Program | How it ships |
 | --- | --- |
-| Cortex Ignition | whole image, 1 CD-DA track |
+| Cortex Ignition | current PXBSP project as a whole image, 1 CD-DA track |
+| Cortex Ignition Legacy | frozen grid project as a whole image, 1 CD-DA track |
 | Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
 | Voxide | whole image, WORLD.PAK assets |
 | NitroXide | whole image, WORLD.PAK arena atlas |
@@ -91,12 +92,13 @@ arguments is still a correct `_start`. Voxide and NitroXide load `WORLD.PAK`
 at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
-`CORTEX IGNITION` is the first entry on every pressing. It is the original
-PSoXide souls-like technology demo and is no longer hidden behind the menu's
-unlock code. Its pressed payload deliberately remains the tracked legacy grid
-sample at `editor/samples/cortex_v1`; it is not the new souls BSP vertical
-slice. That BSP candidate stays an editor and standalone test until it has its
-own clean chain-load proof. `QUAKE SHAREWARE` is the last program before
+`CORTEX IGNITION` is the active new-engine entry. It comes from the exact
+`editor/projects/default` project named `Quake Units Arena` at the dedicated
+PSoXide pin recorded in the Makefile. `CORTEX IGNITION LEGACY` follows it and
+preserves the original `editor/samples/cortex_v1` grid demo on its separate old
+engine pin. The standard, publication-shaped pressing keeps both unfinished
+entries behind the Konami unlock. The private Half-Life pressing exposes both
+for direct testing. `QUAKE SHAREWARE` is the last program before
 CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,
 so a bare executable is not sufficient; the entry uses the same caller-provided
 LBA offset that relocates
@@ -104,9 +106,10 @@ Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
-The default visible order is Cortex Ignition, Voxide, NitroXide, Celeste
-Collection, PSXcel, GH-PSX, Breakout, Space Invaders, Magikaaaaarp Pong,
-Hardware Tests, Quake Shareware, then Credits.
+After unlocking, the standard order is Cortex Ignition, Cortex Ignition
+Legacy, Voxide, NitroXide, Celeste Collection, PSXcel, GH-PSX, Breakout, Space
+Invaders, Magikaaaaarp Pong, Hardware Tests, Quake Shareware, then Credits. The
+Half-Life pressing inserts Half-Life directly after the two Cortex entries.
 
 ## The menu
 
@@ -171,8 +174,8 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the current carousel contains twelve visible entries; focused gates navigate
-  to and chain-load the entries they cover
+- the locked standard carousel contains eleven visible entries including
+  Credits; the unlock reveals both Cortex entries
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
@@ -190,9 +193,10 @@ emulator next to everything else:
 
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
 different library. `PSOXIDE=/absolute/path/to/PSoXide` selects the checkout
-used for every rebuilt program. Cortex is staged from that checkout's tracked
-`editor/samples/cortex_v1` sample into `build/`, keeping
-generated bake output outside the PSoXide worktree. gh-psx keeps its audio in a gitignored
+used for every ordinary rebuilt program. The two Cortex projects are staged
+from `games/PSoXide-cortex-current` and `games/PSoXide-cortex` into separate
+directories under `build/`, keeping generated output outside both pinned
+PSoXide worktrees. gh-psx keeps its audio in a gitignored
 `data/audio/`, so a fresh clone needs that dropped in before `make disc` will
 get past it.
 
