@@ -75,9 +75,8 @@ const ICONS_V: u8 = 24;
 const ICONS_CLUT: Clut = Clut::new(400, 257);
 const ICONS_CELL: i16 = 12;
 const ICONS_SIZE: i16 = 12;
-/// Cells in the cooked strip. Not `LINKS.len()`: the strip carries every
-/// mark tools/icons.py cooks (YouTube included, currently undrawn), and the
-/// upload must match the file or `upload_bytes` panics at boot.
+/// Cells in the cooked strip. Keep this separate from `LINKS.len()` so the
+/// upload remains tied to the asset format rather than the current card rows.
 const ICONS_COUNT: i16 = 6;
 static ICONS_TEX: &[u8] = include_bytes!("../assets/icons.tex");
 static ICONS_CLUT_DATA: &[u8] = include_bytes!("../assets/icons.clut");
@@ -86,12 +85,13 @@ static ICONS_CLUT_DATA: &[u8] = include_bytes!("../assets/icons.clut");
 /// the whole point of the card is that someone photographs or retypes these;
 /// the first cut showed only the part after the slash and read as "which
 /// site is this?".
-const LINKS: [(i16, &str); 5] = [
+const LINKS: [(i16, &str); 6] = [
     (0, "github.com/EBonura/PSoXide"),
     (1, "bonnie-studios.itch.io"),
     (2, "x.com/_bonniestudios"),
     (3, "instagram.com/izzy88izzy"),
     (4, "buymeacoffee.com/bonniestudios"),
+    (5, "youtube.com/@magikAAAAArp/videos"),
 ];
 
 const TITLE: (u8, u8, u8) = (255, 84, 62);
