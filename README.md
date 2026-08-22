@@ -3,6 +3,14 @@
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
+| v0.28 outer carousel | PSoXide Arcade selector |
+| --- | --- |
+| [![v0.28 outer carousel](assets/readme/v028-carousel.png)](assets/readme/v028-carousel.png) | [![PSoXide Arcade selector](assets/readme/arcade-selector.png)](assets/readme/arcade-selector.png) |
+
+| Quake chain-loaded from the combined disc | Current Cortex Ignition project |
+| --- | --- |
+| [![Quake chain-loaded](assets/readme/quake-chainloaded.png)](assets/readme/quake-chainloaded.png) | [![Current Cortex Ignition gameplay](assets/readme/cortex-current.png)](assets/readme/cortex-current.png) |
+
 ```bash
 make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
 make check     # host tests, including the Quake pin check
@@ -64,9 +72,10 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-Ten outer programs ship on the default pressing and Half-Life adds an
-eleventh. PSoXide Arcade is one of those programs and contains three games of
-its own. Automated evidence is recorded per program and must not be read as an
+The current layout has ten outer programs on the default pressing, and
+Half-Life adds an eleventh. PSoXide Arcade is one of those programs and
+contains three games of its own. Automated evidence is recorded per program
+and must not be read as an
 original hardware claim. The current default disc is 99450 sectors (22:06:00,
 223.1 MiB, 8 CD-DA tracks); the Half-Life pressing is 303989 sectors
 (67:33:14, 681.9 MiB, 35 CD-DA tracks), which is 84% of an 80-minute CD-R.
@@ -180,8 +189,10 @@ real-BIOS or original-console claim:
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
-- PSoXide Arcade owns the Goncharov CD-DA track; both Magikarp Pong and GH-PSX
-  relocate to that one physical copy on the combined disc
+- PSoXide Arcade owns the Goncharov CD-DA track by
+  [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
+  band's permission; both Magikarp Pong and GH-PSX relocate to that one
+  physical copy on the combined disc
 
 ## Building
 
@@ -201,9 +212,10 @@ Cortex projects are staged
 from `games/PSoXide-cortex-current` and `games/PSoXide-cortex` into separate
 directories under `build/`, keeping generated output outside both pinned
 PSoXide worktrees. `games/psoxide-arcade` is the private collection repository
-and the canonical owner of `goncharov.cdda`; the combined-disc GH-PSX image is
-built data-only and borrows Arcade's relocated track instead of carrying a
-second copy.
+and the canonical owner of `goncharov.cdda` by
+[magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
+band's permission; the combined-disc GH-PSX image is built data-only and
+borrows Arcade's relocated track instead of carrying a second copy.
 
 Two pressings exist. `make disc` builds the default one; `make disc HL=1`
 builds the same disc plus Half-Life, for show-floor demos, under a different
