@@ -17,15 +17,24 @@ const BAR_W: i16 = 160;
 const BAR_H: i16 = 12;
 const BAR_X: i16 = (320 - BAR_W) / 2;
 const BAR_Y: i16 = 202;
-const BAR_INSET: i16 = 2;
+const BAR_INSET: i16 = 3;
 const BAR_FILL_W: i16 = BAR_W - BAR_INSET * 2;
+const LABEL_SCALE: i16 = 2;
+const LABEL_W: i16 = 7 * 8 * LABEL_SCALE;
+const LABEL_X: i16 = (320 - LABEL_W) / 2;
+const LABEL_Y: i16 = 180;
 
 const MAX_SEGMENTS: usize = 9;
 const MIN_SEGMENTS: usize = 6;
 
 const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
 const GLOSS_BOTTOM: (u8, u8, u8) = (58, 0, 2);
+const GLOSS_EDGE: (u8, u8, u8) = (178, 10, 12);
 const SPECULAR: (u8, u8, u8) = (255, 196, 170);
+
+const fn packed_rgb((r, g, b): (u8, u8, u8)) -> u32 {
+    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
+}
 
 pub struct LoadingScreen {
     yaw: i32,
@@ -95,14 +104,40 @@ impl LoadingScreen {
         draw_starfield(self.travel);
         draw_sphere(self.yaw, self.pitch, &mut self.beads);
 
-        paint::rect(BAR_X, BAR_Y, BAR_W, BAR_H, paint::TRACK);
+        paint::text(
+            LABEL_X,
+            LABEL_Y,
+            LABEL_SCALE,
+            "LOADING",
+            packed_rgb(SPECULAR),
+        );
+
+        // The bar borrows the carousel's glossy red lozenge palette. Two
+        // crossed rectangles leave clipped corners without pulling any menu
+        // texture or font state into the high-RAM loader.
+        paint::rect(BAR_X + 2, BAR_Y, BAR_W - 4, BAR_H, packed_rgb(GLOSS_EDGE));
+        paint::rect(BAR_X, BAR_Y + 2, BAR_W, BAR_H - 4, packed_rgb(GLOSS_EDGE));
+        paint::rect(
+            BAR_X + BAR_INSET,
+            BAR_Y + 2,
+            BAR_FILL_W,
+            BAR_H - 4,
+            packed_rgb(GLOSS_BOTTOM),
+        );
         if self.progress > 0 {
             paint::rect(
                 BAR_X + BAR_INSET,
-                BAR_Y + BAR_INSET,
+                BAR_Y + 2,
                 self.progress,
-                BAR_H - BAR_INSET * 2,
-                paint::WHITE,
+                BAR_H - 4,
+                packed_rgb(GLOSS_EDGE),
+            );
+            paint::rect(
+                BAR_X + BAR_INSET,
+                BAR_Y + 2,
+                self.progress,
+                3,
+                packed_rgb(GLOSS_TOP),
             );
         }
     }
