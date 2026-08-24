@@ -101,7 +101,7 @@ at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
 `CORTEX IGNITION` is the active new-engine entry. It comes from the exact
-`editor/projects/default` project named `Quake Units Arena` at the dedicated
+`editor/projects/default` project named `Cortex Ignition Tech Demo 0.1` at the dedicated
 PSoXide pin recorded in the Makefile. `CORTEX IGNITION LEGACY` follows it and
 preserves the original `editor/samples/cortex_v1` grid demo on its separate old
 engine pin. The standard, publication-shaped pressing keeps both unfinished
@@ -116,9 +116,9 @@ sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
 After unlocking, the standard order is Cortex Ignition, Cortex Ignition
 Legacy, Voxide, NitroXide, Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
-Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a second
-carousel for Breakout, Space Invaders and Magikarp Pong. The Half-Life pressing
-inserts Half-Life directly after the two Cortex entries.
+Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
+cabinet selector for Breakout, Space Invaders and Magikarp Pong. The Half-Life
+pressing inserts Half-Life directly after the two Cortex entries.
 
 ## The menu
 

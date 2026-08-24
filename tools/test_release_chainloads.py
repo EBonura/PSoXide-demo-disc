@@ -50,7 +50,9 @@ class CortexGameplayTests(unittest.TestCase):
         )
         self.assertEqual(
             chainloads.route_for("HALF-LIFE", 2, 12),
-            "400:left:8,600:left:8,1000:cross:12",
+            "400:left:8,600:left:8,1000:cross:12,1400:cross:12,"
+            "1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,"
+            "3400:cross:12",
         )
 
     def test_sustained_textured_gameplay_passes(self) -> None:
@@ -59,6 +61,14 @@ class CortexGameplayTests(unittest.TestCase):
             for index in range(35)
         ]
         evidence = chainloads.cortex_gameplay_evidence(self.write_gpu(rows))
+        self.assertEqual(evidence, {"frames": 35, "sustained": 35, "hashes": 35})
+
+    def test_half_life_train_ride_gameplay_passes(self) -> None:
+        rows = [
+            (100 + index * 4, 423, 246, f"0x{index + 1:016x}")
+            for index in range(35)
+        ]
+        evidence = chainloads.hl_gameplay_evidence(self.write_gpu(rows))
         self.assertEqual(evidence, {"frames": 35, "sustained": 35, "hashes": 35})
 
     def test_menu_like_frames_fail(self) -> None:
