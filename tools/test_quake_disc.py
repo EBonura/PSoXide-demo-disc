@@ -854,7 +854,7 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy", makefile
         )
-        self.assertIn("897e90deba0d96105308a3aa114f0b9a6988a671", makefile)
+        self.assertIn("e5dce1577925118b386255fe0ba50458c91b31a7", makefile)
         self.assertIn("687d2ae7681f9de3090dc89635beac99d1654c93", makefile)
         self.assertNotIn(
             "$(CORTEX_CURRENT_PSOXIDE)/editor/samples/cortex_v1", makefile
