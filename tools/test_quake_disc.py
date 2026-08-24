@@ -717,6 +717,14 @@ class MakeVariantContractTests(unittest.TestCase):
         default = self.dry_run()
         self.assertEqual(default.returncode, 0, default.stderr)
         self.assertIn('--image "QUAKE SHAREWARE=', default.stdout)
+        self.assertRegex(
+            default.stdout,
+            r'--shot "QUAKE SHAREWARE=[^"\n]*/quake-menu\.shot"',
+        )
+        self.assertRegex(
+            default.stdout,
+            r'--shot "QUAKE SHAREWARE=[^"\n]*/quake-gameplay\.shot"',
+        )
         self.assertIn(
             f'--version-of "QUAKE SHAREWARE={self.pinned_menu_version()}"',
             default.stdout,

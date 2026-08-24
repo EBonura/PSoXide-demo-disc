@@ -43,6 +43,7 @@ fn gp0_packet(words: &[u32]) {
 /// whole displayed framebuffer, zero offset, display area at 0,0.
 pub fn setup() {
     unsafe { psx_io::write32(GP1, 0x0300_0001) }; // display off while painting
+
     // Program the display the way the launcher's gpu::init does, rather
     // than inheriting whatever GP1(00h) reset leaves behind. Without
     // these the loader's 320x240 image was shown through the reset
@@ -56,13 +57,63 @@ pub fn setup() {
         psx_io::write32(GP1, 0x0500_0000); // display area starts at VRAM 0,0
     }
     gp0_packet(&[0xE1_00_0000]); // texpage/draw-mode defaults
-    gp0_packet(&[0xE3_00_0000]); // drawing area top-left (0,0)
-    gp0_packet(&[0xE4_00_0000 | (255 << 10) | 320]); // bottom-right (320,255)
-    gp0_packet(&[0xE5_00_0000]); // drawing offset 0
+    set_draw_buffer(0);
 }
 
 pub fn show() {
     unsafe { psx_io::write32(GP1, 0x0300_0000) }; // display on
+}
+
+/// Select one of the two vertically stacked 320x240 loading buffers.
+/// Coordinates sent afterwards stay screen-relative because the draw offset
+/// supplies the VRAM row.
+pub fn set_draw_buffer(y: i16) {
+    let top = y as u32 & 0x1ff;
+    let bottom = (y as u32 + 239) & 0x1ff;
+    gp0_packet(&[0xE3_00_0000 | (top << 10)]);
+    gp0_packet(&[0xE4_00_0000 | (bottom << 10) | 319]);
+    gp0_packet(&[0xE5_00_0000 | ((y as u32 & 0x7ff) << 11)]);
+}
+
+fn display_buffer(y: i16) {
+    unsafe { psx_io::write32(GP1, 0x0500_0000 | ((y as u32 & 0x1ff) << 10)) };
+}
+
+/// Show a completed loading buffer exactly at a fresh VBlank edge. I_STAT is
+/// sticky, so clear any old edge before waiting. Otherwise a long CD read can
+/// leave the bit set and make an apparently guarded flip happen mid-scanout.
+pub fn present_at_next_vblank(y: i16) {
+    ack_vblank();
+    while !vblank_pending() {}
+    display_buffer(y);
+    ack_vblank();
+}
+
+/// Restore the first buffer for a failure checklist.
+pub fn diagnostic_mode() {
+    display_buffer(0);
+    set_draw_buffer(0);
+}
+
+/// Whether the interrupt controller has latched a VBlank edge. Interrupts
+/// remain masked while the loader runs; the pending bit can still be polled.
+pub fn vblank_pending() -> bool {
+    psx_io::irq::stat() & (1 << psx_io::irq::source::VBLANK) != 0
+}
+
+pub fn ack_vblank() {
+    psx_io::irq::ack(1 << psx_io::irq::source::VBLANK);
+}
+
+/// Wait until every submitted primitive has drained before presenting its
+/// buffer. GPUSTAT bit 28 is the same idle gate used by the SDK's deferred
+/// framebuffer flip.
+pub fn draw_sync() {
+    for _ in 0..1_000_000u32 {
+        if unsafe { psx_io::read32(GP1) } & (1 << 28) != 0 {
+            return;
+        }
+    }
 }
 
 /// Whether the diagnostic checklist has been revealed.
@@ -92,6 +143,22 @@ pub fn rect(x: i16, y: i16, w: i16, h: i16, rgb: u32) {
     ]);
 }
 
+fn packed_rgb((r, g, b): (u8, u8, u8)) -> u32 {
+    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
+}
+
+/// One Gouraud triangle for the procedural globe.
+pub fn tri_gouraud(verts: [(i16, i16); 3], colors: [(u8, u8, u8); 3]) {
+    gp0_packet(&[
+        0x30_00_0000 | packed_rgb(colors[0]),
+        ((verts[0].1 as u32) << 16) | (verts[0].0 as u32 & 0xffff),
+        packed_rgb(colors[1]),
+        ((verts[1].1 as u32) << 16) | (verts[1].0 as u32 & 0xffff),
+        packed_rgb(colors[2]),
+        ((verts[2].1 as u32) << 16) | (verts[2].0 as u32 & 0xffff),
+    ]);
+}
+
 pub const WHITE: u32 = 0x00FF_FFFF;
 pub const GREEN: u32 = 0x0000_D000;
 pub const YELLOW: u32 = 0x0000_D8FF;
@@ -99,8 +166,7 @@ pub const YELLOW: u32 = 0x0000_D8FF;
 /// of a CRT, dark enough to read as "not yet".
 pub const DIM: u32 = 0x0080_8080;
 pub const RED_BASE: u32 = 0x0000_0040;
-/// The loading screen's background and its empty bar track.
-pub const BLACK: u32 = 0x0000_0000;
+/// Diagnostic and loading-screen colours.
 pub const TRACK: u32 = 0x0030_3030;
 
 /// The SDK's 8x8 public-domain font (dhepper font8x8), reused as plain

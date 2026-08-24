@@ -39,6 +39,23 @@ FILE_LINE = re.compile(r'^FILE "([^"\r\n]+)" BINARY$', re.MULTILINE)
 TRACK_LINE = re.compile(r"^\s*TRACK\s+(\d+)\s+([^\s]+)\s*$", re.MULTILINE)
 INDEX_LINE = re.compile(r"^\s*INDEX\s+(\d+)\s+(\d+):(\d+):(\d+)\s*$", re.MULTILINE)
 REVISION = re.compile(r"^[0-9a-f]{40}$")
+DIGEST = re.compile(r"^[0-9a-f]{64}$")
+HL_COOK_MANIFEST = Path("data/.hlpsx-cook.json")
+HL_COOK_SCHEMA = 1
+TREE_DOMAIN = b"hl-psx-tree-v1\0"
+PSOXIDE_SKIPPED_DIRECTORIES = {
+    ".git",
+    "target",
+    "build",
+    "dist",
+    "baked",
+    "cooked",
+    "node_modules",
+    "captures",
+    "graphify-out",
+    ".web",
+    "__pycache__",
+}
 
 
 class ReceiptError(RuntimeError):
@@ -75,6 +92,92 @@ def sha256(path: Path) -> str:
         while chunk := stream.read(1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def tree_sha256(root: Path, files: list[Path]) -> str:
+    digest = hashlib.sha256()
+    digest.update(TREE_DOMAIN)
+    for relative in sorted(set(files)):
+        path = root / relative
+        if not path.is_file():
+            raise ReceiptError(f"provenance input is missing: {path}")
+        encoded = relative.as_posix().encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "little"))
+        digest.update(encoded)
+        digest.update(path.stat().st_size.to_bytes(8, "little"))
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
+def recursive_files(
+    root: Path, *, skip_directories: set[str] | None = None
+) -> list[Path]:
+    skipped = skip_directories or set()
+    files: list[Path] = []
+    for directory, directories, names in os.walk(root):
+        directories[:] = sorted(name for name in directories if name not in skipped)
+        base = Path(directory)
+        for name in sorted(names):
+            path = base / name
+            if path.is_file():
+                files.append(path.relative_to(root))
+    return files
+
+
+def source_tree_sha256(source: Path) -> str:
+    listed = subprocess.run(
+        ["git", "-C", str(source), "ls-files", "-z"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if listed.returncode:
+        raise ReceiptError(
+            f"git ls-files failed for {source}: "
+            f"{listed.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    files = [
+        Path(raw.decode("utf-8"))
+        for raw in listed.stdout.split(b"\0")
+        if raw
+    ]
+    return tree_sha256(source, files)
+
+
+def psoxide_tree_sha256(psoxide: Path) -> str:
+    files = recursive_files(psoxide, skip_directories=PSOXIDE_SKIPPED_DIRECTORIES)
+    files = [path for path in files if path.name != ".DS_Store"]
+    return tree_sha256(psoxide, files)
+
+
+def psoxide_revision_from_marker(marker: str) -> str:
+    if marker.startswith("git:"):
+        revision = marker.removeprefix("git:").lower()
+        if REVISION.fullmatch(revision) is None:
+            raise ReceiptError("invalid git revision in hydrated PSoXide marker")
+        return revision
+    if marker.startswith("local:"):
+        source = Path(marker.removeprefix("local:")).resolve(strict=True)
+        revision = git(source, "rev-parse", "--verify", "HEAD^{commit}").lower()
+        if REVISION.fullmatch(revision) is None:
+            raise ReceiptError("invalid revision for local hydrated PSoXide source")
+        if git(source, "status", "--porcelain=v1", "--untracked-files=normal"):
+            raise ReceiptError(
+                f"local hydrated PSoXide source is dirty and cannot identify a release: {source}"
+            )
+        return revision
+    raise ReceiptError(f"unsupported hydrated PSoXide marker: {marker!r}")
+
+
+def cooked_tree_sha256(source: Path) -> str:
+    data = source / "data"
+    files = [
+        path
+        for path in recursive_files(data)
+        if path != Path(".hlpsx-cook.json")
+    ]
+    return tree_sha256(data, files)
 
 
 def file_record(path: Path) -> dict[str, object]:
@@ -142,6 +245,80 @@ def source_record(source: Path) -> dict[str, object]:
         "kind": "clean-git-commit",
         "revision": revision,
         "tree_clean": True,
+    }
+
+
+def hl_cook_record(source: Path, source_row: dict[str, object]) -> dict[str, object]:
+    path = source / HL_COOK_MANIFEST
+    try:
+        document = json.loads(path.read_text(encoding="ascii"))
+    except FileNotFoundError as error:
+        raise ReceiptError(
+            f"Half-Life cooked provenance is missing: {path}; run a fresh full asset cook"
+        ) from error
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ReceiptError(f"invalid Half-Life cooked provenance: {path}: {error}") from error
+    required = {
+        "schema",
+        "hl_psx_revision",
+        "hl_psx_tree_sha256",
+        "psoxide_source",
+        "psoxide_revision",
+        "psoxide_tree_sha256",
+        "half_life_input_sha256",
+        "cooked_tree_sha256",
+    }
+    if not isinstance(document, dict) or set(document) != required:
+        raise ReceiptError(f"Half-Life cooked provenance has unexpected fields: {path}")
+    if document["schema"] != HL_COOK_SCHEMA:
+        raise ReceiptError(
+            f"unsupported Half-Life cooked provenance schema: {document['schema']!r}"
+        )
+    for field in (
+        "hl_psx_tree_sha256",
+        "psoxide_tree_sha256",
+        "half_life_input_sha256",
+        "cooked_tree_sha256",
+    ):
+        if DIGEST.fullmatch(str(document[field])) is None:
+            raise ReceiptError(f"Half-Life cooked provenance has invalid {field}")
+    if document["hl_psx_revision"] != source_row["revision"]:
+        raise ReceiptError(
+            "Half-Life cooked provenance revision does not match the clean source"
+        )
+    if document["hl_psx_tree_sha256"] != source_tree_sha256(source):
+        raise ReceiptError(
+            "Half-Life cooked provenance source tree does not match the clean source"
+        )
+    psoxide = source / ".psoxide"
+    marker = psoxide / ".psoxide-source"
+    try:
+        marker_text = marker.read_text(encoding="utf-8").strip()
+    except FileNotFoundError as error:
+        raise ReceiptError(f"Half-Life hydrated PSoXide marker is missing: {marker}") from error
+    if document["psoxide_source"] != marker_text:
+        raise ReceiptError(
+            "Half-Life cooked provenance PSoXide source does not match its hydrated tree"
+        )
+    if document["psoxide_tree_sha256"] != psoxide_tree_sha256(psoxide):
+        raise ReceiptError(
+            "Half-Life cooked provenance PSoXide tree does not match its hydrated tree"
+        )
+    if document["psoxide_revision"] != psoxide_revision_from_marker(marker_text):
+        raise ReceiptError(
+            "Half-Life cooked provenance PSoXide revision does not match its source"
+        )
+    if document["cooked_tree_sha256"] != cooked_tree_sha256(source):
+        raise ReceiptError(
+            "Half-Life cooked provenance digest does not match the current cooked assets"
+        )
+    revision = str(document["psoxide_revision"])
+    if REVISION.fullmatch(revision) is None and not revision.startswith("tree:"):
+        raise ReceiptError("Half-Life cooked provenance has invalid PSoXide revision")
+    return {
+        "manifest": file_record(path),
+        "document": document,
+        "verified": True,
     }
 
 
@@ -365,10 +542,12 @@ def build_document(
     ranges: list[tuple[int, int, str]] = []
     for name in REQUIRED_PROGRAMS:
         record = program_record(programs[name], combined, entries[name])
-        program_rows[name] = {
-            "source": source_record(sources[name]),
-            **record,
-        }
+        source = sources[name].resolve(strict=True)
+        source_row = source_record(source)
+        row = {"source": source_row, **record}
+        if name == "HALF-LIFE":
+            row["cooked_assets"] = hl_cook_record(source, source_row)
+        program_rows[name] = row
         embedded = record["embedded"]
         ranges.append(
             (
@@ -495,6 +674,36 @@ def verify_sealed_document(receipt_path: Path, expected: dict[str, object]) -> N
             raise ReceiptError(f"{name}: receipt lacks clean source provenance")
         if REVISION.fullmatch(str(source.get("revision", ""))) is None:
             raise ReceiptError(f"{name}: invalid recorded source revision")
+        if name == "HALF-LIFE":
+            try:
+                cooked = row["cooked_assets"]
+                manifest_file = cooked["manifest"]
+                manifest = cooked["document"]
+            except (KeyError, TypeError) as error:
+                raise ReceiptError(
+                    f"{name}: sealed receipt lacks cooked-asset provenance"
+                ) from error
+            if cooked.get("verified") is not True:
+                raise ReceiptError(f"{name}: cooked-asset provenance was not verified")
+            if (
+                not isinstance(manifest_file.get("bytes"), int)
+                or manifest_file["bytes"] <= 0
+                or DIGEST.fullmatch(str(manifest_file.get("sha256", ""))) is None
+            ):
+                raise ReceiptError(f"{name}: invalid sealed cooked manifest record")
+            if (
+                manifest.get("schema") != HL_COOK_SCHEMA
+                or manifest.get("hl_psx_revision") != source["revision"]
+            ):
+                raise ReceiptError(f"{name}: cooked manifest does not match source")
+            for field in (
+                "hl_psx_tree_sha256",
+                "psoxide_tree_sha256",
+                "half_life_input_sha256",
+                "cooked_tree_sha256",
+            ):
+                if DIGEST.fullmatch(str(manifest.get(field, ""))) is None:
+                    raise ReceiptError(f"{name}: invalid sealed cooked {field}")
 
     for previous, current in zip(sorted(ranges), sorted(ranges)[1:]):
         if current[0] < previous[1]:

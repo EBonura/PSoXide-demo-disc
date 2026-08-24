@@ -12,21 +12,23 @@
 //! and stack all come out of the target's own PSX-EXE header, so the launcher
 //! needs no per-game build-time knowledge.
 //!
-//! A clean load shows nothing: the launcher fades to black, the GPU reset
-//! in `quiesce` leaves the display off, and the next thing on screen is
-//! the game (proven across every program on the 2026-08-01 19:10 console
-//! run). The diagnostic checklist only materialises on the first failure:
-//! one named row per load stage, OK/FAIL statuses, and a fail log with
-//! the stage's detail word and the reader's diag word in hex. Retries
-//! then paint live, so a photo of a hung or halted screen still says
-//! exactly how far the boot got and why it stopped.
+//! A clean load keeps the demo disc's procedural globe and starfield alive
+//! over a progress bar. The renderer is self-contained here because the
+//! target payload overwrites the launcher while it streams. The diagnostic
+//! checklist only materialises on the first failure: one named row per load
+//! stage, OK/FAIL statuses, and a fail log with the stage's detail word and
+//! the reader's diag word in hex. Retries then paint live, so a photo of a
+//! hung or halted screen still says exactly how far the boot got and why it
+//! stopped.
 
 #![no_std]
 #![no_main]
 #![feature(asm_experimental_arch)]
 
+mod loading;
 mod paint;
 
+use loading::LoadingScreen;
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 
 const SECTOR_BYTES: u32 = (SECTOR_WORDS * 4) as u32;
@@ -51,7 +53,9 @@ const EXE_MAGIC: [u32; 2] = [0x582D_5350, 0x4558_4520]; // "PS-X EXE"
 /// the header LBA, MAGIC the first header word, BOUNDS the load address,
 /// PAYLOAD the failing sector index, VERIFY the FNV the RAM actually
 /// hashed to. Stage 8 is the panic handler.
-const STAGE_NAMES: [&str; 7] = ["DRIVE", "SEEK", "HEADER", "MAGIC", "BOUNDS", "PAYLOAD", "VERIFY"];
+const STAGE_NAMES: [&str; 7] = [
+    "DRIVE", "SEEK", "HEADER", "MAGIC", "BOUNDS", "PAYLOAD", "VERIFY",
+];
 const STAGE_PANIC: u32 = 8;
 
 /// Checklist geometry: stage names down the left at 2x scale, OK / FAIL
@@ -63,14 +67,7 @@ const ROW_H: i16 = 18;
 const BAR_X: i16 = 128;
 const BAR_W: i16 = 112;
 const STATUS_X: i16 = 248;
-/// The loading screen is one centred bar on black and nothing else. It
-/// had a LOADING caption beside an off-centre bar; a bar alone reads as
-/// "working" without asking anyone to read anything, and black keeps the
-/// hand-over from the launcher's fade invisible.
-const LOAD_BAR_W: i16 = 160;
 const LOAD_BAR_H: i16 = 12;
-const LOAD_BAR_X: i16 = (320 - LOAD_BAR_W) / 2;
-const LOAD_BAR_Y: i16 = (240 - LOAD_BAR_H) / 2;
 const LOG_Y: i16 = 190;
 const VERDICT_Y: i16 = 222;
 
@@ -94,17 +91,13 @@ pub unsafe extern "C" fn loader_entry(
 ) -> ! {
     unsafe { quiesce() };
 
-    // A clean load is no longer silent. It used to run dark on purpose,
-    // which read as a hung console for however many seconds the payload
-    // took -- the biggest game on the disc is a megabyte and a half. So
-    // the screen comes up immediately with a title and a progress bar,
-    // and nothing else: the diagnostic checklist still stays out of sight
-    // until something actually fails.
+    // The target overwrites the launcher, so the chain loader owns a small
+    // copy of the menu's procedural visual. It has no textures and keeps its
+    // two framebuffers outside the payload. Diagnostics remain hidden unless
+    // an actual load stage fails.
     paint::setup();
-    paint::rect(0, 0, 320, 240, paint::BLACK);
-    paint::show();
-    // The empty track, so the bar has somewhere visible to grow into.
-    paint::rect(LOAD_BAR_X, LOAD_BAR_Y, LOAD_BAR_W, LOAD_BAR_H, paint::TRACK);
+    let mut loading = LoadingScreen::new();
+    loading.begin();
 
     let mut header = [0u32; SECTOR_WORDS];
 
@@ -127,7 +120,7 @@ pub unsafe extern "C" fn loader_entry(
         // drive mid-stream -- the 2026-08-01 console panels showed retry 2
         // reading an all-ones header straight from a poisoned FIFO.
         let mut reader = SectorReader::new();
-        match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv) } {
+        match unsafe { try_load(&mut reader, exe_lba, &mut header, payload_fnv, &mut loading) } {
             Ok(exe) => break exe,
             Err((stage, detail)) => {
                 reveal(attempt, stage);
@@ -169,7 +162,8 @@ pub unsafe extern "C" fn loader_entry(
     } else if !alive {
         // Nothing else on a clean load, but a dead scratchpad is worth
         // saying even when the checklist stayed away.
-        paint::text(LOAD_BAR_X, LOAD_BAR_Y - 24, 2, "NOSPAD", paint::YELLOW);
+        paint::diagnostic_mode();
+        paint::text(112, 104, 2, "NOSPAD", paint::YELLOW);
     }
     unsafe { enter(exe.pc0, exe.gp0, exe.sp, lba_offset, cdda_track_base) }
 }
@@ -182,6 +176,7 @@ fn reveal(attempt: u32, failed_stage: u32) {
         return;
     }
     paint::show_checklist();
+    paint::diagnostic_mode();
     // Wipe the loading screen and put the diagnostics in its place.
     paint::rect(0, 0, 320, 240, paint::RED_BASE);
     draw_checklist(attempt);
@@ -200,7 +195,13 @@ fn row_y(row: usize) -> i16 {
 fn draw_checklist(attempt: u32) {
     paint::rect(0, 0, 320, LOG_Y, paint::RED_BASE);
     paint::text(LIST_X, 8, 2, "CHAIN LOADER", paint::WHITE);
-    paint::text_bytes(232, 8, 2, &[b'T', b'R', b'Y', b' ', b'1' + attempt as u8], paint::DIM);
+    paint::text_bytes(
+        232,
+        8,
+        2,
+        &[b'T', b'R', b'Y', b' ', b'1' + attempt as u8],
+        paint::DIM,
+    );
     for (row, name) in STAGE_NAMES.iter().enumerate() {
         paint::text(LIST_X, row_y(row), 2, name, paint::DIM);
     }
@@ -268,6 +269,7 @@ unsafe fn try_load(
     exe_lba: u32,
     header: &mut [u32; SECTOR_WORDS],
     payload_fnv: u32,
+    loading: &mut LoadingScreen,
 ) -> Result<LoadedExe, (u32, u32)> {
     // Scrub the header buffer before every attempt, volatile so the
     // write cannot be elided. The 2026-08-01 11:00 burn's MAGIC panel
@@ -341,14 +343,6 @@ unsafe fn try_load(
     let sectors = t_size.div_ceil(SECTOR_BYTES);
     let mut dst = t_addr as *mut [u32; SECTOR_WORDS];
     unsafe { reader.stop() };
-    // The bar lives on the loading screen; if the checklist has been
-    // revealed it sits on the PAYLOAD row instead, which is where a
-    // failure capture expects it.
-    let (bar_x, bar_y, bar_w) = if paint::checklist_shown() {
-        (BAR_X, row_y(5) + 2, BAR_W)
-    } else {
-        (LOAD_BAR_X, LOAD_BAR_Y, LOAD_BAR_W)
-    };
     let mut sector = 0u32;
     while sector < sectors {
         let chunk_lba = exe_lba + 1 + sector;
@@ -368,8 +362,21 @@ unsafe fn try_load(
         }
         unsafe { reader.stop() };
         sector += n;
-        let done = (sector * bar_w as u32 / sectors.max(1)) as i16;
-        paint::rect(bar_x, bar_y, done.clamp(2, bar_w), LOAD_BAR_H, paint::WHITE);
+        if !paint::checklist_shown() {
+            loading.update(sector, sectors);
+        } else {
+            let done = (sector * BAR_W as u32 / sectors.max(1)) as i16;
+            paint::rect(
+                BAR_X,
+                row_y(5) + 2,
+                done.clamp(2, BAR_W),
+                LOAD_BAR_H,
+                paint::WHITE,
+            );
+        }
+    }
+    if !paint::checklist_shown() {
+        loading.finish();
     }
     stage_ok(6);
 
@@ -417,9 +424,11 @@ unsafe fn quiesce() {
         psx_io::write16(0x1F80_1D8E, 0x00FF); // KEY_OFF hi
         psx_io::write16(0x1F80_1D80, 0); // main volume L
         psx_io::write16(0x1F80_1D82, 0); // main volume R
+
         // Mask + acknowledge every interrupt source.
         psx_io::write32(0x1F80_1074, 0); // I_MASK
         psx_io::write32(0x1F80_1070, 0); // I_STAT
+
         // Disable every DMA channel but keep the BIOS's priority ladder.
         // The third debug burn proved silicon cares about the difference:
         // with DPCR fully zeroed, re-enabling channel 3 alone (enable bit,
@@ -430,6 +439,7 @@ unsafe fn quiesce() {
         // the same baseline. (The emulator does not model priorities, so
         // only a burn could catch this.)
         psx_io::write32(0x1F80_10F0, 0x0765_4321); // DPCR
+
         // GP1(00h): reset the GPU (display off, FIFO cleared, defaults).
         psx_io::write32(0x1F80_1814, 0);
     }
