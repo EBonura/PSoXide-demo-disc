@@ -16,9 +16,9 @@ ROOT       := $(CURDIR)
 # advance on their own clean shared-runtime pin below.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= b50e90266084beea85a94a7a194955dfe9bf6228
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 897e90deba0d96105308a3aa114f0b9a6988a671
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= b50e90266084beea85a94a7a194955dfe9bf6228
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 897e90deba0d96105308a3aa114f0b9a6988a671
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 CORTEX_LEGACY_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
