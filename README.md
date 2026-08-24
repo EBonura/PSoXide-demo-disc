@@ -72,8 +72,8 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-The current layout has ten outer programs on the default pressing, and
-Half-Life adds an eleventh. PSoXide Arcade is one of those programs and
+The current layout has nine outer programs on the default pressing, and
+Half-Life adds a tenth. PSoXide Arcade is one of those programs and
 contains three games of its own. Automated evidence is recorded per program
 and must not be read as an
 original hardware claim. The current default disc is 99450 sectors (22:06:00,
@@ -83,7 +83,6 @@ original hardware claim. The current default disc is 99450 sectors (22:06:00,
 | Program | How it ships |
 | --- | --- |
 | Cortex Ignition | current PXBSP project as a whole image, 1 CD-DA track |
-| Cortex Ignition Legacy | frozen grid project as a whole image, 1 CD-DA track |
 | Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
 | Voxide | whole image, WORLD.PAK assets |
 | NitroXide | whole image, WORLD.PAK arena atlas |
@@ -102,11 +101,9 @@ larger streaming games.
 
 `CORTEX IGNITION` is the active new-engine entry. It comes from the exact
 `editor/projects/default` project named `Cortex Ignition Tech Demo 0.1` at the dedicated
-PSoXide pin recorded in the Makefile. `CORTEX IGNITION LEGACY` follows it and
-preserves the original `editor/samples/cortex_v1` grid demo on its separate old
-engine pin. The standard, publication-shaped pressing keeps both unfinished
-entries behind the Konami unlock. The private Half-Life pressing exposes both
-for direct testing. `QUAKE SHAREWARE` is the last program before
+PSoXide pin recorded in the Makefile. The standard, publication-shaped pressing
+keeps this unfinished entry behind the Konami unlock. The private Half-Life
+pressing exposes it for direct testing. `QUAKE SHAREWARE` is the last program before
 CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,
 so a bare executable is not sufficient; the entry uses the same caller-provided
 LBA offset that relocates
@@ -114,11 +111,11 @@ Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
-After unlocking, the standard order is Cortex Ignition, Cortex Ignition
-Legacy, Voxide, NitroXide, Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
+After unlocking, the standard order is Cortex Ignition, Voxide, NitroXide,
+Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
 Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
 cabinet selector for Breakout, Space Invaders and Magikarp Pong. The Half-Life
-pressing inserts Half-Life directly after the two Cortex entries.
+pressing inserts Half-Life directly after Cortex Ignition.
 
 ## The menu
 
@@ -207,11 +204,10 @@ Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
 different library. `PROGRAMS_PSOXIDE=/absolute/path/to/PSoXide` selects the
 checkout used for every ordinary rebuilt program. `PSOXIDE` remains the exact
 checkout named by Quake's artifact provenance, so advancing the shared runtime
-cannot silently change the SDK contract of the pinned Quake image. The two
-Cortex projects are staged
-from `games/PSoXide-cortex-current` and `games/PSoXide-cortex` into separate
-directories under `build/`, keeping generated output outside both pinned
-PSoXide worktrees. `games/psoxide-arcade` is the private collection repository
+cannot silently change the SDK contract of the pinned Quake image. The Cortex
+project is staged from `games/PSoXide-cortex-current` under `build/`, keeping
+generated output outside the pinned PSoXide worktree. `games/psoxide-arcade`
+is the private collection repository
 and the canonical owner of `goncharov.cdda` by
 [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
 band's permission; the combined-disc GH-PSX image is built data-only and

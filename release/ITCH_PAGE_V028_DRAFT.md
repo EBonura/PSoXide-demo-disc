@@ -23,7 +23,6 @@ copy goes live.
 ### On the disc
 
 - **Cortex Ignition**, the current new-engine tech demo.
-- **Cortex Ignition Legacy**, the frozen original grid demo.
 - **VoXide**, a Minecraft-style sandbox.
 - **NitroXide**, rocket-car football against the CPU or in split-screen.
 - **Celeste Classic Collection**, both PICO-8 Celeste games as native PS1 code.

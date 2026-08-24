@@ -44,13 +44,13 @@ class CortexGameplayTests(unittest.TestCase):
 
     def test_cortex_route_enters_internal_menu_after_launcher(self) -> None:
         self.assertEqual(
-            chainloads.route_for("CORTEX IGNITION", 0, 12),
+            chainloads.route_for("CORTEX IGNITION", 0, 11),
             "1000:cross:12,1400:cross:12,1800:cross:12,2200:cross:12,"
             "2600:cross:12,3000:cross:12,3400:cross:12",
         )
         self.assertEqual(
-            chainloads.route_for("HALF-LIFE", 2, 12),
-            "400:left:8,600:left:8,1000:cross:12,1400:cross:12,"
+            chainloads.route_for("HALF-LIFE", 1, 11),
+            "400:left:8,1000:cross:12,1400:cross:12,"
             "1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,"
             "3400:cross:12",
         )

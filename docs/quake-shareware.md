@@ -77,10 +77,8 @@ the programs with `PSOXIDE`, runs `sdk-coherence`, verifies that PSoXide is
 still clean, and atomically writes its full HEAD to
 `build/programs.psoxide-revision` before layout. The active Cortex Ignition is
 copied from the exact `editor/projects/default` project into
-`build/cortex-current`, while Cortex Ignition Legacy is copied from
-`editor/samples/cortex_v1` into `build/cortex-legacy`. Separate PSoXide pins
-keep the current Quake Units Arena project and the frozen grid demo
-reproducible without dirtying either checkout.
+`build/cortex-current`. Its PSoXide pin keeps the project reproducible without
+dirtying the checkout.
 
 To reuse already-built demo-disc programs:
 
@@ -165,9 +163,8 @@ test suites. The tests cover:
 - table-entry and embedded-sector verification;
 - the default and Half-Life dry-run recipes both carrying the Quake image,
   its metadata, the verifier and the receipt, and the opt-in switch being gone;
-- the default and Half-Life recipes both carrying current and legacy Cortex
-  images, with both gated on the standard pressing and visible on the private
-  Half-Life pressing;
+- the default and Half-Life recipes carrying current Cortex, gated on the
+  standard pressing and visible on the private Half-Life pressing;
 - every way the payload can be wrong stopping `make quake-verify`: absent,
   stale Quake pin, wrong PSoXide pin, stale artifact hash, either checkout
   dirty, stamp stale, stamp missing;
@@ -177,7 +174,7 @@ test suites. The tests cover:
   Quake entry failing, and payload identity against the receipt;
 - `make quake-repin` printing every pin the Makefile holds.
 - post-program SDK coherence, missing/malformed/stale SDK stamp rejection, and
-  separate current/legacy Cortex staging and engine pins.
+  isolated current Cortex staging with its exact engine pin.
 
 The strongest local structural check is the receipt itself. It proves that the
 combined image has one visible `QUAKE SHAREWARE` table entry pointing to the
