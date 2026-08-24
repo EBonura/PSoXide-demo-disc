@@ -35,9 +35,9 @@ DEFAULT_MENU_ENTRIES = 9
 # are held to run-to-run equality instead, which is what determinism means.
 EXPECTED_FRAME_FNV_BY_MENU_ENTRIES = {
     # Public pressing: unfinished Cortex cards are hidden.
-    DEFAULT_MENU_ENTRIES: ("0xd4c7d646b38454ee", "0x5d1e1206b5dd6d5e"),
+    DEFAULT_MENU_ENTRIES: ("0xf4784eaf9ec2930d", "0x9c071c8606da9e61"),
     # Private Half-Life pressing: Cortex and Half-Life are visible.
-    11: ("0x6ecfb471324a0207", "0x9c071c8606da9e61"),
+    11: ("0xb4e15cbaed40cff2", "0x1ba73537914d7c80"),
 }
 DETERMINISTIC_FIELDS = (
     "tick",

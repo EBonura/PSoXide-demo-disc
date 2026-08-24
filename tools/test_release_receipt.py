@@ -37,8 +37,38 @@ class ReleaseFixture:
         run("git", "config", "user.name", "Fixture", cwd=self.source)
         run("git", "config", "user.email", "fixture@example.invalid", cwd=self.source)
         (self.source / "tracked.txt").write_text("release\n", encoding="ascii")
-        run("git", "add", "tracked.txt", cwd=self.source)
+        (self.source / ".gitignore").write_text("data/\n.psoxide/\n", encoding="ascii")
+        run("git", "add", "tracked.txt", ".gitignore", cwd=self.source)
         run("git", "commit", "-q", "-m", "fixture", cwd=self.source)
+        revision = run("git", "rev-parse", "HEAD", cwd=self.source)
+        psoxide = self.source / ".psoxide"
+        psoxide.mkdir()
+        (psoxide / ".psoxide-source").write_text(
+            f"git:{revision}\n", encoding="ascii"
+        )
+        (psoxide / "sdk.rs").write_text("sdk\n", encoding="ascii")
+        data = self.source / "data"
+        data.mkdir()
+        (data / "chunk.bin").write_bytes(b"fresh cooked data")
+        self.cook_manifest = data / ".hlpsx-cook.json"
+        self.cook_manifest.write_text(
+            json.dumps(
+                {
+                    "schema": receipt.HL_COOK_SCHEMA,
+                    "hl_psx_revision": revision,
+                    "hl_psx_tree_sha256": receipt.source_tree_sha256(self.source),
+                    "psoxide_source": f"git:{revision}",
+                    "psoxide_revision": revision,
+                    "psoxide_tree_sha256": receipt.psoxide_tree_sha256(psoxide),
+                    "half_life_input_sha256": "a" * 64,
+                    "cooked_tree_sha256": receipt.cooked_tree_sha256(self.source),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="ascii",
+        )
 
         self.frontend = root / "frontend"
         self.frontend.write_bytes(b"frontend")
@@ -129,6 +159,29 @@ class ReleaseReceiptTests(unittest.TestCase):
                 self.assertEqual(row["source"]["tree_clean"], True)
                 self.assertEqual(row["embedded"]["image_sectors"], 4)
                 self.assertEqual(row["input"]["payload"]["bytes"], 2048)
+            cooked = document["programs"]["HALF-LIFE"]["cooked_assets"]
+            self.assertTrue(cooked["verified"])
+            self.assertEqual(cooked["document"]["schema"], receipt.HL_COOK_SCHEMA)
+
+    def test_half_life_cooked_asset_tamper_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseFixture(Path(directory))
+            (fixture.source / "data/chunk.bin").write_bytes(b"stale mutation")
+            with self.assertRaisesRegex(
+                receipt.ReceiptError, "does not match the current cooked assets"
+            ):
+                fixture.document()
+
+    def test_half_life_manifest_revision_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseFixture(Path(directory))
+            document = json.loads(fixture.cook_manifest.read_text(encoding="ascii"))
+            document["hl_psx_revision"] = "0" * 40
+            fixture.cook_manifest.write_text(json.dumps(document), encoding="ascii")
+            with self.assertRaisesRegex(
+                receipt.ReceiptError, "revision does not match"
+            ):
+                fixture.document()
 
     def test_dirty_source_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

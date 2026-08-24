@@ -212,6 +212,7 @@ programs: examples
 		DIST=$(GAMES)/psoxide-arcade/dist
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
+	cd $(GAMES)/hl-psx && cargo run --release -- assets --psoxide $(PROGRAMS_PSOXIDE)
 	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
 endif
 
@@ -313,11 +314,13 @@ HL_ARGS = --image "HALF-LIFE=$(HLPSX)" \
 	--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine."
 endif
 
-# The three QUAKE SHAREWARE arguments travel together for the same reason the
+# The QUAKE SHAREWARE arguments travel together for the same reason the
 # HALF-LIFE ones do, and they are not conditional: there is no pressing without
 # Quake on it. QUAKE_PREREQS is what stops a disc being laid out around an
-# unverified payload -- disc-only cannot run until the stamp and the pins check.
+# unverified payload. disc-only cannot run until the stamp and the pins check.
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
+	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-menu.shot" \
+	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-gameplay.shot" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1, rebuilt from scratch for the original PlayStation. All nine maps load from this disc, with the full arsenal and Chthon. Still in development.|Quake 1.06 shareware Episodio 1, riscritto da zero per la prima PlayStation. Tutte e nove le mappe si caricano dal disco, con l'arsenale completo e Chthon. Ancora in sviluppo."
 QUAKE_PREREQS = quake-programs-verify quake-verify
@@ -410,7 +413,8 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
-              invaders2 pong pong2 hwtests hwtests2 halflife
+              invaders2 pong pong2 hwtests hwtests2 halflife quake-menu \
+              quake-gameplay
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
