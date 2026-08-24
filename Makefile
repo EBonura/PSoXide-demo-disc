@@ -9,16 +9,16 @@
 # exact PSoXide pins so the old engine remains reproducible while the active
 # editor project advances on the new engine.
 
-.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # Quake's independently verified SDK input stays frozen here. Ordinary games
 # advance on their own clean shared-runtime pin below.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 588d7637a4cb49209d3072438110683b921bb634
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= b50e90266084beea85a94a7a194955dfe9bf6228
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= ded86107538cbf53b952dda75973780c3fd1b48f
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= b50e90266084beea85a94a7a194955dfe9bf6228
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 CORTEX_LEGACY_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
@@ -79,14 +79,15 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= b5ef23041e5d644d1b2e63f196de64cf2b45427c
-QUAKE_EXPECTED_PSOXIDE_REV ?= 9c298d83909fe5c74ac44870d45afb8227b30a63
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 3474e726b92eaa0bfa36c2f3d14849cb900bb532cf5e0a7573a42cfb99cc79b2
+QUAKE_EXPECTED_REV ?= 5430efe7ddcf0ce850b5ac902515193efb37ac58
+QUAKE_EXPECTED_PSOXIDE_REV ?= f894437986e1c0148ad39eaa38134ab09185312d
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= bde1802607fda2820792548c8784aa434f8750870ec0dff58576e32690d0ebbe
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 12d8ff24de1c92db197f1c53cf6368286d2b17ee2ed728580db8fa94ec6ee062
-QUAKE_EXPECTED_EXE_SHA256 ?= 5fd0cc8eb4ff5139b3c001c3e3e94e6a8eb9e920730f0cfd7200dd25f848e675
+QUAKE_EXPECTED_BIN_SHA256 ?= d3d7deb7131e3b0d53485e9f150126bd588f195447b6deb030058b9918b72ed6
+QUAKE_EXPECTED_EXE_SHA256 ?= b91404a8c2d44a9edf5b02eb55abdca725412db77f797b054ab901ef2f4f2e9b
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
+HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
 # The disc lands in PSoXide's game library, laid out the way every other
 # homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
@@ -97,6 +98,8 @@ DISC_NAME ?= PSoXide Demo Disc
 endif
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)/$(DISC_NAME)
+RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
+RELEASE_BUILD_COMMAND ?= make disc HL=1 DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
@@ -133,6 +136,7 @@ help:
 	@echo "make quake-verify     - check the pinned Quake input on its own"
 	@echo "make quake-repin      - print the pin values a built Quake tree implies"
 	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
+	@echo "make release-headless-check - build the private HL pressing and deterministically chain-load Cortex, HL, Hardware Tests and Quake"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
 
@@ -365,6 +369,23 @@ _quake-headless-check:
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
 		--expected-menu-entries "$(if $(HL),12,9)"
 
+# Burn gate for the one-disc private pressing.  Rebuild first: a release gate
+# that accepted `disc-only` could prove a perfectly deterministic stale guest.
+# Run both recursive makes with HL=1 so DISC_NAME/DIST and the carousel layout
+# are computed in the same variant that verifies them.  The checker launches
+# each release-critical entry twice and requires byte-identical route/CD/GPU/PC
+# logs as well as a final PC and sampled execution inside that entry's
+# checksummed PS-X EXE.
+release-headless-check:
+	$(MAKE) disc HL=1
+	$(MAKE) _release-headless-check HL=1
+
+_release-headless-check:
+	python3 tools/release_receipt.py verify --receipt "$(RELEASE_RECEIPT)"
+	python3 tools/check_release_chainloads.py \
+		--frontend "$(FRONTEND)" \
+		--cue "$(DIST)/$(DISC_NAME).cue"
+
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
 #
@@ -499,6 +520,24 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--demo-bin "$(DIST)/$(DISC_NAME).bin" \
 		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
 
+ifneq ($(HL),)
+	python3 tools/release_receipt.py create \
+		--combined-cue "$(DIST)/$(DISC_NAME).cue" \
+		--frontend "$(FRONTEND)" \
+		--build-command "$(RELEASE_BUILD_COMMAND)" \
+		--program "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		--source "CORTEX IGNITION=$(CORTEX_CURRENT_PSOXIDE)" \
+		--program "CORTEX IGNITION LEGACY=$(CORTEX_LEGACY)" \
+		--source "CORTEX IGNITION LEGACY=$(CORTEX_LEGACY_PSOXIDE)" \
+		--program "HALF-LIFE=$(HLPSX)" \
+		--source "HALF-LIFE=$(HLPSX_SOURCE)" \
+		--program "HARDWARE TESTS=$(HWTESTS)" \
+		--source "HARDWARE TESTS=$(PROGRAMS_PSOXIDE)" \
+		--program "QUAKE SHAREWARE=$(QUAKE_CUE)" \
+		--source "QUAKE SHAREWARE=$(QUAKE_SRC)" \
+		--out "$(RELEASE_RECEIPT)"
+endif
+
 
 # Every pressing carries Quake 1.06 shareware data now, so both distribution
 # paths stop before they build anything. Redistributing that data is a separate
@@ -565,6 +604,7 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
 	python3 -m unittest discover -s tools -p 'test_quake_disc.py'
+	python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py
 
 # Every program on this disc has to be built against one SDK.
 #
