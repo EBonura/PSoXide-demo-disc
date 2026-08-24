@@ -14,10 +14,10 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `ae28819a1f516e3e10c9ba638714a56b4bbfeb42` |
+| Quake source revision | `a0353c8318c259b7838221ad6cba4e7a62bd3d32` |
 | Quake-declared PSoXide revision | `f894437986e1c0148ad39eaa38134ab09185312d` |
 | Shipping provenance sidecar | `dist/quake-psx.provenance.json` |
-| Sidecar SHA-256 | `b7852d8f0e50a2714f943363f880c1ab0aad3c8418492c0c29197e229c01bc96` |
+| Sidecar SHA-256 | `6cb11dbed6ac0a7eb9d66104efa5a4187413104be5b08990af2932bd4ffc3455` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
 | Input bin SHA-256 | `6de7f13ec4f78268a3f6a81988ae663c96b4cddfa4535e0d48c7f1153a29945a` |
 | Input EXE SHA-256 | `ba95c1ef083aae96ead448c40e036cba90d528f7b64d699ff7555b4f386ff4ec` |
