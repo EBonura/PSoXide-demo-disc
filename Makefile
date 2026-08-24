@@ -9,16 +9,16 @@
 # exact PSoXide pins so the old engine remains reproducible while the active
 # editor project advances on the new engine.
 
-.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # Quake's independently verified SDK input stays frozen here. Ordinary games
 # advance on their own clean shared-runtime pin below.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 897e90deba0d96105308a3aa114f0b9a6988a671
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 0a6881c34474ed4c0ac1a088a99034a00eef85ea
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= e5dce1577925118b386255fe0ba50458c91b31a7
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 0a6881c34474ed4c0ac1a088a99034a00eef85ea
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 CORTEX_LEGACY_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex
@@ -79,12 +79,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 5430efe7ddcf0ce850b5ac902515193efb37ac58
+QUAKE_EXPECTED_REV ?= ae28819a1f516e3e10c9ba638714a56b4bbfeb42
 QUAKE_EXPECTED_PSOXIDE_REV ?= f894437986e1c0148ad39eaa38134ab09185312d
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= bde1802607fda2820792548c8784aa434f8750870ec0dff58576e32690d0ebbe
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= b7852d8f0e50a2714f943363f880c1ab0aad3c8418492c0c29197e229c01bc96
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= d3d7deb7131e3b0d53485e9f150126bd588f195447b6deb030058b9918b72ed6
-QUAKE_EXPECTED_EXE_SHA256 ?= b91404a8c2d44a9edf5b02eb55abdca725412db77f797b054ab901ef2f4f2e9b
+QUAKE_EXPECTED_BIN_SHA256 ?= 6de7f13ec4f78268a3f6a81988ae663c96b4cddfa4535e0d48c7f1153a29945a
+QUAKE_EXPECTED_EXE_SHA256 ?= ba95c1ef083aae96ead448c40e036cba90d528f7b64d699ff7555b4f386ff4ec
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -116,7 +116,7 @@ ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
-CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/quake_units_arena.cue
+CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_1.cue
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
 CORTEX_LEGACY_SOURCE := $(CORTEX_LEGACY_PSOXIDE)/editor/samples/cortex_v1
 CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy
@@ -136,7 +136,8 @@ help:
 	@echo "make quake-verify     - check the pinned Quake input on its own"
 	@echo "make quake-repin      - print the pin values a built Quake tree implies"
 	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
-	@echo "make release-headless-check - build the private HL pressing and deterministically chain-load Cortex, HL, Hardware Tests and Quake"
+	@echo "make program-headless-check - boot the independent games and all three Arcade guests"
+	@echo "make release-headless-check - build the private HL pressing and deterministically chain-load the release-critical entries"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
 
@@ -217,7 +218,8 @@ programs: examples
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist \
 		CDDA_LIST=$(ROOT)/audio/no-cdda.txt
-	$(MAKE) -C $(GAMES)/psoxide-arcade disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
+	$(MAKE) -C $(GAMES)/psoxide-arcade disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
+		DIST=$(GAMES)/psoxide-arcade/dist
 	@$(MAKE) cortex-if-stale
 ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
@@ -362,6 +364,17 @@ quake-headless-check:
 	$(MAKE) disc-only
 	$(MAKE) _quake-headless-check
 
+# Smoke-test every independently maintained program outside the three large
+# ports. The script reads the pressed table and navigates by name, so adding or
+# reordering carousel cards does not silently point a route at the wrong game.
+# It also enters the Arcade collection and starts each of its three guests.
+program-headless-check:
+	python3 tools/check_program_headless.py \
+		--frontend "$(FRONTEND)" \
+		--cue "$(DIST)/$(DISC_NAME).cue" \
+		--out "$(BUILD)/program-headless" \
+		--jobs 3
+
 _quake-headless-check:
 	python3 tools/check_quake_headless.py \
 		--frontend "$(FRONTEND)" \
@@ -498,7 +511,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
 		--version-of "HARDWARE TESTS=$(V_HWTESTS)" \
 		$(CORTEX_GATE_ARGS) \
-		--describe "CORTEX IGNITION=An early new-engine Cortex Ignition build. Explore Quake Units Arena, a work-in-progress PXBSP level running on PSoXide's current scene-streaming runtime.|Prima build di Cortex Ignition sul nuovo motore. Esplora Quake Units Arena, un livello PXBSP in sviluppo sul runtime attuale di PSoXide." \
+		--describe "CORTEX IGNITION=Cortex Ignition Tech Demo 0.1, built on PSoXide's current PXBSP and scene-streaming runtime.|Cortex Ignition Tech Demo 0.1, costruita sul runtime PXBSP e scene-streaming attuale di PSoXide." \
 		--describe "CORTEX IGNITION LEGACY=The original grid-based Cortex Ignition technology demo, preserved on its old PSoXide engine with its original combat, skeletal animation and lighting.|La demo tecnologica originale di Cortex Ignition, conservata sul vecchio motore PSoXide con combattimento, animazioni scheletriche e luci." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work, but much of the game is still unfinished.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano, ma gran parte del gioco e ancora incompleta." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Play against the CPU or a friend in split screen: drive, boost, jump, dodge and score, with music off the disc.|Un clone di Rocket League per la prima PlayStation. Gioca contro la CPU o in due a schermo diviso: guida, boost, salti, dodge e gol, con la musica del disco." \
@@ -610,7 +623,7 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
 	python3 -m unittest discover -s tools -p 'test_quake_disc.py'
-	python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py
+	python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py tools/test_check_program_headless.py
 
 # Every program on this disc has to be built against one SDK.
 #

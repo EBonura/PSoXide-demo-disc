@@ -37,7 +37,7 @@ EXPECTED_FRAME_FNV_BY_MENU_ENTRIES = {
     # Public pressing: unfinished Cortex cards are hidden.
     DEFAULT_MENU_ENTRIES: ("0xd4c7d646b38454ee", "0x5d1e1206b5dd6d5e"),
     # Private Half-Life pressing: both Cortex cards and Half-Life are visible.
-    12: ("0x4325a1773effa4a7", "0x997d60e18a6b2602"),
+    12: ("0x0f76f2368f46a964", "0x3ac4a28cef8cb565"),
 }
 DETERMINISTIC_FIELDS = (
     "tick",

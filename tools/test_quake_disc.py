@@ -842,6 +842,11 @@ class MakeVariantContractTests(unittest.TestCase):
 
     def test_cortex_bakes_separate_current_and_legacy_projects(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        project = (
+            ROOT
+            / "games/PSoXide-cortex-current/editor/projects/default/project.ron"
+        ).read_text(encoding="utf-8")
+        scene = project.split("resources:", 1)[0]
         self.assertIn(
             "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/default", makefile
         )
@@ -854,7 +859,8 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy", makefile
         )
-        self.assertIn("e5dce1577925118b386255fe0ba50458c91b31a7", makefile)
+        self.assertIn("0a6881c34474ed4c0ac1a088a99034a00eef85ea", makefile)
+        self.assertIn("cortex_ignition_tech_demo_0_1.cue", makefile)
         self.assertIn("687d2ae7681f9de3090dc89635beac99d1654c93", makefile)
         self.assertNotIn(
             "$(CORTEX_CURRENT_PSOXIDE)/editor/samples/cortex_v1", makefile
@@ -883,6 +889,13 @@ class MakeVariantContractTests(unittest.TestCase):
             ),
             2,
         )
+        # These must be live scene entities, not catalogue-only resources.
+        self.assertIn('name: "Aletha", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((1655))', scene)
+        self.assertIn('name: "Rust Mantis", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((1656))', scene)
+        self.assertIn('name: "Tank Boss", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((5027))', scene)
 
     def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
         default = self.dry_run()

@@ -85,6 +85,10 @@ CORTEX_GAMEPLAY_QUADS = 40
 CORTEX_GAMEPLAY_MIN_FRAMES = 30
 CORTEX_GAMEPLAY_MAX_FRAME_GAP = 16
 CORTEX_GAMEPLAY_MIN_HASHES = 8
+HL_GAMEPLAY_TRIANGLES = 300
+HL_GAMEPLAY_QUADS = 150
+HL_GAMEPLAY_MIN_FRAMES = 30
+HL_GAMEPLAY_MIN_HASHES = 8
 # A polygon-count gate cannot distinguish a correctly rendered room from a
 # deterministic frame that draws only its floor and character.  Cortex's
 # release start deliberately faces a textured wall, so require real high-
@@ -214,10 +218,10 @@ def launcher_route(index: int, count: int) -> tuple[list[str], int]:
 
 def route_for(target: str, index: int, count: int) -> str:
     events, cross_tick = launcher_route(index, count)
-    if target == "CORTEX IGNITION":
-        # Cortex has its own menu after the demo-disc carousel. Sparse presses
-        # remain deterministic across the two scene loads and enter the first
-        # playable project without depending on a single timing edge.
+    if target in {"CORTEX IGNITION", "HALF-LIFE"}:
+        # These programs have their own menu after the demo-disc carousel.
+        # Sparse presses remain deterministic across scene and data loads and
+        # enter gameplay without depending on a single timing edge.
         events.extend(
             f"{cross_tick + offset}:cross:12"
             for offset in (400, 800, 1200, 1600, 2000, 2400)
@@ -263,6 +267,28 @@ def cortex_gameplay_evidence(path: Path) -> dict[str, int]:
             f"({hashes} distinct frame hashes)"
         )
     return {"frames": len(qualifying), "sustained": longest, "hashes": hashes}
+
+
+def hl_gameplay_evidence(path: Path) -> dict[str, int]:
+    qualifying: list[tuple[int, str]] = []
+    with path.open(newline="", encoding="ascii") as stream:
+        for row in csv.DictReader(stream):
+            if (
+                int(row["textured_tris"]) >= HL_GAMEPLAY_TRIANGLES
+                and int(row["textured_quads"]) >= HL_GAMEPLAY_QUADS
+            ):
+                qualifying.append((int(row["route_tick"]), row["frame_draw_hash"]))
+    hashes = len({digest for _, digest in qualifying})
+    if len(qualifying) < HL_GAMEPLAY_MIN_FRAMES or hashes < HL_GAMEPLAY_MIN_HASHES:
+        raise CheckError(
+            "HALF-LIFE: route did not sustain textured train-ride gameplay "
+            f"({len(qualifying)} frames, {hashes} hashes)"
+        )
+    return {
+        "frames": len(qualifying),
+        "sustained": len(qualifying),
+        "hashes": hashes,
+    }
 
 
 def cortex_geometry_evidence(path: Path) -> int:
@@ -366,11 +392,12 @@ def run_once(
                 samples += int(row["samples"])
     if not samples:
         raise CheckError(f"{target.name}: PC sampler never observed payload code")
-    gameplay = (
-        cortex_gameplay_evidence(paths["gpu"])
-        if target.name == "CORTEX IGNITION"
-        else {"frames": 0, "sustained": 0, "hashes": 0}
-    )
+    if target.name == "CORTEX IGNITION":
+        gameplay = cortex_gameplay_evidence(paths["gpu"])
+    elif target.name == "HALF-LIFE":
+        gameplay = hl_gameplay_evidence(paths["gpu"])
+    else:
+        gameplay = {"frames": 0, "sustained": 0, "hashes": 0}
     geometry_edge_permille = (
         cortex_geometry_evidence(paths["display_ppm"])
         if target.name == "CORTEX IGNITION"
