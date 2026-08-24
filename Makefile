@@ -9,7 +9,7 @@
 # exact PSoXide pins so the old engine remains reproducible while the active
 # editor project advances on the new engine.
 
-.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # Quake's independently verified SDK input stays frozen here. Ordinary games
@@ -376,7 +376,10 @@ _quake-headless-check:
 # each release-critical entry twice and requires byte-identical route/CD/GPU/PC
 # logs as well as a final PC and sampled execution inside that entry's
 # checksummed PS-X EXE.
-release-headless-check:
+release-frontend:
+	cd $(PROGRAMS_PSOXIDE)/emu && cargo build --release -p frontend
+
+release-headless-check: release-frontend
 	$(MAKE) disc HL=1
 	$(MAKE) _release-headless-check HL=1
 
@@ -439,6 +442,9 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
 # `make disc` builds.
+ifneq ($(HL),)
+disc-only: release-frontend
+endif
 disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
