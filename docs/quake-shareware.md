@@ -14,14 +14,14 @@ The default contract is:
 
 | Item | Pinned value |
 | --- | --- |
-| Quake source revision | `28507a6dd605730a43909d6b2258f081def68a79` |
-| Quake-declared PSoXide revision | `79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d` |
+| Quake source revision | `ae28819a1f516e3e10c9ba638714a56b4bbfeb42` |
+| Quake-declared PSoXide revision | `f894437986e1c0148ad39eaa38134ab09185312d` |
 | Shipping provenance sidecar | `dist/quake-psx.provenance.json` |
-| Sidecar SHA-256 | `8560401739d0def8ec08cfafee9ec02ba90dfb3d62933946f8d7198401d5506d` |
+| Sidecar SHA-256 | `b7852d8f0e50a2714f943363f880c1ab0aad3c8418492c0c29197e229c01bc96` |
 | Input cue SHA-256 | `5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c` |
-| Input bin SHA-256 | `50a6a9d792e3ef074dd49e300dcb69fb5f2d84a7d2d053c07ae9c8d473f0b1a2` |
-| Input EXE SHA-256 | `f0b3e7ff814c5eba320ea78bceb6f38bdec1938f971a52a87213dd774ca6de85` |
-| Guest recipe SHA-256 | `3f94b7935843619b24075dbe13514968d7315aa4305afab89e4d2e775c936610` |
+| Input bin SHA-256 | `6de7f13ec4f78268a3f6a81988ae663c96b4cddfa4535e0d48c7f1153a29945a` |
+| Input EXE SHA-256 | `ba95c1ef083aae96ead448c40e036cba90d528f7b64d699ff7555b4f386ff4ec` |
+| Guest recipe SHA-256 | `9aa38cb4a944d8b80f632e53e9150e7d59e0ebbb9ec5537f2812cc2484aa807c` |
 | Default source checkout | sibling `quake-psx` |
 | Default input cue | `dist/quake-psx.cue` in that checkout |
 
@@ -45,7 +45,7 @@ two-pass headless gate before the demo-disc payload is called current.
 procedure.
 
 The demo-disc PSoXide submodule, Quake's source declaration, and Quake's
-shipping sidecar all name `79d51dd2f2fd78cfb8aa418e2ad123730f56ac3d`.
+shipping sidecar all name `f894437986e1c0148ad39eaa38134ab09185312d`.
 The ordinary demo-disc programs must be rebuilt from that same clean revision
 before the Quake layout step records its revision stamp.
 
