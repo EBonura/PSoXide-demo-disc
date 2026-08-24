@@ -3,9 +3,9 @@
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
-| v0.28 outer carousel | PSoXide Arcade selector |
+| Demo Disc outer carousel | PSoXide Arcade selector |
 | --- | --- |
-| [![v0.28 outer carousel](assets/readme/v028-carousel.png)](assets/readme/v028-carousel.png) | [![PSoXide Arcade selector](assets/readme/arcade-selector.png)](assets/readme/arcade-selector.png) |
+| [![Demo Disc outer carousel](assets/readme/v028-carousel.png)](assets/readme/v028-carousel.png) | [![PSoXide Arcade selector](assets/readme/arcade-selector.png)](assets/readme/arcade-selector.png) |
 
 | Quake chain-loaded from the combined disc | Current Cortex Ignition project |
 | --- | --- |
@@ -183,7 +183,7 @@ the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
 - the locked standard carousel contains nine visible entries including
-  Credits; the unlock reveals both Cortex entries
+  Credits; the unlock reveals the current Cortex Ignition entry
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
