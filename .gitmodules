@@ -1,9 +1,6 @@
 [submodule "games/PSoXide"]
 	path = games/PSoXide
 	url = https://github.com/EBonura/PSoXide.git
-[submodule "games/PSoXide-cortex"]
-	path = games/PSoXide-cortex
-	url = https://github.com/EBonura/PSoXide.git
 [submodule "games/PSoXide-cortex-current"]
 	path = games/PSoXide-cortex-current
 	url = https://github.com/EBonura/PSoXide.git

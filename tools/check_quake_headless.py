@@ -18,10 +18,10 @@ STEPS = "500000000"
 PRESS_ROUTE = "400:right:8,600:right:8,1000:cross:12"
 EXPECTED_TICK = 500_000_000
 EXPECTED_DISPLAY = (320, 240)
-# The standard pressing carries both Cortex images but hides their unfinished
-# cards, leaving eight visible programs plus CREDITS. The private HL pressing
-# exposes both Cortex cards and adds Half-Life, so its caller raises this to
-# twelve. Quake stays immediately before CREDITS in both layouts.
+# The standard pressing hides the unfinished Cortex card, leaving eight
+# visible programs plus CREDITS. The private HL pressing exposes Cortex and
+# adds Half-Life, so its caller raises this to eleven. Quake stays immediately
+# before CREDITS in both layouts.
 DEFAULT_MENU_ENTRIES = 9
 # The frame both replays end on, hashed by the emulator. Each pressing needs
 # its own pair because its carousel table gives the launcher a different amount
@@ -36,8 +36,8 @@ DEFAULT_MENU_ENTRIES = 9
 EXPECTED_FRAME_FNV_BY_MENU_ENTRIES = {
     # Public pressing: unfinished Cortex cards are hidden.
     DEFAULT_MENU_ENTRIES: ("0xd4c7d646b38454ee", "0x5d1e1206b5dd6d5e"),
-    # Private Half-Life pressing: both Cortex cards and Half-Life are visible.
-    12: ("0x0f76f2368f46a964", "0x3ac4a28cef8cb565"),
+    # Private Half-Life pressing: Cortex and Half-Life are visible.
+    11: ("0x0f76f2368f46a964", "0x3ac4a28cef8cb565"),
 }
 DETERMINISTIC_FIELDS = (
     "tick",

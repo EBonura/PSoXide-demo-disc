@@ -1,18 +1,17 @@
 PSoXide Demo Disc (PSX)
 =======================
 
-The standard disc carries ten outer programs: the current new-engine Cortex
-Ignition, Cortex Ignition Legacy, VoXide, NitroXide, the Celeste Classic
+The standard disc carries nine outer programs: the current new-engine Cortex
+Ignition, VoXide, NitroXide, the Celeste Classic
 Collection, PSXcel, GH-PSX, PSoXide Arcade, the hardware test suite, and Quake
 Shareware. PSoXide Arcade opens its own selector for Breakout, Space Invaders,
 and Magikaaaaarp Pong. The private Half-Life pressing adds Half-Life as the
-eleventh outer program. Everything on it is native PlayStation software built
+tenth outer program. Everything on it is native PlayStation software built
 with the PSoXide Rust SDK.
 
-The standard disc keeps both work-in-progress Cortex cards behind the Konami
-unlock. The Half-Life pressing shows both cards directly. Cortex Ignition is
-the current new-engine tech demo; Cortex Ignition Legacy preserves the
-original grid demo on its frozen engine.
+The standard disc keeps the work-in-progress Cortex card behind the Konami
+unlock. The Half-Life pressing shows it directly. Cortex Ignition is the
+current new-engine tech demo.
 
 To run:
   - Boot the .cue in a PS1 emulator (PSoXide, DuckStation, or PCSX-Redux), or

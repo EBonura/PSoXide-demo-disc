@@ -17,7 +17,6 @@ from pathlib import Path
 SCHEMA = "psoxide-combined-release-v1"
 REQUIRED_PROGRAMS = (
     "CORTEX IGNITION",
-    "CORTEX IGNITION LEGACY",
     "HALF-LIFE",
     "HARDWARE TESTS",
     "QUAKE SHAREWARE",

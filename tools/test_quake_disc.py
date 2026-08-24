@@ -840,7 +840,7 @@ class MakeVariantContractTests(unittest.TestCase):
         replay_at = headless.stdout.index("tools/check_quake_headless.py")
         self.assertLess(stamp_at, replay_at)
 
-    def test_cortex_bakes_separate_current_and_legacy_projects(self) -> None:
+    def test_cortex_bakes_only_the_current_project(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (
             ROOT
@@ -853,15 +853,10 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current", makefile
         )
-        self.assertIn(
-            "$(CORTEX_LEGACY_PSOXIDE)/editor/samples/cortex_v1", makefile
-        )
-        self.assertIn(
-            "CORTEX_LEGACY_PROJECT := $(BUILD)/cortex-legacy", makefile
-        )
         self.assertIn("0a6881c34474ed4c0ac1a088a99034a00eef85ea", makefile)
         self.assertIn("cortex_ignition_tech_demo_0_1.cue", makefile)
-        self.assertIn("687d2ae7681f9de3090dc89635beac99d1654c93", makefile)
+        self.assertNotIn("CORTEX_LEGACY", makefile)
+        self.assertNotIn("CORTEX IGNITION LEGACY", makefile)
         self.assertNotIn(
             "$(CORTEX_CURRENT_PSOXIDE)/editor/samples/cortex_v1", makefile
         )
@@ -871,23 +866,14 @@ class MakeVariantContractTests(unittest.TestCase):
             makefile,
         )
         self.assertIn(
-            "CORTEX_LEGACY_GUEST_STAGE_ROOT ?= "
-            "/tmp/psoxide-psx-guest-v1-cortex-legacy",
-            makefile,
-        )
-        self.assertIn(
             'PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)"',
-            makefile,
-        )
-        self.assertIn(
-            'PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_LEGACY_GUEST_STAGE_ROOT)"',
             makefile,
         )
         self.assertEqual(
             makefile.count(
                 'PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)"'
             ),
-            2,
+            1,
         )
         # These must be live scene entities, not catalogue-only resources.
         self.assertIn('name: "Aletha", kind: Entity', scene)
@@ -905,16 +891,12 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertNotIn('--image "HALF-LIFE=', default.stdout)
         for pressing in (default, half_life):
             self.assertIn('--image "CORTEX IGNITION=', pressing.stdout)
-            self.assertIn('--image "CORTEX IGNITION LEGACY=', pressing.stdout)
+            self.assertNotIn("CORTEX IGNITION LEGACY", pressing.stdout)
         self.assertIn('--gate "CORTEX IGNITION"', default.stdout)
-        self.assertIn('--gate "CORTEX IGNITION LEGACY"', default.stdout)
         self.assertNotIn('--gate "CORTEX IGNITION"', half_life.stdout)
-        self.assertNotIn('--gate "CORTEX IGNITION LEGACY"', half_life.stdout)
         current_at = half_life.stdout.index('--image "CORTEX IGNITION=')
-        legacy_at = half_life.stdout.index('--image "CORTEX IGNITION LEGACY=')
         half_life_at = half_life.stdout.index('--image "HALF-LIFE=')
-        self.assertLess(current_at, legacy_at)
-        self.assertLess(legacy_at, half_life_at)
+        self.assertLess(current_at, half_life_at)
         # Everything the default pressing carries, the HL pressing carries too.
         for argument in (
             '--image "QUAKE SHAREWARE=',
@@ -1141,17 +1123,14 @@ class HeadlessChainloadTests(unittest.TestCase):
 
     @classmethod
     def default_entries(cls) -> tuple[tuple[str, int, int], ...]:
-        """The standard pressing's locked shape: two hidden, seven, Quake.
+        """The standard pressing's locked shape: one hidden, seven, Quake.
 
         Eight visible programs plus the launcher's CREDITS card is nine, and
         the headless route's two RIGHT presses still land on Quake.
         """
-        cortex = (
-            ("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),
-            ("CORTEX IGNITION LEGACY", 31, check_quake_headless.FLAG_HIDDEN),
-        )
+        cortex = (("CORTEX IGNITION", 30, check_quake_headless.FLAG_HIDDEN),)
         filler = tuple(
-            (f"PROGRAM {index}", 32 + index, 0) for index in range(7)
+            (f"PROGRAM {index}", 31 + index, 0) for index in range(7)
         )
         return cortex + filler + ((check_quake_headless.QUAKE_ENTRY, cls.QUAKE_LBA, 0),)
 
@@ -1252,7 +1231,6 @@ class HeadlessChainloadTests(unittest.TestCase):
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
             self.assertEqual(menu[0], "PROGRAM 0")
             self.assertNotIn("CORTEX IGNITION", menu)
-            self.assertNotIn("CORTEX IGNITION LEGACY", menu)
             self.assertEqual(menu[-1], "CREDITS")
             self.assertEqual(
                 payload,
@@ -1270,20 +1248,19 @@ class HeadlessChainloadTests(unittest.TestCase):
     def test_route_selects_visible_quake_on_the_half_life_carousel(self) -> None:
         default = self.default_entries()
         entries = (
-            tuple((name, lba, 0) for name, lba, _ in default[:2])
+            tuple((name, lba, 0) for name, lba, _ in default[:1])
             + (("HALF-LIFE", 41, 0),)
-            + default[2:]
+            + default[1:]
         )
         with tempfile.TemporaryDirectory() as directory:
             image = self.make_disc_image(Path(directory), entries)
             selected, menu, _ = check_quake_headless.quake_menu_entry(
-                image, self.QUAKE_LBA, 12
+                image, self.QUAKE_LBA, 11
             )
-            self.assertEqual(len(menu), 12)
-            self.assertEqual(selected + 1, 11)
-            self.assertEqual(menu[:3], [
+            self.assertEqual(len(menu), 11)
+            self.assertEqual(selected + 1, 10)
+            self.assertEqual(menu[:2], [
                 "CORTEX IGNITION",
-                "CORTEX IGNITION LEGACY",
                 "HALF-LIFE",
             ])
             self.assertEqual(menu[selected], check_quake_headless.QUAKE_ENTRY)
@@ -1404,7 +1381,7 @@ class HeadlessChainloadTests(unittest.TestCase):
     def test_each_pressing_has_its_own_visible_frame_pins(self) -> None:
         self.assertEqual(
             set(check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES),
-            {check_quake_headless.DEFAULT_MENU_ENTRIES, 12},
+            {check_quake_headless.DEFAULT_MENU_ENTRIES, 11},
         )
         for menu_entries, (vram, display) in (
             check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES.items()
