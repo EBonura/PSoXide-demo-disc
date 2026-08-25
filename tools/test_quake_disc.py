@@ -636,7 +636,11 @@ class VerifyQuakeTests(unittest.TestCase):
             self.assertEqual(
                 receipt["demo_disc_output"]["quake_toc"]["image_lba_offset"], 30
             )
-            self.assertIn("legal and release approval", receipt["redistribution"])
+            self.assertEqual(
+                receipt["redistribution"],
+                "owner-approved public non-commercial release of canonical "
+                "Quake 1.06 shareware payload, 2026-08-25",
+            )
 
     def test_receipt_rejects_embedded_image_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -928,32 +932,23 @@ class MakeVariantContractTests(unittest.TestCase):
             makefile,
         )
 
-    def test_distribution_targets_are_blocked_before_they_build_anything(self) -> None:
-        blocked = run(
-            "make", "--no-print-directory", "publication-block", cwd=ROOT, check=False
-        )
-        self.assertNotEqual(blocked.returncode, 0)
-        self.assertIn("publication is blocked", blocked.stdout)
-        self.assertIn("Quake 1.06 shareware data", blocked.stdout)
-
+    def test_distribution_targets_publish_only_the_standard_pressing(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertNotIn("publication-block", makefile)
         for target in ("release-web", "itch"):
             with self.subTest(target=target):
-                self.assertIn(f"\n{target}: publication-block\n", makefile)
-                dry = run(
-                    "make",
-                    "-n",
-                    "--no-print-directory",
-                    target,
-                    "DIST=/tmp/psoxide-quake-contract",
-                    cwd=ROOT,
-                    check=False,
-                )
-                # The block has to come out before the target's own first line,
-                # which is as far as this can read: `make -n` recurses into the
-                # $(MAKE) disc below it, and that needs the submodules.
-                block_at = dry.stdout.index("publication is blocked")
-                self.assertLess(block_at, dry.stdout.index('test -z "'))
+                self.assertIn(f"\n{target}:\n", makefile)
+
+        self.assertIn(
+            'release-web:\n\t@test -z "$(HL)" || { echo '
+            '"release-web: the HL pressing is never distributed"',
+            makefile,
+        )
+        self.assertIn(
+            'itch:\n\t@test -z "$(HL)" || { echo '
+            '"itch: the HL pressing is never distributed"',
+            makefile,
+        )
 
 
 class FailClosedDefaultTests(unittest.TestCase):

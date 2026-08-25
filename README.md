@@ -16,17 +16,17 @@ make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
 make check     # host tests, including the Quake pin check
 ```
 
-## Publication is blocked
+## Public release
 
-The disc carries Quake 1.06 shareware data, so building it and publishing it
-are now different questions. Building it locally, and burning it, is what this
-repo does. Publishing or redistributing the combined image is a separate owner
-decision that has **not** been made, and `make release-web` and `make itch`
-fail before they build anything until it is.
+The owner approved public non-commercial distribution of the standard pressing
+with the canonical Quake 1.06 shareware payload on 2026-08-25. `make itch`
+publishes its flat BIN/CUE download, while `make release-web` updates the split
+disc delivery consumed by the browser emulator. Both commands reject `HL=1`;
+the Half-Life pressing is never sent to either public destination.
 
-The copies on [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and
-in the [browser emulator](https://bonnie-studios.itch.io/psoxide) predate this
-and carry no Quake. Nothing here updates them.
+The current public destinations are
+[itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and the
+[browser emulator](https://bonnie-studios.itch.io/psoxide).
 
 ## How it boots
 
