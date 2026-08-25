@@ -81,17 +81,16 @@ const ICONS_COUNT: i16 = 6;
 static ICONS_TEX: &[u8] = include_bytes!("../assets/icons.tex");
 static ICONS_CLUT_DATA: &[u8] = include_bytes!("../assets/icons.clut");
 
-/// Which mark leads the row, and the URL written out in full. Full because
-/// the whole point of the card is that someone photographs or retypes these;
-/// the first cut showed only the part after the slash and read as "which
-/// site is this?".
+/// Which mark leads the row, and the useful part of the address. The icon
+/// names the service and the QR beside the list carries the full link hub;
+/// this keeps every destination legible in the standard two-panel card.
 const LINKS: [(i16, &str); 6] = [
-    (0, "github.com/EBonura/PSoXide"),
-    (1, "bonnie-studios.itch.io"),
-    (2, "x.com/_bonniestudios"),
-    (3, "instagram.com/izzy88izzy"),
-    (4, "buymeacoffee.com/bonniestudios"),
-    (5, "youtube.com/@magikAAAAArp/videos"),
+    (0, "EBonura/PSoXide"),
+    (1, "bonnie-studios"),
+    (2, "@_bonniestudios"),
+    (3, "@izzy88izzy"),
+    (4, "bonniestudios"),
+    (5, "@magikAAAAArp"),
 ];
 
 const TITLE: (u8, u8, u8) = (255, 84, 62);
@@ -198,27 +197,56 @@ const DESC_LEADING: i16 = 9;
 const SHOT_X: i16 = SHOT_BOX_X + 1;
 const SHOT_Y: i16 = PANEL_Y + 1;
 
-/// The credits card stacks two centred boxes in the band instead of the twin
-/// description/screenshot pair: CREDITS on top, LINKS below. Wide enough that
-/// the Just Music credit and every full URL fit on one line.
-const CARD_W: i16 = 212;
-const CARD_X: i16 = (320 - CARD_W) / 2;
-/// Characters a card line holds at the 5-pixel font.
-const CARD_COLS: usize = ((CARD_W - 8) / 5) as usize;
-/// Rows the credits box holds at the description leading.
-const CRED_ROWS: i16 = 5;
-const CRED_Y: i16 = HEADER_H + 2;
-const CRED_H: i16 = CRED_ROWS * DESC_LEADING + 7;
-const LINKS_Y: i16 = CRED_Y + CRED_H + 2;
-/// A links row is a 12px mark with the URL's 8px font centred beside it.
-const LINKS_PITCH: i16 = 12;
-const LINKS_H: i16 = LINKS.len() as i16 * LINKS_PITCH + 6;
+/// Credits uses the same twin panels as every game: text and links on the
+/// left, a cached QR on the right. Eight compact rows fit the standard cache.
+const LINKS_PITCH: i16 = 11;
 const LINKS_TEXT_DY: i16 = 2;
-/// Rows of the cache page the two card caches render into: the description
-/// cache owns 0..92, these sit below it, all inside the u8 V a sprite UV
-/// can address.
 const CRED_CACHE_V: u16 = 96;
-const LINKS_CACHE_V: u16 = 152;
+const QR_CACHE_X: u16 = 640;
+const QR_MODULES: i16 = 37;
+const QR_QUIET: i16 = 2;
+const QR_SCALE: i16 = 2;
+const QR_SIZE: i16 = (QR_MODULES + QR_QUIET * 2) * QR_SCALE;
+/// Exact 37x37 module grid from the supplied QR, one row per low 37 bits.
+const QR_ROWS: [u64; QR_MODULES as usize] = [
+    136752566399,
+    70202754881,
+    100365685853,
+    100053188189,
+    99925316701,
+    70064700225,
+    136723125631,
+    398509312,
+    31607192039,
+    58141150508,
+    19069816641,
+    97668523363,
+    95946071262,
+    99100424620,
+    53167849275,
+    48038650609,
+    129944075734,
+    4917952804,
+    91750251395,
+    84261004338,
+    104221637876,
+    73689287716,
+    59362993863,
+    110133073121,
+    61732027871,
+    97477476516,
+    72002531959,
+    78020666754,
+    100145545206,
+    399991568,
+    136541063515,
+    69995382033,
+    100345143286,
+    100210234204,
+    100241999265,
+    70032520081,
+    136491338767,
+];
 
 /// Ticks between drive-status polls while the menu track plays. Often enough
 /// to restart the loop without a gap anyone notices, rare enough that the
@@ -498,10 +526,10 @@ fn main() {
     let mut order = [0usize; MAX_ENTRIES];
     let mut beads = [Bead::default(); SPHERE_POINTS];
     let mut text_cache = paint::TextCache::new();
-    // The credits card's two boxes never change, so these render once and
-    // are blitted for the rest of the run. Key 0 is as good as any.
-    let mut credits_cache = paint::TextCache::at(CRED_CACHE_V, CARD_W - 2, CRED_H - 2);
-    let mut links_cache = paint::TextCache::at(LINKS_CACHE_V, CARD_W - 2, LINKS_H - 2);
+    // Credits and its QR never change, so each renders once and is blitted
+    // for the rest of the run. The QR gets a separate free VRAM page.
+    let mut credits_cache = paint::TextCache::at(CRED_CACHE_V, paint::CACHE_W, paint::CACHE_H);
+    let mut qr_cache = paint::TextCache::at_xy(QR_CACHE_X, 0, paint::CACHE_W, paint::CACHE_H);
     // The backdrop: which cached shot is in VRAM, how bright it is drawn,
     // and the slideshow clock. -1 means the single VRAM slot holds nothing
     // worth showing.
@@ -845,13 +873,13 @@ fn main() {
             } else if entries[index].exe_lba == 0 {
                 if !credits_cache.holds(0) {
                     credits_cache.begin(0);
-                    render_credits(&small, &header.expect("count came from it"));
+                    render_credits_links(&small, &icons, &header.expect("count came from it"));
                     credits_cache.end(&fb);
                 }
-                if !links_cache.holds(0) {
-                    links_cache.begin(0);
-                    render_links(&small, &icons);
-                    links_cache.end(&fb);
+                if !qr_cache.holds(0) {
+                    qr_cache.begin(0);
+                    render_qr();
+                    qr_cache.end(&fb);
                 }
             } else if !text_cache.holds(key) {
                 text_cache.begin(key);
@@ -898,12 +926,11 @@ fn main() {
             }
             if !hide_text {
                 if entries[index].exe_lba == 0 {
-                    // The credits card: two stacked centred boxes where the
-                    // description/screenshot pair normally sits.
-                    paint::text_panel(CARD_X, CRED_Y, CARD_W, CRED_H);
-                    credits_cache.draw(CARD_X + 1, CRED_Y + 1);
-                    paint::text_panel(CARD_X, LINKS_Y, CARD_W, LINKS_H);
-                    links_cache.draw(CARD_X + 1, LINKS_Y + 1);
+                    // Credits follows the same text/media pair as a game.
+                    paint::text_panel(PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
+                    credits_cache.draw(TEXT_X, TEXT_Y);
+                    paint::text_panel(SHOT_BOX_X, PANEL_Y, PANEL_W, PANEL_H);
+                    qr_cache.draw(SHOT_BOX_X + (PANEL_W - paint::CACHE_W) / 2, TEXT_Y);
                     if italian {
                         paint::flag_it(320 - paint::FLAG_W - 5, 4);
                     } else {
@@ -1231,68 +1258,63 @@ fn draw_text_block(font: &FontAtlas, cache: &paint::TextCache, italian: bool) {
     cache.draw(TEXT_X, TEXT_Y);
 }
 
-/// One centred line of the credits card's wide box. Coordinates are local
-/// to its cache.
-fn card_line(font: &FontAtlas, line: i16, text: &str, tint: (u8, u8, u8)) {
-    if text.is_empty() {
-        return;
-    }
-    let x = (CARD_W - 2) / 2 - (font.text_width(text) as i16) / 2;
-    font.draw_text(x, line * DESC_LEADING + 2, text, tint);
-}
-
-/// Draw the credits into their cache. The card is wide enough that the
-/// artist credit sits on one line, with the four track titles under it.
-fn render_credits(font: &FontAtlas, header: &Header) {
-    let mut lines = 0i16;
-    let mut rest = header.credit_str();
-    while !rest.is_empty() && lines < 2 {
-        let (_, tail) = wrap(rest, CARD_COLS);
-        lines += 1;
-        rest = tail;
-    }
-    let titled = (0..header.menu_track_count as usize)
-        .filter(|&t| !header.title(t).is_empty())
-        .count() as i16;
-    let total = (lines + titled).min(CRED_ROWS);
-    let mut line = (CRED_ROWS - total) / 2;
-    let mut rest = header.credit_str();
-    let credit_end = line + lines;
-    while !rest.is_empty() && line < credit_end {
-        let (head, tail) = wrap(rest, CARD_COLS);
-        card_line(font, line, head, BLURB);
-        line += 1;
-        rest = tail;
-    }
-    for track in 0..header.menu_track_count as usize {
-        if line >= CRED_ROWS {
-            break;
+/// Draw the licensed music credit followed by every project and social
+/// destination. The platform marks make the shortened handles unambiguous.
+fn render_credits_links(font: &FontAtlas, icons: &paint::Icons, header: &Header) {
+    let mut credit = header.credit_str();
+    for row in 0..2i16 {
+        // `wrap` searches before its limit, so 21 admits the exact
+        // 20-character first line: "Just Music - YouTube".
+        let (head, tail) = wrap(credit, 21);
+        if row == 0 {
+            icons.draw(5, 0, 2, BLURB);
         }
-        let title = header.title(track);
-        if !title.is_empty() {
-            card_line(font, line, title, TRACK_NAME);
-            line += 1;
-        }
+        font.draw_text(
+            ICONS_SIZE + 2,
+            2 + row * LINKS_PITCH + LINKS_TEXT_DY,
+            head,
+            TRACK_NAME,
+        );
+        credit = tail;
     }
-}
-
-/// Draw the links into their cache. Coordinates are local to it.
-///
-/// One mark and one full URL each. The rows left-align as a block, and the
-/// block centres on the widest URL, so the domains line up under each other
-/// the way a list should. Nothing here depends on the disc, so the cache
-/// never needs rebuilding after the first time.
-fn render_links(font: &FontAtlas, icons: &paint::Icons) {
-    let widest = LINKS
-        .iter()
-        .map(|(_, url)| font.text_width(url) as i16)
-        .max()
-        .unwrap_or(0);
-    let x0 = ((CARD_W - 2) - (ICONS_SIZE + 2 + widest)) / 2;
     for (row, (slot, url)) in LINKS.iter().enumerate() {
-        let y = 2 + row as i16 * LINKS_PITCH;
-        icons.draw(*slot, x0, y, BLURB);
-        font.draw_text(x0 + ICONS_SIZE + 2, y + LINKS_TEXT_DY, url, BLURB);
+        let y = 2 + (row as i16 + 2) * LINKS_PITCH;
+        icons.draw(*slot, 0, y, BLURB);
+        font.draw_text(ICONS_SIZE + 2, y + LINKS_TEXT_DY, url, BLURB);
+    }
+}
+
+/// Paint the supplied QR once into its off-screen 15bpp cache. The two-module
+/// quiet zone is part of the white square; adjacent dark modules merge into
+/// one rectangle per run, keeping the one-time command list compact.
+fn render_qr() {
+    let x0 = (paint::CACHE_W - QR_SIZE) / 2;
+    let y0 = (paint::CACHE_H - QR_SIZE) / 2;
+    gpu::draw_rect_flat(x0, y0, QR_SIZE as u16, QR_SIZE as u16, 255, 255, 255);
+    for (row, bits) in QR_ROWS.iter().enumerate() {
+        let mut col = 0i16;
+        while col < QR_MODULES {
+            let set = (bits >> (QR_MODULES - 1 - col)) & 1 != 0;
+            if !set {
+                col += 1;
+                continue;
+            }
+            let start = col;
+            while col < QR_MODULES && (bits >> (QR_MODULES - 1 - col)) & 1 != 0 {
+                col += 1;
+            }
+            gpu::draw_rect_flat(
+                x0 + (QR_QUIET + start) * QR_SCALE,
+                y0 + (QR_QUIET + row as i16) * QR_SCALE,
+                ((col - start) * QR_SCALE) as u16,
+                QR_SCALE as u16,
+                // 0x0000 is transparent when the cache is blitted. This is
+                // visually black but keeps its texels opaque on PS1.
+                8,
+                8,
+                8,
+            );
+        }
     }
 }
 
