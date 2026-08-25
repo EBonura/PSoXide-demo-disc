@@ -414,10 +414,10 @@ pub struct TextCache {
     /// What is currently rendered, so a frame that would draw the same thing
     /// again can skip it.
     key: u32,
-    /// Row of the shared page this instance owns, and its extent. A second
-    /// cache costs nothing but rows: at 15bpp a texel is a halfword, so the
-    /// page at `CACHE_X` runs 256 rows deep and the description block only
-    /// uses the top 92 of them.
+    /// Off-screen page origin and extent. Most caches share rows at
+    /// [`CACHE_X`]; large fixed art can take another free 64-pixel-aligned
+    /// 15bpp page without consuming main RAM.
+    x: u16,
     y: u16,
     w: i16,
     h: i16,
@@ -440,8 +440,15 @@ impl TextCache {
     /// A second cache further down the same page. `y` is a texture V, so it
     /// has to stay inside a byte.
     pub const fn at(y: u16, w: i16, h: i16) -> Self {
+        Self::at_xy(CACHE_X, y, w, h)
+    }
+
+    /// A cache on another free 15bpp texture page. `x` must be aligned to a
+    /// 64-pixel page boundary and `y` must remain addressable by an 8-bit V.
+    pub const fn at_xy(x: u16, y: u16, w: i16, h: i16) -> Self {
         TextCache {
             key: u32::MAX,
+            x,
             y,
             w,
             h,
@@ -458,14 +465,14 @@ impl TextCache {
     /// contributes nothing and the panel behind shows through.
     pub fn begin(&mut self, key: u32) {
         self.key = key;
-        gpu::fill_rect(CACHE_X, self.y, self.w as u16, self.h as u16, 0, 0, 0);
+        gpu::fill_rect(self.x, self.y, self.w as u16, self.h as u16, 0, 0, 0);
         gpu::set_draw_area(
-            CACHE_X,
+            self.x,
             self.y,
-            CACHE_X + self.w as u16 - 1,
+            self.x + self.w as u16 - 1,
             self.y + self.h as u16 - 1,
         );
-        gpu::set_draw_offset(CACHE_X as i16, self.y as i16);
+        gpu::set_draw_offset(self.x as i16, self.y as i16);
     }
 
     /// Point it back at the buffer being drawn this frame.
@@ -482,7 +489,7 @@ impl TextCache {
     /// glyph; the polygon path carries the page in a vertex instead and drew
     /// nothing here, including when pointed at the framebuffer itself.
     pub fn draw(&self, x: i16, y: i16) {
-        let tpage = Tpage::new(CACHE_X, CACHE_Y, TexDepth::Bit15);
+        let tpage = Tpage::new(self.x, CACHE_Y, TexDepth::Bit15);
         gpu::draw_sprite_material(
             x,
             y,
