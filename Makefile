@@ -322,7 +322,7 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-menu.shot" \
 	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-gameplay.shot" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
-	--describe "QUAKE SHAREWARE=Quake 1.06 shareware Episode 1 for the original PlayStation, built on PSoXide with the GPL source and earlier QuakePSX C port as references. All nine maps load, with the full arsenal and Chthon. Still in development.|Quake 1.06 shareware Episodio 1 per la prima PlayStation, costruito su PSoXide usando il sorgente GPL e il precedente port C QuakePSX come riferimenti. Tutte e nove le mappe si caricano, con l'arsenale completo e Chthon. Ancora in sviluppo."
+	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 QUAKE_PREREQS = quake-programs-verify quake-verify
 
 disc: launcher quake-programs mkdisc
