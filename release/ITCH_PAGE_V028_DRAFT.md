@@ -1,8 +1,8 @@
 # PSoXide Demo Disc v0.28 itch.io draft
 
-> Internal publishing draft. Do not paste or upload this until the Quake
-> shareware redistribution decision in `docs/quake-shareware.md` is resolved.
-> The Half-Life pressing is private and must not be offered on itch.io.
+> Historical v0.28 page draft. Public non-commercial distribution of the
+> standard pressing was approved by the owner on 2026-08-25. The Half-Life
+> pressing remains private and must not be offered on itch.io.
 
 ## Short description
 

@@ -48,8 +48,9 @@ INDEX_LINE = re.compile(
     r"^\s*INDEX\s+([0-9]{2})\s+([0-9]{2}:[0-9]{2}:[0-9]{2})\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
-REDISTRIBUTION_GATE = (
-    "blocked pending separate Quake shareware legal and release approval"
+REDISTRIBUTION_STATUS = (
+    "owner-approved public non-commercial release of canonical Quake 1.06 "
+    "shareware payload, 2026-08-25"
 )
 QUAKE_PROVENANCE_SCHEMA = 1
 GUEST_STAGE_SCHEMA = 1
@@ -834,7 +835,7 @@ def write_receipt(args: argparse.Namespace, verified: VerifiedQuake) -> Path:
     receipt = {
         "schema": 3,
         "variant": "quake-shareware-default",
-        "redistribution": REDISTRIBUTION_GATE,
+        "redistribution": REDISTRIBUTION_STATUS,
         "quake_input": {
             "source_revision": verified.source_revision,
             "source_tree_clean": True,

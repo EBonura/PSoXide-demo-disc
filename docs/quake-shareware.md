@@ -5,8 +5,9 @@ disc` builds it, verifies it against the pins below, and writes a provenance
 receipt beside the image; the Half-Life pressing carries it too. There is no
 switch that leaves it off.
 
-Building it is local. Publishing it is a separate owner decision that has not
-been made, and `release-web` and `itch` are blocked until it is.
+The owner approved public non-commercial distribution of the canonical Quake
+1.06 shareware payload on 2026-08-25. `release-web` and `itch` publish only the
+standard pressing and reject `HL=1`.
 
 ## Pinned input
 
@@ -133,7 +134,7 @@ build configuration, a changed artifact name/size/hash, an unsafe cue path, a
 malformed disc image, a missing menu entry, or embedded payload drift stops the
 build.
 
-## Default inclusion and release gate
+## Default inclusion and public release
 
 - There is no opt-in switch. `make disc` and `make disc-only` carry Quake, and
   so does `make disc HL=1`.
@@ -141,12 +142,11 @@ build.
   program order and CD-DA ownership. It owns no CD-DA track.
 - `disc-only` will not lay out a sector until `quake-programs-verify` and
   `quake-verify` have passed, and `make check` runs `quake-verify` too.
-- `release-web` and `itch` depend on `publication-block`, which always fails.
-  They stop before they build anything.
-- Public redistribution requires a separate legal and release decision. The
-  presence of id Software's shareware data and the ability to build the disc
-  locally do not authorize this repository to publish the combined image. That
-  decision has not been made here.
+- `release-web` and `itch` publish the standard pressing after rebuilding and
+  verifying it. Both reject `HL=1`, so the private Half-Life pressing cannot
+  reach either public destination.
+- Receipt schema 3 records the owner's 2026-08-25 non-commercial publication
+  decision beside the exact canonical shareware payload identity.
 
 ## Automated checks
 
@@ -169,7 +169,7 @@ test suites. The tests cover:
   stale Quake pin, wrong PSoXide pin, stale artifact hash, either checkout
   dirty, stamp stale, stamp missing;
 - `make check` reaching the verifier, layout not starting before it passes,
-  and the publication block failing before either upload path builds;
+  and both upload paths rejecting the Half-Life pressing;
 - the carousel's entry count and Quake's position in it, a hidden or absent
   Quake entry failing, and payload identity against the receipt;
 - `make quake-repin` printing every pin the Makefile holds.

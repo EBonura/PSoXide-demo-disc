@@ -65,9 +65,9 @@ override HL := $(filter-out 0,$(HL))
 # the combined image gets a machine-readable provenance receipt beside it, so
 # a disc that carries Quake cannot stop saying exactly which Quake it carries.
 #
-# Building it locally is not permission to publish it. release-web and itch
-# are blocked below, and stay blocked until the owner decides the shareware
-# redistribution question.
+# The owner approved public non-commercial distribution of the canonical
+# Quake 1.06 shareware payload on 2026-08-25. The public upload paths still
+# refuse the Half-Life pressing; only the standard disc may be published.
 #
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
@@ -520,20 +520,8 @@ ifneq ($(HL),)
 endif
 
 
-# Every pressing carries Quake 1.06 shareware data now, so both distribution
-# paths stop before they build anything. Redistributing that data is a separate
-# owner decision and it has not been made.
-#
-# This is a prerequisite rather than a line inside each recipe so it cannot be
-# reached around: `make itch` fails before butler is even looked for. When the
-# owner grants redistribution, drop the prerequisite from the two targets.
-# Local builds and burns are unaffected -- `make disc` is the supported path.
-.PHONY: publication-block
-publication-block:
-	@echo "publication is blocked: every pressing carries Quake 1.06 shareware data,"
-	@echo "and redistributing it needs a separate owner decision that has not been"
-	@echo "made. Build and burn locally with 'make disc'."
-	@exit 1
+# The standard pressing may be published. Both upload recipes fail closed when
+# HL is set so the private Half-Life pressing cannot reach either public path.
 
 # Keep the browser emulator's copy current. PSoXide's Pages deploy stages
 # these files from the rolling `web-disc` release next to the wasm, and the
@@ -546,7 +534,7 @@ publication-block:
 # runs in.
 WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
-release-web: publication-block
+release-web:
 	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
@@ -567,7 +555,7 @@ release-web: publication-block
 # one-time `butler login`. The HL pressing is never distributed -- the music
 # permission is scoped to the disc without it.
 .PHONY: itch
-itch: publication-block
+itch:
 	@test -z "$(HL)" || { echo "itch: the HL pressing is never distributed"; exit 1; }
 	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
 	$(MAKE) disc
