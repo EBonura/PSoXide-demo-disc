@@ -11,8 +11,8 @@
 .PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
-# Quake's independently verified SDK input stays frozen here. Ordinary games
-# advance on their own clean shared-runtime pin below.
+# Every program on the disc, Quake included, now builds from one PSoXide pin.
+# Quake carries its own copy of that revision in its source tree.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
 PROGRAMS_EXPECTED_PSOXIDE_REV ?= bb074d72dc7f4f08d1d9a33aa875aae15fc305fd
@@ -75,12 +75,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 0ac800027d01a6d24e0d2b9877aa812f6b472098
-QUAKE_EXPECTED_PSOXIDE_REV ?= bc295a055deb0b376fe24acd3deb98145f4aa070
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 0d0f122274e0d14aabf453cdab6d6fdea8d5932b82deb86ba84a3ce24a0efcc7
+QUAKE_EXPECTED_REV ?= 5325fc4a3bcf344d7e917b0b94ff1fe93e744ace
+QUAKE_EXPECTED_PSOXIDE_REV ?= bb074d72dc7f4f08d1d9a33aa875aae15fc305fd
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= d6cffd6a2ad7872eb4ac77a289c4dd390d44e1ffcac32084057dd591e0631528
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= ac86fb6bb78627bdce09470127ed430ead28b5b181712d84dfcd53cce51f240f
-QUAKE_EXPECTED_EXE_SHA256 ?= fa310eaa662716f97614506703c0ae6a0fce6830df0d89fb5b27dd091e93357f
+QUAKE_EXPECTED_BIN_SHA256 ?= 89242ceb11145e7f095182b4cd5053ea13753ae7e76337da9e203cdae292f4c3
+QUAKE_EXPECTED_EXE_SHA256 ?= 049f3de3f3a055fbdccb97b8148f99b5131bab7a3c0ee658174cc3ef1ccbc31a
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
