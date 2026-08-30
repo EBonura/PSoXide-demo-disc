@@ -110,9 +110,9 @@ CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/rel
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
+CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.3
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
-CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_1.cue
+CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_3.cue
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
