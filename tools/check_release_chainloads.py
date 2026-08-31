@@ -70,14 +70,14 @@ ROUTE_SUMMARY = re.compile(r"route-ticks=(\d+)\s+port1-polls=(\d+)")
 VRAM = re.compile(r"vram_fnv1a_64=(0x[0-9a-f]+)")
 DISPLAY = re.compile(r"display_fnv1a_64=(0x[0-9a-f]+)\s+w=(\d+)\s+h=(\d+)")
 
-# These are deliberately below the accepted current Cortex gameplay load
-# (median 353 textured triangles/49 quads, maxima 370/52), but above every
-# frame of Cortex's own menu/loading sequence (zero textured triangles and
-# <=31 quads).
+# These are deliberately below the accepted Cortex 0.4 gameplay load
+# (259-294 textured triangles and 115 quads in the integration replay), but
+# above every frame of Cortex's own menu/loading sequence (zero textured
+# triangles and at most 54 quads).
 # Requiring both therefore proves that the launcher entered Cortex, Cortex's
 # menu accepted input, and a textured model plus the textured world rendered.
-CORTEX_GAMEPLAY_TRIANGLES = 300
-CORTEX_GAMEPLAY_QUADS = 40
+CORTEX_GAMEPLAY_TRIANGLES = 240
+CORTEX_GAMEPLAY_QUADS = 100
 CORTEX_GAMEPLAY_MIN_FRAMES = 30
 CORTEX_GAMEPLAY_MAX_FRAME_GAP = 16
 CORTEX_GAMEPLAY_MIN_HASHES = 8
@@ -87,12 +87,12 @@ HL_GAMEPLAY_MIN_FRAMES = 30
 HL_GAMEPLAY_MIN_HASHES = 8
 # A polygon-count gate cannot distinguish a correctly rendered room from a
 # deterministic frame that draws only its floor and character.  Cortex's
-# release start deliberately faces a textured wall, so require real high-
-# frequency world detail in the upper playfield as a visual-semantic oracle.
-# The ROI excludes the HUD and player silhouette.  The broken exterior-facing
-# capture measured 92 permille; the corrected authored view measures 551.
+# release start deliberately faces textured world geometry, so require real
+# high-frequency detail in the upper playfield as a visual-semantic oracle.
+# The ROI excludes the HUD and player silhouette. The broken exterior-facing
+# capture measured 92 permille; the foggier 0.4 authored view measures 135.
 CORTEX_GEOMETRY_EDGE_DELTA = 24
-CORTEX_GEOMETRY_MIN_EDGE_PERMILLE = 250
+CORTEX_GEOMETRY_MIN_EDGE_PERMILLE = 110
 
 
 class CheckError(RuntimeError):
