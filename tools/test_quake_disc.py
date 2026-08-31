@@ -856,17 +856,18 @@ class MakeVariantContractTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (
             ROOT
-            / "games/PSoXide-cortex-current/editor/projects/default/project.ron"
+            / "games/PSoXide-cortex-current/editor/projects/cortex-ignition-tech-demo-0.4/project.ron"
         ).read_text(encoding="utf-8")
         scene = project.split("resources:", 1)[0]
         self.assertIn(
-            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/default", makefile
+            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.4",
+            makefile,
         )
         self.assertIn(
             "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current", makefile
         )
-        self.assertIn("0a6881c34474ed4c0ac1a088a99034a00eef85ea", makefile)
-        self.assertIn("cortex_ignition_tech_demo_0_1.cue", makefile)
+        self.assertIn("d812d5bde04ec2a9ac10e436ee516ecc79efaa96", makefile)
+        self.assertIn("cortex_ignition_tech_demo_0_4.cue", makefile)
         self.assertNotIn("CORTEX_LEGACY", makefile)
         self.assertNotIn("CORTEX IGNITION LEGACY", makefile)
         self.assertNotIn(
@@ -888,12 +889,12 @@ class MakeVariantContractTests(unittest.TestCase):
             1,
         )
         # These must be live scene entities, not catalogue-only resources.
-        self.assertIn('name: "Aletha", kind: Entity', scene)
-        self.assertIn('CharacterController(character: Some((1655))', scene)
-        self.assertIn('name: "Rust Mantis", kind: Entity', scene)
-        self.assertIn('CharacterController(character: Some((1656))', scene)
-        self.assertIn('name: "Tank Boss", kind: Entity', scene)
-        self.assertIn('CharacterController(character: Some((5027))', scene)
+        self.assertIn('name: "Aletha (Player)", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((62))', scene)
+        self.assertIn('name: "Intake Custodian", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((113))', scene)
+        self.assertIn('name: "Heavy Enemy", kind: Entity', scene)
+        self.assertIn('CharacterController(character: Some((95))', scene)
 
     def test_half_life_pressing_is_the_default_disc_plus_half_life(self) -> None:
         default = self.dry_run()

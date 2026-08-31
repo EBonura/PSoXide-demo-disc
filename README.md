@@ -100,7 +100,7 @@ at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
 `CORTEX IGNITION` is the active new-engine entry. It comes from the exact
-`editor/projects/default` project named `Cortex Ignition Tech Demo 0.1` at the dedicated
+`editor/projects/cortex-ignition-tech-demo-0.4` project named `Cortex Ignition Tech Demo 0.4` at the dedicated
 PSoXide pin recorded in the Makefile. The standard, publication-shaped pressing
 keeps this unfinished entry behind the Konami unlock. The private Half-Life
 pressing exposes it for direct testing. `QUAKE SHAREWARE` is the last program before
