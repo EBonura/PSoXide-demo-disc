@@ -15,9 +15,9 @@ ROOT       := $(CURDIR)
 # Quake carries its own copy of that revision in its source tree.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 50c3015e6f21c5f758b49bbfdaf515d787851f9c
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 317ecb3732d500090e70cf098cdd47991178211c
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 9c73d788b10ff38c22e5d4358d70d656da6085a8
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= ffaa1050d9394bf61721b5c8be55f35a01c35185
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -75,12 +75,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 7b11476a2e2b805ebd3410f094c5837290993351
-QUAKE_EXPECTED_PSOXIDE_REV ?= 50c3015e6f21c5f758b49bbfdaf515d787851f9c
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 1939d9bb86d77c1ba8cd78ba4e826f8a415ded7f766099e8533015f9d74ae155
+QUAKE_EXPECTED_REV ?= 00c7ce0b5398f256dd8bdd1ee21e07cdd1a4e249
+QUAKE_EXPECTED_PSOXIDE_REV ?= 317ecb3732d500090e70cf098cdd47991178211c
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 34dd2095f77b74929c23632593ea63b32cb1d91c8fff67fe0c4da4d54a07b11c
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 85b46f7e460631b2130be30944b92319ef25e39530455ccc04cff9fa3b998a2e
-QUAKE_EXPECTED_EXE_SHA256 ?= 0ff6e871277c49cac43ed388d326830531d1626cf7eb82118653c2535b9865d1
+QUAKE_EXPECTED_BIN_SHA256 ?= 071173647e830600ccb665878eb7284a9ab9896cfeb45138542583a30584cadd
+QUAKE_EXPECTED_EXE_SHA256 ?= 664330d730edcea61deec4a718507357204c7a591f69ffea05a1a2d6052368f3
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -135,7 +135,7 @@ help:
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 # Each program's own version, read from the source that declares it rather than
@@ -179,7 +179,7 @@ DISC_VERSION := $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) \
-		RUSTFLAGS="-Clink-arg=-T$(PROGRAMS_PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(PROGRAMS_PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 examples:
