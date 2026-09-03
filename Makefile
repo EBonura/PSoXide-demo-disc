@@ -298,12 +298,10 @@ cortex-current-if-stale:
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
-# The standard pressing is the publication-shaped build, so unfinished Cortex
-# stays behind the Konami unlock there. The private Half-Life pressing exposes
-# its card for direct show-floor and hardware testing.
-ifeq ($(HL),)
-CORTEX_GATE_ARGS = --gate "CORTEX IGNITION"
-endif
+# Cortex Ignition is on the carousel of both pressings since 2026-09-03 (it
+# used to sit behind the Konami unlock on the standard one). The launcher's
+# unlock sequence still works; nothing is gated by default.
+CORTEX_GATE_ARGS =
 
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
@@ -348,7 +346,7 @@ _quake-headless-check:
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
-		--expected-menu-entries "$(if $(HL),11,9)"
+		--expected-menu-entries "$(if $(HL),11,10)"
 
 # Burn gate for the one-disc private pressing.  Rebuild first: a release gate
 # that accepted `disc-only` could prove a perfectly deterministic stale guest.
