@@ -85,15 +85,15 @@ QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
-# The disc lands in PSoXide's game library, laid out the way every other
-# homebrew entry there is: <library>/<Name>/<Name>.{bin,cue}.
+# The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
+# no per-disc subfolder (Manny, 2026-09-03).
 ifneq ($(HL),)
 DISC_NAME ?= PSoXide Demo Disc HL
 else
 DISC_NAME ?= PSoXide Demo Disc
 endif
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
-DIST ?= $(PSOXIDE_LIB)/$(DISC_NAME)
+DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
 RELEASE_BUILD_COMMAND ?= make disc HL=1 DIST=$(DIST)
 
