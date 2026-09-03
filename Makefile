@@ -15,9 +15,9 @@ ROOT       := $(CURDIR)
 # Quake carries its own copy of that revision in its source tree.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 086eee6de5aecf2383f4a6214923012dffb61646
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= c3f8a76a3fe7b9cdeeec5570e2ed3e8981f58cd7
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 086eee6de5aecf2383f4a6214923012dffb61646
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= c3f8a76a3fe7b9cdeeec5570e2ed3e8981f58cd7
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
