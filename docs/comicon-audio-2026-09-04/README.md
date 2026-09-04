@@ -8,4 +8,5 @@ initial full battery used HL `1abbb19`; the critical rerun added Cortex
 `eee3aa93` and Quake `c2329be`. Their image hashes identify those builds.
 The final HL source is `feeb9b3`. Final build receipts and repeated gates
 are saved alongside the delivered disc images; use those for burn identity.
-The final source build reruns the full critical battery and audio audit.
+The `delivery-*` evidence records the completed final battery, both Quake
+gates, nine standard program routes and image hashes for clean `dad175d`.

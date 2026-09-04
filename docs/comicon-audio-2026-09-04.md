@@ -45,7 +45,7 @@ evidence lives in the corresponding PSoXide and Quake reports.
 All nine independent-program routes pass on each pressing. The full HL
 chain-load battery passes Cortex, Half-Life, Hardware Tests and Quake twice;
 after the final Cortex/Quake rebuild, those two pass again with deterministic
-logs. Cortex sustains 466 gameplay frames in that final check. These are
+logs. Cortex sustains 466 gameplay frames in that staged check. These are
 headless build/runtime checks; original-console validation remains separate.
 
 Evidence, hashes and the independent audit script are in
@@ -54,3 +54,15 @@ Evidence, hashes and the independent audit script are in
 The fixed-frame Quake pairs were refreshed after the validated runtime/source
 pins changed. Both pressings pass the official two-replay gate: payload and
 receipt checks, relocated CD reads, exact final frames and all six log types.
+
+## Delivered build
+
+The delivered images were built from clean disc source `dad175d`, with the
+source revisions above, into `~/Downloads/PSoXide-Comicon-2026-09-04`.
+Both audio audits pass again. Both official Quake two-replay gates pass.
+The standard pressing passes all nine independent-program routes, and the
+HL pressing passes the full four-target release battery with byte-identical
+paired logs. The HL build receipt verifies all embedded payload identities.
+`delivery-*.txt` and `delivery-hashes.json` capture these final results.
+The following commit only archives validation evidence; the image build
+revision remains `dad175d`.
