@@ -1,0 +1,10 @@
+disc: PSoXide Demo Disc HL.bin
+menu: 11 visible entries, QUAKE SHAREWARE at 10/11: CORTEX IGNITION, HALF-LIFE, VOXIDE, NITROXIDE, CELESTE COLLECTION, PSXCEL, GH-PSX, PSOXIDE ARCADE, HARDWARE TESTS, QUAKE SHAREWARE, CREDITS
+payload matches receipt: EXE LBA 43047, FNV-1a-32 0xaf96dbfa, menu version q263f43f, 8279 embedded sectors
+loader: 240 payload sectors; entry 0x80010000
+chain-load first: booted, chain-loaded, Quake Start map resident; final PC 0x800329b0; relocated runtime read LBA 44049; 417 CD commands; 28798 PC samples inside the payload
+chain-load second: booted, chain-loaded, Quake Start map resident; final PC 0x800329b0; relocated runtime read LBA 44049; 417 CD commands; 28798 PC samples inside the payload
+both replays identical: stdout, summaries and all six logs
+route ticks: 2431; pad polls: 1157; cycles: 1389227451
+VRAM/display FNV-1a-64: 0x1f3fe9f43ef41800 / 0xf782598f822c9017
+no screenshots, frame dumps, audio dumps, or guest instrumentation used

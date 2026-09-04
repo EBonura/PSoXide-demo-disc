@@ -1,0 +1,30 @@
+[
+  {
+    "cue": "/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-architecture-pass/PSoXide Demo Disc HL.cue",
+    "track": 6,
+    "source": "cortex_boss.wav",
+    "pcm_sha256": "0749ad7dae5026c3dbe8aa5ff3e90413e75959d0c64e0bfee165bf7e9a9b3106",
+    "result": "PASS"
+  },
+  {
+    "cue": "/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-architecture-pass/PSoXide Demo Disc HL.cue",
+    "track": 7,
+    "source": "menu2.wav",
+    "pcm_sha256": "ba6d1c8ae3adb468dd6b76f0ec0a4085119004ced3241469f94fad49fa0db541",
+    "result": "PASS"
+  },
+  {
+    "cue": "/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-architecture-pass/PSoXide Demo Disc.cue",
+    "track": 6,
+    "source": "cortex_boss.wav",
+    "pcm_sha256": "0749ad7dae5026c3dbe8aa5ff3e90413e75959d0c64e0bfee165bf7e9a9b3106",
+    "result": "PASS"
+  },
+  {
+    "cue": "/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-architecture-pass/PSoXide Demo Disc.cue",
+    "track": 7,
+    "source": "menu2.wav",
+    "pcm_sha256": "ba6d1c8ae3adb468dd6b76f0ec0a4085119004ced3241469f94fad49fa0db541",
+    "result": "PASS"
+  }
+]
