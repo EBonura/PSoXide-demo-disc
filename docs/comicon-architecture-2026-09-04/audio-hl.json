@@ -1,0 +1,256 @@
+{
+  "cue": "/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-architecture-pass/PSoXide Demo Disc HL.cue",
+  "audio_tracks": 35,
+  "track_bases": {
+    "CORTEX IGNITION": 4,
+    "HALF-LIFE": 6,
+    "VOXIDE": 33,
+    "NITROXIDE": 33,
+    "CELESTE COLLECTION": 0,
+    "PSXCEL": 0,
+    "GH-PSX": 33,
+    "PSOXIDE ARCADE": 33,
+    "HARDWARE TESTS": 34,
+    "QUAKE SHAREWARE": 35
+  },
+  "tracks": [
+    {
+      "owner": "LAUNCHER",
+      "track": 2,
+      "sha256": "099402761f0aa9a23b871c0594ca9b4b15105ea29703f1cf76c2f187bb8244e5"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 3,
+      "sha256": "c7550a820b3558dec77b9d5da9dd9e68154b404651ed614e225e52e6f389ae0e"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 4,
+      "sha256": "34b4df2e0b59b858b68d624a108346c307733f25d50f0f5096757576937bdbd8"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 5,
+      "sha256": "3e09346f7907b4dfab655874e243f6b03b277d1f9ac064fe6ebd181cd355cd48"
+    },
+    {
+      "owner": "CORTEX IGNITION",
+      "source_track": 2,
+      "track": 6,
+      "sectors": 5782,
+      "sha256_with_pregap": "d207528be8bda324d331d7b210c1a0e204e0dfce33a1c277bb27ae52d9f15658"
+    },
+    {
+      "owner": "CORTEX IGNITION",
+      "source_track": 3,
+      "track": 7,
+      "sectors": 4435,
+      "sha256_with_pregap": "f4a258b160fba993268dcb6fd45a93abfbdfc4626da59d92c6daae5f4cf363ff"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 2,
+      "track": 8,
+      "sectors": 9889,
+      "sha256_with_pregap": "4e076dd188bf5bfc33b65012b439ec766a1cb7203fae8a92cd0198995c58dbc9"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 3,
+      "track": 9,
+      "sectors": 10034,
+      "sha256_with_pregap": "6081ba59163692f327d49b0ae7efbe56021dabfc524a822423d7adbe3a7561ab"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 4,
+      "track": 10,
+      "sectors": 4660,
+      "sha256_with_pregap": "148431e4bd4ec9a8aa72fffd6f9ef8168909bcbeace58f6c283a329bf778c080"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 5,
+      "track": 11,
+      "sectors": 7360,
+      "sha256_with_pregap": "68603d326bf829a4c1bd3d6277ce24083497d775342a5cbf3df9c29454c5d372"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 6,
+      "track": 12,
+      "sectors": 7648,
+      "sha256_with_pregap": "bff4a4476e537be61b036449ab496065769f6468b0fe8326e45a99a6f9a26cd7"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 7,
+      "track": 13,
+      "sectors": 1892,
+      "sha256_with_pregap": "6357fda347a46cac3ac56adb02bbb36348301cf274f1dc83839e5b4e117b7d3b"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 8,
+      "track": 14,
+      "sectors": 812,
+      "sha256_with_pregap": "70f39f773adcdb21881d7041454d64eb3a3dc0c40ac9ab720504039b4ef640f3"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 9,
+      "track": 15,
+      "sectors": 7143,
+      "sha256_with_pregap": "9274973e222a99a3aafa76e8bd49c53d9a0835fbfdbd81be1904ca017e801b6f"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 10,
+      "track": 16,
+      "sectors": 7989,
+      "sha256_with_pregap": "aefc057e71333c2ae252f483a5f9dc01941fbf7a0232a5d3476922e40849d7a3"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 11,
+      "track": 17,
+      "sectors": 6357,
+      "sha256_with_pregap": "d225e68e40e19ee145011bb2d59721129c48d0ab8b764556f56f87fc702490e6"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 12,
+      "track": 18,
+      "sectors": 9767,
+      "sha256_with_pregap": "c3c46373329188093ce56a7033b44c204f6c9e1e4ac8eb64d8cece6eb5914b25"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 13,
+      "track": 19,
+      "sectors": 2870,
+      "sha256_with_pregap": "6c08cda359b20c54446517aed270c142c7be2b52d4e49aee4fa44910af5d4b87"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 14,
+      "track": 20,
+      "sectors": 5621,
+      "sha256_with_pregap": "7711a06db990ec58abf3648decbd792718a630d3ff5c9bee3510693352c1e4cf"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 15,
+      "track": 21,
+      "sectors": 9042,
+      "sha256_with_pregap": "b20a81573f711a6ab10cb8e27e4f171a728715d64b081abdb6746d66ed0abe2c"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 16,
+      "track": 22,
+      "sectors": 1368,
+      "sha256_with_pregap": "026273e3c6471f8deb1bffee0d792c26111d9c5bc186acb9ae4a231ba514e58a"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 17,
+      "track": 23,
+      "sectors": 9446,
+      "sha256_with_pregap": "1968ba84d49bbb94c778c8221724d2a60d0c65134d16cb5f657181474d943e00"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 18,
+      "track": 24,
+      "sectors": 7681,
+      "sha256_with_pregap": "e7914c4d8e2346df7d86648e98211718bb97f875593a15bb276251067075dc9d"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 19,
+      "track": 25,
+      "sectors": 8823,
+      "sha256_with_pregap": "8d6a7c3619eeb4100df900437b8632411226c3a6e1745d748d4278e0109ba315"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 20,
+      "track": 26,
+      "sectors": 6504,
+      "sha256_with_pregap": "f16e63d5af2e65cb503526f024f7e7df7745a717c2a422debdb5b9621c6a7256"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 21,
+      "track": 27,
+      "sectors": 6493,
+      "sha256_with_pregap": "8fdeb100a82a9320bd5d7a881eece26faafa99a3e229c4f5a10a8b6129f22bc3"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 22,
+      "track": 28,
+      "sectors": 6198,
+      "sha256_with_pregap": "bb465d63a8666cd65d262ed60556ac5d0d123b75ecfa354c5f39bf65076d3f40"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 23,
+      "track": 29,
+      "sectors": 8379,
+      "sha256_with_pregap": "e6aff039247a1ea6167275621a6517c6afce3065af59619aff3c55f2d0d2a2b6"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 24,
+      "track": 30,
+      "sectors": 5956,
+      "sha256_with_pregap": "e4e8b6cee3df4f523ff16cf6c6ed4f0836aa72ddd0e47326d0c587964d8d2072"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 25,
+      "track": 31,
+      "sectors": 7610,
+      "sha256_with_pregap": "62eb91427e4ca7d675a2cb0e02bd97c98bb12bd8e470f3212180670d14acdb07"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 26,
+      "track": 32,
+      "sectors": 2963,
+      "sha256_with_pregap": "10046d6f96352c64b3c9b2e1c4f4b04471dabd6ce0ba09c895958ca8e6e86e77"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 27,
+      "track": 33,
+      "sectors": 1454,
+      "sha256_with_pregap": "4f6af01ca7bb78c5531b50a234aaf7ed591b03103086906529d9c5aad268769b"
+    },
+    {
+      "owner": "HALF-LIFE",
+      "source_track": 28,
+      "track": 34,
+      "sectors": 632,
+      "sha256_with_pregap": "2cd1aeec70efde73c9e02f678b5599226c68f68fc13804f28b65a4c07c5fed7a"
+    },
+    {
+      "owner": "PSOXIDE ARCADE",
+      "source_track": 2,
+      "track": 35,
+      "sectors": 17544,
+      "sha256_with_pregap": "7a18d5ec7d74f111f799c772f04dc880c2e58216c361d28c3d36bdf85c2353bb"
+    },
+    {
+      "owner": "HARDWARE TESTS",
+      "source_track": 2,
+      "track": 36,
+      "sectors": 750,
+      "sha256_with_pregap": "dc6fe45f61ed690007dbfb534121a666976795c769e305beddb0ec61f425758a"
+    }
+  ],
+  "result": "PASS"
+}
