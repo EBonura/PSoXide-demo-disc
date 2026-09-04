@@ -11,13 +11,13 @@
 .PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
-# Every program on the disc, Quake included, now builds from one PSoXide pin.
-# Quake carries its own copy of that revision in its source tree.
+# Ordinary programs and Quake share a runtime pin. Cortex carries the
+# validated vertex-alignment update on top of that runtime.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 76d344bcb2344aad36a4fb7fcb217b13d755e583
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= b1ee0fd50ee6d66a410ea6fa24bd773736947efd
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 76d344bcb2344aad36a4fb7fcb217b13d755e583
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= eee3aa932101a2b45631245535899fa37e515d73
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -75,12 +75,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= f03685054234b13ed37e46ba3038e9f956ab37e5
-QUAKE_EXPECTED_PSOXIDE_REV ?= c2c4b90de6f0c836803c6eba02775814a944dafa
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= f0578ce194a1a95bc7e7a4c467e7ae9cdddbe3e8debf92537a660002dccecdae
+QUAKE_EXPECTED_REV ?= c2329be71db3f928e2702ad4f3cca90cbd6bdffb
+QUAKE_EXPECTED_PSOXIDE_REV ?= b1ee0fd50ee6d66a410ea6fa24bd773736947efd
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 33e4a45eaa24f6ae67ba788d174fde117e80390cecf944ada64343ac1105a610
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 2ce060a4ce83c3cb7a0779980d03ec85789ffcf369a39310192eeebda10653b6
-QUAKE_EXPECTED_EXE_SHA256 ?= 27c4cd9c6fb83dc26f38f85ceb0f3564e1dc4409e2bbb2c4fd3981c9dc5de0ca
+QUAKE_EXPECTED_BIN_SHA256 ?= 8adb387024267bdfe9d26e49d1ad6eef9283028bda6cbfcf5f07d98efef73746
+QUAKE_EXPECTED_EXE_SHA256 ?= ddae5a6cf8e8ef62a6f06cd45bdfe461a1df5a97586f9867aa249735e065928a
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx

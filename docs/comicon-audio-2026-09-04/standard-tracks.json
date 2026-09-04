@@ -1,0 +1,66 @@
+{
+  "cue": "/tmp/astra-perf-20260904/disc-candidate/PSoXide Demo Disc.cue",
+  "audio_tracks": 8,
+  "track_bases": {
+    "CORTEX IGNITION": 4,
+    "VOXIDE": 6,
+    "NITROXIDE": 6,
+    "CELESTE COLLECTION": 0,
+    "PSXCEL": 0,
+    "GH-PSX": 6,
+    "PSOXIDE ARCADE": 6,
+    "HARDWARE TESTS": 7,
+    "QUAKE SHAREWARE": 8
+  },
+  "tracks": [
+    {
+      "owner": "LAUNCHER",
+      "track": 2,
+      "sha256": "099402761f0aa9a23b871c0594ca9b4b15105ea29703f1cf76c2f187bb8244e5"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 3,
+      "sha256": "c7550a820b3558dec77b9d5da9dd9e68154b404651ed614e225e52e6f389ae0e"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 4,
+      "sha256": "34b4df2e0b59b858b68d624a108346c307733f25d50f0f5096757576937bdbd8"
+    },
+    {
+      "owner": "LAUNCHER",
+      "track": 5,
+      "sha256": "3e09346f7907b4dfab655874e243f6b03b277d1f9ac064fe6ebd181cd355cd48"
+    },
+    {
+      "owner": "CORTEX IGNITION",
+      "source_track": 2,
+      "track": 6,
+      "sectors": 5782,
+      "sha256_with_pregap": "d207528be8bda324d331d7b210c1a0e204e0dfce33a1c277bb27ae52d9f15658"
+    },
+    {
+      "owner": "CORTEX IGNITION",
+      "source_track": 3,
+      "track": 7,
+      "sectors": 4435,
+      "sha256_with_pregap": "f4a258b160fba993268dcb6fd45a93abfbdfc4626da59d92c6daae5f4cf363ff"
+    },
+    {
+      "owner": "PSOXIDE ARCADE",
+      "source_track": 2,
+      "track": 8,
+      "sectors": 17544,
+      "sha256_with_pregap": "7a18d5ec7d74f111f799c772f04dc880c2e58216c361d28c3d36bdf85c2353bb"
+    },
+    {
+      "owner": "HARDWARE TESTS",
+      "source_track": 2,
+      "track": 9,
+      "sectors": 750,
+      "sha256_with_pregap": "dc6fe45f61ed690007dbfb534121a666976795c769e305beddb0ec61f425758a"
+    }
+  ],
+  "result": "PASS"
+}

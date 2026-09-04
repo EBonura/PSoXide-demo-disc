@@ -1,0 +1,14 @@
+[
+  {
+    "source": "/Users/ebonura/Desktop/repos/PSoXide/editor/projects/cortex-ignition-tech-demo-0.5/assets/audio/cdda/cortex_boss.wav",
+    "combined_track": 6,
+    "pcm_sha256": "0749ad7dae5026c3dbe8aa5ff3e90413e75959d0c64e0bfee165bf7e9a9b3106",
+    "result": "PASS"
+  },
+  {
+    "source": "/Users/ebonura/Desktop/repos/PSoXide/editor/projects/cortex-ignition-tech-demo-0.5/assets/audio/cdda/menu2.wav",
+    "combined_track": 7,
+    "pcm_sha256": "ba6d1c8ae3adb468dd6b76f0ec0a4085119004ced3241469f94fad49fa0db541",
+    "result": "PASS"
+  }
+]

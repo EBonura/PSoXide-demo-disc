@@ -1,0 +1,10 @@
+celeste: PASS 0xbde15276f411dab2 pc=0x80046880
+nitroxide: PASS 0x3580b127338f9edb pc=0x80037bc0
+voxide: PASS 0x567b1a09d4a05954 pc=0x8005e4d4
+psxcel: PASS 0x3af62cb62ad702da pc=0x80017e6c
+hardware-tests: PASS 0x839ef6872a349af1 pc=0x800d794c
+gh-psx: PASS 0xd6e852c9025f34e6 pc=0x8001228c
+arcade-breakout: PASS 0x08743ff2a56f99c2 pc=0x8003690c
+arcade-invaders: PASS 0x66acde79af4fed92 pc=0x80033c70
+arcade-magikarp: PASS 0x96e547352692e4c2 pc=0x80031ee0
+program headless check: PASS (9 routes)
