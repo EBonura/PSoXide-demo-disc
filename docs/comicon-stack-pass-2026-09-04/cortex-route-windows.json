@@ -1,0 +1,47 @@
+[
+  {
+    "poll_range": [
+      500,
+      1000
+    ],
+    "control_cycles": 399321741,
+    "retained_cycles": 397077286,
+    "delta_percent": -0.5620668171934073
+  },
+  {
+    "poll_range": [
+      1000,
+      2000
+    ],
+    "control_cycles": 788722937,
+    "retained_cycles": 766911252,
+    "delta_percent": -2.765443221793862
+  },
+  {
+    "poll_range": [
+      2000,
+      3000
+    ],
+    "control_cycles": 835800353,
+    "retained_cycles": 793507350,
+    "delta_percent": -5.060180083460675
+  },
+  {
+    "poll_range": [
+      3000,
+      4000
+    ],
+    "control_cycles": 802793100,
+    "retained_cycles": 784150743,
+    "delta_percent": -2.3221869993650945
+  },
+  {
+    "poll_range": [
+      4000,
+      5000
+    ],
+    "control_cycles": 667545179,
+    "retained_cycles": 652005433,
+    "delta_percent": -2.327894274254061
+  }
+]
