@@ -866,7 +866,15 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current", makefile
         )
-        self.assertIn("d812d5bde04ec2a9ac10e436ee516ecc79efaa96", makefile)
+        # The pin is whatever games/PSoXide-cortex-current is checked out at;
+        # a literal here would turn every routine repin into a test failure.
+        pinned = run(
+            "git",
+            "rev-parse",
+            "HEAD",
+            cwd=ROOT / "games/PSoXide-cortex-current",
+        ).stdout.strip()
+        self.assertIn(f"CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= {pinned}", makefile)
         self.assertIn("cortex_ignition_tech_demo_0_4.cue", makefile)
         self.assertNotIn("CORTEX_LEGACY", makefile)
         self.assertNotIn("CORTEX IGNITION LEGACY", makefile)
@@ -905,7 +913,9 @@ class MakeVariantContractTests(unittest.TestCase):
         for pressing in (default, half_life):
             self.assertIn('--image "CORTEX IGNITION=', pressing.stdout)
             self.assertNotIn("CORTEX IGNITION LEGACY", pressing.stdout)
-        self.assertIn('--gate "CORTEX IGNITION"', default.stdout)
+        # Cortex Ignition is on the carousel of both pressings since 2026-09-03;
+        # nothing is gated behind the Konami code any more.
+        self.assertNotIn('--gate "CORTEX IGNITION"', default.stdout)
         self.assertNotIn('--gate "CORTEX IGNITION"', half_life.stdout)
         current_at = half_life.stdout.index('--image "CORTEX IGNITION=')
         half_life_at = half_life.stdout.index('--image "HALF-LIFE=')
@@ -1383,9 +1393,12 @@ class HeadlessChainloadTests(unittest.TestCase):
             self.assertIn(field, check_quake_headless.DETERMINISTIC_FIELDS)
 
     def test_each_pressing_has_its_own_visible_frame_pins(self) -> None:
+        # 10 is the public pressing since Cortex joined its carousel on
+        # 2026-09-03, 11 the private Half-Life pressing; the checker's own
+        # default layout keeps its pins for the older public image.
         self.assertEqual(
             set(check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES),
-            {check_quake_headless.DEFAULT_MENU_ENTRIES, 11},
+            {check_quake_headless.DEFAULT_MENU_ENTRIES, 10, 11},
         )
         for menu_entries, (vram, display) in (
             check_quake_headless.EXPECTED_FRAME_FNV_BY_MENU_ENTRIES.items()
