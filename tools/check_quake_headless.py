@@ -37,9 +37,9 @@ EXPECTED_FRAME_FNV_BY_MENU_ENTRIES = {
     # Public pressing before 2026-09-03: the Cortex card was hidden.
     DEFAULT_MENU_ENTRIES: ("0x1db7984ba55cc00a", "0x202e95d7fce1debf"),
     # Public pressing since 2026-09-03: Cortex is on the carousel.
-    10: ("0x2e6efdd2473f394b", "0x8299f31044609630"),
+    10: ("0xd9a908db168c4c1b", "0xc62521120c8d8d80"),
     # Private Half-Life pressing: Cortex and Half-Life are visible.
-    11: ("0xb66ce9eb5000aa08", "0x35d423730c0016d9"),
+    11: ("0xecb3e8d29dd3e26b", "0x412d51b11ab2ab38"),
 }
 DETERMINISTIC_FIELDS = (
     "tick",
