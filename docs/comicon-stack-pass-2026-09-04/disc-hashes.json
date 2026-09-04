@@ -1,0 +1,18 @@
+{
+  "PSoXide Demo Disc HL.bin": {
+    "bytes": 724726464,
+    "sha256": "71b0fc2bd50b2d2aac2479fa7582e72d18a57265ff685e1af23e4a38a90f07e7"
+  },
+  "PSoXide Demo Disc HL.cue": {
+    "bytes": 2218,
+    "sha256": "f558bf637a01b35b686a4d9b17c1911627cc211bca1148e1a2d25d5e08947fb6"
+  },
+  "PSoXide Demo Disc.bin": {
+    "bytes": 243650736,
+    "sha256": "5206349d220b933f283da8bf124f4c124477aca8848fb21529adb37bf205dbc4"
+  },
+  "PSoXide Demo Disc.cue": {
+    "bytes": 568,
+    "sha256": "85d926750d5e2f8a8953407bc43c5766b309ea584b407d31a2ab8068101db734"
+  }
+}

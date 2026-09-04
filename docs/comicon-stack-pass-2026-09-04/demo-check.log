@@ -1,0 +1,132 @@
+sdk-on-main: 26698622425404adfd4b27a1c9aa948c72634227 is on PSoXide main (identical)
+sdk-on-main: 26698622425404adfd4b27a1c9aa948c72634227 is on PSoXide main (identical)
+sdk-coherence: 7 game(s) on /Users/ebonura/Desktop/repos/psx-demo-disc/games/PSoXide-runtime
+check-locks: 92 tracked lock(s) reproducible, 5 pins consistent
+python3 tools/quake_disc.py verify \
+		--source "/Users/ebonura/Desktop/repos/quake-psx-pinned" \
+		--psoxide "/Users/ebonura/Desktop/repos/psx-demo-disc/games/PSoXide" \
+		--programs-psoxide "/Users/ebonura/Desktop/repos/psx-demo-disc/games/PSoXide-runtime" \
+		--programs-psoxide-stamp "/Users/ebonura/Desktop/repos/psx-demo-disc/build/programs.psoxide-revision" \
+		--cue "/Users/ebonura/Desktop/repos/quake-psx-pinned/dist/quake-psx.cue" \
+		--provenance "/Users/ebonura/Desktop/repos/quake-psx-pinned/dist/quake-psx.provenance.json" \
+		--expected-revision "60190c78e407f319aaa97eaa84bfbe0e1fa0d956" \
+		--expected-psoxide-revision "26698622425404adfd4b27a1c9aa948c72634227" \
+		--expected-programs-psoxide-revision "26698622425404adfd4b27a1c9aa948c72634227" \
+		--expected-provenance-sha256 "12da142ff276ec8e373f57e7db81c91ea730cf1294f360f54e2c1161cf13989e" \
+		--expected-cue-sha256 "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c" \
+		--expected-bin-sha256 "52433a93dafb4933ccb0cb0b6bddf1e50af199cf722dc61796fd554c4a822be2" \
+		--expected-exe-sha256 "abdaec5c1166035b0eb45f52f20eaa2c9c8a94fe313f25b0d28f85d292ee20d7"
+quake source revision: 60190c78e407f319aaa97eaa84bfbe0e1fa0d956
+quake declared PSoXide revision: 26698622425404adfd4b27a1c9aa948c72634227
+disc PSoXide revision: 26698622425404adfd4b27a1c9aa948c72634227
+ordinary-program PSoXide revision: 26698622425404adfd4b27a1c9aa948c72634227
+quake provenance SHA-256: 12da142ff276ec8e373f57e7db81c91ea730cf1294f360f54e2c1161cf13989e
+quake guest recipe SHA-256: d4d799e1b006d7e25efd00bba8422dab60c5d1b9c8b1b1462c708699fb39f16c
+quake cue SHA-256: 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
+quake bin SHA-256: 52433a93dafb4933ccb0cb0b6bddf1e50af199cf722dc61796fd554c4a822be2
+quake bin bytes: 19472208
+quake exe SHA-256: abdaec5c1166035b0eb45f52f20eaa2c9c8a94fe313f25b0d28f85d292ee20d7
+quake exe bytes: 493568
+cd carousel && cargo test
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/carousel-8bc1e77eb76af6bd)
+
+running 20 tests
+test tests::a_kick_decays_rather_than_snapping ... ok
+test tests::a_pulse_peaks_on_the_beat_and_falls_away ... ok
+test tests::a_reflection_is_flatter_than_the_ring_and_sits_below_it ... ok
+test tests::a_browse_kick_always_settles_back_to_the_idle_drift ... ok
+test tests::a_reflection_keeps_the_rings_near_and_far_the_way_round_they_were ... ok
+test tests::a_track_with_no_measured_tempo_does_not_pulse ... ok
+test tests::an_impulse_points_somewhere_different_each_time_and_is_a_unit_vector ... ok
+test tests::a_swelling_ball_pushes_its_beads_apart ... ok
+test tests::depth_sort_puts_the_far_ones_first ... ok
+test tests::every_sphere_point_is_written ... ok
+test field_density::most_of_the_field_is_on_screen_at_any_moment ... ok
+test tests::a_visible_star_is_always_on_screen ... ok
+test tests::pitching_the_ball_moves_its_beads_off_the_yaw_only_positions ... ok
+test tests::stars_get_nearer_brighter_and_bigger_as_they_come_at_you ... ok
+test tests::the_bar_runs_four_beats_and_the_downbeat_is_the_first ... ok
+test tests::the_field_wraps_rather_than_running_out ... ok
+test tests::the_front_of_the_ring_is_lower_bigger_and_brighter_than_the_back ... ok
+test tests::the_offbeat_peaks_between_two_beats ... ok
+test tests::most_stars_still_streak_at_warp_speed ... ok
+test tests::a_streak_points_at_the_centre_of_the_screen ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests carousel
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+cd disc-toc && cargo test
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/disc_toc-1e9df274b8eaa926)
+
+running 6 tests
+test tests::rejects_a_sector_that_is_not_a_toc ... ok
+test tests::rejects_more_entries_than_fit ... ok
+test tests::truncates_an_overlong_description ... ok
+test tests::round_trips_entries ... ok
+test tests::round_trips_the_hidden_flag ... ok
+test tests::truncates_an_overlong_name ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests disc_toc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+cd tools/mkdisc && cargo test
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running unittests src/main.rs (target/debug/deps/mkdisc-20225f76af4f251b)
+
+running 29 tests
+test tests::an_overlong_description_and_credit_share_the_same_reasoning ... ok
+test tests::accepts_a_program_that_clears_the_blob ... ok
+test tests::a_disc_with_no_menu_music_has_nothing_to_check ... ok
+test tests::a_borrower_plays_the_lenders_tracks ... ok
+test spectrum::tests::bands_are_log_spaced_and_never_empty ... ok
+test tests::a_program_track_before_the_menu_songs_is_an_error ... ok
+test spectrum::tests::normalising_stretches_a_bands_own_range_over_the_meter ... ok
+test tests::an_overlong_description_is_an_error_rather_than_a_silent_trim ... ok
+test tests::counting_wrapped_lines_matches_a_greedy_wrap ... ok
+test tests::describing_a_program_that_is_not_on_the_disc_is_an_error ... ok
+test tests::descriptions_land_on_the_named_program ... ok
+test tests::finds_a_collection_launcher_after_cached_disc_data ... ok
+test tests::iso_names_stay_within_8_3 ... ok
+test tests::menu_audio_leading_the_disc_is_accepted ... ok
+test tests::rejects_a_file_that_is_not_a_psx_exe ... ok
+test tests::parses_a_psx_exe_header ... ok
+test tests::placing_a_track_re_addresses_every_sector_and_keeps_the_payload ... ok
+test tests::rejects_a_track_that_is_not_whole_sectors ... ok
+test tests::relocated_sectors_carry_their_new_address ... ok
+test tests::sharing_with_a_program_that_is_not_on_the_disc_is_an_error ... ok
+test tests::rejects_a_program_that_would_overwrite_the_blob ... ok
+test tests::cue_times_are_absolute_on_the_finished_disc ... ok
+test cue::tests::rejects_a_sheet_with_no_data_track ... ok
+test cue::tests::a_data_only_disc_is_all_data ... ok
+test cue::tests::an_audio_track_without_a_pregap_starts_where_it_plays ... ok
+test spectrum::tests::silence_analyses_without_dividing_by_zero ... ok
+test cue::tests::splits_data_from_audio_and_times_tracks_relatively ... ok
+test spectrum::tests::a_frame_is_one_byte_per_band_thirty_times_a_second ... ok
+test spectrum::tests::a_low_tone_lights_a_lower_band_than_a_high_one ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+python3 -m unittest discover -s tools -p 'test_quake_disc.py'
+...............................................
+----------------------------------------------------------------------
+Ran 47 tests in 26.568s
+
+OK
+python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py tools/test_check_program_headless.py
+...................
+----------------------------------------------------------------------
+Ran 19 tests in 1.300s
+
+OK

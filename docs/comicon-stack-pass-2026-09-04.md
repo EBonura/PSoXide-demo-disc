@@ -21,3 +21,30 @@ The standard pressing then has the shared GH/Arcade track 8 and hardware-test
 track 9. The private HL pressing has HL tracks 8-34, GH/Arcade 35 and hardware
 tests 36. The independent audio audit compares the actual pressed sectors,
 including pregaps, with every source image and validates every game's base.
+
+
+## Validated images
+
+The new BIN/CUE pairs are in
+`/Users/ebonura/Downloads/PSoXide-Comicon-2026-09-04-stack-pass`.
+They were built from clean disc source d5bd1d7. Later commits record the frame
+reference and evidence; the images retain that exact build identity.
+
+Both independent audio audits pass (8 standard and 35 HL tracks), both WAV PCM
+comparisons pass, and the private full-build receipt verifies. Each pressing
+passes every applicable critical chain-load target twice with identical logs.
+Both official Quake pairs pass; all nine other program routes pass on each.
+The standard Quake 500-million-instruction frame reference was refreshed after
+inspection against the previous image: the same Start-map menu is rendered at
+a slightly different animation phase. The complete E1M1-to-E1M2 route keeps its
+canonical hashes. The HL pressing's fixed-budget Quake reference did not move.
+
+The Cortex shipping route still presents every two route ticks after entering
+gameplay, matching the previous disc. A smaller frame count at the fixed CPU
+instruction budget reflects an earlier bus-time endpoint, not lower cadence.
+The full-disc checks cover actual relocated payloads and normal shipping
+features, separately from the fixed-cadence whole-level performance tape.
+
+`make check` passes: 92 tracked lockfiles, seven hydrated runtimes, source
+ancestry/provenance, 55 Rust tests and 66 Python tests. Evidence and exact image
+hashes are archived in [comicon-stack-pass-2026-09-04/](comicon-stack-pass-2026-09-04/).
