@@ -15,9 +15,9 @@ ROOT       := $(CURDIR)
 # Quake carries its own copy of that revision in its source tree.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 4df9ece2f29afcfe6ef6e3690bb37be6c1dfedfd
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 6bee61170142e1fed47e8c31ac3dfd11a073ac1e
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 4df9ece2f29afcfe6ef6e3690bb37be6c1dfedfd
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 6bee61170142e1fed47e8c31ac3dfd11a073ac1e
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -110,9 +110,9 @@ CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/rel
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.4
+CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.5
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
-CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4.cue
+CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_5.cue
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
