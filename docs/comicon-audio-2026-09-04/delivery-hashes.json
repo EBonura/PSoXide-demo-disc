@@ -1,0 +1,27 @@
+{
+  "source_revisions": {
+    "demo_disc": "dad175d",
+    "psoxide_runtime": "b1ee0fd5",
+    "cortex": "eee3aa93",
+    "quake": "c2329be",
+    "hl": "feeb9b3"
+  },
+  "files": {
+    "PSoXide Demo Disc HL.bin": {
+      "bytes": 724726464,
+      "sha256": "3f9345d94be60580192bc78939ded928778d871b321b194235c1cb1af47bfc8c"
+    },
+    "PSoXide Demo Disc HL.cue": {
+      "bytes": 2218,
+      "sha256": "f558bf637a01b35b686a4d9b17c1911627cc211bca1148e1a2d25d5e08947fb6"
+    },
+    "PSoXide Demo Disc.bin": {
+      "bytes": 243650736,
+      "sha256": "5c1da150be127e5c358e7372f66e3431012c8481ee7e21f018a7ae61949ec15b"
+    },
+    "PSoXide Demo Disc.cue": {
+      "bytes": 568,
+      "sha256": "85d926750d5e2f8a8953407bc43c5766b309ea584b407d31a2ab8068101db734"
+    }
+  }
+}
