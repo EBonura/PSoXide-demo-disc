@@ -121,7 +121,7 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
 
     voxide, _ = outer("VOXIDE")
     nitroxide, _ = outer("NITROXIDE")
-    celeste, _ = outer("CELESTE COLLECTION")
+    celeste, celeste_cross = outer("CELESTE COLLECTION")
     psxcel, _ = outer("PSXCEL")
     hardware, _ = outer("HARDWARE TESTS")
 
@@ -153,6 +153,15 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
             markers=("psx-engine: loading ready",),
         ),
         Route("celeste", ",".join(celeste), 450_000_000),
+        # Wait for the collection intro, choose each cart, then dismiss its
+        # title screen. These exercise both linked games, not just the menu.
+        Route("celeste-classic", ",".join(celeste + [
+            f"{celeste_cross + 1600}:cross:12", f"{celeste_cross + 2200}:cross:12"
+        ]), 800_000_000),
+        Route("celeste-classic-2", ",".join(celeste + [
+            f"{celeste_cross + 1500}:right:8", f"{celeste_cross + 1700}:cross:12",
+            f"{celeste_cross + 2300}:cross:12"
+        ]), 800_000_000),
         # PSXcel is six carousel moves from the initial card. Give the launcher
         # enough emulated time to reach the delayed launch press before judging
         # the guest, rather than stopping while its card is merely selected.
