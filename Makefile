@@ -16,7 +16,7 @@ PSOXIDE    ?= $(ROOT)/games/PSoXide
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
 PROGRAMS_EXPECTED_PSOXIDE_REV ?= 8df242b353b8a3664c1d2ed20622d692d1349306
 CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 8df242b353b8a3664c1d2ed20622d692d1349306
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 97a604f632d0c6ceb5fcb16e0d79d4b2c7b594af
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -109,9 +109,9 @@ CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/rel
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.5
-CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current
-CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_5.cue
+CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.4b
+CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b
+CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.cue
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
@@ -165,9 +165,9 @@ V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 # The hardware suite already versions itself on screen; take that same string so
 # the carousel and the suite header cannot disagree.
 V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
-# Authored projects do not declare semantic versions. The exact engine pin is
-# its useful identity on camera without inventing a project version.
-V_CORTEX_CURRENT := new-$(shell printf '%.7s' '$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)')
+# Include the selected authored project version and its exact engine pin so
+# the carousel distinguishes the current 0.4b build from retired experiments.
+V_CORTEX_CURRENT := 0.4b-$(shell printf '%.7s' '$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)')
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
@@ -288,11 +288,12 @@ cortex-current-if-stale:
 		rm -rf "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		mkdir -p "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		cp -R "$(CORTEX_CURRENT_SOURCE)/." "$(CORTEX_CURRENT_PROJECT)/" || exit 1; \
-		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
+		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" PSOXIDE_GUEST_LINK_MAP="$(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
 		printf '%s\n' "$$current_rev" > "$(CORTEX_CURRENT_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex-current: project unchanged -- reusing $(CORTEX_CURRENT)"; \
 	fi
+	sh "$(CORTEX_CURRENT_PSOXIDE)/tools/guest_symbol_gate.sh" "$(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map"
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
