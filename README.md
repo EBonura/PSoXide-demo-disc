@@ -195,6 +195,20 @@ real-BIOS or original-console claim:
 
 ## Building
 
+Clone with `git clone --recurse-submodules`, then run `make components`.
+`release-components.json` locks the SDK, editor/engine/Cortex and standalone
+emulator separately. Their source receipts are checked before building.
+The launcher, loader, carousel and disc packer consume `games/PSoXide-sdk`;
+games consume the SDK and engine through the bootstrapped editor tree.
+`games/PSoXide` is retained only as Quake's historical build reference.
+It is not the SDK used to build the current launcher or other games.
+
+Each pressing receives a `.components.json` receipt containing all game
+revisions, nested component locks, the emulator hash and the final image hashes.
+The existing Quake and HL release receipts remain additional verification.
+See [the repository map](docs/repositories.md) for ownership and dependencies.
+
+
 `make disc` writes into PSoXide's game library, so the disc shows up in the
 emulator next to everything else. The release files are flat in that directory:
 
@@ -203,11 +217,11 @@ emulator next to everything else. The release files are flat in that directory:
 ```
 
 Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
-different library. `PROGRAMS_PSOXIDE=/absolute/path/to/PSoXide` selects the
+different library. `PROGRAMS_PSOXIDE=/absolute/path/to/PSoXide-editor` selects the
 checkout used for every ordinary rebuilt program. `PSOXIDE` remains the exact
 checkout named by Quake's artifact provenance, so advancing the shared runtime
 cannot silently change the SDK contract of the pinned Quake image. The Cortex
-project is staged from `games/PSoXide-cortex-current` under `build/`, keeping
+project is staged from `games/PSoXide-editor` under `build/`, keeping
 generated output outside the pinned PSoXide worktree. `games/psoxide-arcade`
 is the private collection repository
 and the canonical owner of `goncharov.cdda` by
@@ -254,7 +268,7 @@ Paste those six lines over the ones near the top of the `Makefile`, then:
 1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
    games/PSoXide` -- the Quake tree names the SDK it was built against, and
    the disc has to be on that same revision or `quake-verify` refuses.
-2. Update `games/PSoXide-runtime` and `PROGRAMS_EXPECTED_PSOXIDE_REV` together
+2. Update `games/PSoXide-editor` and `PROGRAMS_EXPECTED_PSOXIDE_REV` together
    when the ordinary programs advance. The verifier requires that clean exact
    checkout and its build stamp independently of Quake's frozen SDK.
 3. `make disc` -- rebuilds every ordinary program against the shared runtime,
