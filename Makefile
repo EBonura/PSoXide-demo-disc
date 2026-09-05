@@ -436,10 +436,10 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		$(HL_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
+		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "PSOXIDE ARCADE=$(ARCADE)" \
 		--image "GH-PSX=$(GHPSX)" \
 		--game "PSXCEL=$(PSXCEL)" \
-		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
