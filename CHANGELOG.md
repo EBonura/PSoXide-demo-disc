@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.34
+
+- Includes the Cortex Ignition and hl-psx gameplay fixes and the reordered carousel from the v0.33 test builds.
+
 ## v0.33.1
 
 - Reordered the carousel: Cortex Ignition, Quake, Half-Life, VoXide, NitroXide, Arcade, GH-PSX, PSXcel, Celeste Collection and Hardware Tests. Credits remain last.
