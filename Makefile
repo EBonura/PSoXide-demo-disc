@@ -13,10 +13,12 @@
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
 PSOXIDE    ?= $(ROOT)/games/PSoXide
-PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-runtime
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 8df242b353b8a3664c1d2ed20622d692d1349306
-CORTEX_CURRENT_PSOXIDE ?= $(ROOT)/games/PSoXide-cortex-current
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= d2132e7e2946d1938a76b7759f404d10e191b7c4
+SDK ?= $(ROOT)/games/PSoXide-sdk
+EMULATOR ?= $(ROOT)/games/PSoXide-emulator
+PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 0f12f4d8f5ebaf2ab3bdf0bd1a7a0469166d7c58
+CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 0f12f4d8f5ebaf2ab3bdf0bd1a7a0469166d7c58
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -81,7 +83,7 @@ QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bf
 QUAKE_EXPECTED_BIN_SHA256 ?= 903edba2b460363fd5804f4bf267643d9f844ff5e7ce2facc95f7569a1d89360
 QUAKE_EXPECTED_EXE_SHA256 ?= 32e6a4e0a678e02c9278f34803bef503e9e51ff355e174aae8dbace2a255b2ac
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
-FRONTEND ?= $(PROGRAMS_PSOXIDE)/target/release/frontend
+FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
 # The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
@@ -178,7 +180,7 @@ DISC_VERSION := $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(PROGRAMS_PSOXIDE)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 examples:
@@ -356,7 +358,7 @@ _quake-headless-check:
 # logs as well as a final PC and sampled execution inside that entry's
 # checksummed PS-X EXE.
 release-frontend:
-	cd $(PROGRAMS_PSOXIDE)/emu && cargo build --release -p frontend
+	cd $(EMULATOR) && cargo build --locked --release -p frontend
 
 release-headless-check: release-frontend
 	$(MAKE) disc HL=1
@@ -516,6 +518,7 @@ ifneq ($(HL),)
 		--source "QUAKE SHAREWARE=$(QUAKE_SRC)" \
 		--out "$(RELEASE_RECEIPT)"
 endif
+	python3 tools/components.py --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
 
 
 # The standard pressing may be published. Both upload recipes fail closed when
@@ -601,19 +604,8 @@ check-locks:
 # when main contains the revision. DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 skips the
 # check for a deliberate side-branch pressing and says so.
 .PHONY: sdk-on-main
-sdk-on-main:
-	@if [ -n "$(DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN)" ]; then \
-		echo "sdk-on-main: SKIPPED by request"; exit 0; \
-	fi; \
-	sub=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	for rev in "$$sub" "$(QUAKE_EXPECTED_PSOXIDE_REV)"; do \
-		status=$$(gh api "repos/EBonura/PSoXide/compare/$$rev...main" --jq .status 2>/dev/null) || { \
-			echo "sdk-on-main: cannot compare $$rev with PSoXide main via gh api (offline or unauthenticated); set DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 only for a deliberate side-branch pressing"; exit 1; }; \
-		case "$$status" in \
-			identical|ahead) echo "sdk-on-main: $$rev is on PSoXide main ($$status)";; \
-			*) echo "sdk-on-main: $$rev is NOT on PSoXide main ($$status); merge it before pressing"; exit 1;; \
-		esac; \
-	done
+sdk-on-main: components
+	@python3 tools/components.py --check-main
 
 .PHONY: sdk-coherence
 sdk-coherence:
@@ -653,3 +645,12 @@ relocation-check: launcher mkdisc
 
 clean:
 	rm -rf $(BUILD) $(ROOT)/dist
+
+# Fetching is explicit and pinned. Both authoring and validation use their
+# own repositories; ordinary guests receive the bootstrapped engine tree.
+.PHONY: components verify-components
+components:
+	python3 tools/components.py
+verify-components:
+	python3 tools/components.py --check
+loader examples programs mkdisc release-frontend cortex-current-if-stale sdk-coherence: components

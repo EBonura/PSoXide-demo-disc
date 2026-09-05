@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "components": {
+    "sdk": {
+      "path": "games/PSoXide-sdk",
+      "repository": "EBonura/PSoXide",
+      "revision": "a7bde2b5baeb409061e9458e92f2e0037ba1c7f5"
+    },
+    "editor": {
+      "path": "games/PSoXide-editor",
+      "repository": "EBonura/PSoXide-editor",
+      "revision": "0f12f4d8f5ebaf2ab3bdf0bd1a7a0469166d7c58"
+    },
+    "emulator": {
+      "path": "games/PSoXide-emulator",
+      "repository": "EBonura/PSoXide-emulator",
+      "revision": "fd914c5ed8fbb0b46f8276c5ff7376904b9b444f"
+    },
+    "quake_build_reference": {
+      "path": "games/PSoXide",
+      "repository": "EBonura/PSoXide",
+      "revision": "8df242b353b8a3664c1d2ed20622d692d1349306"
+    }
+  }
+}

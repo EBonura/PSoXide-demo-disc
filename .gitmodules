@@ -1,9 +1,6 @@
 [submodule "games/PSoXide"]
 	path = games/PSoXide
 	url = https://github.com/EBonura/PSoXide.git
-[submodule "games/PSoXide-cortex-current"]
-	path = games/PSoXide-cortex-current
-	url = https://github.com/EBonura/PSoXide.git
 [submodule "games/hl-psx"]
 	path = games/hl-psx
 	url = https://github.com/EBonura/hl-psx.git
@@ -22,9 +19,15 @@
 [submodule "games/nitroxide"]
 	path = games/nitroxide
 	url = https://github.com/EBonura/nitroxide.git
-[submodule "games/PSoXide-runtime"]
-	path = games/PSoXide-runtime
-	url = https://github.com/EBonura/PSoXide.git
 [submodule "games/psoxide-arcade"]
 	path = games/psoxide-arcade
 	url = https://github.com/EBonura/psoxide-arcade.git
+[submodule "games/PSoXide-editor"]
+	path = games/PSoXide-editor
+	url = https://github.com/EBonura/PSoXide-editor.git
+[submodule "games/PSoXide-emulator"]
+	path = games/PSoXide-emulator
+	url = https://github.com/EBonura/PSoXide-emulator.git
+[submodule "games/PSoXide-sdk"]
+	path = games/PSoXide-sdk
+	url = https://github.com/EBonura/PSoXide.git
