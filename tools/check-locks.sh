@@ -13,11 +13,11 @@
 # inside them.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
-REPOS=(. games/PSoXide games/PSoXide-runtime games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx)
+REPOS=(. games/PSoXide games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx games/psoxide-arcade)
 offline="--offline"
 [ "${CHECK_LOCKS_ONLINE:-}" = "1" ] && offline=""
 
-pass=0; fail=0
+pass=0; fail=0; pins=0
 for repo in "${REPOS[@]}"; do
   while IFS= read -r lock; do
     [ -z "$lock" ] && continue
@@ -38,6 +38,7 @@ for game in nitroxide voxide pico8-psx psxcel gh-psx; do
   manifest="games/$game/psoxide-pin/Cargo.toml"
   lock="games/$game/psoxide-pin/Cargo.lock"
   [ -f "$manifest" ] || continue
+  pins=$((pins + 1))
   want=$(grep -oE '[a-f0-9]{40}' "$manifest" | head -1)
   got=$(grep -oE 'rev=[a-f0-9]{40}' "$lock" 2>/dev/null | head -1 | cut -d= -f2)
   if [ "$want" != "$got" ]; then
@@ -57,4 +58,4 @@ if [ "$fail" -ne 0 ]; then
   echo "check-locks: $fail problem(s). Refresh with: cargo metadata --manifest-path <the manifest> --format-version 1"
   exit 1
 fi
-echo "check-locks: $pass tracked lock(s) reproducible, 5 pins consistent"
+echo "check-locks: $pass tracked lock(s) reproducible, $pins pins consistent"

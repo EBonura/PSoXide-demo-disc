@@ -12,4 +12,4 @@ license = "GPL-2.0-or-later"
 path = "src/lib.rs"
 
 [dependencies]
-psx-math = { path = "../games/PSoXide-runtime/sdk/crates/psx-math" }
+psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }

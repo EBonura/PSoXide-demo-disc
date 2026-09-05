@@ -29,9 +29,9 @@ opt-level     = "s"
 
 [dependencies]
 carousel = { path = "../carousel" }
-psx-pack = { path = "../games/PSoXide-runtime/sdk/crates/psx-pack" }
-psx-io   = { path = "../games/PSoXide-runtime/sdk/crates/psx-io" }
-psx-math = { path = "../games/PSoXide-runtime/sdk/crates/psx-math" }
+psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
+psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
 # Data only: the checklist borrows the SDK's 8x8 font table and draws it
 # with GP0 rectangles itself, so none of psx-font's VRAM code is linked.
-psx-font = { path = "../games/PSoXide-runtime/sdk/crates/psx-font" }
+psx-font = { path = "../games/PSoXide-sdk/sdk/crates/psx-font" }

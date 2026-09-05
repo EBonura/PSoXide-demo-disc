@@ -318,13 +318,13 @@ const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
 /// hundred times a minute should be. At 0.10 s it can also retrigger three
 /// times inside the window jump was still sounding in.
 static SFX_BROWSE: &[u8] =
-    include_bytes!("../../games/PSoXide-runtime/assets/audio/voxide-ui/psau/ui_click.psau");
+    include_bytes!("../../games/PSoXide-editor/assets/audio/voxide-ui/psau/ui_click.psau");
 static SFX_SELECT: &[u8] =
-    include_bytes!("../../games/PSoXide-runtime/assets/audio/voxide-ui/psau/ui_confirm.psau");
+    include_bytes!("../../games/PSoXide-editor/assets/audio/voxide-ui/psau/ui_confirm.psau");
 /// 0.56 s of rushing air, which is just under the 40 frames of warp the
 /// starfield accelerates through before the fade takes the screen.
 static SFX_LAUNCH: &[u8] =
-    include_bytes!("../../games/PSoXide-runtime/assets/audio/freesfx/psau/swoosh.psau");
+    include_bytes!("../../games/PSoXide-editor/assets/audio/freesfx/psau/swoosh.psau");
 
 /// Idle frames before the menu clears itself down to the ball turning over
 /// the carousel. A demo disc spends most of its life unattended.

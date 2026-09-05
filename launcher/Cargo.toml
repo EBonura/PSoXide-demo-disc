@@ -26,16 +26,16 @@ codegen-units = 1
 lto           = true
 
 [dependencies]
-psx-font = { path = "../games/PSoXide-runtime/sdk/crates/psx-font" }
-psx-gpu  = { path = "../games/PSoXide-runtime/sdk/crates/psx-gpu" }
-psx-pack = { path = "../games/PSoXide-runtime/sdk/crates/psx-pack" }
-psx-pad  = { path = "../games/PSoXide-runtime/sdk/crates/psx-pad" }
-psx-rt   = { path = "../games/PSoXide-runtime/sdk/crates/psx-rt" }
-psx-vram = { path = "../games/PSoXide-runtime/sdk/crates/psx-vram" }
-psx-math = { path = "../games/PSoXide-runtime/sdk/crates/psx-math" }
+psx-font = { path = "../games/PSoXide-sdk/sdk/crates/psx-font" }
+psx-gpu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gpu" }
+psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
+psx-pad  = { path = "../games/PSoXide-sdk/sdk/crates/psx-pad" }
+psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt" }
+psx-vram = { path = "../games/PSoXide-sdk/sdk/crates/psx-vram" }
+psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
 carousel = { path = "../carousel" }
-psx-io   = { path = "../games/PSoXide-runtime/sdk/crates/psx-io" }
-psx-spu  = { path = "../games/PSoXide-runtime/sdk/crates/psx-spu" }
-psx-asset = { path = "../games/PSoXide-runtime/sdk/crates/psx-asset" }
-psx-sfx  = { path = "../games/PSoXide-runtime/sdk/crates/psx-sfx" }
+psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-spu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-spu" }
+psx-asset = { path = "../games/PSoXide-sdk/sdk/crates/psx-asset" }
+psx-sfx  = { path = "../games/PSoXide-sdk/sdk/crates/psx-sfx" }
 disc-toc = { path = "../disc-toc" }

@@ -16,3 +16,7 @@ PLAN.md
 SESSION.md
 SECOND_PASS_CONSOLIDATION_PLAN.md
 graphify-out/
+
+# Retained local pre-split build inputs; no longer release dependencies.
+/games/PSoXide-runtime/
+/games/PSoXide-cortex-current/

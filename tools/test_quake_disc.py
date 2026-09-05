@@ -779,7 +779,7 @@ class MakeVariantContractTests(unittest.TestCase):
     def test_lock_audit_includes_both_psoxide_inputs(self) -> None:
         script = (ROOT / "tools" / "check-locks.sh").read_text(encoding="utf-8")
         self.assertIn("games/PSoXide ", script)
-        self.assertIn("games/PSoXide-runtime ", script)
+        self.assertIn("games/PSoXide-editor ", script)
 
     def test_disc_runtime_crates_do_not_use_quakes_frozen_sdk(self) -> None:
         paths = (
@@ -791,13 +791,13 @@ class MakeVariantContractTests(unittest.TestCase):
         for path in paths:
             manifest = path.read_text(encoding="utf-8")
             self.assertNotIn("games/PSoXide/", manifest, path)
-            self.assertIn("games/PSoXide-runtime/", manifest, path)
+            self.assertIn("games/PSoXide-sdk/", manifest, path)
 
         launcher = (ROOT / "launcher" / "src" / "main.rs").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("games/PSoXide/assets/", launcher)
-        self.assertIn("games/PSoXide-runtime/assets/", launcher)
+        self.assertIn("games/PSoXide-editor/assets/", launcher)
 
     def test_quake_program_stamp_rejects_missing_malformed_and_stale(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -856,7 +856,7 @@ class MakeVariantContractTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (
             ROOT
-            / "games/PSoXide-cortex-current/editor/projects/cortex-ignition-tech-demo-0.4b/project.ron"
+            / "games/PSoXide-editor/editor/projects/cortex-ignition-tech-demo-0.4b/project.ron"
         ).read_text(encoding="utf-8")
         scene = project.split("resources:", 1)[0]
         self.assertIn(
@@ -866,13 +866,13 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn(
             "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b", makefile
         )
-        # The pin is whatever games/PSoXide-cortex-current is checked out at;
+        # The pin is whatever games/PSoXide-editor is checked out at;
         # a literal here would turn every routine repin into a test failure.
         pinned = run(
             "git",
             "rev-parse",
             "HEAD",
-            cwd=ROOT / "games/PSoXide-cortex-current",
+            cwd=ROOT / "games/PSoXide-editor",
         ).stdout.strip()
         self.assertIn(f"CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= {pinned}", makefile)
         self.assertIn("cortex_ignition_tech_demo_0_4b.cue", makefile)
