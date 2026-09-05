@@ -182,18 +182,16 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or_else(|| format!("--version-of wants NAME=VERSION, got {spec:?}"))?;
                 versions.push((name.to_string(), version.trim().to_string()));
             }
-            "--gate" => {
-                gates.push(it.next().ok_or("--gate takes a display NAME".to_string())?)
-            }
+            "--gate" => gates.push(it.next().ok_or("--gate takes a display NAME".to_string())?),
             "--shot" => {
                 let (name, path) = split(&it.next().ok_or("--shot takes NAME=path")?, "--shot")?;
                 shots.push((name, path));
             }
             "--describe" => {
                 let spec = it.next().ok_or("--describe takes NAME=ENGLISH|ITALIAN")?;
-                let (name, text) = spec
-                    .split_once('=')
-                    .ok_or_else(|| format!("--describe wants NAME=ENGLISH|ITALIAN, got {spec:?}"))?;
+                let (name, text) = spec.split_once('=').ok_or_else(|| {
+                    format!("--describe wants NAME=ENGLISH|ITALIAN, got {spec:?}")
+                })?;
                 let (english, italian) = text.split_once('|').ok_or_else(|| {
                     format!("--describe wants the two languages split by '|', got {text:?}")
                 })?;
@@ -212,9 +210,9 @@ fn parse_args() -> Result<Args, String> {
             }
             "--menu-beat" => {
                 let spec = it.next().ok_or("--menu-beat takes MILLIBPM:PHASEMS")?;
-                let (bpm, phase) = spec.split_once(':').ok_or_else(|| {
-                    format!("--menu-beat wants MILLIBPM:PHASEMS, got {spec:?}")
-                })?;
+                let (bpm, phase) = spec
+                    .split_once(':')
+                    .ok_or_else(|| format!("--menu-beat wants MILLIBPM:PHASEMS, got {spec:?}"))?;
                 let parse = |v: &str, what: &str| {
                     v.parse::<u32>()
                         .map_err(|_| format!("--menu-beat {what} {v:?} is not a number"))
@@ -440,7 +438,8 @@ struct PlacedAudio {
 }
 
 fn write_cue(path: &Path, bin_name: &str, audio: &[PlacedAudio]) -> Result<(), String> {
-    let mut text = format!("FILE \"{bin_name}\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n");
+    let mut text =
+        format!("FILE \"{bin_name}\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n");
     for (index, track) in audio.iter().enumerate() {
         let number = index + 2;
         text.push_str(&format!("  TRACK {number:02} AUDIO\n"));
@@ -669,7 +668,6 @@ fn run() -> Result<(), String> {
         spectrum_data.extend_from_slice(&data);
     }
 
-
     // Screenshots, cooked by tools/cook-shots.py. Grouped by program (in
     // first-appearance order, keeping each program's own slideshow order) and
     // padded to sector boundaries, so the launcher addresses shot `i` as
@@ -715,8 +713,7 @@ fn run() -> Result<(), String> {
     let spectrum_sectors = sectors_for(spectrum_data.len());
     let shots_lba = spectrum_lba + spectrum_sectors;
     let shots_sectors = sectors_for(shots_bin.len());
-    let mut next_lba =
-        shots_lba + shots_sectors + sectors_for(launcher.len());
+    let mut next_lba = shots_lba + shots_sectors + sectors_for(launcher.len());
     let mut entries: Vec<Option<Entry>> = vec![None; args.programs.len()];
     let mut iso_files = Vec::new();
     let mut map = Vec::new();
@@ -768,10 +765,7 @@ fn run() -> Result<(), String> {
             let at = sector * SECTOR_BYTES + 24;
             let take = remaining.min(SECTOR_SIZE);
             let data = image.data.get(at..at + take).ok_or_else(|| {
-                format!(
-                    "{}: image ends inside its boot EXE payload",
-                    path.display()
-                )
+                format!("{}: image ends inside its boot EXE payload", path.display())
             })?;
             for &b in data {
                 hash ^= b as u32;
@@ -900,9 +894,11 @@ fn run() -> Result<(), String> {
         }
     }
     if !menu_audio.is_empty() && args.credit.is_empty() {
-        return Err("--menu-cdda without --credit: the menu has nowhere to attribute the \
+        return Err(
+            "--menu-cdda without --credit: the menu has nowhere to attribute the \
                     track, which is the one thing an attribution licence asks for"
-            .to_string());
+                .to_string(),
+        );
     }
 
     let toc = disc_toc::encode(
@@ -916,7 +912,11 @@ fn run() -> Result<(), String> {
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>(),
-        if spectrum_data.is_empty() { 0 } else { spectrum_lba },
+        if spectrum_data.is_empty() {
+            0
+        } else {
+            spectrum_lba
+        },
         &spectrum_frames,
         if shots_bin.is_empty() { 0 } else { shots_lba },
     )
@@ -1154,7 +1154,11 @@ mod tests {
             assert_eq!(sector[24], i as u8 + 1, "payload survived");
             let mut expect = vec![0u8; SECTOR_BYTES];
             rewrite_sector_msf(&mut expect, 1000 + i as u32);
-            assert_eq!(sector[0x0C..0x0F], expect[0x0C..0x0F], "sector {i} re-addressed");
+            assert_eq!(
+                sector[0x0C..0x0F],
+                expect[0x0C..0x0F],
+                "sector {i} re-addressed"
+            );
         }
     }
 
@@ -1173,12 +1177,8 @@ mod tests {
         ];
         let names = ["GH-PSX", "CORTEX", "PONG"];
         // Pong ships no audio of its own and asks for track 2, same as GH-PSX.
-        apply_shared_cdda(
-            &mut entries,
-            &names,
-            &[("PONG".into(), "GH-PSX".into())],
-        )
-        .expect("both names exist");
+        apply_shared_cdda(&mut entries, &names, &[("PONG".into(), "GH-PSX".into())])
+            .expect("both names exist");
         assert_eq!(entries[2].cdda_track_base, entries[0].cdda_track_base);
         assert_eq!(entries[1].cdda_track_base, 1, "others untouched");
     }
@@ -1186,12 +1186,8 @@ mod tests {
     #[test]
     fn sharing_with_a_program_that_is_not_on_the_disc_is_an_error() {
         let mut entries = [Entry::new("PONG", 0, 0, 0)];
-        let err = apply_shared_cdda(
-            &mut entries,
-            &["PONG"],
-            &[("PONG".into(), "GH-PSX".into())],
-        )
-        .unwrap_err();
+        let err = apply_shared_cdda(&mut entries, &["PONG"], &[("PONG".into(), "GH-PSX".into())])
+            .unwrap_err();
         assert!(err.contains("GH-PSX"), "{err}");
     }
 
@@ -1218,7 +1214,11 @@ mod tests {
         apply_descriptions(
             &mut entries,
             &["PONG", "VOXIDE"],
-            &[("VOXIDE".into(), "Voxel sandbox".into(), "Sandbox a voxel".into())],
+            &[(
+                "VOXIDE".into(),
+                "Voxel sandbox".into(),
+                "Sandbox a voxel".into(),
+            )],
         )
         .expect("the name exists");
         assert_eq!(entries[1].desc_en_str(), "Voxel sandbox");

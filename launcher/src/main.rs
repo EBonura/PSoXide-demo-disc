@@ -27,11 +27,11 @@ use psx_font::{
 use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaEndDetector, CddaStarter};
 use psx_io::cdrom::{self, PlayPosition};
-use psx_sfx::{Bank, OneShot, Player};
-use psx_spu::{self as spu, Adsr, CdVolume, Pitch, SpuAddr, Voice, Volume};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_pad::{button, poll_port1, ButtonState};
 use psx_rt::tty;
+use psx_sfx::{Bank, OneShot, Player};
+use psx_spu::{self as spu, Adsr, CdVolume, Pitch, SpuAddr, Voice, Volume};
 use psx_vram::{Clut, TexDepth, Tpage};
 
 /// The chain-load blob, linked at `LOADER_BASE` by `loader/loader.ld`.
@@ -556,10 +556,7 @@ fn main() {
             // Debug-only, and issued BEFORE this frame's GetStat: command
             // then status-drain is the order the controller tolerates (see
             // CddaStarter's note; the reverse has wedged it on silicon).
-            if debug
-                && music.started()
-                && tick.wrapping_sub(next_pos_poll) < u32::MAX / 2
-            {
+            if debug && music.started() && tick.wrapping_sub(next_pos_poll) < u32::MAX / 2 {
                 next_pos_poll = tick.wrapping_add(CDDA_POLL_TICKS);
                 if let Some(r) = cdrom::try_get_loc_p(CDDA_SPINS) {
                     if let Some(p) = PlayPosition::parse(&r) {
@@ -601,8 +598,7 @@ fn main() {
                     let near_end = header
                         .and_then(|h| h.spectrum_span(menu_track_index as usize))
                         .map_or(true, |(_, frames)| {
-                            let duration_ms =
-                                frames * 1000 / disc_toc::SPECTRUM_FRAME_RATE;
+                            let duration_ms = frames * 1000 / disc_toc::SPECTRUM_FRAME_RATE;
                             song_ms + END_MARGIN_MS >= duration_ms
                         });
                     if near_end {
@@ -615,9 +611,7 @@ fn main() {
                     }
                     hsk_begin = tick;
                     music.begin(tick);
-                } else if !track_end.armed()
-                    && tick.wrapping_sub(confirm_by) < u32::MAX / 2
-                {
+                } else if !track_end.armed() && tick.wrapping_sub(confirm_by) < u32::MAX / 2 {
                     // Accepted but never seen playing: re-run the start
                     // from Stop, same track, however long it takes. Silence
                     // first, as the manual skip does -- re-Playing over a
@@ -812,8 +806,7 @@ fn main() {
             }
         };
         let shake = yaw_rate.abs().max(pitch_rate.abs());
-        let scatter = ((shake - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5)
-            .min(SCATTER_MAX);
+        let scatter = ((shake - SPHERE_IDLE_SPIN).max(0) * SCATTER_PER_KICK / 5).min(SCATTER_MAX);
         // The warp term dwarfs the other two: the ball does not pulse its way
         // out, it detonates.
         let swell = swell_beat + scatter + warp.max(0) * WARP_SWELL;
@@ -1154,7 +1147,12 @@ fn draw_cd_debug(
     let mut buf = [0u8; 56];
     let mut emit = |small: &FontAtlas, y: &mut i16, buf: &[u8], n: usize| {
         // SAFETY: every byte written above is ASCII.
-        small.draw_text(x, *y, unsafe { core::str::from_utf8_unchecked(&buf[..n]) }, LABEL);
+        small.draw_text(
+            x,
+            *y,
+            unsafe { core::str::from_utf8_unchecked(&buf[..n]) },
+            LABEL,
+        );
         *y += 9;
     };
 
@@ -1214,10 +1212,22 @@ fn draw_cd_debug(
             n = put_dec(&mut buf, n + 2, p.index as u32);
             buf[n] = b' ';
             buf[n + 1] = b'R';
-            n = put_msf(&mut buf, n + 2, p.relative_min, p.relative_sec, p.relative_frame);
+            n = put_msf(
+                &mut buf,
+                n + 2,
+                p.relative_min,
+                p.relative_sec,
+                p.relative_frame,
+            );
             buf[n] = b' ';
             buf[n + 1] = b'A';
-            n = put_msf(&mut buf, n + 2, p.absolute_min, p.absolute_sec, p.absolute_frame);
+            n = put_msf(
+                &mut buf,
+                n + 2,
+                p.absolute_min,
+                p.absolute_sec,
+                p.absolute_frame,
+            );
         }
         None => n = put_str(&mut buf, n, "?"),
     }
@@ -1499,9 +1509,7 @@ fn shot_bytes(index: u8) -> &'static [u8] {
     let buffer = unsafe { &*core::ptr::addr_of!(SHOTS) };
     let words = &buffer[index as usize * SHOT_SLOT_WORDS..];
     // SAFETY: u32 -> u8 loosens alignment; SHOT_BYTES fits inside a slot.
-    unsafe {
-        core::slice::from_raw_parts(words.as_ptr() as *const u8, disc_toc::SHOT_BYTES)
-    }
+    unsafe { core::slice::from_raw_parts(words.as_ptr() as *const u8, disc_toc::SHOT_BYTES) }
 }
 
 fn read_spectrum(header: Option<&Header>) -> u32 {
@@ -1547,9 +1555,8 @@ fn spectrum_frame(header: &Header, track: u8, song_ms: u32, loaded_frames: u32) 
     let start = at * disc_toc::SPECTRUM_BANDS;
     // SAFETY: as `read_spectrum`; read-only here.
     let buffer = unsafe { &*core::ptr::addr_of!(SPECTRUM) };
-    let bytes = unsafe {
-        core::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 4)
-    };
+    let bytes =
+        unsafe { core::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 4) };
     bytes.get(start..start + disc_toc::SPECTRUM_BANDS)
 }
 

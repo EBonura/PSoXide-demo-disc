@@ -9,9 +9,9 @@ and Magikaaaaarp Pong. The private Half-Life pressing adds Half-Life as the
 tenth outer program. Everything on it is native PlayStation software built
 with the PSoXide Rust SDK.
 
-The standard disc keeps the work-in-progress Cortex card behind the Konami
-unlock. The Half-Life pressing shows it directly. Cortex Ignition is the
-current new-engine tech demo.
+Cortex Ignition 0.4b is visible directly on the carousel in both editions.
+The carousel also includes its own credits card (ten visible entries on the
+standard disc, eleven on the private Half-Life edition).
 
 To run:
   - Boot the .cue in a PS1 emulator (PSoXide, DuckStation, or PCSX-Redux), or
