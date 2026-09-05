@@ -184,7 +184,9 @@ launcher: loader
 		cargo build $(PSX_FLAGS)
 
 examples:
-	$(MAKE) -C $(PROGRAMS_PSOXIDE) hardware-tests-disc
+	$(MAKE) -C $(PROGRAMS_PSOXIDE) hardware-tests-disc \
+		ENGINE_EXAMPLE_CARGO_ENV='CARGO_TARGET_DIR=$(PROGRAMS_PSOXIDE)/build/examples RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T../../../sdk/psoxide.ld -Clink-arg=--oformat=binary"'
+	python3 $(SDK)/tools/hazard_scan.py $(EXAMPLES)/hardware-tests.exe
 
 # PSXcel and the Celeste collection never read the disc after boot, so they
 # ride as bare EXEs and do not care which SDK they were built against.
