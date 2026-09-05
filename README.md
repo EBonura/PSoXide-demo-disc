@@ -22,8 +22,29 @@ make check     # host tests, including the Quake pin check
 carousel reordered and Celeste directly after NitroXide. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
-`make itch` uploads the BIN/CUE download; `make release-web` updates the
-browser emulator build. Both commands reject `HL=1`.
+Every deployment updates both the BIN/CUE download and the playable browser
+disc. Stage them from the same tested image:
+
+```sh
+python3 tools/deploy_public.py \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.34 \
+  --emulator ../PSoXide-emulator --out /path/to/new-release --publish
+```
+
+This builds the browser emulator with Trunk, verifies the public game and audio
+layout, and proves the streamed audio/data reconstruct the original image.
+Omit `--publish` to prepare packages for review. `make itch` only updates the
+download; the older `make release-web` only stages GitHub delivery assets.
+Neither is a complete deployment on its own.
+
+After upload, check both live pages: launch Cortex from the browser carousel,
+check music and input, and confirm the downloadable version. Keep the existing
+page colours unless a change is requested. Update both pages' player-facing
+changelogs when gameplay changes ship.
+
+Google Drive is the third destination only when requested. Upload the private
+Half-Life edition to the personal Bonnie Studios folder, verify completion,
+and return its link. Never include that edition in either public package.
 
 The current public destinations are
 [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and the
