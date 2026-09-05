@@ -72,13 +72,13 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-The current layout has nine outer programs on the default pressing, and
-Half-Life adds a tenth. PSoXide Arcade is one of those programs and
-contains three games of its own. Automated evidence is recorded per program
-and must not be read as an
-original hardware claim. The current default disc is 99450 sectors (22:06:00,
-223.1 MiB, 8 CD-DA tracks); the Half-Life pressing is 303989 sectors
-(67:33:14, 681.9 MiB, 35 CD-DA tracks), which is 84% of an 80-minute CD-R.
+The current layout has nine outer programs plus Credits on the standard
+pressing; Half-Life adds a tenth program. PSoXide Arcade contains three games
+of its own, and Celeste Collection contains both Celeste Classic games.
+The standard disc has 8 CD-DA tracks; the Half-Life edition has 35. Disc size
+and image hashes are recorded in each build's receipts rather than fixed here.
+Automated evidence is recorded per program and is not an original-hardware
+claim. See [the dated split validation](docs/repository-split-validation-2026-09-05.md).
 
 | Program | How it ships |
 | --- | --- |
@@ -100,10 +100,9 @@ at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
 `CORTEX IGNITION` is the active new-engine entry. It comes from the exact
-`editor/projects/cortex-ignition-tech-demo-0.4` project named `Cortex Ignition Tech Demo 0.4` at the dedicated
-PSoXide pin recorded in the Makefile. The standard, publication-shaped pressing
-keeps this unfinished entry behind the Konami unlock. The private Half-Life
-pressing exposes it for direct testing. `QUAKE SHAREWARE` is the last program before
+`editor/projects/cortex-ignition-tech-demo-0.4b` project at the exact editor
+revision recorded in `release-components.json` and the Makefile. Both editions
+expose this early tech demo directly in the carousel. `QUAKE SHAREWARE` is the last program before
 CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,
 so a bare executable is not sufficient; the entry uses the same caller-provided
 LBA offset that relocates
@@ -111,7 +110,7 @@ Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
-After unlocking, the standard order is Cortex Ignition, Voxide, NitroXide,
+The standard order is Cortex Ignition, Voxide, NitroXide,
 Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
 Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
 cabinet selector for Breakout, Space Invaders and Magikarp Pong. The Half-Life
@@ -165,14 +164,11 @@ overwrites the launcher. A tail brighter than its head marks a star that
 wrapped back to the far plane between two frames, which is what keeps a streak
 from crossing the whole sky.
 
-None of it uses a texture or a float. Ellipses are triangle fans whose segment
+The menu's procedural geometry uses no floating point. Its screenshot cards
+and branding are cooked textures. Ellipses are triangle fans whose segment
 count follows their size: at a flat twelve the ball alone put the frame over
 2000 triangles and the menu stopped holding 60 Hz, which stretched every
 time-driven effect with it.
-
-No textures and no floating point. Ellipses are twelve-segment triangle fans
-shaded top to bottom; the ring and the sphere are one perspective divide each,
-depth-sorted back to front.
 
 ## Status
 
@@ -182,8 +178,8 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the locked standard carousel contains nine visible entries including
-  Credits; the unlock reveals the current Cortex Ignition entry
+- the standard carousel contains ten visible entries including Cortex
+  Ignition and Credits; the HL edition contains eleven
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
@@ -195,7 +191,28 @@ real-BIOS or original-console claim:
 
 ## Building
 
-Clone with `git clone --recurse-submodules`, then run `make components`.
+Install Rust through rustup, Make, Git, an authenticated GitHub CLI, Python 3,
+host C/C++ build tools, and `mipsel-none-elf-objdump` on `PATH`. Native frontend
+builds on Ubuntu also need `pkg-config libasound2-dev libudev-dev
+libxkbcommon-dev`; headless renderer checks need a working GPU backend, such
+as Mesa Vulkan. Private repository/submodule access is required.
+
+```sh
+git clone --recurse-submodules https://github.com/EBonura/PSoXide-demo-disc.git
+cd PSoXide-demo-disc
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install Pillow opencv-python-headless segno qrcode
+make components
+make release-frontend
+```
+
+The Python packages cover menu-image cooking and the label/QR test suite.
+Before `make disc`, provide the validated Quake source/artifacts described
+below and the authorized audio inputs in [audio/README.md](audio/README.md).
+The HL edition additionally needs a local Half-Life installation, found by
+its builder or supplied through `HL_DIR`.
+
 `release-components.json` locks the SDK, editor/engine/Cortex and standalone
 emulator separately. Their source receipts are checked before building.
 The launcher, loader, carousel and disc packer consume `games/PSoXide-sdk`;
@@ -232,9 +249,10 @@ borrows Arcade's relocated track instead of carrying a second copy.
 Two pressings exist. `make disc` builds the default one; `make disc HL=1`
 builds the same disc plus Half-Life, for show-floor demos, under a different
 name so the two bins cannot be confused. Both carry Quake shareware. The
-`games/hl-psx` and `games/psoxide-arcade` are private until their own releases,
-so a fresh clone needs access to Arcade even for the default pressing. The
-Half-Life pressing additionally requires access to HL-PSX.
+private submodules require repository access: a recursive clone fetches all
+submodules, including HL-PSX, even when the standard edition is selected.
+`HL=1` also requires the separately supplied original game data. Public
+release targets reject that edition.
 
 `make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
 sibling `quake-psx` checkout by default) and will not build without
