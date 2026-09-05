@@ -94,3 +94,14 @@ settings; combat music and the audio track lengths are unchanged. The source
 WAV SHA256 is `a5355af0d22dfe89e0d267a63f23178053b6a3a61fbf4a372e7c277749acbce1`.
 The changed revision invalidates the Cortex build cache on the next disc build.
 Earlier combined-disc hashes in this directory predate this audio replacement.
+
+## Updated Cortex combat music
+
+Cortex now pins `d2132e7e2946d1938a76b7759f404d10e191b7c4`, adding the updated
+`Cortex Boss (1).wav` as `cortex_boss.wav` while retaining the new menu music.
+The combat track is 72.727279 seconds, down from 77.090930 seconds, and its
+padded audio payload is 327 sectors shorter (5,455 instead of 5,782). Rebuild
+the Cortex input and combined disc so all subsequent offsets are regenerated.
+The changed source revision invalidates the Cortex build cache automatically.
+Source WAV SHA256: `18e07a90fa5f674fdfcd92c835a7606b0deead4346d4f3aeb526fc98cb84ce93`.
+Earlier combined-disc hashes and audio receipts predate this replacement.
