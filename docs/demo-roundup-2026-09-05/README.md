@@ -85,3 +85,12 @@ Rebuild with the normal release configuration and rerun the combined-disc
 receipt, chain-load and relocated audio checks before using the new pressing.
 Detailed HL validation is in the submodule's
 `docs/depth-ordering-2026-09-05.md`.
+
+## Updated Cortex menu music
+
+Cortex now pins `b77a054775342282967c6336da4df7bbf1abd010`, which replaces `menu2.wav` with the
+updated `Cortex Intro.wav` delivery. The three menu nodes retain their existing
+settings; combat music and the audio track lengths are unchanged. The source
+WAV SHA256 is `a5355af0d22dfe89e0d267a63f23178053b6a3a61fbf4a372e7c277749acbce1`.
+The changed revision invalidates the Cortex build cache on the next disc build.
+Earlier combined-disc hashes in this directory predate this audio replacement.
