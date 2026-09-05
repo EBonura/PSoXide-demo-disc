@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.33
+
+- Cortex Ignition: fixed the camera and movement failure triggered by Select, restored a fresh start when choosing New Game, and raised the default music volume.
+- hl-psx pressing: restored NPC replies and microwave interaction; corrected seated scientists, missing heads and the overturned cabinet drawing through a body.
+
 ## Source 2026.09.05
 
 This source snapshot is tagged `source-2026.09.05`. Download versions are

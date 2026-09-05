@@ -16,9 +16,9 @@ PSOXIDE    ?= $(ROOT)/games/PSoXide
 SDK ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR ?= $(ROOT)/games/PSoXide-emulator
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 0f12f4d8f5ebaf2ab3bdf0bd1a7a0469166d7c58
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 4a197e840a19c093e7aa58d8c22151011402f862
 CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 0f12f4d8f5ebaf2ab3bdf0bd1a7a0469166d7c58
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 4a197e840a19c093e7aa58d8c22151011402f862
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -167,9 +167,8 @@ V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 # The hardware suite already versions itself on screen; take that same string so
 # the carousel and the suite header cannot disagree.
 V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
-# Include the selected authored project version and its exact engine pin so
-# the carousel distinguishes the current 0.4b build from retired experiments.
-V_CORTEX_CURRENT := 0.4b-$(shell printf '%.7s' '$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)')
+# Build revisions are recorded in the release receipt.
+V_CORTEX_CURRENT := Tech demo
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
