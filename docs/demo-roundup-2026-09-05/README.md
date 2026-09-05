@@ -63,3 +63,25 @@ final standard pack was performed after the full HL build so both launchers
 identify build source `81f7a84`. `SHA256SUMS` records both BIN/CUE pairs.
 The later evidence/test-fixture commit does not change those image bytes.
 
+
+## Main integration: Half-Life depth ordering
+
+The source pin advances from `22c4f7c` to
+`50778a1eea549c046780cd85a37abbb184892568`, already on HL-PSX main with
+passing Source CI. It adds fractional actor-depth sorting inside the existing
+PS1 ordering-table buckets and keeps the rectangular wall-grid improvements.
+The matched scientist probe reduces wrong-depth samples from 177 to 52; the
+full opening tram measures 21.445 fps versus 21.476 fps before. Persistent RAM
+and primitive capacity remain unchanged.
+
+The validated normal standalone executable has SHA256
+`383bc08912a4addc7d4af851e7f5c95c7b64a9fd94fd33f27fa340cf525bda9f`; its disc has
+SHA256 `d5c8fd225a28e3cd7c8c897930df505f3f3d1f857e27fb47fc46fe11f6b2cd00`.
+All 27 Half-Life CDDA tracks and standalone CUE indices remain unchanged.
+
+The combined-disc hashes and replay logs above describe the earlier
+`22c4f7c` pressing. They do not certify a combined disc using the new pin.
+Rebuild with the normal release configuration and rerun the combined-disc
+receipt, chain-load and relocated audio checks before using the new pressing.
+Detailed HL validation is in the submodule's
+`docs/depth-ordering-2026-09-05.md`.
