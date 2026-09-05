@@ -1,0 +1,14 @@
+python3 tools/release_receipt.py verify --receipt "/Users/ebonura/Downloads/ps1 games/PSoXide Demo Disc HL.release-receipt.json"
+release receipt verified: /Users/ebonura/Downloads/ps1 games/PSoXide Demo Disc HL.release-receipt.json
+python3 tools/check_release_chainloads.py \
+		--frontend "/Users/ebonura/Desktop/repos/psx-demo-disc/games/PSoXide-runtime/target/release/frontend" \
+		--cue "/Users/ebonura/Downloads/ps1 games/PSoXide Demo Disc HL.cue"
+frontend SHA-256: 6aaf0e5ad6febe84e456532a92322a127ccfdaa95c7701ba3f172372bf14e98b
+cue SHA-256: 0b76f5033eb1bd7490f780ac9a496e015828f10d5e3407ce39eecf53159eb0f1
+bin SHA-256: 999c2646bab499d9770d420f835a11f4fa067f6de34c5440a92f0201034bdf36
+menu (11): CORTEX IGNITION, HALF-LIFE, VOXIDE, NITROXIDE, CELESTE COLLECTION, PSXCEL, GH-PSX, PSOXIDE ARCADE, HARDWARE TESTS, QUAKE SHAREWARE, CREDITS
+CORTEX IGNITION: PASS route=1000:cross:12,1400:cross:12,1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,3400:cross:12 version=0.4b-97a604f EXE-LBA=847 image-LBA=825 payload-FNV=0xbe9ee196 PC=0x80026754 samples=38932 CD=382 runtime-read=2342 VRAM=0xfd45715376e2f463 display=0x8346f3fde840bf56 gameplay=437/437 hashes=437 geometry-edge=192permille
+HALF-LIFE: PASS route=400:left:8,1000:cross:12,1400:cross:12,1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,3400:cross:12 version=0.2.0 EXE-LBA=2424 image-LBA=2402 payload-FNV=0x6edebb3f PC=0x8001f6b4 samples=40486 CD=186 runtime-read=3426 VRAM=0x493c9b4cb586e021 display=0x9e47d8bc43e6b8e1 gameplay=36/36 hashes=36 geometry-edge=0permille
+HARDWARE TESTS: PASS route=400:right:8,600:right:8,800:right:8,1200:cross:12 version=1.20 EXE-LBA=42242 image-LBA=42220 payload-FNV=0x8ee84075 PC=0x8006c66c samples=39512 CD=135 runtime-read=None VRAM=0x57129f545720186b display=0x839ef6872a349af1 gameplay=0/0 hashes=0 geometry-edge=0permille
+QUAKE SHAREWARE: PASS route=400:right:8,600:right:8,1000:cross:12 version=q263f43f EXE-LBA=43266 image-LBA=43244 payload-FNV=0xaf96dbfa PC=0x80011434 samples=41006 CD=441 runtime-read=44268 VRAM=0x0a6c09fa1111618c display=0xa95dc746ad31eedb gameplay=0/0 hashes=0 geometry-edge=0permille
+all release-critical chain-load replays are byte-deterministic

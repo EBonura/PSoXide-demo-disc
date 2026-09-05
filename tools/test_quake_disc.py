@@ -856,15 +856,15 @@ class MakeVariantContractTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (
             ROOT
-            / "games/PSoXide-cortex-current/editor/projects/cortex-ignition-tech-demo-0.5/project.ron"
+            / "games/PSoXide-cortex-current/editor/projects/cortex-ignition-tech-demo-0.4b/project.ron"
         ).read_text(encoding="utf-8")
         scene = project.split("resources:", 1)[0]
         self.assertIn(
-            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.5",
+            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.4b",
             makefile,
         )
         self.assertIn(
-            "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current", makefile
+            "CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b", makefile
         )
         # The pin is whatever games/PSoXide-cortex-current is checked out at;
         # a literal here would turn every routine repin into a test failure.
@@ -875,7 +875,7 @@ class MakeVariantContractTests(unittest.TestCase):
             cwd=ROOT / "games/PSoXide-cortex-current",
         ).stdout.strip()
         self.assertIn(f"CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= {pinned}", makefile)
-        self.assertIn("cortex_ignition_tech_demo_0_5.cue", makefile)
+        self.assertIn("cortex_ignition_tech_demo_0_4b.cue", makefile)
         self.assertNotIn("CORTEX_LEGACY", makefile)
         self.assertNotIn("CORTEX IGNITION LEGACY", makefile)
         self.assertNotIn(
