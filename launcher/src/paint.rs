@@ -7,9 +7,9 @@
 use carousel::{Bead, Placed, TURN};
 use psx_gpu::framebuf::FrameBuffer;
 use psx_gpu::material::{BlendMode, TextureMaterial};
-use psx_vram::{Clut, Color555, TexDepth, Tpage, VramRect};
 use psx_gpu::{self as gpu};
 use psx_math::{cos_q12, sin_q12};
+use psx_vram::{Clut, Color555, TexDepth, Tpage, VramRect};
 
 /// Most segments an ellipse is drawn with. These are triangle fans, so this is
 /// the polygon count: at twelve the pills read as coarse dodecagons, and at
@@ -181,7 +181,6 @@ pub fn level_meter_beat(x: i16, base_y: i16, pulse: u8) {
         meter_bar(x + bar * METER_PITCH, base_y, level);
     }
 }
-
 
 /// Flags are drawn at this size in the top-right corner. Two to one, which is
 /// the Union flag's own ratio; at three to two it read as squat.
@@ -531,8 +530,12 @@ fn shot_clut_bank() -> usize {
 fn set_shot_clut_bank(bank: usize) {
     unsafe { core::ptr::write(&raw mut SHOT_CLUT_BANK, bank) }
 }
-const SHOT_RECT: VramRect =
-    VramRect::new(512, 256, (disc_toc::SHOT_W / 2) as u16, disc_toc::SHOT_H as u16);
+const SHOT_RECT: VramRect = VramRect::new(
+    512,
+    256,
+    (disc_toc::SHOT_W / 2) as u16,
+    disc_toc::SHOT_H as u16,
+);
 
 /// Send one cooked shot (CLUT then pixels, `disc_toc::SHOT_BYTES` of it)
 /// into the screenshot's VRAM slot. Only call while the shot is faded to
