@@ -18,11 +18,9 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-The owner approved public non-commercial distribution of the standard pressing
-with the canonical Quake 1.06 shareware payload on 2026-08-25. `make itch`
-publishes its flat BIN/CUE download, while `make release-web` updates the split
-disc delivery consumed by the browser emulator. Both commands reject `HL=1`;
-the Half-Life pressing is never sent to either public destination.
+The public disc includes Quake 1.06 shareware and excludes Half-Life.
+`make itch` uploads the BIN/CUE download; `make release-web` updates the
+browser emulator build. Both commands reject `HL=1`.
 
 The current public destinations are
 [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and the
@@ -306,3 +304,8 @@ The Quake input also requires its schema-1 shipping sidecar, which binds the
 clean Quake and PSoXide revisions, canonical shareware PAK, guest recipe and
 toolchain, and actual cue/bin/EXE bytes. See
 [the Quake runbook](docs/quake-shareware.md).
+
+## Recent changes
+
+Source snapshot **2026.09.05**: Documented the SDK, engine/editor, emulator and game revision pins used by the disc.
+See the [changelog](CHANGELOG.md) for the remaining changes and published download versions.
