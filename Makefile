@@ -432,15 +432,15 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		$(QUAKE_ARGS) \
 		$(HL_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
-		--game "CELESTE COLLECTION=$(CELESTE)" \
-		--game "PSXCEL=$(PSXCEL)" \
-		--image "GH-PSX=$(GHPSX)" \
 		--image "PSOXIDE ARCADE=$(ARCADE)" \
+		--image "GH-PSX=$(GHPSX)" \
+		--game "PSXCEL=$(PSXCEL)" \
+		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "HARDWARE TESTS=$(HWTESTS)" \
-		$(QUAKE_ARGS) \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
