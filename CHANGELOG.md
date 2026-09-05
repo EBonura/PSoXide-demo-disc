@@ -2,6 +2,8 @@
 
 ## v0.34
 
+- Celeste Collection follows NitroXide in the carousel.
+
 - Includes the Cortex Ignition and hl-psx gameplay fixes and the reordered carousel from the v0.33 test builds.
 
 ## v0.33.1
