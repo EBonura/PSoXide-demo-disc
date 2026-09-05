@@ -1,32 +1,40 @@
-PSoXide Demo Disc (PSX)
-=======================
+PSoXide Demo Disc v0.34
+======================
 
-The standard disc carries nine outer programs: the current new-engine Cortex
-Ignition, VoXide, NitroXide, the Celeste Classic
-Collection, PSXcel, GH-PSX, PSoXide Arcade, the hardware test suite, and Quake
-Shareware. PSoXide Arcade opens its own selector for Breakout, Space Invaders,
-and Magikaaaaarp Pong. The private Half-Life pressing adds Half-Life as the
-tenth outer program. Everything on it is native PlayStation software built
-with the PSoXide Rust SDK.
+A little of everything. One PlayStation disc.
 
-Cortex Ignition 0.4b is visible directly on the carousel in both editions.
-The carousel also includes its own credits card (ten visible entries on the
-standard disc, eleven on the private Half-Life edition).
+Choose from Cortex Ignition Tech Demo, Quake Shareware, VoXide, NitroXide,
+Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. The disc also
+includes a Hardware Tests menu. Arcade contains Breakout, Space Invaders
+and Magikaaaaarp Pong.
 
-To run:
-  - Boot the .cue in a PS1 emulator (PSoXide, DuckStation, or PCSX-Redux), or
-  - burn it to a CD-R and run on a modchipped console.
+What's new in v0.34
+------------------
+- Cortex: fixed the camera and movement failure triggered by Select.
+- Cortex: New Game starts fresh after returning to the title.
+- Cortex: louder default music. Saved volume preferences are preserved.
+- Reordered the carousel, with Cortex and Quake first and Celeste after NitroXide.
 
-In the menu: D-pad to browse, Cross to launch. Each program returns to the
-menu on reset.
+How to play
+-----------
+Extract the download and keep the CUE and BIN together with their original
+names. Open the CUE in your PlayStation emulator and set up your controller.
+For an original PlayStation, use a setup that can load homebrew discs.
+When writing a CD-R, select the CUE so the music tracks are included.
 
+Left/right: choose a game. Cross: play. Up/down: English/Italian description.
+L1/R1: change menu music. Follow each game's prompts for its own controls.
+To switch games, return to the disc menu where supported or restart the disc.
+
+Credits
+-------
 Menu music: four tracks by Just Music
-(https://www.youtube.com/@Just-Music-Beats), used with the artist's
-permission. Non-commercial, do not redistribute the audio separately.
+https://www.youtube.com/@Just-Music-Beats
+Used with the artist's permission for this non-commercial release.
+Do not redistribute the audio separately.
 
-Goncharov: magikAAAAArp
-(https://www.youtube.com/@magikAAAAArp/videos), used with the band's
-permission. PSoXide Arcade owns the track used by Magikarp Pong; GH-PSX
-borrows that same physical copy.
+Goncharov, used in Magikaaaaarp Pong and GH-PSX, is by magikAAAAArp:
+https://www.youtube.com/@magikAAAAArp/videos
+Included with the band's permission. Individual games retain their own credits.
 
-Bonnie Studios  -  https://bonnie-studios.itch.io
+Bonnie Studios: https://bonnie-studios.itch.io

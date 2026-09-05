@@ -18,6 +18,9 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
+**v0.34** includes the Cortex camera, New Game and music fixes, with the
+carousel reordered and Celeste directly after NitroXide. See [the changelog](CHANGELOG.md).
+
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 `make itch` uploads the BIN/CUE download; `make release-web` updates the
 browser emulator build. Both commands reject `HL=1`.
