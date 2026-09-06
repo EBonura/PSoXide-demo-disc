@@ -2,6 +2,10 @@
 
 ## v0.35
 
+- Cortex: enemies switch between melee and ranged stances as the distance changes, respecting the five-second swap cooldown.
+- Cortex: new heavy-enemy attack animations and chest-fired shots, with longer melee contact windows.
+- Cortex: combat music starts at a random point and loops; inactive stance health recovers more slowly.
+
 - Cortex: new stance changes burst into polygons and rebuild from feet to head, with a smooth return to Aletha's colours.
 - Cortex: dashes leave fading fragments behind a travelling wireframe, then gradually restore the body.
 - Cortex: faster sprint response, cleaner stops, shorter evades and a five-second stance cooldown.
