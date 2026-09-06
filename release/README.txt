@@ -10,6 +10,9 @@ and Magikaaaaarp Pong.
 
 What's new in v0.35
 ------------------
+- Cortex: enemies switch between melee and ranged stances as you move closer or farther away, respecting the swap cooldown.
+- Cortex: three new heavy-enemy attacks, chest-fired projectiles and longer melee contact windows.
+- Cortex: combat music starts at a random point and loops; inactive stance health recovers more slowly.
 - Cortex: new stance changes burst into polygons and rebuild from feet to head, with a smooth return to Aletha's colours.
 - Cortex: dashes leave fading fragments behind a travelling wireframe, then gradually restore the body.
 - Cortex: faster sprint response, cleaner stops, shorter evades and a five-second stance cooldown.
