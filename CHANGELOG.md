@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.35
+
+- Cortex: new stance changes burst into polygons and rebuild from feet to head, with a smooth return to Aletha's colours.
+- Cortex: dashes leave fading fragments behind a travelling wireframe, then gradually restore the body.
+- Cortex: faster sprint response, cleaner stops, shorter evades and a five-second stance cooldown.
+- Cortex: better swing sounds, trails and hit timing; reworked heavy-enemy combos and improved ranged aiming.
+- Cortex: improved close-space camera handling, clearer module prompts and animated message dismissal.
+- Cortex: combat music continues through the inventory, new pickup and entry sounds, and a darker default brightness.
+
 ## v0.34
 
 - Celeste Collection follows NitroXide in the carousel.

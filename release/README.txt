@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.34
+PSoXide Demo Disc v0.35
 ======================
 
 A little of everything. One PlayStation disc.
@@ -8,12 +8,14 @@ Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. The disc also
 includes a Hardware Tests menu. Arcade contains Breakout, Space Invaders
 and Magikaaaaarp Pong.
 
-What's new in v0.34
+What's new in v0.35
 ------------------
-- Cortex: fixed the camera and movement failure triggered by Select.
-- Cortex: New Game starts fresh after returning to the title.
-- Cortex: louder default music. Saved volume preferences are preserved.
-- Reordered the carousel, with Cortex and Quake first and Celeste after NitroXide.
+- Cortex: new stance changes burst into polygons and rebuild from feet to head, with a smooth return to Aletha's colours.
+- Cortex: dashes leave fading fragments behind a travelling wireframe, then gradually restore the body.
+- Cortex: faster sprint response, cleaner stops, shorter evades and a five-second stance cooldown.
+- Cortex: better swing sounds, trails and hit timing; reworked heavy-enemy combos and improved ranged aiming.
+- Cortex: improved close-space camera handling, clearer module prompts and animated message dismissal.
+- Cortex: combat music continues through the inventory, new pickup and entry sounds, and a darker default brightness.
 
 How to play
 -----------

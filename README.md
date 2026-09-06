@@ -18,8 +18,8 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.34** includes the Cortex camera, New Game and music fixes, with the
-carousel reordered and Celeste directly after NitroXide. See [the changelog](CHANGELOG.md).
+**v0.35** adds Cortex's polygon stance and dash effects, more responsive movement,
+improved combat feedback and closer camera handling. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 Every deployment updates both the BIN/CUE download and the playable browser
@@ -27,7 +27,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.34 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.35 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
