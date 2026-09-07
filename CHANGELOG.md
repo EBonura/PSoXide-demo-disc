@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.36
+
+- Cortex: enemies now dissolve from the top down after defeat, with rising fragments that fade before the body is removed.
+- Cortex: the latest combat audio, stance, dash and movement polish is included in both the browser build and the downloadable disc.
+
 ## v0.35
 
 - Cortex: enemies switch between melee and ranged stances as the distance changes, respecting the five-second swap cooldown.
