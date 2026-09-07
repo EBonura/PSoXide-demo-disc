@@ -9,7 +9,7 @@
     "editor": {
       "path": "games/PSoXide-editor",
       "repository": "EBonura/PSoXide-editor",
-      "revision": "f9c002a4dcab0a1efebcbad5ec6484a6b87e65af"
+      "revision": "f9c002a450ce10ba7d8003922f50e41a9b617fcc"
     },
     "emulator": {
       "path": "games/PSoXide-emulator",
