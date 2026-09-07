@@ -18,7 +18,7 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.35** adds Cortex's polygon stance and dash effects, more responsive movement,
+**v0.36** adds Cortex's enemy death dissolve, refreshed combat feedback, polygon stance and dash effects, more responsive movement,
 improved combat feedback and closer camera handling. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
@@ -27,7 +27,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.35 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.36 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
