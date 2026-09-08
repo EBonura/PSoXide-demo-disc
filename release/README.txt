@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.35
+PSoXide Demo Disc v0.36
 ======================
 
 A little of everything. One PlayStation disc.
@@ -8,8 +8,10 @@ Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. The disc also
 includes a Hardware Tests menu. Arcade contains Breakout, Space Invaders
 and Magikaaaaarp Pong.
 
-What's new in v0.35
+What's new in v0.36
 ------------------
+- Quake: fixed the loading-screen hang on original PlayStation hardware, verified on a real console on 8 September 2026.
+- Cortex: defeated enemies dissolve from head to feet into rising, fading fragments.
 - Cortex: enemies switch between melee and ranged stances as you move closer or farther away, respecting the swap cooldown.
 - Cortex: three new heavy-enemy attacks, chest-fired projectiles and longer melee contact windows.
 - Cortex: combat music starts at a random point and loops; inactive stance health recovers more slowly.
