@@ -2,6 +2,9 @@
 
 ## v0.36
 
+- Quake: fixed the loading-screen hang on original PlayStation hardware. The CD now stays paused while cached map nodes are converted. Verified on console on 8 September; replaces the earlier v0.36 download and browser build.
+- Quake: loading now shows the active stage and displays a CD diagnostic code if a sound or level load fails.
+
 - Cortex: enemies now dissolve from the top down after defeat, with rising fragments that fade before the body is removed.
 - Cortex: the latest combat audio, stance, dash and movement polish is included in both the browser build and the downloadable disc.
 

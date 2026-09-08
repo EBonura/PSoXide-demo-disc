@@ -943,7 +943,7 @@ def print_repin(args: argparse.Namespace) -> None:
     print("# then, in this order:")
     print(f"#   git -C games/PSoXide checkout {declared} && git add games/PSoXide")
     print("#   make disc")
-    print("#   make quake-headless-check   (recompute the two FNV pins it prints)")
+    print("#   make quake-headless-check   (two deterministic replays, Quake selected by name)")
     if dirty:
         print()
         print("# WARNING: the Quake tree is dirty, so these values name no revision.")

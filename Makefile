@@ -76,12 +76,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 263f43f9ad5521b5203c8514d0369ab1345de7ba
+QUAKE_EXPECTED_REV ?= 0d8c13b855c90a9d878507f7284828f25a91d37e
 QUAKE_EXPECTED_PSOXIDE_REV ?= 8df242b353b8a3664c1d2ed20622d692d1349306
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 031ad79e5332c590d2fc2501b26ead32278b54ed4c995eec2f5e83d8c94a9260
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 251d3270e89070a41b10683758098417ec3d202de790a03c59e1cabf17bdb9ee
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 903edba2b460363fd5804f4bf267643d9f844ff5e7ce2facc95f7569a1d89360
-QUAKE_EXPECTED_EXE_SHA256 ?= 32e6a4e0a678e02c9278f34803bef503e9e51ff355e174aae8dbace2a255b2ac
+QUAKE_EXPECTED_BIN_SHA256 ?= ef6988d2da16586b855d2989edcf60d57ad33231a21bbd67aa84cbaa2fb82cd2
+QUAKE_EXPECTED_EXE_SHA256 ?= bc06368fbe26cd215e551bbcdbebecc60fbc8f45e53b13f05dbb936000414ca7
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -345,11 +345,10 @@ program-headless-check:
 		--jobs 3
 
 _quake-headless-check:
-	python3 tools/check_quake_headless.py \
+	python3 tools/check_release_chainloads.py \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
-		--receipt "$(DIST)/$(DISC_NAME).quake-provenance.json" \
-		--expected-menu-entries "$(if $(HL),11,10)"
+		--target "QUAKE SHAREWARE"
 
 # Burn gate for the one-disc private pressing.  Rebuild first: a release gate
 # that accepted `disc-only` could prove a perfectly deterministic stale guest.
@@ -381,7 +380,7 @@ _release-headless-check:
 # follow them, and writes nothing. Editing by hand is the point: the diff then
 # shows exactly which contract moved, and a repin that rewrote the pins itself
 # would be a verifier agreeing with whatever it was handed. README.md has the
-# full procedure, including the two FNV pins in tools/check_quake_headless.py.
+# full procedure. The chain-load gate resolves Quake by its pressed name.
 quake-repin:
 	@python3 tools/quake_disc.py repin \
 		--source "$(QUAKE_SRC)" \
