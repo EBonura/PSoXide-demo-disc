@@ -849,7 +849,8 @@ class MakeVariantContractTests(unittest.TestCase):
         )
         self.assertEqual(headless.returncode, 0, headless.stderr)
         stamp_at = headless.stdout.index("programs.psoxide-revision")
-        replay_at = headless.stdout.index("tools/check_quake_headless.py")
+        replay_at = headless.stdout.index("tools/check_release_chainloads.py")
+        self.assertIn('--target "QUAKE SHAREWARE"', headless.stdout)
         self.assertLess(stamp_at, replay_at)
 
     def test_cortex_bakes_only_the_current_project(self) -> None:
