@@ -18,7 +18,8 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.36** adds Cortex's enemy death dissolve, refreshed combat feedback, polygon stance and dash effects, more responsive movement,
+**v0.36** fixes Quake getting stuck before its main menu on original PlayStation
+hardware, verified on console on 8 September. It also adds Cortex's enemy death dissolve, refreshed combat feedback, polygon stance and dash effects, more responsive movement,
 improved combat feedback and closer camera handling. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
@@ -277,7 +278,7 @@ submodules, including HL-PSX, even when the standard edition is selected.
 release targets reject that edition.
 
 `make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
-sibling `quake-psx` checkout by default) and will not build without
+sibling `quake-psx-pinned` checkout by default) and will not build without
 it. `make quake-headless-check` is the gate to run before a burn: it chain-
 loads Quake off the built disc twice and requires the two replays to agree.
 
@@ -314,11 +315,10 @@ Paste those six lines over the ones near the top of the `Makefile`, then:
 3. `make disc` -- rebuilds every ordinary program against the shared runtime,
    re-verifies both SDK inputs and the Quake image, and writes the provenance
    receipt beside the image.
-4. `make quake-headless-check` -- if `EXPECTED_VRAM_FNV` or
-   `EXPECTED_DISPLAY_FNV` in `tools/check_quake_headless.py` fail, the error
-   prints the values the new build produced. Those two are the only pins
-   outside the Makefile. Paste them in and run it again, so a green run is
-   the proof rather than the edit.
+4. `make quake-headless-check` -- the shared release checker locates Quake
+   by name in the pressed carousel, verifies its executable checksum and
+   runtime reads, and requires two identical successful chain-load replays.
+   It does not require hand-updating a screenshot hash when the layout changes.
 
 Nothing rewrites a pin on your behalf. A repin that edited its own contract
 would be a verifier that agrees with whatever it is handed, and the diff is
