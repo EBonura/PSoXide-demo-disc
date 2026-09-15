@@ -52,11 +52,17 @@ class QuakeFixture:
         run("git", "config", "user.name", "Test", cwd=self.psoxide)
         run("git", "config", "user.email", "test@example.invalid", cwd=self.psoxide)
         (self.psoxide / "sdk.txt").write_text("pinned\n", encoding="ascii")
-        run("git", "add", "sdk.txt", cwd=self.psoxide)
+        self.components = {
+            "sdk": {"repository": "EBonura/PSoXide", "revision": "a" * 40, "paths": ["sdk"]},
+            "emulator": {"repository": "EBonura/PSoXide-emulator", "revision": "b" * 40, "paths": ["emu"]},
+        }
+        (self.psoxide / "components.lock.json").write_text(json.dumps({"schema": 1, "components": self.components}))
+        run("git", "add", "sdk.txt", "components.lock.json", cwd=self.psoxide)
         run("git", "commit", "-q", "-m", "fixture", cwd=self.psoxide)
         self.psoxide_revision = run(
             "git", "rev-parse", "HEAD", cwd=self.psoxide
         ).stdout.strip()
+        self.components["editor"] = {"repository": "EBonura/PSoXide-editor", "revision": self.psoxide_revision, "paths": ["engine"]}
         self.programs_stamp = root / "programs.psoxide-revision"
         self.programs_stamp.write_text(self.psoxide_revision + "\n", encoding="ascii")
 
@@ -67,13 +73,14 @@ class QuakeFixture:
         run("git", "config", "user.email", "test@example.invalid", cwd=self.source)
         (self.source / ".gitignore").write_text("dist/\n", encoding="ascii")
         (self.source / "tracked.txt").write_text("pinned\n", encoding="ascii")
+        (self.source / "components.lock.json").write_text(json.dumps({"schema": 1, "components": self.components}))
         declaration = self.source / quake_disc.PSOXIDE_REV_FILE
         declaration.parent.mkdir(parents=True)
         declaration.write_text(
             f'const PSOXIDE_REV: &str = "{self.psoxide_revision}";\n', encoding="ascii"
         )
         run(
-            "git", "add", ".gitignore", "tracked.txt", str(declaration), cwd=self.source
+            "git", "add", ".gitignore", "tracked.txt", "components.lock.json", str(declaration), cwd=self.source
         )
         run("git", "commit", "-q", "-m", "fixture", cwd=self.source)
         self.revision = run("git", "rev-parse", "HEAD", cwd=self.source).stdout.strip()
@@ -105,6 +112,8 @@ class QuakeFixture:
             "schema": quake_disc.QUAKE_PROVENANCE_SCHEMA,
             "quake_source": {"revision": self.revision, "tree_clean": True},
             "psoxide": {
+                "repository": "EBonura/PSoXide-editor",
+                "components": self.components,
                 "revision": self.psoxide_revision,
                 "tree_clean": True,
                 "source_kind": quake_disc.PSOXIDE_SOURCE_KIND,
@@ -281,6 +290,16 @@ class VerifyQuakeTests(unittest.TestCase):
 
             self.assertEqual(verified.psoxide_revision, fixture.psoxide_revision)
             self.assertEqual(verified.programs_psoxide_revision, programs_revision)
+
+    def test_rejects_component_provenance_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = QuakeFixture(Path(directory))
+            document = json.loads(fixture.provenance.read_text())
+            document["psoxide"]["components"]["sdk"]["revision"] = "c" * 40
+            fixture.write_provenance(document)
+            fixture.provenance_sha256 = digest(fixture.provenance)
+            with self.assertRaisesRegex(quake_disc.VerificationError, "component provenance differs"):
+                fixture.verify()
 
     def test_rejects_wrong_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -767,7 +786,7 @@ class MakeVariantContractTests(unittest.TestCase):
         )
         self.assertEqual(quake.returncode, 0, quake.stderr)
         programs_at = quake.stdout.index("PSOXIDE_FROM=")
-        coherence_at = quake.stdout.index('expected="local:')
+        coherence_at = quake.stdout.index('tools/components.py --check --games')
         stamp_at = quake.stdout.index("programs.psoxide-revision.tmp")
         verify_at = quake.stdout.index("tools/quake_disc.py verify")
         self.assertIn(f"DIST={ROOT}/games/voxide/dist", quake.stdout)
@@ -778,7 +797,7 @@ class MakeVariantContractTests(unittest.TestCase):
 
     def test_lock_audit_includes_both_psoxide_inputs(self) -> None:
         script = (ROOT / "tools" / "check-locks.sh").read_text(encoding="utf-8")
-        self.assertIn("games/PSoXide ", script)
+        self.assertNotIn("games/PSoXide ", script)
         self.assertIn("games/PSoXide-editor ", script)
 
     def test_disc_runtime_crates_do_not_use_quakes_frozen_sdk(self) -> None:

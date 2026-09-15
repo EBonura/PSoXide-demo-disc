@@ -655,6 +655,22 @@ def verify_provenance(
     }
 
 
+def verify_component_provenance(source: Path, editor: Path, provenance: Path, revision: str) -> None:
+    try:
+        expected = json.loads((source / "components.lock.json").read_text())["components"]
+        nested = json.loads((editor / "components.lock.json").read_text())["components"]
+        recorded = json.loads(provenance.read_text())["psoxide"]
+        if recorded["repository"] != "EBonura/PSoXide-editor" or recorded["components"] != expected:
+            raise VerificationError("Quake component provenance differs from its source lock")
+        if expected["editor"]["revision"] != revision or expected["editor"]["repository"] != recorded["repository"]:
+            raise VerificationError("Quake editor component differs from the selected checkout")
+        for name in ("sdk", "emulator"):
+            if expected[name] != nested[name]:
+                raise VerificationError(f"Quake {name} component differs from the selected editor lock")
+    except (OSError, KeyError, ValueError, TypeError) as error:
+        raise VerificationError(f"missing or invalid Quake component provenance: {error}") from error
+
+
 def verify_quake(
     source: Path,
     psoxide: Path,
@@ -747,6 +763,7 @@ def verify_quake(
         expected_bin_sha256,
         expected_exe_sha256,
     )
+    verify_component_provenance(source, psoxide, provenance, psoxide_revision)
     return VerifiedQuake(
         source_revision=revision,
         declared_psoxide_revision=declared_revision,
@@ -941,7 +958,7 @@ def print_repin(args: argparse.Namespace) -> None:
     print(f"QUAKE_EXPECTED_EXE_SHA256 ?= {sha256(exe)}")
     print()
     print("# then, in this order:")
-    print(f"#   git -C games/PSoXide checkout {declared} && git add games/PSoXide")
+    print(f"#   git -C games/PSoXide-editor checkout {declared} && git add games/PSoXide-editor")
     print("#   make disc")
     print("#   make quake-headless-check   (two deterministic replays, Quake selected by name)")
     if dirty:
