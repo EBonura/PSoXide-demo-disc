@@ -113,7 +113,8 @@ def receipt(output, cue, frontend):
         if git(source, "status", "--porcelain", "--untracked-files=normal"):
             raise RuntimeError(f"{path}: source is dirty")
         row = {"revision": revision}
-        for name in ("components.lock.json", ".components-receipt.json"):
+        for name in ("components.lock.json", ".components-receipt.json",
+                     ".psoxide/.components-receipt.json", ".psoxide/.psoxide-source"):
             if (source / name).is_file():
                 row[name] = file_record(source / name)
         repositories[path] = row
