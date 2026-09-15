@@ -12,13 +12,13 @@
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
-PSOXIDE    ?= $(ROOT)/games/PSoXide
+PSOXIDE    ?= $(ROOT)/games/PSoXide-editor
 SDK ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR ?= $(ROOT)/games/PSoXide-emulator
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 13dca06b1f48854a766dde67e3e36c2e28b7e893
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 35725f597a248c298124baf82cc8e07964812e39
 CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 13dca06b1f48854a766dde67e3e36c2e28b7e893
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 35725f597a248c298124baf82cc8e07964812e39
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -73,15 +73,15 @@ override HL := $(filter-out 0,$(HL))
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
 # and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 06dc3ef45cb39e238ebdc49d586c62db2681eb58
-QUAKE_EXPECTED_PSOXIDE_REV ?= 5fa8c351c0b168ba6fea78d27e7134f668dab137
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 251d3270e89070a41b10683758098417ec3d202de790a03c59e1cabf17bdb9ee
+QUAKE_EXPECTED_REV ?= 851e672c34588dde63adf8836efcbdd2b89ebda6
+QUAKE_EXPECTED_PSOXIDE_REV ?= 35725f597a248c298124baf82cc8e07964812e39
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= f7a9b9867fafa45ef4df85a342c6743546e1879aba0633c8b82510c96936a8c2
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= ef6988d2da16586b855d2989edcf60d57ad33231a21bbd67aa84cbaa2fb82cd2
-QUAKE_EXPECTED_EXE_SHA256 ?= bc06368fbe26cd215e551bbcdbebecc60fbc8f45e53b13f05dbb936000414ca7
+QUAKE_EXPECTED_BIN_SHA256 ?= ec4a51031daa19567ba1e16008a23701cb33363c7c8959d66b8e7153da61bb1f
+QUAKE_EXPECTED_EXE_SHA256 ?= d90b31cbcb260c6786fd712e6475edf0a14809dabc64ce76fc81437cd61840d8
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -609,22 +609,7 @@ sdk-on-main: components
 
 .PHONY: sdk-coherence
 sdk-coherence:
-	@expected="local:$(PROGRAMS_PSOXIDE)"; bad=0; seen=0; \
-	for m in $(GAMES)/*/.psoxide/.psoxide-source; do \
-		[ -f "$$m" ] || continue; \
-		seen=$$((seen+1)); \
-		got=$$(cat "$$m"); \
-		name=$$(basename $$(dirname $$(dirname "$$m"))); \
-		if [ "$$got" != "$$expected" ]; then \
-			echo "sdk-coherence: $$name is on $$got, not $$expected"; \
-			bad=1; \
-		fi; \
-	done; \
-	if [ $$bad -ne 0 ]; then \
-		echo "sdk-coherence: run 'make programs' to put every game on this tree"; \
-		exit 1; \
-	fi; \
-	echo "sdk-coherence: $$seen game(s) on $(PROGRAMS_PSOXIDE)"
+	python3 tools/components.py --check --games $(if $(HL),--hl,)
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its

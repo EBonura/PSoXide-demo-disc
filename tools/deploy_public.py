@@ -48,11 +48,41 @@ def run(*args, **kwargs):
     subprocess.run([str(a) for a in args], check=True, **kwargs)
 
 
+WEB_RECEIPT = "emulator-build.json"
+
+
+def web_record(directory, revision, lock_sha256):
+    return {
+        "schema": 1, "emulator_revision": revision, "components_lock_sha256": lock_sha256,
+        "files": {str(path.relative_to(directory)): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in sorted(directory.rglob("*")) if path.is_file() and path.name != WEB_RECEIPT},
+    }
+
+
+def verify_web_build(directory, revision, lock_sha256):
+    path = directory / WEB_RECEIPT
+    if not path.is_file():
+        raise ValueError("reused web build has no emulator source and content receipt; rebuild it")
+    recorded = json.loads(path.read_text())
+    if recorded != web_record(directory, revision, lock_sha256):
+        raise ValueError("reused web build differs from the locked emulator or its content receipt")
+
+
+def selected_emulator(emulator):
+    selected = json.loads((ROOT / "release-components.json").read_text())["components"]["emulator"]
+    revision = subprocess.check_output(["git", "-C", str(emulator), "rev-parse", "HEAD"], text=True).strip()
+    dirty = subprocess.check_output(["git", "-C", str(emulator), "status", "--porcelain", "--untracked-files=normal"], text=True).strip()
+    if revision != selected["revision"] or dirty:
+        raise ValueError("web emulator must be the clean revision selected by release-components.json")
+    run(sys.executable, emulator / "tools/bootstrap-components.py", "--check")
+    return revision, hashlib.sha256((emulator / "components.lock.json").read_bytes()).hexdigest()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cue", type=Path, required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--emulator", type=Path, default=ROOT.parent / "PSoXide-emulator")
+    parser.add_argument("--emulator", type=Path, default=ROOT / "games/PSoXide-emulator")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--web-build", type=Path, help="reuse an already built Trunk directory")
     parser.add_argument("--publish", action="store_true", help="upload BOTH verified packages")
@@ -70,10 +100,11 @@ def main():
     for source in (cue, image, ROOT / "release/README.txt"):
         shutil.copy2(source, download / source.name)
     emulator = args.emulator.resolve()
+    emulator_revision, emulator_lock_sha256 = selected_emulator(emulator)
     if args.web_build:
+        verify_web_build(args.web_build.resolve(), emulator_revision, emulator_lock_sha256)
         shutil.copytree(args.web_build.resolve(), web)
     else:
-        run(sys.executable, emulator / "tools/bootstrap-components.py", "--check")
         env = dict(os.environ)
         env.pop("NO_COLOR", None)
         env["RUSTFLAGS"] = "-C target-feature=+simd128 -C link-arg=-zstack-size=16777216"
@@ -93,7 +124,9 @@ def main():
     oversized = [p.name for p in web.rglob("*") if p.is_file() and p.stat().st_size >= 200_000_000]
     if oversized:
         raise ValueError(f"itch.io HTML file limit exceeded: {oversized}")
+    (web / WEB_RECEIPT).write_text(json.dumps(web_record(web, emulator_revision, emulator_lock_sha256), indent=2) + "\n")
     receipt = {
+        "emulator_components_lock_sha256": emulator_lock_sha256,
         "version": args.version,
         "disc_sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
         "disc_source": subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip(),
