@@ -43,7 +43,9 @@ inputs += [('VOXIDE',p/'games/voxide/dist/voxide.cue'),('NITROXIDE',p/'build/nit
 base=4
 for name,path in inputs:
     source,original=cue(path)
-    if name!='GH-PSX': assert entries[name]==base,(name,entries[name],base)
+    # Data-only guests may appear earlier in the packer's image order; their
+    # unused CD audio base does not describe a track owned by this guest.
+    if len(original)>1 and name!='GH-PSX': assert entries[name]==base,(name,entries[name],base)
     for st in original[1:]:
         t=tracks[base+st['number']-1]
         assert t['type']=='AUDIO' and st['type']=='AUDIO'
