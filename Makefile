@@ -73,7 +73,7 @@ override HL := $(filter-out 0,$(HL))
 # The default paths name the validated convergence checkout. A caller can use
 # another checkout or artifact set, but must also state the revision, sidecar,
 # and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
 QUAKE_EXPECTED_REV ?= 9774d8919ccdf17a6f793607bfbd76248903a8d4
