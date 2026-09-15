@@ -43,6 +43,54 @@ def run(check=False, check_main=False):
     print("Release component revisions and imported source receipts verified")
 
 
+GAMES = ("voxide", "nitroxide", "psxcel", "pico8-psx", "gh-psx", "psoxide-arcade")
+
+
+def verify_game_locks():
+    specs = json.loads((ROOT / "release-components.json").read_text())["components"]
+    for game in (*GAMES, "hl-psx"):
+        source = ROOT / "games" / game
+        lock = source / "components.lock.json"
+        if lock.is_file():
+            components = json.loads(lock.read_text())["components"]
+            for name in ("sdk", "emulator", "editor"):
+                for field in ("repository", "revision"):
+                    if components[name][field] != specs[name][field]:
+                        raise RuntimeError(f"{game}: standalone {name} {field} differs from the disc lock")
+        else:
+            import re
+            manifest = (source / "psoxide-pin/Cargo.toml").read_text()
+            pins = re.findall(r'rev\s*=\s*"([a-f0-9]{40})"', manifest)
+            if pins != [specs["sdk"]["revision"]]:
+                raise RuntimeError(f"{game}: standalone SDK pin differs from the disc lock")
+    print("Every standalone game pin agrees with the release component tuple")
+
+
+def verify_games(hl=False):
+    verify_game_locks()
+    specs = json.loads((ROOT / "release-components.json").read_text())["components"]
+    editor = ROOT / specs["editor"]["path"]
+    imported = json.loads((editor / ".components-receipt.json").read_text())["files"]
+    # Compare both imported SDK/emulator files and editor-owned build inputs.
+    owned = git(editor, "ls-files").splitlines()
+    inputs = dict(imported)
+    for name in owned:
+        path = editor / name
+        if path.is_file() and name.startswith(("engine/", "editor/crates/", "sdk/", "crates/")):
+            inputs[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    selected = (*GAMES, "hl-psx") if hl else GAMES
+    for game in selected:
+        hydrated = ROOT / "games" / game / ".psoxide"
+        marker = hydrated / ".psoxide-source"
+        if not marker.is_file() or marker.read_text() != f"local:{editor}":
+            raise RuntimeError(f"{game}: missing current shared-source hydration; run make programs")
+        for name, expected in inputs.items():
+            path = hydrated / name
+            if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                raise RuntimeError(f"{game}: hydrated build input changed or missing: {name}")
+    print(f"Verified all {len(selected)} required game hydrations against the selected components")
+
+
 def file_record(path):
     path = path.resolve(strict=True)
     digest = hashlib.sha256()
@@ -65,7 +113,8 @@ def receipt(output, cue, frontend):
         if git(source, "status", "--porcelain", "--untracked-files=normal"):
             raise RuntimeError(f"{path}: source is dirty")
         row = {"revision": revision}
-        for name in ("components.lock.json", ".components-receipt.json"):
+        for name in ("components.lock.json", ".components-receipt.json",
+                     ".psoxide/.components-receipt.json", ".psoxide/.psoxide-source"):
             if (source / name).is_file():
                 row[name] = file_record(source / name)
         repositories[path] = row
@@ -84,12 +133,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--check-main", action="store_true")
+    parser.add_argument("--games", action="store_true")
+    parser.add_argument("--game-locks", action="store_true")
+    parser.add_argument("--hl", action="store_true")
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--cue", type=Path)
     parser.add_argument("--frontend", type=Path)
     args = parser.parse_args()
     try:
         run(args.check, args.check_main)
+        if args.games:
+            verify_games(args.hl)
+        elif args.game_locks:
+            verify_game_locks()
         if args.receipt:
             if not args.cue or not args.frontend:
                 raise ValueError("--receipt requires --cue and --frontend")

@@ -240,7 +240,7 @@ its builder or supplied through `HL_DIR`.
 emulator separately. Their source receipts are checked before building.
 The launcher, loader, carousel and disc packer consume `games/PSoXide-sdk`;
 games consume the SDK and engine through the bootstrapped editor tree.
-`games/PSoXide` is retained only as Quake's historical build reference.
+Quake uses the same locked editor/engine and SDK components as the other games.
 It is not the SDK used to build the current launcher or other games.
 
 Each pressing receives a `.components.json` receipt containing all game
@@ -306,14 +306,15 @@ QUAKE_EXPECTED_EXE_SHA256 ?= <dist/quake-psx.exe>
 
 Paste those six lines over the ones near the top of the `Makefile`, then:
 
-1. `git -C games/PSoXide checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
-   games/PSoXide` -- the Quake tree names the SDK it was built against, and
+1. `git -C games/PSoXide-editor checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
+   games/PSoXide-editor` -- the Quake tree names the editor/engine revision it was built against, and
    the disc has to be on that same revision or `quake-verify` refuses.
 2. Update `games/PSoXide-editor` and `PROGRAMS_EXPECTED_PSOXIDE_REV` together
    when the ordinary programs advance. The verifier requires that clean exact
-   checkout and its build stamp independently of Quake's frozen SDK.
+   checkout and its build stamp. Keep `release-components.json` and all game
+   component locks on the same SDK/emulator/editor tuple.
 3. `make disc` -- rebuilds every ordinary program against the shared runtime,
-   re-verifies both SDK inputs and the Quake image, and writes the provenance
+   re-verifies the component inputs and the Quake image, and writes the provenance
    receipt beside the image.
 4. `make quake-headless-check` -- the shared release checker locates Quake
    by name in the pressed carousel, verifies its executable checksum and
