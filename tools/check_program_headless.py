@@ -154,14 +154,17 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
         ),
         Route("celeste", ",".join(celeste), 450_000_000),
         # Wait for the collection intro, choose each cart, then dismiss its
-        # title screen. These exercise both linked games, not just the menu.
+        # title screen. The private pressing adds another outer carousel move;
+        # leave time for the cart title fade and retry Cross once after it.
+        # These exercise both linked games, not just the collection menu.
         Route("celeste-classic", ",".join(celeste + [
-            f"{celeste_cross + 1600}:cross:12", f"{celeste_cross + 2200}:cross:12"
-        ]), 800_000_000),
+            f"{celeste_cross + 1600}:cross:12", f"{celeste_cross + 2200}:cross:12",
+            f"{celeste_cross + 2800}:cross:12"
+        ]), 1_100_000_000),
         Route("celeste-classic-2", ",".join(celeste + [
             f"{celeste_cross + 1500}:right:8", f"{celeste_cross + 1700}:cross:12",
-            f"{celeste_cross + 2300}:cross:12"
-        ]), 800_000_000),
+            f"{celeste_cross + 2300}:cross:12", f"{celeste_cross + 2900}:cross:12"
+        ]), 1_100_000_000),
         # PSXcel is six carousel moves from the initial card. Give the launcher
         # enough emulated time to reach the delayed launch press before judging
         # the guest, rather than stopping while its card is merely selected.
