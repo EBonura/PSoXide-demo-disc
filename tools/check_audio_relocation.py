@@ -39,7 +39,7 @@ for i,name in enumerate(menus,2):
     report.append({'owner':'LAUNCHER','track':i,'sha256':hashlib.sha256(expected).hexdigest()})
 inputs=[('CORTEX IGNITION',p/'build/cortex-current-04b/baked/cortex_ignition_tech_demo_0_4b.cue')]
 if 'HALF-LIFE' in entries: inputs += [('HALF-LIFE',p/'games/hl-psx/dist/hl-psx.cue')]
-inputs += [('VOXIDE',p/'games/voxide/dist/voxide.cue'),('NITROXIDE',p/'build/nitroxide/NitroXide/NitroXide.cue'),('GH-PSX',p/'games/gh-psx/dist/gh-psx.cue'),('PSOXIDE ARCADE',p/'games/psoxide-arcade/dist/psoxide-arcade.cue'),('HARDWARE TESTS',p/'games/PSoXide-editor/build/examples/mipsel-sony-psx/release/hardware-tests.cue'),('QUAKE SHAREWARE',p.parent/'quake-psx-pinned/dist/quake-psx.cue')]
+inputs += [('VOXIDE',p/'games/voxide/dist/voxide.cue'),('NITROXIDE',p/'build/nitroxide/NitroXide/NitroXide.cue'),('GH-PSX',p/'games/gh-psx/dist/gh-psx.cue'),('PSOXIDE ARCADE',p/'games/psoxide-arcade/dist/psoxide-arcade.cue'),('HARDWARE TESTS',p/'games/PSoXide-editor/build/examples/mipsel-sony-psx/release/hardware-tests.cue'),('QUAKE SHAREWARE',p.parent/'quake-psx/dist/quake-psx.cue')]
 base=4
 for name,path in inputs:
     source,original=cue(path)

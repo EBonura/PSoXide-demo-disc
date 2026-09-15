@@ -13,20 +13,23 @@
 # inside them.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
-REPOS=(. games/PSoXide games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx games/psoxide-arcade)
+REPOS=(. games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx games/psoxide-arcade)
 offline="--offline"
 [ "${CHECK_LOCKS_ONLINE:-}" = "1" ] && offline=""
 
 pass=0; fail=0; pins=0
+diagnostics=$(mktemp)
+trap 'rm -f "$diagnostics"' EXIT
 for repo in "${REPOS[@]}"; do
   while IFS= read -r lock; do
     [ -z "$lock" ] && continue
     manifest="$repo/${lock%Cargo.lock}Cargo.toml"
     [ -f "$manifest" ] || continue
-    if cargo metadata --manifest-path "$manifest" --format-version 1 --locked $offline >/dev/null 2>&1; then
+    if cargo metadata --manifest-path "$manifest" --format-version 1 --locked $offline >/dev/null 2>"$diagnostics"; then
       pass=$((pass + 1))
     else
-      echo "check-locks: stale lock, cargo wants to change it: $repo/$lock"
+      echo "check-locks: lock or dependency resolution failed: $repo/$lock"
+      cat "$diagnostics"
       fail=$((fail + 1))
     fi
   done < <(git -C "$repo" ls-files '*Cargo.lock' 2>/dev/null)
@@ -34,7 +37,7 @@ done
 
 # A pin crate can name one revision in its manifest and resolve another in its
 # lock. That compiles, and silently builds a game against an SDK nobody chose.
-for game in nitroxide voxide pico8-psx psxcel gh-psx; do
+for game in nitroxide voxide pico8-psx psxcel gh-psx psoxide-arcade; do
   manifest="games/$game/psoxide-pin/Cargo.toml"
   lock="games/$game/psoxide-pin/Cargo.lock"
   [ -f "$manifest" ] || continue
@@ -53,6 +56,8 @@ for game in nitroxide voxide pico8-psx psxcel gh-psx; do
     fail=$((fail + 1))
   fi
 done
+
+python3 tools/components.py --check --game-locks || fail=$((fail + 1))
 
 if [ "$fail" -ne 0 ]; then
   echo "check-locks: $fail problem(s). Refresh with: cargo metadata --manifest-path <the manifest> --format-version 1"

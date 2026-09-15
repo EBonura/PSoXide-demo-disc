@@ -18,7 +18,7 @@ import sys
 from xml.sax.saxutils import escape
 from pathlib import Path
 
-LOGO = Path(__file__).resolve().parents[2] / "PSoXide/assets/branding/psoxide-logo.svg"
+LOGO = Path(__file__).resolve().parents[1] / "games/PSoXide-editor/assets/branding/psoxide-logo.svg"
 
 GAMES = ["CORTEX IGNITION", "QUAKE SHAREWARE", "VOXIDE", "NITROXIDE",
          "CELESTE COLLECTION", "PSXCEL", "GH-PSX", "BREAKOUT",
