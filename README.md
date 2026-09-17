@@ -18,9 +18,10 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.36** fixes Quake getting stuck before its main menu on original PlayStation
-hardware, verified on console on 8 September. It also adds Cortex's enemy death dissolve, refreshed combat feedback, polygon stance and dash effects, more responsive movement,
-improved combat feedback and closer camera handling. See [the changelog](CHANGELOG.md).
+**v0.37** updates the Celeste Collection to 0.2.3: both Celeste games now hold
+60 fps throughout (the audio renders while the game waits for VBlank and each frame
+is drawn by the GPU from a display list), the left analog stick works as the d-pad,
+and the PICO-8 synthesiser runs on the PS1 itself. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 Every deployment updates both the BIN/CUE download and the playable browser
@@ -28,7 +29,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.36 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.37 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
