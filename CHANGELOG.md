@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.38
+
+- Emulator component moved to d16168e: the reverb work-address wrap that ran thousands of loop iterations per sample once the SDK parked the work area at the top of SPU RAM is closed-form now, which restores full speed for every game on the current SDK, in the browser build too, and user-supplied firmware loading is back. The editor (c0ae6e3a), every game's component lock and the Quake contract follow the same tuple.
+
 ## v0.37
 
 - Celeste Collection updated to 0.2.3: both games hold 60 fps throughout (the audio is rendered while the game waits for VBlank and each frame is drawn by the GPU from a display list), analog stick support, and the PICO-8 synthesiser running on the PS1.

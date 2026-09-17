@@ -18,10 +18,11 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.37** updates the Celeste Collection to 0.2.3: both Celeste games now hold
-60 fps throughout (the audio renders while the game waits for VBlank and each frame
-is drawn by the GPU from a display list), the left analog stick works as the d-pad,
-and the PICO-8 synthesiser runs on the PS1 itself. See [the changelog](CHANGELOG.md).
+**v0.38** moves the emulator component to the revision with the SPU reverb fix, so
+every game on the current SDK runs at full speed in the browser build as well, and
+user-supplied firmware loading is back in the player. v0.37 brought the Celeste
+Collection to 0.2.3: 60 fps throughout, analog stick, the PICO-8 synthesiser on the
+PS1. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 Every deployment updates both the BIN/CUE download and the playable browser
@@ -29,7 +30,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.37 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.38 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
