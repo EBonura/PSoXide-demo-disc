@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.37
 
 - Celeste Collection updated to 0.2.3: both games hold 60 fps throughout (the audio is rendered while the game waits for VBlank and each frame is drawn by the GPU from a display list), analog stick support, and the PICO-8 synthesiser running on the PS1.
 
