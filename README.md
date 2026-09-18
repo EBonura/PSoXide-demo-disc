@@ -125,7 +125,8 @@ at startup, so their complete images ride the same relocation path as the
 larger streaming games.
 
 `CORTEX IGNITION` is the active new-engine entry. It comes from the exact
-`editor/projects/cortex-ignition-tech-demo-0.4b` project at the exact editor
+`editor/projects/default` project (formerly `cortex-ignition-tech-demo-0.4b`,
+renamed when it became the editor's New Project template) at the exact editor
 revision recorded in `release-components.json` and the Makefile. Both editions
 expose this early tech demo directly in the carousel. `QUAKE SHAREWARE` is the last program before
 CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,

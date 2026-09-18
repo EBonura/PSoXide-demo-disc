@@ -876,11 +876,11 @@ class MakeVariantContractTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (
             ROOT
-            / "games/PSoXide-editor/editor/projects/cortex-ignition-tech-demo-0.4b/project.ron"
+            / "games/PSoXide-editor/editor/projects/default/project.ron"
         ).read_text(encoding="utf-8")
         scene = project.split("resources:", 1)[0]
         self.assertIn(
-            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/cortex-ignition-tech-demo-0.4b",
+            "$(CORTEX_CURRENT_PSOXIDE)/editor/projects/default",
             makefile,
         )
         self.assertIn(
