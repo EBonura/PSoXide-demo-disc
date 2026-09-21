@@ -872,6 +872,20 @@ class MakeVariantContractTests(unittest.TestCase):
         self.assertIn('--target "QUAKE SHAREWARE"', headless.stdout)
         self.assertLess(stamp_at, replay_at)
 
+    def test_cortex_symbol_gate_rejects_missing_empty_and_forbidden_maps(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            link_map = Path(temporary) / "guest.map"
+            for content, expected_success in ((None, False), ("", False),
+                                               (" 00001000 __udivdi3\n", False),
+                                               (" 00001000 guest_main\n", True)):
+                with self.subTest(content=content):
+                    if content is not None:
+                        link_map.write_text(content, encoding="ascii")
+                    result = run("make", "--no-print-directory", "cortex-symbol-check",
+                                 f"CORTEX_CURRENT_MAP={link_map}", cwd=ROOT, check=False)
+                    self.assertEqual(result.returncode == 0, expected_success,
+                                     result.stdout + result.stderr)
+
     def test_cortex_bakes_only_the_current_project(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         project = (

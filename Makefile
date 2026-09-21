@@ -16,9 +16,9 @@ PSOXIDE    ?= $(ROOT)/games/PSoXide-editor
 SDK ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR ?= $(ROOT)/games/PSoXide-emulator
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 9b4513d009197b2a98c4355a844823e11368af0a
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
 CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 9b4513d009197b2a98c4355a844823e11368af0a
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -76,12 +76,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 66d3c9950fc721244440053c9c4ee935df38a9e1
-QUAKE_EXPECTED_PSOXIDE_REV ?= c0ae6e3a71153e31822538389db1900174be638a
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= b5c6f289660dc6978424271ae349815b7cfb4083d08757d34da1adc3ed06a528
+QUAKE_EXPECTED_REV ?= 7d6e6f5b1c82bdd1b266c064fb350d9aa6f161e6
+QUAKE_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 137f428328a219412a47129e4d21e2b690810ff31fda0ab6b62e7b0f63583e30
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= decec7c2bf2a0ed8bedbe644fad728cd05b6b8fe40924eae7934e2567c88cf7b
-QUAKE_EXPECTED_EXE_SHA256 ?= c105778550bc356c04f0c439b5eeb4d0ff341011967d27d83a580a2c2520e2dd
+QUAKE_EXPECTED_BIN_SHA256 ?= bac3490600bb088da7e0fc039959c97a3cb8a17242de144f4ecf2a7ed150057b
+QUAKE_EXPECTED_EXE_SHA256 ?= c14d61d7ea119c12900cdcbfb37a1a0be6927f003c85ea572e9f5f15d5da72e5
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -114,6 +114,7 @@ HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b
 CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.cue
+CORTEX_CURRENT_MAP := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
 HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
@@ -269,9 +270,11 @@ quake-programs-verify:
 # layout all remain exactly as build-project-disc authored them.
 CORTEX_FORCE   ?=
 
-.PHONY: cortex-if-stale cortex-current-if-stale
+.PHONY: cortex-if-stale cortex-current-if-stale cortex-symbol-check
 cortex-if-stale: cortex-current-if-stale
 
+# Replacing the project deletes its linker map. Invalidate the staged guest
+# executable too, so Cargo relinks and emits a matching map for the symbol gate.
 cortex-current-if-stale:
 	@current_rev=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
 	dirty=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
@@ -284,19 +287,26 @@ cortex-current-if-stale:
 		exit 1; \
 	fi; \
 	stamped_rev=$$(sed -n '1p' "$(CORTEX_CURRENT_REV_STAMP)" 2>/dev/null || true); \
-	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX_CURRENT)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_CURRENT_SOURCE)/" -type f -newer "$(CORTEX_CURRENT)" -print -quit 2>/dev/null)" ]; then \
+	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX_CURRENT)" ] || [ ! -s "$(CORTEX_CURRENT_MAP)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_CURRENT_SOURCE)/" -type f -newer "$(CORTEX_CURRENT)" -print -quit 2>/dev/null)" ]; then \
 		echo "cortex-current: project or PSoXide revision changed (or forced) -- baking"; \
 		case "$(BUILD)" in ""|"/") echo "cortex-current: unsafe build root $(BUILD)"; exit 1 ;; esac; \
 		case "$(CORTEX_CURRENT_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex-current: unsafe staging path $(CORTEX_CURRENT_PROJECT)"; exit 1 ;; esac; \
 		rm -rf "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		mkdir -p "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
 		cp -R "$(CORTEX_CURRENT_SOURCE)/." "$(CORTEX_CURRENT_PROJECT)/" || exit 1; \
-		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" PSOXIDE_GUEST_LINK_MAP="$(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
+		if [ -f "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/engine/examples/editor-playtest/Cargo.toml" ]; then \
+			CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" cargo clean --offline --release --target mipsel-sony-psx -Zjson-target-spec --package editor-playtest --manifest-path "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/engine/examples/editor-playtest/Cargo.toml" --target-dir "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/build/examples" || exit 1; \
+		fi; \
+		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" PSOXIDE_GUEST_LINK_MAP="$(CORTEX_CURRENT_MAP)" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
 		printf '%s\n' "$$current_rev" > "$(CORTEX_CURRENT_REV_STAMP)" || exit 1; \
 	else \
 		echo "cortex-current: project unchanged -- reusing $(CORTEX_CURRENT)"; \
 	fi
-	sh "$(CORTEX_CURRENT_PSOXIDE)/tools/guest_symbol_gate.sh" "$(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map"
+	$(MAKE) cortex-symbol-check
+
+cortex-symbol-check:
+	@test -s "$(CORTEX_CURRENT_MAP)" || { echo "cortex-current: missing or empty guest linker map: $(CORTEX_CURRENT_MAP)" >&2; exit 1; }
+	sh "$(CORTEX_CURRENT_PSOXIDE)/tools/guest_symbol_gate.sh" "$(CORTEX_CURRENT_MAP)"
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
@@ -574,6 +584,7 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 	cd disc-toc && cargo test
 	cd tools/mkdisc && cargo test
 	python3 -m unittest discover -s tools -p 'test_quake_disc.py'
+	python3 -m unittest discover -s tools -p 'test_components.py'
 	python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py tools/test_check_program_headless.py
 
 # Every program on this disc has to be built against one SDK.
