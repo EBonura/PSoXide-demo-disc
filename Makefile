@@ -16,9 +16,9 @@ PSOXIDE    ?= $(ROOT)/games/PSoXide-editor
 SDK ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR ?= $(ROOT)/games/PSoXide-emulator
 PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
+PROGRAMS_EXPECTED_PSOXIDE_REV ?= 0946dc892e0e86f190bbb6476874a250935fd5aa
 CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
+CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 0946dc892e0e86f190bbb6476874a250935fd5aa
 CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
 CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
 BUILD      := $(ROOT)/build
@@ -76,12 +76,12 @@ override HL := $(filter-out 0,$(HL))
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= a2916a3c502897abd572ace90ceec72344ed629d
-QUAKE_EXPECTED_PSOXIDE_REV ?= 70770b42c408289a723077c77391d5b472ee5d87
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 4a50f921d2420ee2198e22afbf48c679a67244c735b462694b53451e350edd5d
+QUAKE_EXPECTED_REV ?= 96a7a0977c7f92ac8f87b9d0a213d28be553c33a
+QUAKE_EXPECTED_PSOXIDE_REV ?= 0946dc892e0e86f190bbb6476874a250935fd5aa
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 9704a176b93bda2a70f19b96f657cd0530203209f25c8496b1cb3129cc0b298d
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 85f2e7cd6a73a87e5a7077c1a2b29dd56865f576c708c764dad31308547f1071
-QUAKE_EXPECTED_EXE_SHA256 ?= 955c02005e6a9a4ca844c956fc4323a43c02e1b3ea37b8e3bba8dc6bfc3a9252
+QUAKE_EXPECTED_BIN_SHA256 ?= 711ffd1f1b41ebf6f9fa35b894307acca0c0da9e13ccdc25cf530583a95a33a5
+QUAKE_EXPECTED_EXE_SHA256 ?= c61ca4a58200874e4d2779a2a685968591b313c551d30882d1722f09a81b4b14
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -580,8 +580,8 @@ itch:
 # The chain-load half of the proof needs a built disc and lives in
 # `make quake-headless-check`.
 check: sdk-on-main sdk-coherence check-locks quake-verify
-	cd carousel && cargo test
-	cd disc-toc && cargo test
+	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-carousel
+	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-disc-toc
 	cd tools/mkdisc && cargo test
 	python3 -m unittest discover -s tools -p 'test_quake_disc.py'
 	python3 -m unittest discover -s tools -p 'test_components.py'

@@ -9,7 +9,7 @@ import components
 
 
 class GameCoherenceTests(unittest.TestCase):
-    def test_rejects_transitive_emulator_sdk_drift(self):
+    def test_rejects_transitive_sdk_drift(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             specs = {name: {"revision": letter * 40, "path": name}
@@ -24,12 +24,18 @@ class GameCoherenceTests(unittest.TestCase):
                 return specs[source.name]["revision"] if args[0] == "rev-parse" else ""
             with patch.object(components, "ROOT", root), patch.object(components, "git", side_effect=git_result), patch.object(components.subprocess, "run"):
                 components.run(check=True)
-                path = root / "emulator/components.lock.json"
-                lock = json.loads(path.read_text())
-                lock["components"]["sdk"]["revision"] = "d" * 40
-                path.write_text(json.dumps(lock))
-                with self.assertRaisesRegex(RuntimeError, "emulator sdk pin differs"):
-                    components.run(check=True)
+                # The launcher now resolves SDK crates through the editor.
+                # Reject drift in either importing owner before any build.
+                for owner in ("editor", "emulator"):
+                    with self.subTest(owner=owner):
+                        path = root / owner / "components.lock.json"
+                        original = path.read_text()
+                        lock = json.loads(original)
+                        lock["components"]["sdk"]["revision"] = "d" * 40
+                        path.write_text(json.dumps(lock))
+                        with self.assertRaisesRegex(RuntimeError, owner + " sdk pin differs"):
+                            components.run(check=True)
+                        path.write_text(original)
 
     def fixture(self, root):
         specs = {name: {"revision": letter * 40, "repository": "owner/" + name, "path": name}
