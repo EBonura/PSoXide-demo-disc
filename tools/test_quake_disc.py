@@ -803,14 +803,22 @@ class MakeVariantContractTests(unittest.TestCase):
     def test_disc_runtime_crates_do_not_use_quakes_frozen_sdk(self) -> None:
         paths = (
             ROOT / "loader" / "Cargo.toml",
-            ROOT / "carousel" / "Cargo.toml",
             ROOT / "launcher" / "Cargo.toml",
             ROOT / "tools" / "mkdisc" / "Cargo.toml",
         )
         for path in paths:
             manifest = path.read_text(encoding="utf-8")
             self.assertNotIn("games/PSoXide/", manifest, path)
-            self.assertIn("games/PSoXide-sdk/", manifest, path)
+            expected = "games/PSoXide-sdk/" if path.parent.name == "mkdisc" else "games/PSoXide-editor/sdk/"
+            self.assertIn(expected, manifest, path)
+
+        # Collection geometry/catalog now have one engine owner. Neither
+        # collection keeps a second production implementation.
+        manifest = (ROOT / "launcher" / "Cargo.toml").read_text()
+        self.assertIn('package = "psx-carousel"', manifest)
+        self.assertIn('package = "psx-disc-toc"', manifest)
+        self.assertNotIn('path = "../carousel"', manifest)
+        self.assertNotIn('path = "../disc-toc"', manifest)
 
         launcher = (ROOT / "launcher" / "src" / "main.rs").read_text(
             encoding="utf-8"

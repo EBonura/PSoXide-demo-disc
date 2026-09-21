@@ -26,7 +26,11 @@ commits. The editor component lock must agree with that tuple, and the
 emulator records its own SDK dependency. Imported files are verified against
 content receipts before a release build.
 
-The demo builds its own launcher/loader/packer directly against the SDK.
+The demo launcher and loader resolve direct SDK dependencies and shared
+collection crates through the verified editor hydration. The SDK pin remains
+authoritative; component checks reject disagreement or modified imported files.
+The host packer shares the engine catalog crate and uses the SDK ISO builder in
+its separate dependency graph.
 Ordinary game builds receive an explicit bootstrapped editor/engine source
 override; this does not compile the editor UI into any game. Cortex uses
 that editor source to cook its project. The separate emulator executable

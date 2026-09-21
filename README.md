@@ -77,8 +77,8 @@ reach `0x801F0000`, so that constraint fails the build rather than the console.
 | --- | --- |
 | `loader/` | the chain-load blob, its own linker script, no `psx-rt` |
 | `launcher/` | the menu, a normal PSoXide program |
-| `carousel/` | where the ring and the ball of balls land on screen, host-testable |
-| `disc-toc/` | the on-disc table format, shared by `mkdisc` and the launcher |
+| `games/PSoXide-editor/engine/crates/psx-carousel/` | shared ring and decorative geometry, host-testable |
+| `games/PSoXide-editor/engine/crates/psx-disc-toc/` | shared PSXDEMO1 table format, used by `mkdisc` and the launcher |
 | `tools/mkdisc/` | host disc builder, on top of PSoXide's `psx-iso` |
 | `games/` | the source repos, as submodules |
 
@@ -241,10 +241,14 @@ its builder or supplied through `HL_DIR`.
 
 `release-components.json` locks the SDK, editor/engine/Cortex and standalone
 emulator separately. Their source receipts are checked before building.
-The launcher, loader, carousel and disc packer consume `games/PSoXide-sdk`;
-games consume the SDK and engine through the bootstrapped editor tree.
-Quake uses the same locked editor/engine and SDK components as the other games.
-It is not the SDK used to build the current launcher or other games.
+The launcher and loader consume the SDK through the receipt-verified editor
+hydration, so their shared engine collection crates and direct SDK dependencies
+resolve one physical source path. `make components` checks that the editor SDK
+revision equals the authoritative SDK pin before building. The host disc packer
+uses the same engine-owned catalog format and a separate SDK ISO dependency;
+its Cargo graph does not link the guest renderer. Games and Quake use the same
+locked SDK/engine tuple. Carousel geometry and the PSXDEMO1 wire format have one
+engine owner, shared with Arcade; the format and layout constants are unchanged.
 
 Each pressing receives a `.components.json` receipt containing all game
 revisions, nested component locks, the emulator hash and the final image hashes.

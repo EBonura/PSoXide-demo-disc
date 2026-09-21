@@ -32,15 +32,7 @@ const GLOSS_BOTTOM: (u8, u8, u8) = (58, 0, 2);
 const GLOSS_EDGE: (u8, u8, u8) = (178, 10, 12);
 const SPECULAR: (u8, u8, u8) = (255, 196, 170);
 
-fn lerp(a: u8, b: u8, t: u8) -> u8 {
-    let a = a as i32;
-    let b = b as i32;
-    (a + (((b - a) * t as i32) >> 8)) as u8
-}
-
-fn mix(a: (u8, u8, u8), b: (u8, u8, u8), t: u8) -> (u8, u8, u8) {
-    (lerp(a.0, b.0, t), lerp(a.1, b.1, t), lerp(a.2, b.2, t))
-}
+use psx_math::color::lerp_rgb_q8 as mix;
 
 fn scale_rgb(c: (u8, u8, u8), t: u8) -> (u8, u8, u8) {
     (
