@@ -9,6 +9,28 @@ import components
 
 
 class GameCoherenceTests(unittest.TestCase):
+    def test_rejects_transitive_emulator_sdk_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = {name: {"revision": letter * 40, "path": name}
+                     for name, letter in (("sdk", "a"), ("emulator", "b"), ("editor", "c"))}
+            (root / "release-components.json").write_text(json.dumps({"schema": 1, "components": specs}))
+            for owner, dependencies in (("editor", ("sdk", "emulator")), ("emulator", ("sdk",))):
+                source = root / owner
+                source.mkdir()
+                (source / "components.lock.json").write_text(json.dumps({
+                    "components": {name: specs[name] for name in dependencies}}))
+            def git_result(source, *args):
+                return specs[source.name]["revision"] if args[0] == "rev-parse" else ""
+            with patch.object(components, "ROOT", root), patch.object(components, "git", side_effect=git_result), patch.object(components.subprocess, "run"):
+                components.run(check=True)
+                path = root / "emulator/components.lock.json"
+                lock = json.loads(path.read_text())
+                lock["components"]["sdk"]["revision"] = "d" * 40
+                path.write_text(json.dumps(lock))
+                with self.assertRaisesRegex(RuntimeError, "emulator sdk pin differs"):
+                    components.run(check=True)
+
     def fixture(self, root):
         specs = {name: {"revision": letter * 40, "repository": "owner/" + name, "path": name}
                  for name, letter in (("sdk", "a"), ("emulator", "b"), ("editor", "c"))}

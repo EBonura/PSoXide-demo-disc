@@ -27,11 +27,12 @@ def run(check=False, check_main=False):
             status = subprocess.check_output(["gh", "api", f"repos/{spec['repository']}/compare/{spec['revision']}...main", "--jq", ".status"], text=True).strip()
             if status not in ("identical", "ahead"):
                 raise RuntimeError(f"{name}: selected revision is not on its repository main")
-    editor = ROOT / specs["editor"]["path"]
-    nested = json.loads((editor / "components.lock.json").read_text())["components"]
-    for name in ("sdk", "emulator"):
-        if nested[name]["revision"] != specs[name]["revision"]:
-            raise RuntimeError(f"editor {name} pin differs from the disc component lock")
+    for owner, dependencies in (("editor", ("sdk", "emulator")), ("emulator", ("sdk",))):
+        source = ROOT / specs[owner]["path"]
+        nested = json.loads((source / "components.lock.json").read_text())["components"]
+        for name in dependencies:
+            if nested[name]["revision"] != specs[name]["revision"]:
+                raise RuntimeError(f"{owner} {name} pin differs from the disc component lock")
     for name in ("emulator", "editor"):
         source = ROOT / specs[name]["path"]
         command = [sys.executable, str(source / "tools/bootstrap-components.py")]
