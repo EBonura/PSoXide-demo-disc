@@ -70,10 +70,10 @@ override HL := $(filter-out 0,$(HL))
 # Quake 1.06 shareware payload on 2026-08-25. The public upload paths still
 # refuse the Half-Life pressing; only the standard disc may be published.
 #
-# The default paths name the validated convergence checkout. A caller can use
-# another checkout or artifact set, but must also state the revision, sidecar,
-# and hashes expected from it. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx-pinned)
+# The default paths name the canonical checkout. The expected revision,
+# sidecar and hashes still gate use; current main may require a deliberate
+# repin. The verifier fails closed if any one differs.
+QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
 QUAKE_EXPECTED_REV ?= 66d3c9950fc721244440053c9c4ee935df38a9e1
