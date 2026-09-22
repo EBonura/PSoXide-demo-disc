@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.36
+PSoXide Demo Disc v0.39
 ======================
 
 A little of everything. One PlayStation disc.
@@ -8,19 +8,19 @@ Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. The disc also
 includes a Hardware Tests menu. Arcade contains Breakout, Space Invaders
 and Magikaaaaarp Pong.
 
-What's new in v0.36
+What's new in v0.39
 ------------------
-- Quake: fixed the loading-screen hang on original PlayStation hardware, verified on a real console on 8 September 2026.
-- Cortex: defeated enemies dissolve from head to feet into rising, fading fragments.
-- Cortex: enemies switch between melee and ranged stances as you move closer or farther away, respecting the swap cooldown.
-- Cortex: three new heavy-enemy attacks, chest-fired projectiles and longer melee contact windows.
-- Cortex: combat music starts at a random point and loops; inactive stance health recovers more slowly.
-- Cortex: new stance changes burst into polygons and rebuild from feet to head, with a smooth return to Aletha's colours.
-- Cortex: dashes leave fading fragments behind a travelling wireframe, then gradually restore the body.
-- Cortex: faster sprint response, cleaner stops, shorter evades and a five-second stance cooldown.
-- Cortex: better swing sounds, trails and hit timing; reworked heavy-enemy combos and improved ranged aiming.
-- Cortex: improved close-space camera handling, clearer module prompts and animated message dismissal.
-- Cortex: combat music continues through the inventory, new pickup and entry sounds, and a darker default brightness.
+- Celeste Classic Collection 0.2.4: faster Classic object removal and Celeste 2
+  grapple checks, reduced pixel drawing overhead, and improved audio refill
+  scheduling. Both games retain their original gameplay and audio quality.
+- Shared chain-loading, audio, rendering and asset helpers now come from the
+  same pinned PSoXide SDK and engine across the included games.
+- Quake Shareware is rebuilt against the current pinned components, with
+  checked source and artifact provenance.
+
+The collection is still in development. Celeste 2 can miss occasional frame
+deadlines; this release does not claim locked 60 fps throughout either game.
+This public download contains no Half-Life game data.
 
 How to play
 -----------
