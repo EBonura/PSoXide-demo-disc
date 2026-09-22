@@ -50,5 +50,5 @@ pub unsafe extern "C" fn loader_entry(
 }
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
-    runtime::panic(&mut LoadingScreen::new())
+    runtime::panic(|| paint::setup(319, 239))
 }
