@@ -89,3 +89,12 @@ class GameCoherenceTests(unittest.TestCase):
             with patch.object(components, "ROOT", root):
                 with self.assertRaisesRegex(RuntimeError, "standalone sdk revision"):
                     components.verify_game_locks()
+
+    def test_rejects_a_game_without_a_component_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            (root / "games/pico8-psx/components.lock.json").unlink()
+            with patch.object(components, "ROOT", root):
+                with self.assertRaisesRegex(RuntimeError, "pico8-psx: no components.lock.json"):
+                    components.verify_game_locks()

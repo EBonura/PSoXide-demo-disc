@@ -52,19 +52,14 @@ def verify_game_locks():
     for game in (*GAMES, "hl-psx"):
         source = ROOT / "games" / game
         lock = source / "components.lock.json"
-        if lock.is_file():
-            components = json.loads(lock.read_text())["components"]
-            for name in ("sdk", "emulator", "editor"):
-                for field in ("repository", "revision"):
-                    if components[name][field] != specs[name][field]:
-                        raise RuntimeError(f"{game}: standalone {name} {field} differs from the disc lock")
-        else:
-            import re
-            manifest = (source / "psoxide-pin/Cargo.toml").read_text()
-            pins = re.findall(r'rev\s*=\s*"([a-f0-9]{40})"', manifest)
-            if pins != [specs["sdk"]["revision"]]:
-                raise RuntimeError(f"{game}: standalone SDK pin differs from the disc lock")
-    print("Every standalone game pin agrees with the release component tuple")
+        if not lock.is_file():
+            raise RuntimeError(f"{game}: no components.lock.json; every game must import PSoXide from the lock")
+        components = json.loads(lock.read_text())["components"]
+        for name in ("sdk", "emulator", "editor"):
+            for field in ("repository", "revision"):
+                if components[name][field] != specs[name][field]:
+                    raise RuntimeError(f"{game}: standalone {name} {field} differs from the disc lock")
+    print("Every standalone game lock agrees with the release component tuple")
 
 
 def verify_games(hl=False):
