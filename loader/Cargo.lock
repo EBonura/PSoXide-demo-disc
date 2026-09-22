@@ -13,10 +13,9 @@ name = "loader"
 version = "0.1.0"
 dependencies = [
  "psx-carousel",
- "psx-font",
+ "psx-chainloader",
  "psx-io",
  "psx-math",
- "psx-pack",
 ]
 
 [[package]]
@@ -24,6 +23,15 @@ name = "psx-carousel"
 version = "0.1.0"
 dependencies = [
  "psx-math",
+]
+
+[[package]]
+name = "psx-chainloader"
+version = "0.1.0"
+dependencies = [
+ "psx-font",
+ "psx-io",
+ "psx-pack",
 ]
 
 [[package]]
