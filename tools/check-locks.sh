@@ -1,6 +1,6 @@
 #!/bin/bash
 # Every tracked Cargo.lock must resolve without Cargo wanting to change it, and
-# every PSoXide pin must name the revision its lockfile actually resolved.
+# every game's components.lock.json must select the disc's component tuple.
 #
 # sdk-coherence proves the HYDRATED tree is consistent: it reads the marker
 # psoxide-link leaves in each .psoxide. That says nothing about whether a fresh
@@ -17,7 +17,7 @@ REPOS=(. games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nit
 offline="--offline"
 [ "${CHECK_LOCKS_ONLINE:-}" = "1" ] && offline=""
 
-pass=0; fail=0; pins=0
+pass=0; fail=0
 diagnostics=$(mktemp)
 trap 'rm -f "$diagnostics"' EXIT
 for repo in "${REPOS[@]}"; do
@@ -35,32 +35,10 @@ for repo in "${REPOS[@]}"; do
   done < <(git -C "$repo" ls-files '*Cargo.lock' 2>/dev/null)
 done
 
-# A pin crate can name one revision in its manifest and resolve another in its
-# lock. That compiles, and silently builds a game against an SDK nobody chose.
-for game in nitroxide voxide pico8-psx psxcel gh-psx psoxide-arcade; do
-  manifest="games/$game/psoxide-pin/Cargo.toml"
-  lock="games/$game/psoxide-pin/Cargo.lock"
-  [ -f "$manifest" ] || continue
-  pins=$((pins + 1))
-  want=$(grep -oE '[a-f0-9]{40}' "$manifest" | head -1)
-  got=$(grep -oE 'rev=[a-f0-9]{40}' "$lock" 2>/dev/null | head -1 | cut -d= -f2)
-  if [ "$want" != "$got" ]; then
-    echo "check-locks: $game pins ${want:0:8} but its lock resolved ${got:0:8}"
-    fail=$((fail + 1))
-  fi
-  # And the constant the bootstrap stamps the hydrated tree with has to agree,
-  # or an unchanged pin silently skips the copy and reuses the wrong tree.
-  code=$(grep -oE '[a-f0-9]{40}' "games/$game/psoxide-pin/src/main.rs" 2>/dev/null | head -1)
-  if [ -n "$code" ] && [ "$code" != "$want" ]; then
-    echo "check-locks: $game REV constant ${code:0:8} disagrees with its manifest ${want:0:8}"
-    fail=$((fail + 1))
-  fi
-done
-
 python3 tools/components.py --check --game-locks || fail=$((fail + 1))
 
 if [ "$fail" -ne 0 ]; then
   echo "check-locks: $fail problem(s). Refresh with: cargo metadata --manifest-path <the manifest> --format-version 1"
   exit 1
 fi
-echo "check-locks: $pass tracked lock(s) reproducible, $pins pins consistent"
+echo "check-locks: $pass tracked lock(s) reproducible, every game lock agrees with the disc"
