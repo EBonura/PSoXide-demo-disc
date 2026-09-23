@@ -28,3 +28,9 @@
 [submodule "games/PSoXide-sdk"]
 	path = games/PSoXide-sdk
 	url = https://github.com/EBonura/PSoXide.git
+[submodule "games/cs-psx"]
+	path = games/cs-psx
+	url = https://github.com/EBonura/cs-psx.git
+[submodule "games/hk-psx"]
+	path = games/hk-psx
+	url = https://github.com/EBonura/hk-psx.git

@@ -29,15 +29,24 @@ TOC_FLAGS_AT = 504
 FLAG_HIDDEN = 1
 PSX_EXE_MAGIC = b"PS-X EXE"
 DEFAULT_STEPS = 700_000_000
-TARGETS = (
+# Every pressing carries the core entries; HL=1, CS=1 and HK=1 add the others.
+CORE_TARGETS = (
     "CORTEX IGNITION",
-    "HALF-LIFE",
     "HARDWARE TESTS",
     "QUAKE SHAREWARE",
 )
+OPTIONAL_TARGETS = (
+    "HALF-LIFE",
+    "COUNTER-STRIKE",
+    "HOLLOW KNIGHT",
+)
+TARGETS = (*CORE_TARGETS, *OPTIONAL_TARGETS)
 TARGET_MARKERS = {
     "CORTEX IGNITION": (),
     "HALF-LIFE": ("hl-psx: booting renderer",),
+    # cs-psx is built on hl-psx's renderer and keeps its log prefix.
+    "COUNTER-STRIKE": ("hl-psx: booting renderer",),
+    "HOLLOW KNIGHT": (),
     "HARDWARE TESTS": ("hardware-tests: main menu ready",),
     "QUAKE SHAREWARE": (
         "quake-psx: all-Rust PSoXide boot",
@@ -52,6 +61,13 @@ TARGET_FAILURES = {
         "hl-psx: WORLD.PAK texture stream failed",
         "hl-psx: WORLD.PAK world stream failed",
     ),
+    "COUNTER-STRIKE": (
+        "PANIC:",
+        "STACK/DATA COLLISION",
+        "hl-psx: WORLD.PAK texture stream failed",
+        "hl-psx: WORLD.PAK world stream failed",
+    ),
+    "HOLLOW KNIGHT": ("PANIC:", "STACK/DATA COLLISION"),
     "HARDWARE TESTS": ("PANIC:", "STACK/DATA COLLISION"),
     "QUAKE SHAREWARE": (
         "PANIC:",
@@ -63,6 +79,8 @@ TARGET_FAILURES = {
 REQUIRE_RUNTIME_READ = {
     "CORTEX IGNITION",
     "HALF-LIFE",
+    "COUNTER-STRIKE",
+    "HOLLOW KNIGHT",
     "QUAKE SHAREWARE",
 }
 TICK_SUMMARY = re.compile(r"tick=(\d+)\s+cycles=(\d+)\s+pc=(0x[0-9a-f]+)")
@@ -85,6 +103,19 @@ HL_GAMEPLAY_TRIANGLES = 300
 HL_GAMEPLAY_QUADS = 150
 HL_GAMEPLAY_MIN_FRAMES = 30
 HL_GAMEPLAY_MIN_HASHES = 8
+# Per entry: minimum textured triangles, quads and rects in one frame, the
+# frames and distinct frame hashes that must clear them, and what they prove.
+# Measured 2026-09-23 on the frozen frontend. cs-psx's own menu draws no
+# textured triangles and at most 47 quads; de_dust2 draws hundreds of
+# triangles from its first frame.
+THRESHOLD_GAMEPLAY = {
+    "HALF-LIFE": (
+        HL_GAMEPLAY_TRIANGLES, HL_GAMEPLAY_QUADS, 0,
+        HL_GAMEPLAY_MIN_FRAMES, HL_GAMEPLAY_MIN_HASHES,
+        "textured train-ride gameplay",
+    ),
+    "COUNTER-STRIKE": (150, 0, 0, 30, 8, "textured de_dust2 gameplay"),
+}
 # A polygon-count gate cannot distinguish a correctly rendered room from a
 # deterministic frame that draws only its floor and character.  Cortex's
 # release start deliberately faces textured world geometry, so require real
@@ -214,7 +245,7 @@ def launcher_route(index: int, count: int) -> tuple[list[str], int]:
 
 def route_for(target: str, index: int, count: int) -> str:
     events, cross_tick = launcher_route(index, count)
-    if target in {"CORTEX IGNITION", "HALF-LIFE"}:
+    if target in {"CORTEX IGNITION", "HALF-LIFE", "COUNTER-STRIKE", "HOLLOW KNIGHT"}:
         # These programs have their own menu after the demo-disc carousel.
         # Sparse presses remain deterministic across scene and data loads and
         # enter gameplay without depending on a single timing edge.
@@ -265,19 +296,21 @@ def cortex_gameplay_evidence(path: Path) -> dict[str, int]:
     return {"frames": len(qualifying), "sustained": longest, "hashes": hashes}
 
 
-def hl_gameplay_evidence(path: Path) -> dict[str, int]:
+def threshold_gameplay_evidence(path: Path, target: str) -> dict[str, int]:
+    triangles, quads, rects, min_frames, min_hashes, what = THRESHOLD_GAMEPLAY[target]
     qualifying: list[tuple[int, str]] = []
     with path.open(newline="", encoding="ascii") as stream:
         for row in csv.DictReader(stream):
             if (
-                int(row["textured_tris"]) >= HL_GAMEPLAY_TRIANGLES
-                and int(row["textured_quads"]) >= HL_GAMEPLAY_QUADS
+                int(row["textured_tris"]) >= triangles
+                and int(row["textured_quads"]) >= quads
+                and (not rects or int(row["textured_rects"]) >= rects)
             ):
                 qualifying.append((int(row["route_tick"]), row["frame_draw_hash"]))
     hashes = len({digest for _, digest in qualifying})
-    if len(qualifying) < HL_GAMEPLAY_MIN_FRAMES or hashes < HL_GAMEPLAY_MIN_HASHES:
+    if len(qualifying) < min_frames or hashes < min_hashes:
         raise CheckError(
-            "HALF-LIFE: route did not sustain textured train-ride gameplay "
+            f"{target}: route did not sustain {what} "
             f"({len(qualifying)} frames, {hashes} hashes)"
         )
     return {
@@ -285,6 +318,10 @@ def hl_gameplay_evidence(path: Path) -> dict[str, int]:
         "sustained": len(qualifying),
         "hashes": hashes,
     }
+
+
+def hl_gameplay_evidence(path: Path) -> dict[str, int]:
+    return threshold_gameplay_evidence(path, "HALF-LIFE")
 
 
 def cortex_geometry_evidence(path: Path) -> int:
@@ -390,8 +427,8 @@ def run_once(
         raise CheckError(f"{target.name}: PC sampler never observed payload code")
     if target.name == "CORTEX IGNITION":
         gameplay = cortex_gameplay_evidence(paths["gpu"])
-    elif target.name == "HALF-LIFE":
-        gameplay = hl_gameplay_evidence(paths["gpu"])
+    elif target.name in THRESHOLD_GAMEPLAY:
+        gameplay = threshold_gameplay_evidence(paths["gpu"], target.name)
     else:
         gameplay = {"frames": 0, "sustained": 0, "hashes": 0}
     geometry_edge_permille = (
@@ -502,7 +539,10 @@ def main() -> int:
         image = image_for_cue(cue)
         entries, menu = parse_toc(image)
         by_name = {entry.name: entry for entry in entries}
-        targets = args.target or list(TARGETS)
+        # With no --target: the core entries plus every optional one pressed.
+        targets = args.target or [
+            *CORE_TARGETS, *(name for name in OPTIONAL_TARGETS if name in by_name)
+        ]
         print(f"frontend SHA-256: {sha256(frontend)}")
         print(f"cue SHA-256: {sha256(cue)}")
         print(f"bin SHA-256: {sha256(image)}")

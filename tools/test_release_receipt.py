@@ -29,8 +29,12 @@ def put_user_sector(image: bytearray, lba: int, data: bytes) -> None:
     image[at : at + len(data)] = data
 
 
+HL_PRESSING = (*receipt.CORE_PROGRAMS, "HALF-LIFE")
+
+
 class ReleaseFixture:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, names: tuple[str, ...] = HL_PRESSING) -> None:
+        self.names = names
         self.source = root / "source"
         self.source.mkdir()
         run("git", "init", "-q", cwd=self.source)
@@ -75,7 +79,7 @@ class ReleaseFixture:
         self.programs: dict[str, Path] = {}
         inputs: dict[str, bytes] = {}
         payloads: dict[str, bytes] = {}
-        for index, name in enumerate(receipt.REQUIRED_PROGRAMS):
+        for index, name in enumerate(self.names):
             payload = bytes([index + 1]) * receipt.USER_DATA_BYTES
             image = bytearray(4 * receipt.SECTOR_BYTES)
             header = bytearray(receipt.USER_DATA_BYTES)
@@ -98,12 +102,12 @@ class ReleaseFixture:
             inputs[name] = bytes(image)
             payloads[name] = payload
 
-        image_lbas = {name: 30 + index * 4 for index, name in enumerate(receipt.REQUIRED_PROGRAMS)}
-        combined = bytearray(50 * receipt.SECTOR_BYTES)
+        image_lbas = {name: 30 + index * 4 for index, name in enumerate(self.names)}
+        combined = bytearray((34 + 4 * len(self.names)) * receipt.SECTOR_BYTES)
         toc = bytearray(receipt.TOC_SECTORS * receipt.USER_DATA_BYTES)
         toc[:8] = receipt.TOC_MAGIC
-        toc[8:12] = len(receipt.REQUIRED_PROGRAMS).to_bytes(4, "little")
-        for index, name in enumerate(receipt.REQUIRED_PROGRAMS):
+        toc[8:12] = len(self.names).to_bytes(4, "little")
+        for index, name in enumerate(self.names):
             image_lba = image_lbas[name]
             combined[
                 image_lba * receipt.SECTOR_BYTES : (image_lba + 4) * receipt.SECTOR_BYTES
@@ -139,13 +143,14 @@ class ReleaseFixture:
             encoding="ascii",
         )
 
-    def document(self) -> dict[str, object]:
+    def document(self, names: tuple[str, ...] | None = None) -> dict[str, object]:
+        names = self.names if names is None else names
         return receipt.build_document(
             self.combined_cue,
             self.frontend,
-            "make disc HL=1 DIST=dist/hardware-candidate",
-            self.programs,
-            {name: self.source for name in receipt.REQUIRED_PROGRAMS},
+            "make disc HL=1 CS=0 HK=0 DIST=dist/hardware-candidate",
+            {name: self.programs[name] for name in names},
+            {name: self.source for name in names},
         )
 
 
@@ -154,7 +159,7 @@ class ReleaseReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseFixture(Path(directory))
             document = fixture.document()
-            self.assertEqual(set(document["programs"]), set(receipt.REQUIRED_PROGRAMS))
+            self.assertEqual(set(document["programs"]), set(HL_PRESSING))
             for row in document["programs"].values():
                 self.assertEqual(row["source"]["tree_clean"], True)
                 self.assertEqual(row["embedded"]["image_sectors"], 4)
@@ -162,6 +167,27 @@ class ReleaseReceiptTests(unittest.TestCase):
             cooked = document["programs"]["HALF-LIFE"]["cooked_assets"]
             self.assertTrue(cooked["verified"])
             self.assertEqual(cooked["document"]["schema"], receipt.HL_COOK_SCHEMA)
+
+    def test_counter_strike_and_hollow_knight_without_half_life(self) -> None:
+        names = (*receipt.CORE_PROGRAMS, "COUNTER-STRIKE", "HOLLOW KNIGHT")
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseFixture(Path(directory), names)
+            document = fixture.document()
+            self.assertEqual(tuple(document["programs"]), names)
+            self.assertNotIn("cooked_assets", document["programs"]["COUNTER-STRIKE"])
+
+    def test_a_pressed_optional_program_must_be_receipted(self) -> None:
+        names = (*receipt.CORE_PROGRAMS, "HALF-LIFE", "HOLLOW KNIGHT")
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseFixture(Path(directory), names)
+            with self.assertRaisesRegex(receipt.ReceiptError, "does not cover.*HOLLOW KNIGHT"):
+                fixture.document(HL_PRESSING)
+
+    def test_unknown_or_missing_programs_are_refused(self) -> None:
+        with self.assertRaisesRegex(receipt.ReceiptError, "extra=.'DOOM'"):
+            receipt.pressed_programs((*receipt.CORE_PROGRAMS, "DOOM"))
+        with self.assertRaisesRegex(receipt.ReceiptError, "missing=.'QUAKE SHAREWARE'"):
+            receipt.pressed_programs(("CORTEX IGNITION", "HARDWARE TESTS"))
 
     def test_half_life_cooked_asset_tamper_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -202,7 +228,7 @@ class ReleaseReceiptTests(unittest.TestCase):
     def test_audio_tracks_are_hashed_but_only_data_track_is_embedded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseFixture(Path(directory))
-            name = receipt.REQUIRED_PROGRAMS[0]
+            name = HL_PRESSING[0]
             cue = fixture.programs[name]
             image = receipt.image_for_cue(cue)
             with image.open("ab") as stream:
