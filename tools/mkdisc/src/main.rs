@@ -116,6 +116,11 @@ struct Args {
     gates: Vec<String>,
     /// `(name, cooked blob)` menu backdrops, in slideshow order per name.
     shots: Vec<(String, PathBuf)>,
+    /// Sectors the target blank holds. A layout over it is an error that names
+    /// every program's share, rather than a burn that runs off the disc.
+    max_sectors: Option<u32>,
+    /// Print the sector budget and stop before writing the image.
+    dry_run: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -131,6 +136,8 @@ fn parse_args() -> Result<Args, String> {
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
     let mut menu_titles: Vec<String> = Vec::new();
     let mut gates: Vec<String> = Vec::new();
+    let mut max_sectors = None;
+    let mut dry_run = false;
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
@@ -219,6 +226,13 @@ fn parse_args() -> Result<Args, String> {
                 };
                 menu_beats.push((parse(bpm, "tempo")?, parse(phase, "phase")?));
             }
+            "--max-sectors" => {
+                let value = it.next().ok_or("--max-sectors takes a sector count")?;
+                max_sectors = Some(value.parse::<u32>().map_err(|_| {
+                    format!("--max-sectors wants a sector count, got {value:?}")
+                })?);
+            }
+            "--dry-run" => dry_run = true,
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -241,6 +255,8 @@ fn parse_args() -> Result<Args, String> {
         menu_titles,
         gates,
         shots,
+        max_sectors,
+        dry_run,
     })
 }
 
@@ -262,7 +278,9 @@ fn print_usage() {
          --credit      attribution the menu prints for that track\n\
          --menu-beat   MILLIBPM:PHASEMS for the matching --menu-cdda, from\n\
         \x20             tools/beatgrid.py; drives the menu's beat pulse\n\
-         --menu-title  title of the matching --menu-cdda, shown as now playing"
+         --menu-title  title of the matching --menu-cdda, shown as now playing\n\
+         --max-sectors the target blank's capacity; a layout over it is an error\n\
+         --dry-run     print the sector budget and stop without writing the image"
     );
 }
 
@@ -624,6 +642,64 @@ fn apply_descriptions(
     Ok(())
 }
 
+/// Red Book numbers tracks 1 to 99, and track 1 is the data track.
+const MAX_TRACKS: u32 = 99;
+
+/// Rows of `(name, sectors, CD-DA tracks)`, one per share of the image.
+type Budget = [(String, u32, u32)];
+
+fn budget_table(budget: &Budget, max_sectors: Option<u32>) -> String {
+    let total: u32 = budget.iter().map(|(_, sectors, _)| sectors).sum();
+    let tracks: u32 = 1 + budget.iter().map(|(_, _, tracks)| tracks).sum::<u32>();
+    let mut out = String::from("sector budget:\n");
+    for (name, sectors, audio) in budget {
+        out.push_str(&format!(
+            "  {name:<32} {sectors:>7} sectors  {:>6.1} MiB  {audio:>2} CD-DA\n",
+            *sectors as f64 * SECTOR_BYTES as f64 / (1024.0 * 1024.0)
+        ));
+    }
+    out.push_str(&format!(
+        "  {:<32} {total:>7} sectors  {:>6.1} MiB  {tracks:>2} tracks  {}\n",
+        "total",
+        total as f64 * SECTOR_BYTES as f64 / (1024.0 * 1024.0),
+        msf(total)
+    ));
+    if let Some(max) = max_sectors {
+        let percent = total as f64 * 100.0 / max as f64;
+        if total <= max {
+            out.push_str(&format!(
+                "  fits: {percent:.1}% of {max} sectors, {} spare\n",
+                max - total
+            ));
+        } else {
+            out.push_str(&format!(
+                "  DOES NOT FIT: {percent:.1}% of {max} sectors, {} over\n",
+                total - max
+            ));
+        }
+    }
+    out
+}
+
+fn check_budget(budget: &Budget, max_sectors: Option<u32>) -> Result<(), String> {
+    let total: u32 = budget.iter().map(|(_, sectors, _)| sectors).sum();
+    let tracks: u32 = 1 + budget.iter().map(|(_, _, tracks)| tracks).sum::<u32>();
+    if tracks > MAX_TRACKS {
+        return Err(format!(
+            "{tracks} tracks is more than the {MAX_TRACKS} a CD can number; drop a program"
+        ));
+    }
+    match max_sectors {
+        Some(max) if total > max => Err(format!(
+            "the layout needs {total} sectors ({}), {} more than the {max} of the target \
+             blank. Drop a program or raise the target.",
+            msf(total),
+            total - max
+        )),
+        _ => Ok(()),
+    }
+}
+
 fn run() -> Result<(), String> {
     let args = parse_args()?;
 
@@ -800,6 +876,34 @@ fn run() -> Result<(), String> {
     // table has to name that. The table is exactly one sector either way, so
     // the second build comes out the same length.
     let iso_frames = (build_iso(vec![0u8; disc_toc::TOC_BYTES]).len() / SECTOR_BYTES) as u32;
+
+    // Every sector the finished image will hold is known now, so the budget is
+    // settled before hundreds of megabytes get written: an optional program
+    // that does not fit fails here with each share named, not at the burner.
+    let mut budget = vec![(
+        String::from("launcher ISO (menu, bare EXEs)"),
+        iso_frames,
+        0u32,
+    )];
+    if !menu_audio.is_empty() {
+        let frames = menu_audio
+            .iter()
+            .map(|bytes| PREGAP_FRAMES + (bytes.len() / SECTOR_BYTES) as u32)
+            .sum();
+        budget.push((String::from("menu music"), frames, menu_audio.len() as u32));
+    }
+    for (index, _, image, _, _) in &images {
+        budget.push((
+            args.programs[*index].name.clone(),
+            ((image.data.len() + image.audio_bytes.len()) / SECTOR_BYTES) as u32,
+            image.audio.len() as u32,
+        ));
+    }
+    print!("{}", budget_table(&budget, args.max_sectors));
+    check_budget(&budget, args.max_sectors)?;
+    if args.dry_run {
+        return Ok(());
+    }
 
     let mut image_lba = iso_frames;
     // Game audio numbers from AFTER the menu's tracks: the menu music is
@@ -1053,6 +1157,36 @@ mod tests {
             index00: index01.saturating_sub(150),
             index01,
         }
+    }
+
+    fn row(name: &str, sectors: u32, tracks: u32) -> (String, u32, u32) {
+        (name.to_string(), sectors, tracks)
+    }
+
+    #[test]
+    fn a_layout_within_the_target_passes_the_budget() {
+        let budget = [row("launcher", 100, 0), row("GAME", 899, 2)];
+        assert!(check_budget(&budget, Some(1000)).is_ok());
+        assert!(check_budget(&budget, Some(999)).is_ok());
+        assert!(check_budget(&budget, None).is_ok());
+        assert!(budget_table(&budget, Some(1000)).contains("1 spare"));
+    }
+
+    #[test]
+    fn a_layout_over_the_target_names_the_overrun() {
+        let budget = [row("launcher", 100, 0), row("GAME", 900, 2)];
+        let error = check_budget(&budget, Some(999)).unwrap_err();
+        assert!(error.contains("1000 sectors"), "{error}");
+        assert!(error.contains("1 more than the 999"), "{error}");
+        assert!(budget_table(&budget, Some(999)).contains("DOES NOT FIT"));
+    }
+
+    #[test]
+    fn more_than_ninety_nine_tracks_is_an_error() {
+        let fits = [row("launcher", 1, 0), row("GAME", 1, 98)];
+        assert!(check_budget(&fits, None).is_ok());
+        let over = [row("launcher", 1, 0), row("GAME", 1, 99)];
+        assert!(check_budget(&over, None).unwrap_err().contains("100 tracks"));
     }
 
     #[test]
