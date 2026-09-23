@@ -109,6 +109,8 @@ claim. See [the dated split validation](docs/repository-split-validation-2026-09
 | --- | --- |
 | Cortex Ignition | current PXBSP project as a whole image, 1 CD-DA track |
 | Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
+| Counter-Strike (cs-psx) | whole image, no CD-DA track, `CS=1` only |
+| Hollow Knight (hk-psx) | whole image, 1 CD-DA track (title music), `HK=1` only |
 | Voxide | whole image, WORLD.PAK assets |
 | NitroXide | whole image, WORLD.PAK arena atlas |
 | Celeste Classic Collection | bare EXE |
@@ -139,8 +141,8 @@ sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 The standard order is Cortex Ignition, Voxide, NitroXide,
 Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
 Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
-cabinet selector for Breakout, Space Invaders and Magikarp Pong. The Half-Life
-pressing inserts Half-Life directly after Cortex Ignition.
+cabinet selector for Breakout, Space Invaders and Magikarp Pong. The optional
+programs follow Quake Shareware in HL, CS, HK order.
 
 ## The menu
 
@@ -237,7 +239,9 @@ The Python packages cover menu-image cooking and the label/QR test suite.
 Before `make disc`, provide the validated Quake source/artifacts described
 below and the authorized audio inputs in [audio/README.md](audio/README.md).
 The HL edition additionally needs a local Half-Life installation, found by
-its builder or supplied through `HL_DIR`.
+its builder or supplied through `HL_DIR`. `CS=1` needs the Windows Steam
+Half-Life folder holding `valve/` and `cstrike/` (`CS_HALF_LIFE`, CrossOver's
+Steam by default) and `HK=1` the Windows Hollow Knight install (`HK_GAME_DIR`).
 
 `release-components.json` locks the SDK, editor/engine/Cortex and standalone
 emulator separately. Their source receipts are checked before building.
@@ -283,6 +287,17 @@ private submodules require repository access: a recursive clone fetches all
 submodules, including HL-PSX, even when the standard edition is selected.
 `HL=1` also requires the separately supplied original game data. Public
 release targets reject that edition.
+
+`CS=1` (Counter-Strike 1.6, from `games/cs-psx`) and `HK=1` (Hollow Knight,
+from `games/hk-psx`) are opt-in the same way, independent of `HL=1` and of each
+other. Each adds its carousel entry and its whole image; the disc name gains a
+tag per flag (`PSoXide Demo Disc HL CS`, for example), the release receipt and
+`make release-headless-check` cover exactly the programs pressed, and the
+public release targets reject every such pressing. Only cooked outputs are
+laid out; no game content enters this repository. mkdisc adds up every sector
+before writing and fails with each program's share when a combination is
+over `DISC_MAX_SECTORS` (an 80-minute CD-R by default). `make disc-budget`
+prints that table for already built inputs without writing an image.
 
 `make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
 sibling `quake-psx-pinned` checkout by default) and will not build without

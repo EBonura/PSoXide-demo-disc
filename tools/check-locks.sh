@@ -13,7 +13,7 @@
 # inside them.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
-REPOS=(. games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx games/psoxide-arcade)
+REPOS=(. games/PSoXide-editor games/PSoXide-emulator games/PSoXide-sdk games/nitroxide games/voxide games/pico8-psx games/psxcel games/gh-psx games/hl-psx games/cs-psx games/hk-psx games/psoxide-arcade)
 offline="--offline"
 [ "${CHECK_LOCKS_ONLINE:-}" = "1" ] && offline=""
 

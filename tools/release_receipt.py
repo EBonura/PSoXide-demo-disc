@@ -15,11 +15,18 @@ from pathlib import Path
 
 
 SCHEMA = "psoxide-combined-release-v1"
-REQUIRED_PROGRAMS = (
+# Every private pressing carries these; the receipt must cover all of them.
+CORE_PROGRAMS = (
     "CORTEX IGNITION",
-    "HALF-LIFE",
     "HARDWARE TESTS",
     "QUAKE SHAREWARE",
+)
+# HL=1, CS=1 and HK=1 each add one. The receipt covers exactly the ones pressed,
+# and a pressed one it does not cover is an error, never a silent omission.
+OPTIONAL_PROGRAMS = (
+    "HALF-LIFE",
+    "COUNTER-STRIKE",
+    "HOLLOW KNIGHT",
 )
 SECTOR_BYTES = 2352
 USER_DATA_AT = 24
@@ -196,6 +203,31 @@ def split_assignment(value: str, label: str) -> tuple[str, Path]:
     return name, Path(raw_path)
 
 
+def pressed_programs(names, label: str = "program") -> tuple[str, ...]:
+    """The receipted programs in canonical order: every core one plus the
+    optional ones given, and nothing else."""
+    names = set(names)
+    missing = set(CORE_PROGRAMS) - names
+    extra = names - set(CORE_PROGRAMS) - set(OPTIONAL_PROGRAMS)
+    if missing or extra:
+        raise ReceiptError(
+            f"{label} names must be {CORE_PROGRAMS} plus any of {OPTIONAL_PROGRAMS}; "
+            f"missing={sorted(missing)} extra={sorted(extra)}"
+        )
+    return tuple(name for name in (*CORE_PROGRAMS, *OPTIONAL_PROGRAMS) if name in names)
+
+
+def check_toc_covered(entries, names: tuple[str, ...]) -> None:
+    missing = set(names) - set(entries)
+    if missing:
+        raise ReceiptError(f"combined TOC is missing required programs: {sorted(missing)}")
+    uncovered = (set(entries) & set(OPTIONAL_PROGRAMS)) - set(names)
+    if uncovered:
+        raise ReceiptError(
+            f"combined TOC carries programs the receipt does not cover: {sorted(uncovered)}"
+        )
+
+
 def exact_assignments(values: list[str], label: str) -> dict[str, Path]:
     decoded: dict[str, Path] = {}
     for value in values:
@@ -203,13 +235,7 @@ def exact_assignments(values: list[str], label: str) -> dict[str, Path]:
         if name in decoded:
             raise ReceiptError(f"duplicate {label} for {name}")
         decoded[name] = path
-    missing = set(REQUIRED_PROGRAMS) - set(decoded)
-    extra = set(decoded) - set(REQUIRED_PROGRAMS)
-    if missing or extra:
-        raise ReceiptError(
-            f"{label} names must be exactly {REQUIRED_PROGRAMS}; "
-            f"missing={sorted(missing)} extra={sorted(extra)}"
-        )
+    pressed_programs(decoded, label)
     return decoded
 
 
@@ -535,12 +561,13 @@ def build_document(
     combined_cue = combined_cue.resolve(strict=True)
     combined = image_for_cue(combined_cue)
     entries = parse_toc(combined)
-    missing = set(REQUIRED_PROGRAMS) - set(entries)
-    if missing:
-        raise ReceiptError(f"combined TOC is missing required programs: {sorted(missing)}")
+    names = pressed_programs(programs)
+    if set(sources) != set(names):
+        raise ReceiptError("every receipted program needs exactly one source")
+    check_toc_covered(entries, names)
     program_rows: dict[str, object] = {}
     ranges: list[tuple[int, int, str]] = []
-    for name in REQUIRED_PROGRAMS:
+    for name in names:
         record = program_record(programs[name], combined, entries[name])
         source = sources[name].resolve(strict=True)
         source_row = source_record(source)
@@ -619,11 +646,13 @@ def verify_sealed_document(receipt_path: Path, expected: dict[str, object]) -> N
         raise ReceiptError("combined sector count no longer matches the receipt")
 
     entries = parse_toc(image)
-    missing = set(REQUIRED_PROGRAMS) - set(entries)
-    if missing:
-        raise ReceiptError(f"combined TOC is missing required programs: {sorted(missing)}")
+    try:
+        names = pressed_programs(expected["programs"])
+    except (KeyError, TypeError) as error:
+        raise ReceiptError(f"malformed receipt: missing {error}") from error
+    check_toc_covered(entries, names)
     ranges: list[tuple[int, int, str]] = []
-    for name in REQUIRED_PROGRAMS:
+    for name in names:
         try:
             row = expected["programs"][name]
             embedded = row["embedded"]
@@ -734,13 +763,14 @@ def verify(args: argparse.Namespace) -> None:
         print(f"sealed release receipt verified: {receipt_path}")
         return
     try:
+        names = pressed_programs(expected["programs"])
         programs = {
             name: Path(expected["programs"][name]["input"]["cue"]["path"])
-            for name in REQUIRED_PROGRAMS
+            for name in names
         }
         sources = {
             name: Path(expected["programs"][name]["source"]["path"])
-            for name in REQUIRED_PROGRAMS
+            for name in names
         }
         actual = build_document(
             Path(expected["combined"]["cue"]["path"]),

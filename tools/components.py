@@ -45,11 +45,39 @@ def run(check=False, check_main=False):
 
 
 GAMES = ("voxide", "nitroxide", "psxcel", "pico8-psx", "gh-psx", "psoxide-arcade")
+# The optional bring-your-own-assets ports. hl-psx and cs-psx hydrate the shared
+# editor tree like every other game; hk-psx imports only the SDK, through its
+# own sdk.lock.json, so its lock is checked by revision instead.
+OPTIONAL = {"hl": "hl-psx", "cs": "cs-psx"}
+HK = "hk-psx"
+
+
+def verify_hk_locks(specs):
+    source = ROOT / "games" / HK
+    for lock, name in (("sdk.lock.json", "sdk"), ("emulator.lock.json", "emulator")):
+        path = source / lock
+        if not path.is_file():
+            raise RuntimeError(f"{HK}: no {lock}")
+        pinned = json.loads(path.read_text())
+        if pinned["revision"] != specs[name]["revision"]:
+            raise RuntimeError(f"{HK}: {lock} revision differs from the disc {name} lock")
+        if not pinned["repository"].removesuffix(".git").endswith(specs[name]["repository"]):
+            raise RuntimeError(f"{HK}: {lock} repository differs from the disc {name} lock")
+
+
+def verify_hk_hydration(specs):
+    """hk-psx hydrates .psoxide from `git archive` of its SDK pin and records it."""
+    state = ROOT / "games" / HK / ".hkpsx" / "sdk.json"
+    if not state.is_file():
+        raise RuntimeError(f"{HK}: missing SDK hydration record; run make programs HK=1")
+    if json.loads(state.read_text())["revision"] != specs["sdk"]["revision"]:
+        raise RuntimeError(f"{HK}: hydrated SDK differs from the disc sdk lock")
 
 
 def verify_game_locks():
     specs = json.loads((ROOT / "release-components.json").read_text())["components"]
-    for game in (*GAMES, "hl-psx"):
+    verify_hk_locks(specs)
+    for game in (*GAMES, *OPTIONAL.values()):
         source = ROOT / "games" / game
         lock = source / "components.lock.json"
         if not lock.is_file():
@@ -62,7 +90,7 @@ def verify_game_locks():
     print("Every standalone game lock agrees with the release component tuple")
 
 
-def verify_games(hl=False):
+def verify_games(hl=False, cs=False, hk=False):
     verify_game_locks()
     specs = json.loads((ROOT / "release-components.json").read_text())["components"]
     editor = ROOT / specs["editor"]["path"]
@@ -74,7 +102,9 @@ def verify_games(hl=False):
         path = editor / name
         if path.is_file() and name.startswith(("engine/", "editor/crates/", "sdk/", "crates/")):
             inputs[name] = hashlib.sha256(path.read_bytes()).hexdigest()
-    selected = (*GAMES, "hl-psx") if hl else GAMES
+    selected = (*GAMES, *(game for flag, game in OPTIONAL.items() if {"hl": hl, "cs": cs}[flag]))
+    if hk:
+        verify_hk_hydration(specs)
     for game in selected:
         hydrated = ROOT / "games" / game / ".psoxide"
         marker = hydrated / ".psoxide-source"
@@ -84,7 +114,7 @@ def verify_games(hl=False):
             path = hydrated / name
             if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
                 raise RuntimeError(f"{game}: hydrated build input changed or missing: {name}")
-    print(f"Verified all {len(selected)} required game hydrations against the selected components")
+    print(f"Verified all {len(selected) + hk} required game hydrations against the selected components")
 
 
 def file_record(path):
@@ -132,6 +162,8 @@ if __name__ == "__main__":
     parser.add_argument("--games", action="store_true")
     parser.add_argument("--game-locks", action="store_true")
     parser.add_argument("--hl", action="store_true")
+    parser.add_argument("--cs", action="store_true")
+    parser.add_argument("--hk", action="store_true")
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--cue", type=Path)
     parser.add_argument("--frontend", type=Path)
@@ -139,7 +171,7 @@ if __name__ == "__main__":
     try:
         run(args.check, args.check_main)
         if args.games:
-            verify_games(args.hl)
+            verify_games(args.hl, args.cs, args.hk)
         elif args.game_locks:
             verify_game_locks()
         if args.receipt:

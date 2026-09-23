@@ -8,7 +8,7 @@
 # music live outside Git. Cortex uses an exact PSoXide pin so the active editor
 # project remains reproducible as the engine advances.
 
-.PHONY: help disc disc-only quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
@@ -39,12 +39,18 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # than looped: make's foreach splits on whitespace, which takes the titles
 # apart at their spaces.
 
-# Two pressings. The menu music permission is scoped to the disc without
-# Half-Life, and hl-psx is private until its own release, so HL is opt-in:
+# One public pressing and private ones. The menu music permission is scoped to
+# the disc without Half-Life, and hl-psx is private until its own release, so HL
+# is opt-in, and so are the two other bring-your-own-assets ports:
 #   make disc        -> "PSoXide Demo Disc"     (the default pressing)
 #   make disc HL=1   -> "PSoXide Demo Disc HL"  (the same disc plus Half-Life)
-# The names differ so the two bins cannot be mistaken for each other. Both
-# carry Quake shareware; HL=1 adds to the default disc, it does not replace it.
+#   make disc CS=1   -> "PSoXide Demo Disc CS"  (plus Counter-Strike 1.6)
+#   make disc HK=1   -> "PSoXide Demo Disc HK"  (plus Hollow Knight)
+# The three flags are independent and combine: HL=1 HK=1 presses
+# "PSoXide Demo Disc HL HK". The names differ so no two bins can be mistaken
+# for each other. Every pressing carries Quake shareware; each flag adds to the
+# default disc, it does not replace anything. Any flag makes the pressing
+# private: the release receipt covers it and the public upload paths refuse it.
 #
 # Adding Quake to the Half-Life pressing was the size question. Measured
 # 2026-08-11 from one tree with one set of inputs, in 2352-byte sectors:
@@ -58,8 +64,28 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # 80-minute CD-R (359999 sectors), 59107 spare, and still fits a 74-minute
 # blank with 32108 to spare. Nothing had to be dropped to make room.
 HL ?=
-# HL=0 means off, not "0 is a non-empty string, so on".
+CS ?=
+HK ?=
+# HL=0 means off, not "0 is a non-empty string, so on". Same for CS and HK.
 override HL := $(filter-out 0,$(HL))
+override CS := $(filter-out 0,$(CS))
+override HK := $(filter-out 0,$(HK))
+PRIVATE := $(strip $(HL)$(CS)$(HK))
+
+# The pressing has to fit the blank it is burned on. mkdisc adds up every
+# sector before it writes anything and fails with each program's share when
+# the layout is over this. 359999 is an 80-minute CD-R; a 74-minute blank is
+# 333000. `make disc-budget` prints the same table for already built inputs.
+#
+# Measured 2026-09-23 with `make disc-budget` from one tree (tuple SDK
+# 6da88d92, hl-psx 9deba2a, cs-psx 7b38ed9), in 2352-byte sectors, against an
+# 80-minute blank. Half-Life is 204888 of them, Counter-Strike 9014:
+#
+#   default            103288   22:57:13   28.7%
+#   CS                 112308   24:57:33   31.2%
+#   HL                 308182   68:29:07   85.6%
+#   HL CS              317202   70:29:27   88.1%
+DISC_MAX_SECTORS ?= 359999
 
 # Quake 1.06 shareware Episode 1 is on every pressing. The source revision,
 # shipping provenance, and all artifact hashes are checked before layout, and
@@ -87,16 +113,14 @@ FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
 # The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
-# no per-disc subfolder (Manny, 2026-09-03).
-ifneq ($(HL),)
-DISC_NAME ?= PSoXide Demo Disc HL
-else
-DISC_NAME ?= PSoXide Demo Disc
-endif
+# no per-disc subfolder (Manny, 2026-09-03). The name carries one tag per
+# optional program, in HL CS HK order.
+DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),HK))
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-RELEASE_BUILD_COMMAND ?= make disc HL=$(if $(HL),1,0) DIST=$(DIST)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0)
+RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
@@ -111,6 +135,20 @@ CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/rel
 GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
+CSPSX_SOURCE ?= $(GAMES)/cs-psx
+CSPSX    := $(CSPSX_SOURCE)/dist/cs-psx.cue
+HKPSX_SOURCE ?= $(GAMES)/hk-psx
+# hk-psx's builder writes its disc only to ~/Downloads/ps1 games, so it runs
+# with HOME pointed at a directory under build/ and the image is taken from
+# there. Nothing reaches the real game library.
+HK_HOME  := $(BUILD)/hk-home
+HKPSX    := $(HK_HOME)/Downloads/ps1 games/hk-psx.cue
+# Both ports cook from the owner's own Windows Steam install in CrossOver:
+# Counter-Strike from the Half-Life folder that holds valve/ and cstrike/ (the
+# macOS Steam Half-Life has no cstrike), Hollow Knight from its install folder.
+STEAM_WINDOWS ?= $(HOME)/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common
+CS_HALF_LIFE ?= $(STEAM_WINDOWS)/Half-Life
+HK_GAME_DIR ?= $(STEAM_WINDOWS)/Hollow Knight
 CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
 CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b
 CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.cue
@@ -125,13 +163,15 @@ NITROXIDE       := $(NITROXIDE_BUILD)/NitroXide/NitroXide.cue
 help:
 	@echo "make disc             - build everything into \"$(DIST)\" (the default pressing, Quake shareware included)"
 	@echo "make disc HL=1        - the same disc plus Half-Life, for the Palermo Comicon"
+	@echo "make disc CS=1 HK=1   - plus Counter-Strike and/or Hollow Knight; flags combine with HL=1"
+	@echo "make disc-budget      - print the sector budget for the selected flags from built inputs"
 	@echo "make disc-only        - relay out the disc without rebuilding the programs"
 	@echo "make check            - host tests (disc-toc, mkdisc) and the Quake pin check"
 	@echo "make quake-verify     - check the pinned Quake input on its own"
 	@echo "make quake-repin      - print the pin values a built Quake tree implies"
 	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
 	@echo "make program-headless-check - boot the independent games and all three Arcade guests"
-	@echo "make release-headless-check - build the private HL pressing and deterministically chain-load the release-critical entries"
+	@echo "make release-headless-check - build the private pressing (HL, or the given HL/CS/HK flags) and chain-load its release-critical entries"
 	@echo "make relocation-check - disc that proves a relocated game still finds its data"
 	@echo "make clean            - drop build/ (the disc in the library is left alone)"
 
@@ -165,6 +205,8 @@ V_CELESTE   := $(call cargo_version,$(GAMES)/pico8-psx/games/celeste-collection/
 V_GHPSX     := $(call cargo_version,$(GAMES)/gh-psx/game/Cargo.toml)
 V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arcade/Makefile 2>/dev/null)
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
+V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
+V_HKPSX     := $(call cargo_version,$(HKPSX_SOURCE)/game/Cargo.toml)
 # The hardware suite already versions itself on screen; take that same string so
 # the carousel and the suite header cannot disagree.
 V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
@@ -218,6 +260,33 @@ ifneq ($(HL),)
 	cd $(GAMES)/hl-psx && cargo run --release -- assets --psoxide $(PROGRAMS_PSOXIDE)
 	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
 endif
+ifneq ($(CS),)
+	$(MAKE) cs-program
+endif
+ifneq ($(HK),)
+	$(MAKE) hk-program
+endif
+
+# Counter-Strike is a Half-Life mod, and cs-psx's cookers take one game
+# directory, so its builder first hard-links valve/ then cstrike/ into
+# .hlpsx/gamedir and cooks from that union. It hydrates the same shared
+# PSoXide as hl-psx, through the same --psoxide.
+cs-program:
+	cd $(CSPSX_SOURCE) && cargo cs-build overlay --half-life "$(CS_HALF_LIFE)"
+	cd $(CSPSX_SOURCE) && cargo cs-build assets --half-life "$(CSPSX_SOURCE)/.hlpsx/gamedir" --psoxide $(PROGRAMS_PSOXIDE)
+	cd $(CSPSX_SOURCE) && cargo cs-build pack --psoxide $(PROGRAMS_PSOXIDE)
+
+# hk-psx imports only the SDK, pinned by its own sdk.lock.json, which must
+# name the tuple's SDK (sdk-coherence checks). --no-validate skips its route
+# replays; the demo disc's own chain-load check replays it from the pressing.
+# HOME is swapped for the disc destination only, so cargo, rustup and pyenv are
+# pointed back at the real ones.
+hk-program:
+	@mkdir -p "$(HK_HOME)/Downloads/ps1 games"
+	cd $(HKPSX_SOURCE) && env HOME="$(HK_HOME)" \
+		CARGO_HOME="$${CARGO_HOME:-$(HOME)/.cargo}" RUSTUP_HOME="$${RUSTUP_HOME:-$(HOME)/.rustup}" \
+		PYENV_ROOT="$${PYENV_ROOT:-$(HOME)/.pyenv}" \
+		cargo run --release -- build --no-validate --sdk-source $(SDK) --hollow-knight "$(HK_GAME_DIR)"
 
 # Every disc build must establish that its ordinary demo-disc programs were
 # rebuilt from their own exact clean shared-runtime revision. Quake's separate
@@ -324,6 +393,18 @@ HL_ARGS = --image "HALF-LIFE=$(HLPSX)" \
 	--version-of "HALF-LIFE=$(V_HLPSX)" \
 	--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine."
 endif
+ifneq ($(CS),)
+CS_ARGS = --image "COUNTER-STRIKE=$(CSPSX)" \
+	--shot "COUNTER-STRIKE=$(SHOTS_OUT)/counterstrike.shot" \
+	--version-of "COUNTER-STRIKE=$(V_CSPSX)" \
+	--describe "COUNTER-STRIKE=A from-scratch PlayStation port of Counter-Strike 1.6, cooked from your own copy. Bots, the buy menu, bomb and hostage rounds, and two-player split screen. Still in development.|Counter-Strike 1.6 portato su PlayStation da zero, partendo dalla propria copia del gioco. Bot, menu acquisti, bomba, ostaggi e schermo diviso per due giocatori. In sviluppo."
+endif
+ifneq ($(HK),)
+HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
+	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
+	--version-of "HOLLOW KNIGHT=$(V_HKPSX)" \
+	--describe "HOLLOW KNIGHT=An early from-scratch PlayStation port of Hollow Knight, cooked from your own copy. King's Pass, Dirtmouth and the Forgotten Crossroads can be explored, with enemies, benches and saves.|Un primo port di Hollow Knight per PlayStation, fatto da zero partendo dalla propria copia. Si possono esplorare King's Pass, Dirtmouth e il Crocevia Dimenticato, con nemici, panchine e salvataggi."
+endif
 
 # The QUAKE SHAREWARE arguments travel together for the same reason the
 # HALF-LIFE ones do, and they are not conditional: there is no pressing without
@@ -370,15 +451,21 @@ _quake-headless-check:
 release-frontend:
 	cd $(EMULATOR) && cargo build --locked --release -p frontend
 
+# With no flags this is the HL pressing, as it always was; with any of HL, CS
+# or HK it is exactly that combination, and the replay covers what it carries.
+RELEASE_FLAGS = $(if $(PRIVATE),$(PRESSING_FLAGS),HL=1 CS=0 HK=0)
 release-headless-check: release-frontend
-	$(MAKE) disc HL=1
-	$(MAKE) _release-headless-check HL=1
+	$(MAKE) disc $(RELEASE_FLAGS)
+	$(MAKE) _release-headless-check $(RELEASE_FLAGS)
 
 _release-headless-check:
 	python3 tools/release_receipt.py verify --receipt "$(RELEASE_RECEIPT)"
 	python3 tools/check_release_chainloads.py \
 		--frontend "$(FRONTEND)" \
-		--cue "$(DIST)/$(DISC_NAME).cue"
+		--cue "$(DIST)/$(DISC_NAME).cue" \
+		--target "CORTEX IGNITION" --target "HARDWARE TESTS" --target "QUAKE SHAREWARE" \
+		$(if $(HL),--target HALF-LIFE) $(if $(CS),--target COUNTER-STRIKE) \
+		$(if $(HK),--target "HOLLOW KNIGHT")
 
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
@@ -424,7 +511,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
               invaders2 pong pong2 hwtests hwtests2 halflife quake-menu \
-              quake-gameplay
+              quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
@@ -434,15 +521,12 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
 # `make disc` builds.
-ifneq ($(HL),)
-disc-only: release-frontend
-endif
-disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
-	@mkdir -p "$(DIST)"
-	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
+MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(QUAKE_ARGS) \
 		$(HL_ARGS) \
+		$(CS_ARGS) \
+		$(HK_ARGS) \
 		--image "VOXIDE=$(VOXIDE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
@@ -494,6 +578,14 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--describe "GH-PSX=A Guitar Hero-style rhythm game for the original PlayStation. This is a bare-bones, one-song prototype.|Un gioco in stile Guitar Hero per la prima PlayStation. E un prototipo essenziale con una sola canzone." \
 		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
 		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
+		--max-sectors $(DISC_MAX_SECTORS)
+
+ifneq ($(PRIVATE),)
+disc-only: release-frontend
+endif
+disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
+	@mkdir -p "$(DIST)"
+	$(MKDISC) $(MKDISC_ARGS)
 
 	python3 tools/quake_disc.py receipt \
 		--source "$(QUAKE_SRC)" \
@@ -513,15 +605,16 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--demo-bin "$(DIST)/$(DISC_NAME).bin" \
 		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
 
-ifneq ($(HL),)
+ifneq ($(PRIVATE),)
 	python3 tools/release_receipt.py create \
 		--combined-cue "$(DIST)/$(DISC_NAME).cue" \
 		--frontend "$(FRONTEND)" \
 		--build-command "$(RELEASE_BUILD_COMMAND)" \
 		--program "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		--source "CORTEX IGNITION=$(CORTEX_CURRENT_PSOXIDE)" \
-		--program "HALF-LIFE=$(HLPSX)" \
-		--source "HALF-LIFE=$(HLPSX_SOURCE)" \
+		$(if $(HL),--program "HALF-LIFE=$(HLPSX)" --source "HALF-LIFE=$(HLPSX_SOURCE)") \
+		$(if $(CS),--program "COUNTER-STRIKE=$(CSPSX)" --source "COUNTER-STRIKE=$(CSPSX_SOURCE)") \
+		$(if $(HK),--program "HOLLOW KNIGHT=$(HKPSX)" --source "HOLLOW KNIGHT=$(HKPSX_SOURCE)") \
 		--program "HARDWARE TESTS=$(HWTESTS)" \
 		--source "HARDWARE TESTS=$(PROGRAMS_PSOXIDE)" \
 		--program "QUAKE SHAREWARE=$(QUAKE_CUE)" \
@@ -531,8 +624,13 @@ endif
 	python3 tools/components.py --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
 
 
+# The sector budget of the pressing these flags select, from inputs already
+# built, without writing an image.
+disc-budget: mkdisc $(SHOT_FILES)
+	$(MKDISC) $(MKDISC_ARGS) --dry-run
+
 # The standard pressing may be published. Both upload recipes fail closed when
-# HL is set so the private Half-Life pressing cannot reach either public path.
+# HL, CS or HK is set so no private pressing can reach either public path.
 
 # Keep the browser emulator's copy current. PSoXide's Pages deploy stages
 # these files from the rolling `web-disc` release next to the wasm, and the
@@ -546,7 +644,7 @@ endif
 WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
 release-web:
-	@test -z "$(HL)" || { echo "release-web: the HL pressing is never distributed"; exit 1; }
+	@test -z "$(PRIVATE)" || { echo "release-web: the HL, CS and HK pressings are never distributed"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
@@ -567,7 +665,7 @@ release-web:
 # permission is scoped to the disc without it.
 .PHONY: itch
 itch:
-	@test -z "$(HL)" || { echo "itch: the HL pressing is never distributed"; exit 1; }
+	@test -z "$(PRIVATE)" || { echo "itch: the HL, CS and HK pressings are never distributed"; exit 1; }
 	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/itch" && mkdir -p "$(BUILD)/itch"
@@ -620,7 +718,7 @@ sdk-on-main: components
 
 .PHONY: sdk-coherence
 sdk-coherence:
-	python3 tools/components.py --check --games $(if $(HL),--hl,)
+	python3 tools/components.py --check --games $(if $(HL),--hl) $(if $(CS),--cs) $(if $(HK),--hk)
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its

@@ -48,11 +48,17 @@ class GameCoherenceTests(unittest.TestCase):
         (editor / "sdk/source.rs").write_text("sdk source")
         (editor / ".components-receipt.json").write_text(json.dumps({"files": {
             "sdk/source.rs": hashlib.sha256(b"sdk source").hexdigest()}}))
-        for game in (*components.GAMES, "hl-psx"):
+        hk = root / "games" / components.HK
+        hk.mkdir(parents=True)
+        for lock, name in (("sdk.lock.json", "sdk"), ("emulator.lock.json", "emulator")):
+            (hk / lock).write_text(json.dumps({
+                "repository": f"https://github.com/owner/{name}.git",
+                "revision": specs[name]["revision"]}))
+        for game in (*components.GAMES, *components.OPTIONAL.values()):
             source = root / "games" / game
             source.mkdir(parents=True)
             (source / "components.lock.json").write_text(json.dumps({"components": specs}))
-            if game == "hl-psx":
+            if game in components.OPTIONAL.values():
                 continue
             hydrated = source / ".psoxide"
             (hydrated / "engine").mkdir(parents=True)
@@ -69,6 +75,17 @@ class GameCoherenceTests(unittest.TestCase):
                 components.verify_games()
                 with self.assertRaisesRegex(RuntimeError, "hl-psx: missing"):
                     components.verify_games(hl=True)
+                with self.assertRaisesRegex(RuntimeError, "cs-psx: missing"):
+                    components.verify_games(cs=True)
+                with self.assertRaisesRegex(RuntimeError, "hk-psx: missing SDK hydration"):
+                    components.verify_games(hk=True)
+                state = root / "games/hk-psx/.hkpsx/sdk.json"
+                state.parent.mkdir()
+                state.write_text(json.dumps({"revision": "a" * 40}))
+                components.verify_games(hk=True)
+                state.write_text(json.dumps({"revision": "d" * 40}))
+                with self.assertRaisesRegex(RuntimeError, "hydrated SDK differs"):
+                    components.verify_games(hk=True)
                 source = root / "games/voxide/.psoxide/sdk/source.rs"
                 source.write_text("tampered")
                 with self.assertRaisesRegex(RuntimeError, "build input changed"):
@@ -88,6 +105,18 @@ class GameCoherenceTests(unittest.TestCase):
             path.write_text(json.dumps(lock))
             with patch.object(components, "ROOT", root):
                 with self.assertRaisesRegex(RuntimeError, "standalone sdk revision"):
+                    components.verify_game_locks()
+
+    def test_rejects_hk_sdk_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            path = root / "games/hk-psx/sdk.lock.json"
+            lock = json.loads(path.read_text())
+            lock["revision"] = "d" * 40
+            path.write_text(json.dumps(lock))
+            with patch.object(components, "ROOT", root):
+                with self.assertRaisesRegex(RuntimeError, "hk-psx: sdk.lock.json revision"):
                     components.verify_game_locks()
 
     def test_rejects_a_game_without_a_component_lock(self):
