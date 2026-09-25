@@ -99,8 +99,12 @@ CORTEX_GAMEPLAY_QUADS = 100
 CORTEX_GAMEPLAY_MIN_FRAMES = 30
 CORTEX_GAMEPLAY_MAX_FRAME_GAP = 16
 CORTEX_GAMEPLAY_MIN_HASHES = 8
-HL_GAMEPLAY_TRIANGLES = 300
-HL_GAMEPLAY_QUADS = 150
+# Remeasured 2026-09-25 on hl-psx d9d3248 (final-6, PGO) from the 13-card
+# pressing: its menu draws no textured triangles and at most 69 quads, and the
+# tram ride's tunnel now clears 300/150 in only 7 frames of the replay (the
+# older build's gate), but 200/100 in 129 frames with 124 distinct hashes.
+HL_GAMEPLAY_TRIANGLES = 200
+HL_GAMEPLAY_QUADS = 100
 HL_GAMEPLAY_MIN_FRAMES = 30
 HL_GAMEPLAY_MIN_HASHES = 8
 # Per entry: minimum textured triangles, quads and rects in one frame, the
