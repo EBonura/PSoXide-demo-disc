@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""Press the disc from already built programs named in a lineup file.
+
+`make disc` rebuilds every program from this repo's submodules. A lineup
+pressing instead takes each program exactly as it was built for the PS1 games
+library (or from a named build directory), because those are the builds that
+were played and checked. The lineup file names every input with its sha256,
+its source revision and the receipt of the build that made it; nothing is
+pressed from a file whose hash moved.
+
+  prepare  verify every input, derive the few that need it into --out, and
+           write --out/lineup.mk, which points the Makefile's program and
+           version variables at them
+  receipt  after mkdisc: prove each pressed entry is its lineup input and
+           write the release receipt and the component receipt
+
+Derivations, all byte-for-byte slices of a hashed input:
+  data_track_of  the image's data track alone (its CD-DA is borrowed)
+  boot_exe_of    the image's SYSTEM.CNF boot EXE, for a bare --game entry
+  from_disc      a data image lifted out of an earlier pressing
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import release_receipt as rr  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+SECTOR = rr.SECTOR_BYTES
+
+
+class LineupError(RuntimeError):
+    pass
+
+
+def expand(value: str) -> Path:
+    return Path(os.path.expanduser(value))
+
+
+def sha256(path: Path) -> str:
+    return rr.sha256(path)
+
+
+def check_hash(path: Path, expected: str | None, what: str) -> None:
+    if expected is None:
+        return
+    actual = sha256(path)
+    if actual != expected:
+        raise LineupError(f"{what}: {path} is {actual}, lineup says {expected}")
+
+
+def cue_bin(cue: Path) -> Path:
+    names = rr.FILE_LINE.findall(cue.read_text(encoding="ascii"))
+    if len(set(names)) != 1:
+        raise LineupError(f"{cue}: expected one FILE line")
+    return (cue.parent / names[0]).resolve(strict=True)
+
+
+def slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def iso_boot_exe(image: Path) -> bytes:
+    """The file SYSTEM.CNF boots, read through the image's ISO9660 tree."""
+    with image.open("rb") as stream:
+        def sector(lba: int) -> bytes:
+            return rr.read_user_sector(stream, lba)
+
+        def read(lba: int, size: int) -> bytes:
+            data = b"".join(sector(lba + i) for i in range((size + 2047) // 2048))
+            return data[:size]
+
+        pvd = sector(16)
+        if pvd[1:6] != b"CD001":
+            raise LineupError(f"{image}: no ISO9660 volume descriptor")
+        root = pvd[156:190]
+        listing = read(int.from_bytes(root[2:6], "little"), int.from_bytes(root[10:14], "little"))
+        files: dict[str, tuple[int, int]] = {}
+        at = 0
+        while at < len(listing):
+            length = listing[at]
+            if length == 0:
+                at = (at // 2048 + 1) * 2048
+                continue
+            name = listing[at + 33 : at + 33 + listing[at + 32]].decode("ascii", "replace")
+            files[name.split(";")[0].upper()] = (
+                int.from_bytes(listing[at + 2 : at + 6], "little"),
+                int.from_bytes(listing[at + 10 : at + 14], "little"),
+            )
+            at += length
+        config = read(*files["SYSTEM.CNF"]).decode("ascii", "replace")
+        match = re.search(r"BOOT\s*=\s*cdrom:\\?([^;\s]+)", config, re.IGNORECASE)
+        if match is None:
+            raise LineupError(f"{image}: SYSTEM.CNF names no BOOT file")
+        exe = read(*files[match.group(1).upper()])
+    if exe[:8] != rr.PSX_EXE_MAGIC:
+        raise LineupError(f"{image}: boot file is not a PS-X EXE")
+    return exe
+
+
+def write_image(out: Path, name: str, sectors: bytes) -> Path:
+    stem = slug(name)
+    (out / f"{stem}.bin").write_bytes(sectors)
+    cue = out / f"{stem}.cue"
+    cue.write_text(f'FILE "{stem}.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n', encoding="ascii")
+    return cue
+
+
+def load(path: Path) -> dict:
+    document = json.loads(path.read_text())
+    if document.get("schema") != 1:
+        raise LineupError(f"{path}: unsupported lineup schema")
+    return document
+
+
+def check_source(row: dict) -> None:
+    source = row["source"]
+    local = expand(source["local"])
+    result = subprocess.run(
+        ["git", "-C", str(local), "cat-file", "-e", f"{source['revision']}^{{commit}}"],
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        raise LineupError(f"{row['name']}: {source['revision']} is not a commit in {local}")
+
+
+def prepare(args: argparse.Namespace) -> None:
+    lineup = load(args.lineup)
+    out = args.out.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    lines = [f"# Generated by tools/lineup.py from {args.lineup.name}; do not edit."]
+    for row in lineup["programs"]:
+        name, derive = row["name"], row.get("derive", {})
+        check_source(row)
+        if "cue" in row:
+            cue = expand(row["cue"]).resolve(strict=True)
+            check_hash(cue, row.get("cue_sha256"), name)
+            check_hash(cue_bin(cue), row.get("bin_sha256"), name)
+            target = cue
+        elif "data_track_of" in derive:
+            source = expand(derive["data_track_of"]).resolve(strict=True)
+            image = cue_bin(source)
+            check_hash(image, row.get("bin_sha256"), name)
+            sectors = rr.data_track_sectors(source, image)
+            with image.open("rb") as stream:
+                target = write_image(out, name, stream.read(sectors * SECTOR))
+        elif "from_disc" in derive:
+            disc = expand(derive["from_disc"]).resolve(strict=True)
+            check_hash(disc, derive.get("disc_sha256"), name)
+            with disc.open("rb") as stream:
+                stream.seek(derive["image_lba"] * SECTOR)
+                target = write_image(out, name, stream.read(derive["sectors"] * SECTOR))
+        elif "boot_exe_of" in derive:
+            source = expand(derive["boot_exe_of"]).resolve(strict=True)
+            image = cue_bin(source)
+            check_hash(image, row.get("bin_sha256"), name)
+            target = out / f"{slug(name)}.exe"
+            target.write_bytes(iso_boot_exe(image))
+        else:
+            raise LineupError(f"{name}: no input")
+        if row["kind"] == "image":
+            exe = rr.find_boot_exe(cue_bin(target))
+            fnv = rr.fnv1a32(exe.payload)
+            if "payload_fnv1a32" in row and int(row["payload_fnv1a32"], 16) != fnv:
+                raise LineupError(f"{name}: payload FNV {fnv:#010x} != lineup {row['payload_fnv1a32']}")
+        lines.append(f"{row['var']} := {target}")
+        if "version_var" in row:
+            lines.append(f"{row['version_var']} := {row['version']}")
+        print(f"{name}: {target}")
+    (out / "lineup.mk").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"lineup verified; variables in {out / 'lineup.mk'}")
+
+
+def mk_values(path: Path) -> dict[str, str]:
+    values = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if " := " in line and not line.startswith("#"):
+            key, value = line.split(" := ", 1)
+            values[key] = value
+    return values
+
+
+def git(*args: str) -> str:
+    return subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
+
+
+def receipt(args: argparse.Namespace) -> None:
+    lineup = load(args.lineup)
+    values = mk_values(args.mk)
+    cue = args.cue.resolve(strict=True)
+    combined = rr.image_for_cue(cue)
+    entries = rr.parse_toc(combined)
+    programs: dict[str, object] = {}
+    ranges = []
+    for row in lineup["programs"]:
+        name = row["name"]
+        if name not in entries:
+            raise LineupError(f"{name} is in the lineup but not on the disc")
+        entry = entries[name]
+        target = Path(values[row["var"]])
+        if row["kind"] == "image":
+            record = rr.program_record(target, combined, entry)
+            embedded = record["embedded"]
+            ranges.append((embedded["image_lba_start"], embedded["image_lba_end_exclusive"], name))
+        else:
+            payload = target.read_bytes()
+            header, body = payload[:2048], payload[2048:]
+            embedded_exe = rr.parse_exe_at(combined, entry.exe_lba)
+            if embedded_exe.header != header or embedded_exe.payload != body[: embedded_exe.payload_bytes]:
+                raise LineupError(f"{name}: embedded EXE differs from the lineup input")
+            fnv = rr.fnv1a32(embedded_exe.payload)
+            if fnv != entry.payload_fnv:
+                raise LineupError(f"{name}: payload FNV {fnv:#010x} != TOC {entry.payload_fnv:#010x}")
+            record = {
+                "input": {"exe": rr.file_record(target), "payload": {"fnv1a32": f"0x{fnv:08x}", "bytes": embedded_exe.payload_bytes}},
+                "embedded": {"exe_lba": entry.exe_lba, "version": entry.version, "flags": entry.flags},
+            }
+        if entry.version != row["version"]:
+            raise LineupError(f"{name}: carousel says {entry.version!r}, lineup says {row['version']!r}")
+        derived_from = row.get("derive")
+        receipt_path = expand(row["receipt"]) if row.get("receipt", "").startswith(("~", "/")) else None
+        programs[name] = {
+            "source": {**row["source"], "kind": "lineup-build"},
+            "build": row["build"],
+            "build_receipt": rr.file_record(receipt_path) if receipt_path and receipt_path.is_file() else row.get("receipt"),
+            **({"derived_from": derived_from} if derived_from else {}),
+            **record,
+        }
+    for previous, current in zip(sorted(ranges), sorted(ranges)[1:]):
+        if current[0] < previous[1]:
+            raise LineupError(f"embedded images overlap: {previous[2]} and {current[2]}")
+    extra = sorted(set(entries) - {row["name"] for row in lineup["programs"]})
+    if extra:
+        raise LineupError(f"on the disc but not in the lineup: {', '.join(extra)}")
+    dirty = git("status", "--porcelain", "--untracked-files=normal")
+    release = {
+        "schema": rr.SCHEMA,
+        "kind": "lineup",
+        "lineup": rr.file_record(args.lineup),
+        "build_command": args.build_command,
+        "frontend": rr.file_record(args.frontend),
+        "combined": {"cue": rr.file_record(cue), "bin": rr.file_record(combined), "sectors": combined.stat().st_size // SECTOR},
+        "programs": programs,
+    }
+    rr.write_receipt(args.release_out, release)
+    components = json.loads((ROOT / "release-components.json").read_text())
+    launcher_inputs = {}
+    for path in ("games/PSoXide-editor", "games/PSoXide-sdk"):
+        head = subprocess.check_output(["git", "-C", str(ROOT / path), "rev-parse", "HEAD"], text=True).strip()
+        link = git("rev-parse", f"HEAD:{path}")
+        if head != link:
+            raise LineupError(f"{path} is at {head}, the gitlink says {link}")
+        launcher_inputs[path] = {"revision": head}
+    launcher_inputs["games/PSoXide-editor"][".components-receipt.json"] = rr.file_record(
+        ROOT / "games/PSoXide-editor/.components-receipt.json"
+    )
+    document = {
+        "schema": 1,
+        "kind": "lineup",
+        "components": components["components"],
+        "launcher_sources": launcher_inputs,
+        "demo_revision": git("rev-parse", "HEAD"),
+        "demo_describe": git("describe", "--tags", "--match", "v*", "--always", "--dirty"),
+        "demo_tree_clean": not dirty,
+        "build_recipe": rr.file_record(ROOT / "Makefile"),
+        "lineup": rr.file_record(args.lineup),
+        "programs": {name: row["source"] for name, row in programs.items()},
+        "rustc": subprocess.check_output(["rustc", "--version"], text=True, cwd=ROOT).strip(),
+        "cargo": subprocess.check_output(["cargo", "--version"], text=True, cwd=ROOT).strip(),
+        "frontend": rr.file_record(args.frontend),
+        "cue": rr.file_record(cue),
+        "bin": rr.file_record(combined),
+    }
+    rr.write_receipt(args.components_out, document)
+    print(f"{len(programs)} programs receipted: {args.release_out}")
+    print(f"components: {args.components_out}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    one = commands.add_parser("prepare")
+    one.add_argument("--lineup", required=True, type=Path)
+    one.add_argument("--out", required=True, type=Path)
+    two = commands.add_parser("receipt")
+    two.add_argument("--lineup", required=True, type=Path)
+    two.add_argument("--mk", required=True, type=Path)
+    two.add_argument("--cue", required=True, type=Path)
+    two.add_argument("--frontend", required=True, type=Path)
+    two.add_argument("--build-command", required=True)
+    two.add_argument("--release-out", required=True, type=Path)
+    two.add_argument("--components-out", required=True, type=Path)
+    args = parser.parse_args()
+    try:
+        {"prepare": prepare, "receipt": receipt}[args.command](args)
+    except (LineupError, rr.ReceiptError, OSError, KeyError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"lineup: {error}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

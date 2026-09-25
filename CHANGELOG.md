@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.40 (release candidate)
+
+- The Half-Life pressing now carries every current project: Counter-Strike 1.6 and Hollow Knight join Half-Life, Quake, Cortex Ignition, VoXide, NitroXide, the Celeste Collection, the Arcade, GH-PSX, PSXcel and the hardware tests.
+- Pressed from the builds in the games library, as played, through a lineup file (`release/lineup-v0.40.json`, `make lineup-disc`) that pins every input by hash, source revision and build receipt.
+
 ## v0.38
 
 - Emulator component moved to d16168e: the reverb work-address wrap that ran thousands of loop iterations per sample once the SDK parked the work area at the top of SPU RAM is closed-form now, which restores full speed for every game on the current SDK, in the browser build too, and user-supplied firmware loading is back. The editor (c0ae6e3a), every game's component lock and the Quake contract follow the same tuple.
