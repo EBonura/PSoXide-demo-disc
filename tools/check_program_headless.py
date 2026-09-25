@@ -146,13 +146,16 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
 
     return [
         Route("voxide", ",".join(voxide), 450_000_000, markers=("voxide: boot",)),
+        # NitroXide and Celeste sit mid-carousel on the 13-card pressing,
+        # six moves from either end, so the launch press lands at route tick
+        # 2000; 450M steps stopped 19 ticks later, before the chain-load.
         Route(
             "nitroxide",
             ",".join(nitroxide),
-            450_000_000,
+            700_000_000,
             markers=("psx-engine: loading ready",),
         ),
-        Route("celeste", ",".join(celeste), 450_000_000),
+        Route("celeste", ",".join(celeste), 700_000_000),
         # Wait for the collection intro, choose each cart, then dismiss its
         # title screen. The private pressing adds another outer carousel move;
         # leave time for the cart title fade and retry Cross once after it.

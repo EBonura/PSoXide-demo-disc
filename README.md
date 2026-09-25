@@ -304,6 +304,49 @@ sibling `quake-psx-pinned` checkout by default) and will not build without
 it. `make quake-headless-check` is the gate to run before a burn: it chain-
 loads Quake off the built disc twice and requires the two replays to agree.
 
+## Pressing from a lineup
+
+`make disc` rebuilds every program from the submodule pins. The v0.40 Half-Life
+pressing instead takes each program exactly as it was built and played for the
+PS1 games library, listed in `release/lineup-v0.40.json` with its sha256,
+source revision and build receipt:
+
+```sh
+make lineup-disc LINEUP=release/lineup-v0.40.json HL=1 CS=1 HK=1 \
+     DIST=<out dir> FRONTEND=<frontend>
+```
+
+The Makefile cannot take a path with spaces in a prerequisite, so from a
+checkout under "Application Support" run it through a space-free symlink and
+pass `ROOT=<symlink>`. The disc is named `PSoXide Demo Disc HL <git describe>`,
+so commit and tag first; a dirty tree names the disc `...-dirty`.
+
+When a game gets a new build, the re-run is:
+
+1. Edit that game's row in the lineup file: the new `cue` (or derived source),
+   `cue_sha256`, `bin_sha256`, `version`, `source.revision`/`ref`, `build` and
+   `receipt`. Nothing else in the repo changes for a game-only update. Half-Life,
+   Counter-Strike, Hollow Knight, Quake, Cortex, VoXide and the Arcade are
+   whole images taken as they are. GH-PSX is sliced to its data track (it
+   borrows the Arcade's song, so check the two tracks still hash the same),
+   Celeste and PSXcel ride as their image's boot EXE, and NitroXide is lifted
+   from the v0.38 pressing until a new build replaces the row (a new NitroXide
+   build should be made without CD-DA; it plays the menu's tracks 2-5).
+2. `make lineup-budget ...` with the same arguments: it verifies the lineup and
+   prints the sector table without writing an image.
+3. Commit, tag, `make lineup-disc ...`. The release and component receipts are
+   written beside the image; `tools/lineup.py receipt` fails if any pressed entry
+   differs from its lineup input.
+4. `python3 tools/check_release_chainloads.py --frontend F --cue C` (Cortex,
+   Quake, Half-Life, Counter-Strike, Hollow Knight and the hardware tests, each
+   replayed twice and required byte-identical) and `python3
+   tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
+   look at a launch frame of every game.
+
+`tools/check_quake_headless.py` still holds frame pins keyed by carousel size,
+but its route (two RIGHT presses) assumes Quake sits just before CREDITS, which
+has not been true since Quake moved to card two; no Makefile target runs it.
+
 ## Repinning Quake
 
 Six values in the Makefile and one submodule pointer are the whole Quake
