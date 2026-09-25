@@ -115,6 +115,11 @@ HLPSX_SOURCE ?= $(GAMES)/hl-psx
 # The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
 # no per-disc subfolder (Manny, 2026-09-03). The name carries one tag per
 # optional program, in HL CS HK order.
+# A lineup pressing (see lineup-disc below) is named for the Half-Life disc it
+# replaces in the library, plus the pressing version, whatever else it carries.
+ifneq ($(LINEUP),)
+DISC_NAME ?= PSoXide Demo Disc HL $(DISC_VERSION)
+endif
 DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),HK))
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
@@ -623,6 +628,46 @@ ifneq ($(PRIVATE),)
 endif
 	python3 tools/components.py --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
 
+
+# A lineup pressing takes every program as it was already built and played,
+# instead of rebuilding it from the submodules: the Half-Life, Hollow Knight
+# and Counter-Strike builds Manny tests come off branches the submodule pins do
+# not name, and rebuilding them would press something nobody has played.
+#
+#   make lineup-disc LINEUP=release/lineup-v0.40.json HL=1 CS=1 HK=1 \
+#        DIST=<dir> FRONTEND=<frontend>
+#
+# The lineup file names each input with its sha256, source revision and build
+# receipt; tools/lineup.py refuses any input whose hash moved, derives the few
+# that need it (a data track alone, a boot EXE, an entry lifted from an older
+# pressing) and writes build/lineup/lineup.mk, which points the program and
+# version variables above at them. The launcher, the layout and the mkdisc
+# arguments are the same ones `make disc` uses. The receipts it writes beside
+# the image prove every pressed entry is its lineup input.
+LINEUP_OUT := $(BUILD)/lineup
+ifneq ($(LINEUP),)
+-include $(LINEUP_OUT)/lineup.mk
+endif
+
+.PHONY: lineup-prepare lineup-disc _lineup-lay lineup-budget
+lineup-prepare:
+	@test -n "$(LINEUP)" || { echo "lineup: set LINEUP=release/lineup-<version>.json"; exit 1; }
+	python3 tools/lineup.py prepare --lineup "$(LINEUP)" --out "$(LINEUP_OUT)"
+
+lineup-disc: launcher mkdisc lineup-prepare
+	$(MAKE) _lineup-lay
+
+lineup-budget: mkdisc lineup-prepare
+	$(MAKE) disc-budget
+
+_lineup-lay: $(SHOT_FILES)
+	@mkdir -p "$(DIST)"
+	$(MKDISC) $(MKDISC_ARGS)
+	python3 tools/lineup.py receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
+		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
+		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
+		--release-out "$(RELEASE_RECEIPT)" \
+		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
 # The sector budget of the pressing these flags select, from inputs already
 # built, without writing an image.
