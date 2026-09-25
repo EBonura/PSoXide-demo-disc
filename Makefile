@@ -408,7 +408,7 @@ ifneq ($(HK),)
 HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
 	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
 	--version-of "HOLLOW KNIGHT=$(V_HKPSX)" \
-	--describe "HOLLOW KNIGHT=An early from-scratch PlayStation port of Hollow Knight, cooked from your own copy. King's Pass, Dirtmouth and the Forgotten Crossroads can be explored, with enemies, benches and saves.|Un primo port di Hollow Knight per PlayStation, fatto da zero partendo dalla propria copia. Si possono esplorare King's Pass, Dirtmouth e il Crocevia Dimenticato, con nemici, panchine e salvataggi."
+	--describe "HOLLOW KNIGHT=An early from-scratch PlayStation port of Hollow Knight, cooked from your own copy. King's Pass, Dirtmouth and the Forgotten Crossroads can be explored, with enemies, benches and saves.|Un primo port di Hollow Knight per PlayStation, fatto da zero partendo dalla propria copia. Si esplorano King's Pass, Dirtmouth e il Crocevia Dimenticato, con nemici, panchine e salvataggi."
 endif
 
 # The QUAKE SHAREWARE arguments travel together for the same reason the
