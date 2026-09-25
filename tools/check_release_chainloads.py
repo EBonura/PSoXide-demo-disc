@@ -32,7 +32,6 @@ DEFAULT_STEPS = 700_000_000
 # Every pressing carries the core entries; HL=1, CS=1 and HK=1 add the others.
 CORE_TARGETS = (
     "CORTEX IGNITION",
-    "HARDWARE TESTS",
     "QUAKE SHAREWARE",
 )
 OPTIONAL_TARGETS = (
@@ -47,7 +46,6 @@ TARGET_MARKERS = {
     # cs-psx is built on hl-psx's renderer and keeps its log prefix.
     "COUNTER-STRIKE": ("hl-psx: booting renderer",),
     "HOLLOW KNIGHT": (),
-    "HARDWARE TESTS": ("hardware-tests: main menu ready",),
     "QUAKE SHAREWARE": (
         "quake-psx: all-Rust PSoXide boot",
         "quake-psx: Rust Start map resident",
@@ -68,7 +66,6 @@ TARGET_FAILURES = {
         "hl-psx: WORLD.PAK world stream failed",
     ),
     "HOLLOW KNIGHT": ("PANIC:", "STACK/DATA COLLISION"),
-    "HARDWARE TESTS": ("PANIC:", "STACK/DATA COLLISION"),
     "QUAKE SHAREWARE": (
         "PANIC:",
         "STACK/DATA COLLISION",

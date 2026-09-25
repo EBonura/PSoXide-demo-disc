@@ -8,7 +8,7 @@
 # music live outside Git. Cortex uses an exact PSoXide pin so the active editor
 # project remains reproducible as the engine advances.
 
-.PHONY: help disc disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher examples mkdisc check relocation-check clean
+.PHONY: help disc disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
@@ -85,6 +85,11 @@ PRIVATE := $(strip $(HL)$(CS)$(HK))
 #   CS                 112308   24:57:33   31.2%
 #   HL                 308182   68:29:07   85.6%
 #   HL CS              317202   70:29:27   88.1%
+#
+# The v0.40 lineup (make lineup-budget, 2026-09-25: library builds, HL CS HK,
+# no hardware tests) is 359238 sectors, 79:49:63, 761 spare of 359999. Most
+# 80-minute blanks put the lead-out at 79:59:74, which leaves 359849 sectors of
+# program area, so about 611 spare there: check the blank with drutil status.
 DISC_MAX_SECTORS ?= 359999
 
 # Quake 1.06 shareware Episode 1 is on every pressing. The source revision,
@@ -159,7 +164,6 @@ CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b
 CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.cue
 CORTEX_CURRENT_MAP := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map
 CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
-HWTESTS  := $(EXAMPLES)/hardware-tests.cue
 
 NITROXIDE_SRC ?= $(GAMES)/nitroxide
 NITROXIDE_BUILD := $(BUILD)/nitroxide
@@ -212,9 +216,6 @@ V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arc
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
 V_HKPSX     := $(call cargo_version,$(HKPSX_SOURCE)/game/Cargo.toml)
-# The hardware suite already versions itself on screen; take that same string so
-# the carousel and the suite header cannot disagree.
-V_HWTESTS   := $(shell awk -F'"' '/SUITE_VERSION: &str/{print $$2; exit}' $(PROGRAMS_PSOXIDE)/engine/examples/hardware-tests/src/main.rs 2>/dev/null | sed 's/HWTEST v//')
 # Build revisions are recorded in the release receipt.
 V_CORTEX_CURRENT := Tech demo
 
@@ -230,10 +231,8 @@ launcher: loader
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
-examples:
-	$(MAKE) -C $(PROGRAMS_PSOXIDE) hardware-tests-disc \
-		ENGINE_EXAMPLE_CARGO_ENV='CARGO_TARGET_DIR=$(PROGRAMS_PSOXIDE)/build/examples RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T../../../sdk/psoxide.ld -Clink-arg=--oformat=binary"'
-	python3 $(SDK)/tools/hazard_scan.py $(EXAMPLES)/hardware-tests.exe
+# The hardware test suite left the demo disc on 2026-09-25; it has a disc of
+# its own (`make hardware-tests-disc` in PSoXide-editor).
 
 # PSXcel and the Celeste collection never read the disc after boot, so they
 # ride as bare EXEs and do not care which SDK they were built against.
@@ -250,7 +249,7 @@ examples:
 # pin is overridden here and all ordinary non-Cortex programs come off the
 # shared submodule.
 # hl-psx's --psoxide below is the same idea under an older spelling.
-programs: examples
+programs:
 	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
 		DIST=$(GAMES)/voxide/dist GAMES_DIR=$(BUILD)/game-library
 	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
@@ -468,7 +467,7 @@ _release-headless-check:
 	python3 tools/check_release_chainloads.py \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
-		--target "CORTEX IGNITION" --target "HARDWARE TESTS" --target "QUAKE SHAREWARE" \
+		--target "CORTEX IGNITION" --target "QUAKE SHAREWARE" \
 		$(if $(HL),--target HALF-LIFE) $(if $(CS),--target COUNTER-STRIKE) \
 		$(if $(HK),--target "HOLLOW KNIGHT")
 
@@ -515,7 +514,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
-              invaders2 pong pong2 hwtests hwtests2 halflife quake-menu \
+              invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
@@ -538,7 +537,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--image "PSOXIDE ARCADE=$(ARCADE)" \
 		--image "GH-PSX=$(GHPSX)" \
 		--game "PSXCEL=$(PSXCEL)" \
-		--image "HARDWARE TESTS=$(HWTESTS)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
@@ -563,8 +561,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
-		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
-		--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests2.shot" \
 		--share-cdda "GH-PSX=PSOXIDE ARCADE" \
 		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
@@ -573,7 +569,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
 		--version-of "GH-PSX=$(V_GHPSX)" \
 		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
-		--version-of "HARDWARE TESTS=$(V_HWTESTS)" \
 		$(CORTEX_GATE_ARGS) \
 		--describe "CORTEX IGNITION=A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano." \
@@ -582,7 +577,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
 		--describe "GH-PSX=A Guitar Hero-style rhythm game for the original PlayStation. This is a bare-bones, one-song prototype.|Un gioco in stile Guitar Hero per la prima PlayStation. E un prototipo essenziale con una sola canzone." \
 		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
-		--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori." \
 		--max-sectors $(DISC_MAX_SECTORS)
 
 ifneq ($(PRIVATE),)
@@ -620,8 +614,6 @@ ifneq ($(PRIVATE),)
 		$(if $(HL),--program "HALF-LIFE=$(HLPSX)" --source "HALF-LIFE=$(HLPSX_SOURCE)") \
 		$(if $(CS),--program "COUNTER-STRIKE=$(CSPSX)" --source "COUNTER-STRIKE=$(CSPSX_SOURCE)") \
 		$(if $(HK),--program "HOLLOW KNIGHT=$(HKPSX)" --source "HOLLOW KNIGHT=$(HKPSX_SOURCE)") \
-		--program "HARDWARE TESTS=$(HWTESTS)" \
-		--source "HARDWARE TESTS=$(PROGRAMS_PSOXIDE)" \
 		--program "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 		--source "QUAKE SHAREWARE=$(QUAKE_SRC)" \
 		--out "$(RELEASE_RECEIPT)"
@@ -696,7 +688,7 @@ release-web:
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
 	python3 tools/web-delivery.py "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
 		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
-		"CORTEX IGNITION" "GH-PSX" "HARDWARE TESTS"
+		"CORTEX IGNITION" "GH-PSX"
 	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
 		--repo $(WEB_DISC_REPO) \
 		--title "PSoXide Demo Disc (disc image)" \
@@ -792,4 +784,4 @@ components:
 	python3 tools/components.py
 verify-components:
 	python3 tools/components.py --check
-loader examples programs mkdisc release-frontend cortex-current-if-stale sdk-coherence: components
+loader programs mkdisc release-frontend cortex-current-if-stale sdk-coherence: components

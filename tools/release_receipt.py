@@ -18,7 +18,6 @@ SCHEMA = "psoxide-combined-release-v1"
 # Every private pressing carries these; the receipt must cover all of them.
 CORE_PROGRAMS = (
     "CORTEX IGNITION",
-    "HARDWARE TESTS",
     "QUAKE SHAREWARE",
 )
 # HL=1, CS=1 and HK=1 each add one. The receipt covers exactly the ones pressed,

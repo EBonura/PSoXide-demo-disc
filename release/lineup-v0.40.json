@@ -206,24 +206,6 @@
       },
       "build": "library build 2026-09-23; the disc carries the image's boot EXE as a bare program, as before",
       "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
-    },
-    {
-      "name": "HARDWARE TESTS",
-      "var": "HWTESTS",
-      "version_var": "V_HWTESTS",
-      "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/demo-disc-2026-09-25/inputs/hardware-tests/hardware-tests.cue",
-      "cue_sha256": "5e3922d27449eff81fe4263460f8daa25b94280ac71f23deecaa31d491f020f4",
-      "bin_sha256": "381232eb9319d15b28a700555785bf913743af105a9d48aab43eb582655af184",
-      "version": "1.23",
-      "source": {
-        "repository": "EBonura/PSoXide-editor",
-        "local": "~/Desktop/repos/PSoXide-editor",
-        "revision": "6eebb2d8667cfa9a5b65cb7aeeeabcff189fe78e",
-        "ref": "the disc's editor pin"
-      },
-      "build": "make examples in the canonical psx-demo-disc tree at the editor pin (clean, 6eebb2d8), 2026-09-23 02:48, by the feat/optional-cs-hk agent; copied here",
-      "receipt": "none beyond this lineup"
     }
   ]
 }

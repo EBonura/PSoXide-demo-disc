@@ -2,7 +2,8 @@
 
 ## v0.40 (release candidate)
 
-- The Half-Life pressing now carries every current project: Counter-Strike 1.6 and Hollow Knight join Half-Life, Quake, Cortex Ignition, VoXide, NitroXide, the Celeste Collection, the Arcade, GH-PSX, PSXcel and the hardware tests.
+- The Half-Life pressing now carries every current project: Counter-Strike 1.6 and Hollow Knight join Half-Life, Quake, Cortex Ignition, VoXide, NitroXide, the Celeste Collection, the Arcade, GH-PSX and PSXcel.
+- The hardware test suite leaves the demo disc for a disc of its own, which is what makes the rest fit an 80-minute CD-R.
 - Pressed from the builds in the games library, as played, through a lineup file (`release/lineup-v0.40.json`, `make lineup-disc`) that pins every input by hash, source revision and build receipt.
 
 ## v0.38

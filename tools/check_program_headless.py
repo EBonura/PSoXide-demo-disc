@@ -123,7 +123,6 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
     nitroxide, _ = outer("NITROXIDE")
     celeste, celeste_cross = outer("CELESTE COLLECTION")
     psxcel, _ = outer("PSXCEL")
-    hardware, _ = outer("HARDWARE TESTS")
 
     gh, gh_cross = outer("GH-PSX")
     gh.extend((f"{gh_cross + 600}:start:12", f"{gh_cross + 1_000}:cross:12"))
@@ -178,15 +177,6 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
             800_000_000,
             markers=("gh-psx: cdda playing",),
             cdda_owner="GH-PSX",
-        ),
-        Route(
-            "hardware-tests",
-            ",".join(hardware),
-            # The suite performs its real CD calibration before announcing the
-            # menu. Stopping at 300M instructions can catch that valid probe in
-            # progress and falsely report a missing boot marker.
-            700_000_000,
-            markers=("hardware-tests: main menu ready",),
         ),
         Route("arcade-breakout", ",".join(breakout), 700_000_000, launcher_count=2),
         Route(
