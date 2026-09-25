@@ -22,7 +22,7 @@ LOGO = Path(__file__).resolve().parents[1] / "games/PSoXide-editor/assets/brandi
 
 GAMES = ["CORTEX IGNITION", "QUAKE SHAREWARE", "VOXIDE", "NITROXIDE",
          "CELESTE COLLECTION", "PSXCEL", "GH-PSX", "BREAKOUT",
-         "SPACE INVADERS", "MAGIKAAAAARP PONG", "HARDWARE TESTS"]
+         "SPACE INVADERS", "MAGIKAAAAARP PONG"]
 
 CX = CY = 60.0
 R_DISC, R_HOLE, R_HUB = 60.0, 7.5, 21.0   # mm; hub = stacking-ring safe zone

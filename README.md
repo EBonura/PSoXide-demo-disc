@@ -117,7 +117,6 @@ claim. See [the dated split validation](docs/repository-split-validation-2026-09
 | PSXcel | bare EXE |
 | GH-PSX | whole image without duplicated CD-DA; borrows Arcade's track |
 | PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; owns 1 CD-DA track |
-| Hardware Tests | whole image, 1 CD-DA track |
 | Quake shareware | whole image, no CD-DA track |
 
 Celeste and PSXcel never read the disc after boot, so they ride as bare EXEs
@@ -140,7 +139,7 @@ sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
 The standard order is Cortex Ignition, Voxide, NitroXide,
 Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
-Hardware Tests, Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
+Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
 cabinet selector for Breakout, Space Invaders and Magikarp Pong. The optional
 programs follow Quake Shareware in HL, CS, HK order.
 
@@ -338,7 +337,7 @@ When a game gets a new build, the re-run is:
    written beside the image; `tools/lineup.py receipt` fails if any pressed entry
    differs from its lineup input.
 4. `python3 tools/check_release_chainloads.py --frontend F --cue C` (Cortex,
-   Quake, Half-Life, Counter-Strike, Hollow Knight and the hardware tests, each
+   Quake, Half-Life, Counter-Strike and Hollow Knight, each
    replayed twice and required byte-identical) and `python3
    tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
    look at a launch frame of every game.
