@@ -1,22 +1,31 @@
-PSoXide Demo Disc v0.39
+PSoXide Demo Disc v0.40
 ======================
 
 A little of everything. One PlayStation disc.
 
 Choose from Cortex Ignition Tech Demo, Quake Shareware, VoXide, NitroXide,
-Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. The disc also
-includes a Hardware Tests menu. Arcade contains Breakout, Space Invaders
-and Magikaaaaarp Pong.
+Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. Arcade
+contains Breakout, Space Invaders and Magikaaaaarp Pong.
 
-What's new in v0.39
+What's new in v0.40
 ------------------
-- Celeste Classic Collection 0.2.4: faster Classic object removal and Celeste 2
-  grapple checks, reduced pixel drawing overhead, and improved audio refill
-  scheduling. Both games retain their original gameplay and audio quality.
-- Shared chain-loading, audio, rendering and asset helpers now come from the
-  same pinned PSoXide SDK and engine across the included games.
-- Quake Shareware is rebuilt against the current pinned components, with
-  checked source and artifact provenance.
+- Cortex Ignition: the Palermo Comicon update. Hitting an enemy in the wrong
+  stance only chips it, swapping stance protects you like a dodge, Aletha and
+  the enemies show their stance colours, the sword reaches further, attacks
+  turn to your locked target even straight after a dash, enemy deaths no
+  longer drag the frame rate down, combat music loops without a gap, the
+  camera stays out of Aletha, and New Game opens with a short intro.
+- NitroXide: the stadium look. Team-coloured halves, walls and roof, lit
+  goals, boost pads as pools of light under floating orbs, goal boxes and arcs
+  on the pitch, a crowd behind the cage, a landing hoop under an airborne ball
+  and a scoreboard that tucks into a tab while you play.
+- VoXide: tuned to Minecraft Java Edition's numbers (movement, mining, combat,
+  hunger, mob spawning, day length and more), an icon-grid inventory, chests
+  and furnaces that move whole stacks, and saves that keep far more.
+- Quake Shareware: better lighting, no sky showing through walls up close,
+  less texture swimming on big surfaces, and doors, secret doors, gibs and
+  explosions closer to the original.
+- The hardware test suite now has a disc of its own.
 
 The collection is still in development. Celeste 2 can miss occasional frame
 deadlines; this release does not claim locked 60 fps throughout either game.

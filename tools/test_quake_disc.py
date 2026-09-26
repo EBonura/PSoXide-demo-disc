@@ -992,14 +992,15 @@ class MakeVariantContractTests(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertIn(f"\n{target}:\n", makefile)
 
+        self.assertIn("\nPRIVATE := $(strip $(HL)$(CS)$(HK))\n", makefile)
         self.assertIn(
-            'release-web:\n\t@test -z "$(HL)" || { echo '
-            '"release-web: the HL pressing is never distributed"',
+            'release-web:\n\t@test -z "$(PRIVATE)" || { echo '
+            '"release-web: the HL, CS and HK pressings are never distributed"',
             makefile,
         )
         self.assertIn(
-            'itch:\n\t@test -z "$(HL)" || { echo '
-            '"itch: the HL pressing is never distributed"',
+            'itch:\n\t@test -z "$(PRIVATE)" || { echo '
+            '"itch: the HL, CS and HK pressings are never distributed"',
             makefile,
         )
 

@@ -1,7 +1,12 @@
 # Changelog
 
-## v0.40 (release candidate)
+## v0.40
 
+- Cortex Ignition: the Palermo Comicon update (wrong-stance hits only chip, stance swaps protect like a dodge, stance colours on Aletha and the enemies, longer sword reach, attacks turn to the locked target after a dash, cheaper enemy deaths, gap-free combat music loop, camera fixes, a New Game intro).
+- NitroXide: the arena and HUD overhaul (team-coloured halves, walls and roof, lit goals, boost pads as light under the floating orbs, goal boxes and arcs, a crowd, a landing hoop under an airborne ball, a scoreboard tab), from nitroxide land/nitro-arena.
+- VoXide: Minecraft Java Edition parity (movement, mining, combat, hunger, spawning, day length, fluids, fishing, experience, breeding), an icon-grid inventory, stack moves in chests and furnaces, fuller saves.
+- Quake: lighting fitted to each face's whole lightmap, no sky through near walls, error-bounded tessellation, the one-rule world sort, doors, gibs and explosions closer to Quake, and SLICNSE.TXT in both public packages.
+- Half-Life, Counter-Strike and Hollow Knight (private pressing only) move to their latest library builds.
 - The Half-Life pressing now carries every current project: Counter-Strike 1.6 and Hollow Knight join Half-Life, Quake, Cortex Ignition, VoXide, NitroXide, the Celeste Collection, the Arcade, GH-PSX and PSXcel.
 - The hardware test suite leaves the demo disc for a disc of its own, which is what makes the rest fit an 80-minute CD-R.
 - Pressed from the builds in the games library, as played, through a lineup file (`release/lineup-v0.40.json`, `make lineup-disc`) that pins every input by hash, source revision and build receipt.
