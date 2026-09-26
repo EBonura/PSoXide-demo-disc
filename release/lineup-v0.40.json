@@ -44,17 +44,17 @@
       "version_var": "V_HLPSX",
       "kind": "image",
       "cue": "~/Downloads/ps1 games/Half-Life (hl-psx).cue",
-      "cue_sha256": "c6008c550ef42e218fc270bb465e929c5c7272a2bfa7c1871a98e30d2195492f",
-      "bin_sha256": "d1c083520c71c1b78c10f468b057cd67a675f575747b09d1d44f76aa78c19341",
+      "cue_sha256": "a02fee3eaec1a05678693826b65dcf8c892a0eaf8abee2673ab7139fade1074c",
+      "bin_sha256": "a5dc30c55d1f3fffb06b992fc2e511671c67736c8b2a001188ea59175c75c3ad",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/hl-psx",
         "local": "~/Desktop/repos/hl-psx",
-        "revision": "05dcf6281e2e2cca06d931dc4acb9234de8241b7",
-        "ref": "land/hl-final7 (local)"
+        "revision": "79b46d60d75c4c493a176dbe52595e265451896f",
+        "ref": "land/hl-final8 (local)"
       },
-      "build": "final-7n, the library Half-Life (hl-psx).bin (PGO build); interim row until final-8 lands",
-      "receipt": "~/Downloads/ps1 games/Half-Life (hl-psx).release-receipt.md"
+      "build": "final-8, cargo hl-build build + pgo (chapter-two tape, threshold 250); the library Half-Life (hl-psx).bin is this bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/hl-final7/final8/RECEIPT.md"
     },
     {
       "name": "COUNTER-STRIKE",
