@@ -46,7 +46,8 @@ class CortexGameplayTests(unittest.TestCase):
         self.assertEqual(
             chainloads.route_for("CORTEX IGNITION", 0, 11),
             "1000:cross:12,1400:cross:12,1800:cross:12,2200:cross:12,"
-            "2600:cross:12,3000:cross:12,3400:cross:12",
+            "2600:cross:12,3000:cross:12,3400:cross:12,3600:cross:150,"
+            "4000:cross:12,4400:cross:12,4800:cross:12",
         )
         self.assertEqual(
             chainloads.route_for("HALF-LIFE", 1, 11),

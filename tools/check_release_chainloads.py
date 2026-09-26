@@ -96,6 +96,9 @@ CORTEX_GAMEPLAY_QUADS = 100
 CORTEX_GAMEPLAY_MIN_FRAMES = 30
 CORTEX_GAMEPLAY_MAX_FRAME_GAP = 16
 CORTEX_GAMEPLAY_MIN_HASHES = 8
+# Measured 2026-09-26 on the 0.4b Comicon build: the intro skip and panels put
+# steady gameplay at route tick ~5000; 1.4 billion steps reach tick ~5800.
+CORTEX_STEPS = 1_500_000_000
 # Remeasured 2026-09-25 on hl-psx d9d3248 (final-6, PGO) from the 13-card
 # pressing: its menu draws no textured triangles and at most 69 quads, and the
 # tram ride's tunnel now clears 300/150 in only 7 frames of the replay (the
@@ -254,7 +257,17 @@ def route_for(target: str, index: int, count: int) -> str:
             f"{cross_tick + offset}:cross:12"
             for offset in (400, 800, 1200, 1600, 2000, 2400)
         )
+    if target == "CORTEX IGNITION":
+        # Cortex 0.4b (Comicon) opens New Game with an intro that only a held
+        # CROSS skips, then three welcome panels that CROSS dismisses.
+        events.append(f"{cross_tick + 2600}:cross:150")
+        events.extend(f"{cross_tick + offset}:cross:12" for offset in (3000, 3400, 3800))
     return ",".join(events)
+
+
+def steps_for(target: str, steps: int) -> int:
+    """The intro and panels push Cortex's gameplay past the default budget."""
+    return max(steps, CORTEX_STEPS) if target == "CORTEX IGNITION" else steps
 
 
 def cortex_gameplay_evidence(path: Path) -> dict[str, int]:
@@ -385,7 +398,7 @@ def run_once(
         "--path",
         str(cue),
         "--steps",
-        str(steps),
+        str(steps_for(target.name, steps)),
         "--press",
         route_for(target.name, target.visible_index, menu_count),
         "--route-log",
