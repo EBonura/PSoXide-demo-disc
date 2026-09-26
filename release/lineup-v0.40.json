@@ -6,6 +6,7 @@
     {
       "name": "CORTEX IGNITION",
       "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
       "kind": "image",
       "cue": "~/Downloads/ps1 games/Cortex Ignition v0.4b.cue",
       "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
