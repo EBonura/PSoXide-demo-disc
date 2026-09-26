@@ -317,7 +317,10 @@ make lineup-disc LINEUP=release/lineup-v0.40.json HL=1 CS=1 HK=1 \
 The Makefile cannot take a path with spaces in a prerequisite, so from a
 checkout under "Application Support" run it through a space-free symlink and
 pass `ROOT=<symlink>`. The disc is named `PSoXide Demo Disc HL <git describe>`,
-so commit and tag first; a dirty tree names the disc `...-dirty`.
+so commit and tag first; a dirty tree names the disc `...-dirty`. The public
+pressing comes from the same lineup without `HL=1 CS=1 HK=1`: it is named
+`PSoXide Demo Disc <git describe>` and its receipt leaves the optional programs
+out.
 
 When a game gets a new build, the re-run is:
 
