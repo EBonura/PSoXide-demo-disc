@@ -4,168 +4,23 @@
   "note": "Each program is the build Manny plays in the PS1 games library (or the named build directory), taken as built. Hashes gate every input; tools/lineup.py refuses a file that changed.",
   "programs": [
     {
-      "name": "CORTEX IGNITION",
-      "var": "CORTEX_CURRENT",
-      "version_var": "V_CORTEX_CURRENT",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/Cortex Ignition v0.4b.cue",
-      "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
-      "bin_sha256": "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
-      "version": "0.4b",
-      "source": {
-        "repository": "EBonura/PSoXide-editor",
-        "local": "~/Desktop/repos/PSoXide-editor",
-        "revision": "1bb7a44c2c40d8811a6a6613f610bff6aa24fab6",
-        "ref": "land/cortex-comicon (on main)"
-      },
-      "build": "library build 2026-09-25, the 0.4b Palermo Comicon update (work/cortex-land/disc, byte-identical)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/cortex-land/disc/source-rev.txt"
-    },
-    {
-      "name": "QUAKE SHAREWARE",
-      "var": "QUAKE_CUE",
-      "version_var": "QUAKE_VERSION",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/quake-psx.cue",
-      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "5cb3bff5694e2fd0f0c5997db6762e0de4a2209cb3faa47eea731712a3e1698d",
-      "version": "0.1.1",
-      "source": {
-        "repository": "EBonura/quake-psx",
-        "local": "~/Desktop/repos/quake-psx",
-        "revision": "e253735f3a2656560015a3b0d76ab6d2018ac12e",
-        "ref": "land/quake-v040 (local)"
-      },
-      "build": "e253735 (0.1.1: licence file + visual-parity re-pin) rebuilds the library bin, cue and exe byte for byte; the library build itself came from 8ae8a27 (work/quake-finish/disc-ship)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/QUAKE-RECEIPT.md"
-    },
-    {
-      "name": "HALF-LIFE",
-      "var": "HLPSX",
-      "version_var": "V_HLPSX",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/Half-Life (hl-psx).cue",
-      "cue_sha256": "a02fee3eaec1a05678693826b65dcf8c892a0eaf8abee2673ab7139fade1074c",
-      "bin_sha256": "a5dc30c55d1f3fffb06b992fc2e511671c67736c8b2a001188ea59175c75c3ad",
-      "version": "0.3.0",
-      "source": {
-        "repository": "EBonura/hl-psx",
-        "local": "~/Desktop/repos/hl-psx",
-        "revision": "79b46d60d75c4c493a176dbe52595e265451896f",
-        "ref": "land/hl-final8 (local)"
-      },
-      "build": "final-8, cargo hl-build build + pgo (chapter-two tape, threshold 250); the library Half-Life (hl-psx).bin is this bin",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/hl-final7/final8/RECEIPT.md"
-    },
-    {
-      "name": "COUNTER-STRIKE",
-      "var": "CSPSX",
-      "version_var": "V_CSPSX",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/cs-psx.cue",
-      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
-      "bin_sha256": "dcdd808099e264c096cbee8593ce04cb0feced491db16ecfec80d5ff8e6d4c44",
-      "version": "0.2.0",
-      "source": {
-        "repository": "EBonura/cs-psx",
-        "local": "~/Desktop/repos/cs-psx",
-        "revision": "2496850cd70a3c5e4d1dcd58c2dd75d1ba0b9d4d",
-        "ref": "fix/bots-easy-and-sky (local)"
-      },
-      "build": "library build 2026-09-24, cargo cs-build build, plain (no PGO)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/cs-polish/final2/RECEIPT.md"
-    },
-    {
-      "name": "HOLLOW KNIGHT",
-      "var": "HKPSX",
-      "version_var": "V_HKPSX",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/hk-psx.cue",
-      "cue_sha256": "9c9aeefbe02051450e05ec9fb82578b1eed917b29b8469f07093986c0e347b1d",
-      "bin_sha256": "a78cbf5aa4a89e234c10e2c2c90d2d4a6296d2a1246b403255ca038a18cedaac",
-      "version": "0.1.0",
-      "source": {
-        "repository": "EBonura/hk-psx",
-        "local": "~/Desktop/repos/hk-psx",
-        "revision": "7c32b222b002c2262bd28ebbc2d97ea31c7e4420",
-        "ref": "land/ship7 (local)"
-      },
-      "build": "ship7, plain cargo hk-build build with full validation, SDK aa4afd28; built from 9f84249's tree, 7c32b22 only re-pins docs/BUDGET.md; the library hk-psx.bin is this bin",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/hk-next/ship7/RECEIPT.md"
-    },
-    {
-      "name": "VOXIDE",
-      "var": "VOXIDE",
-      "version_var": "V_VOXIDE",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/VoXide/VoXide.cue",
-      "bin_sha256": "75263edea9d5e3a9703705f51086f568c325e53b647b2f0d4955e5d374cd6fbc",
-      "version": "0.2.0",
-      "source": {
-        "repository": "EBonura/voxide",
-        "local": "~/Desktop/repos/voxide",
-        "revision": "49ebe944edc8c6e5a3fcd4aee2726c4d9688295e",
-        "ref": "land/voxide-java (local)"
-      },
-      "build": "library build 2026-09-26, make compile (PGO hot=500, committed profile) + make pack, from land/voxide-java 49ebe94 (29b8c33 + version 0.2.0)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/VOXIDE-RECEIPT.md",
-      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108"
-    },
-    {
-      "name": "NITROXIDE",
-      "var": "NITROXIDE",
-      "version_var": "V_NITROXIDE",
-      "kind": "image",
-      "derive": {
-        "data_track_of": "~/Downloads/ps1 games/NitroXide/NitroXide.cue"
-      },
-      "version": "0.3.0",
-      "source": {
-        "repository": "EBonura/nitroxide",
-        "local": "~/Desktop/repos/nitroxide",
-        "revision": "4eaf4c0f37b6db6c26c2ffb7d4afd36a66c60d9d",
-        "ref": "land/nitro-arena (local)"
-      },
-      "build": "library build 2026-09-25 (work/nitro-fix/disc, arena-look-3 e0c504d), data track only: it plays the menu's CD-DA tracks 2-5, the same four songs its own image carries; land/nitro-arena 4eaf4c0 rebuilds the same bin",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/NITROXIDE-RECEIPT.md",
-      "bin_sha256": "30ad352ce38b881b931671f6b4c31570c30be70351ebcbd5be7764e180735041"
-    },
-    {
-      "name": "CELESTE COLLECTION",
-      "var": "CELESTE",
-      "version_var": "V_CELESTE",
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
       "kind": "game",
       "derive": {
-        "boot_exe_of": "~/Downloads/ps1 games/Celeste Classic Collection/Celeste Classic Collection.cue"
+        "boot_exe_of": "~/Downloads/ps1 games/PSXcel/PSXcel.cue"
       },
-      "bin_sha256": "4bc0dd186f85357b12cf36c840f15cbef7898bd4a4a7e4adf42ee71fc4b065c6",
-      "version": "0.2.4",
+      "bin_sha256": "08dfbfc7750d4b2e2458346ddf7e418b6db3b6ae7b22e47dc3731e454fc5f045",
+      "version": "0.2.0",
       "source": {
-        "repository": "EBonura/celeste-collection-psx",
-        "local": "~/Desktop/repos/pico8-psx",
-        "revision": "b80e00c44abb416ff0f5727b87ea6008044fdea0",
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/psxcel",
+        "revision": "c08096c14dfc23ea29fc561c5fda4f7073132f9f",
         "ref": "main"
       },
       "build": "library build 2026-09-23; the disc carries the image's boot EXE as a bare program, as before",
       "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
-    },
-    {
-      "name": "PSOXIDE ARCADE",
-      "var": "ARCADE",
-      "version_var": "V_ARCADE",
-      "kind": "image",
-      "cue": "~/Downloads/ps1 games/psoxide-arcade.cue",
-      "cue_sha256": "44adfd86770f9e9d3977ce4d46775fc73287a768f7358ecf250402023108c15b",
-      "bin_sha256": "ff6b06f2f19f08d76bb3af534206c1fe94e1e33653c4fc6b7fc92cc5f1a741c5",
-      "version": "0.1.1",
-      "source": {
-        "repository": "EBonura/psoxide-arcade",
-        "local": "~/Desktop/repos/psoxide-arcade",
-        "revision": "4fd3daa7c8cf6f6e86c0b94ef375dc3d4833ab46",
-        "ref": "land/arcade-encoder (local)"
-      },
-      "build": "library build 2026-09-26, make disc from land/arcade-encoder 4fd3daa (shared-encoder sound effects, SDK a156a2f)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/ARCADE-RECEIPT.md"
     },
     {
       "name": "GH-PSX",
@@ -187,23 +42,168 @@
       "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
     },
     {
-      "name": "PSXCEL",
-      "var": "PSXCEL",
-      "version_var": "V_PSXCEL",
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/psoxide-arcade.cue",
+      "cue_sha256": "44adfd86770f9e9d3977ce4d46775fc73287a768f7358ecf250402023108c15b",
+      "bin_sha256": "ff6b06f2f19f08d76bb3af534206c1fe94e1e33653c4fc6b7fc92cc5f1a741c5",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/psoxide-arcade",
+        "revision": "4fd3daa7c8cf6f6e86c0b94ef375dc3d4833ab46",
+        "ref": "land/arcade-encoder (local)"
+      },
+      "build": "library build 2026-09-26, make disc from land/arcade-encoder 4fd3daa (shared-encoder sound effects, SDK a156a2f)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/ARCADE-RECEIPT.md"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
       "kind": "game",
       "derive": {
-        "boot_exe_of": "~/Downloads/ps1 games/PSXcel/PSXcel.cue"
+        "boot_exe_of": "~/Downloads/ps1 games/Celeste Classic Collection/Celeste Classic Collection.cue"
       },
-      "bin_sha256": "08dfbfc7750d4b2e2458346ddf7e418b6db3b6ae7b22e47dc3731e454fc5f045",
+      "bin_sha256": "aa223c4331ca4e2584f4c756b3ad1d0b842c6e71b8094b8b5e501e87c60b0c90",
+      "version": "0.2.5",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/pico8-psx",
+        "revision": "76bb26b8779f2df2c91b9d8dfeec05f91f7e829b",
+        "ref": "main (land/celeste-nav)"
+      },
+      "build": "library build 2026-09-26 of 76bb26b (0.2.5: consistent launcher navigation), the same bin as release/celeste-collection.bin; the disc carries its boot EXE",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/celeste-nav"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Downloads/ps1 games/NitroXide/NitroXide.cue"
+      },
+      "version": "0.3.0",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/nitroxide",
+        "revision": "4eaf4c0f37b6db6c26c2ffb7d4afd36a66c60d9d",
+        "ref": "land/nitro-arena (local)"
+      },
+      "build": "library build 2026-09-25 (work/nitro-fix/disc, arena-look-3 e0c504d), data track only: it plays the menu's CD-DA tracks 2-5, the same four songs its own image carries; land/nitro-arena 4eaf4c0 rebuilds the same bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/NITROXIDE-RECEIPT.md",
+      "bin_sha256": "30ad352ce38b881b931671f6b4c31570c30be70351ebcbd5be7764e180735041"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/VoXide/VoXide.cue",
+      "bin_sha256": "bfee58923c4d3b3ba189b625e0b5eb725a227574737fa62cbc4f101bcc02dfc7",
+      "version": "0.2.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/voxide",
+        "revision": "a5d408b6d4c3b03e5615aa4dbd587ae3ddd7f270",
+        "ref": "main (land/voxide-fixes)"
+      },
+      "build": "library build 2026-09-26, make clean compile pack at a5d408b (0.2.1: turn speed, mob picking, cheat menu)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/voxide-fix/RECEIPT.md",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/hk-psx.cue",
+      "cue_sha256": "9c9aeefbe02051450e05ec9fb82578b1eed917b29b8469f07093986c0e347b1d",
+      "bin_sha256": "a78cbf5aa4a89e234c10e2c2c90d2d4a6296d2a1246b403255ca038a18cedaac",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/hk-psx",
+        "revision": "7c32b222b002c2262bd28ebbc2d97ea31c7e4420",
+        "ref": "land/ship7 (local)"
+      },
+      "build": "ship7, plain cargo hk-build build with full validation, SDK aa4afd28; built from 9f84249's tree, 7c32b22 only re-pins docs/BUDGET.md; the library hk-psx.bin is this bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/hk-next/ship7/RECEIPT.md"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/cs-psx.cue",
+      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
+      "bin_sha256": "dcdd808099e264c096cbee8593ce04cb0feced491db16ecfec80d5ff8e6d4c44",
       "version": "0.2.0",
       "source": {
-        "repository": "EBonura/psxcel",
-        "local": "~/Desktop/repos/psxcel",
-        "revision": "c08096c14dfc23ea29fc561c5fda4f7073132f9f",
-        "ref": "main"
+        "repository": "EBonura/cs-psx",
+        "local": "~/Desktop/repos/cs-psx",
+        "revision": "2496850cd70a3c5e4d1dcd58c2dd75d1ba0b9d4d",
+        "ref": "fix/bots-easy-and-sky (local)"
       },
-      "build": "library build 2026-09-23; the disc carries the image's boot EXE as a bare program, as before",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
+      "build": "library build 2026-09-24, cargo cs-build build, plain (no PGO)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/cs-polish/final2/RECEIPT.md"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/Half-Life (hl-psx).cue",
+      "cue_sha256": "a02fee3eaec1a05678693826b65dcf8c892a0eaf8abee2673ab7139fade1074c",
+      "bin_sha256": "a5dc30c55d1f3fffb06b992fc2e511671c67736c8b2a001188ea59175c75c3ad",
+      "version": "0.3.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/hl-psx",
+        "revision": "79b46d60d75c4c493a176dbe52595e265451896f",
+        "ref": "land/hl-final8 (local)"
+      },
+      "build": "final-8, cargo hl-build build + pgo (chapter-two tape, threshold 250); the library Half-Life (hl-psx).bin is this bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/hl-final7/final8/RECEIPT.md"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "eb8858ef7ce18271d6a5167056962b99ebc4590b844f5971bcf97d65a0f61a70",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/quake-psx",
+        "revision": "c58e2dfdfe2f8774ba6b0d1ba9151205df39e553",
+        "ref": "main (land/quake-water)"
+      },
+      "build": "library build 2026-09-26 from land/quake-water c58e2df (0.1.1 with the clear-water fixes), work/quake-water",
+      "receipt": "~/Downloads/ps1 games/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/Cortex Ignition v0.4b.cue",
+      "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
+      "bin_sha256": "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "1bb7a44c2c40d8811a6a6613f610bff6aa24fab6",
+        "ref": "land/cortex-comicon (on main)"
+      },
+      "build": "library build 2026-09-25, the 0.4b Palermo Comicon update (work/cortex-land/disc, byte-identical)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/cortex-land/disc/source-rev.txt"
     }
   ]
 }

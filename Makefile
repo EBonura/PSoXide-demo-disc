@@ -526,19 +526,21 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
-# `make disc` builds.
+# `make disc` builds. The program order here is the carousel order: the
+# reverse of v0.39 (Manny, 2026-09-26), PSXcel first and Cortex last before
+# CREDITS.
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
-		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
-		$(QUAKE_ARGS) \
-		$(HL_ARGS) \
-		$(CS_ARGS) \
-		$(HK_ARGS) \
-		--image "VOXIDE=$(VOXIDE)" \
-		--image "NITROXIDE=$(NITROXIDE)" \
-		--game "CELESTE COLLECTION=$(CELESTE)" \
-		--image "PSOXIDE ARCADE=$(ARCADE)" \
-		--image "GH-PSX=$(GHPSX)" \
 		--game "PSXCEL=$(PSXCEL)" \
+		--image "GH-PSX=$(GHPSX)" \
+		--image "PSOXIDE ARCADE=$(ARCADE)" \
+		--game "CELESTE COLLECTION=$(CELESTE)" \
+		--image "NITROXIDE=$(NITROXIDE)" \
+		--image "VOXIDE=$(VOXIDE)" \
+		$(HK_ARGS) \
+		$(CS_ARGS) \
+		$(HL_ARGS) \
+		$(QUAKE_ARGS) \
+		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \

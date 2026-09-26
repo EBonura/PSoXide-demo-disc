@@ -15,8 +15,8 @@ from check_release_chainloads import TOC_LBA, parse_toc, read_user_sector
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_GAMES = [
-    "CORTEX IGNITION", "QUAKE SHAREWARE", "VOXIDE", "NITROXIDE",
-    "CELESTE COLLECTION", "PSOXIDE ARCADE", "GH-PSX", "PSXCEL",
+    "PSXCEL", "GH-PSX", "PSOXIDE ARCADE", "CELESTE COLLECTION",
+    "NITROXIDE", "VOXIDE", "QUAKE SHAREWARE", "CORTEX IGNITION",
     "CREDITS",
 ]
 TRACK_TITLES = [
@@ -69,7 +69,10 @@ def verify_web_build(directory, revision, lock_sha256):
 
 
 def selected_emulator(emulator):
-    selected = json.loads((ROOT / "release-components.json").read_text())["components"]["emulator"]
+    # The browser player is the emulator itself, so it may run ahead of the
+    # component tuple the disc's launcher is built and checked with.
+    lock = json.loads((ROOT / "release-components.json").read_text())
+    selected = lock.get("web_player", lock["components"]["emulator"])
     revision = subprocess.check_output(["git", "-C", str(emulator), "rev-parse", "HEAD"], text=True).strip()
     dirty = subprocess.check_output(["git", "-C", str(emulator), "status", "--porcelain", "--untracked-files=normal"], text=True).strip()
     if revision != selected["revision"] or dirty:

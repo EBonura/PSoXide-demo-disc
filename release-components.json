@@ -16,5 +16,9 @@
       "repository": "EBonura/PSoXide-emulator",
       "revision": "035bf6f31faba1b920b334f71d403627480f832a"
     }
+  },
+  "web_player": {
+    "repository": "EBonura/PSoXide-emulator",
+    "revision": "12ca60a3642cfb617dd06dd3d91e543398c969ca"
   }
 }
