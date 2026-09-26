@@ -34,12 +34,13 @@ def public_image(cue):
     with image.open("rb") as stream:
         count = int.from_bytes(read_user_sector(stream, TOC_LBA)[8:12], "little")
     entries, menu = parse_toc(image)
-    if menu != PUBLIC_GAMES or len(entries) != 9 or count != 9:
+    programs = len(PUBLIC_GAMES) - 1  # every card but CREDITS
+    if menu != PUBLIC_GAMES or len(entries) != programs or count != programs:
         raise ValueError("disc menu does not match the public collection")
     tracks = re.findall(r'^\s*TRACK (\d+) (\S+)', text, re.M)
-    expected = [("01", "MODE2/2352")] + [(f"{n:02}", "AUDIO") for n in range(2, 10)]
+    expected = [("01", "MODE2/2352")] + [(f"{n:02}", "AUDIO") for n in range(2, len(TRACK_TITLES) + 2)]
     if tracks != expected:
-        raise ValueError("expected the public disc's nine-track layout")
+        raise ValueError(f"expected the public disc's {len(expected)}-track layout")
     return image
 
 
