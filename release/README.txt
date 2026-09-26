@@ -3,8 +3,8 @@ PSoXide Demo Disc v0.40
 
 A little of everything. One PlayStation disc.
 
-Choose from Cortex Ignition Tech Demo, Quake Shareware, VoXide, NitroXide,
-Celeste Classic Collection, PSoXide Arcade, GH-PSX and PSXcel. Arcade
+Choose from PSXcel, GH-PSX, PSoXide Arcade, Celeste Classic Collection,
+NitroXide, VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
 
 What's new in v0.40
@@ -21,11 +21,17 @@ What's new in v0.40
   and a scoreboard that tucks into a tab while you play.
 - VoXide: tuned to Minecraft Java Edition's numbers (movement, mining, combat,
   hunger, mob spawning, day length and more), an icon-grid inventory, chests
-  and furnaces that move whole stacks, and saves that keep far more.
+  and furnaces that move whole stacks, and saves that keep far more. 0.2.1 turns faster on the right stick and
+  lets a mob under the crosshair take the hit before the block behind it.
 - Quake Shareware: better lighting, no sky showing through walls up close,
   less texture swimming on big surfaces, and doors, secret doors, gibs and
-  explosions closer to the original.
-- The hardware test suite now has a disc of its own.
+  explosions closer to the original. Clear water by default, without the
+  tint, white lines and canal flashes seen on a real console.
+- Celeste Classic Collection 0.2.5: the launcher follows one set of rules,
+  and leaving a game returns to the cover menu with that game selected.
+- PSoXide Arcade 0.1.1: sound effects cooked with the shared SDK encoder.
+- The cards run in a new order, and the hardware test suite now has a disc
+  of its own.
 
 The collection is still in development. Celeste 2 can miss occasional frame
 deadlines; this release does not claim locked 60 fps throughout either game.
