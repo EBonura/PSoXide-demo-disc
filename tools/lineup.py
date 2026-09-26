@@ -201,8 +201,13 @@ def receipt(args: argparse.Namespace) -> None:
     entries = rr.parse_toc(combined)
     programs: dict[str, object] = {}
     ranges = []
+    omitted = set(args.omit)
     for row in lineup["programs"]:
         name = row["name"]
+        if name in omitted:
+            if name in entries:
+                raise LineupError(f"{name} is on the disc but the pressing leaves it out")
+            continue
         if name not in entries:
             raise LineupError(f"{name} is in the lineup but not on the disc")
         entry = entries[name]
@@ -298,6 +303,8 @@ def main() -> int:
     two.add_argument("--frontend", required=True, type=Path)
     two.add_argument("--build-command", required=True)
     two.add_argument("--release-out", required=True, type=Path)
+    two.add_argument("--omit", action="append", default=[], metavar="NAME",
+                     help="a lineup program this pressing leaves out (an optional program whose flag is off)")
     two.add_argument("--components-out", required=True, type=Path)
     args = parser.parse_args()
     try:

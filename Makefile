@@ -120,10 +120,12 @@ HLPSX_SOURCE ?= $(GAMES)/hl-psx
 # The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
 # no per-disc subfolder (Manny, 2026-09-03). The name carries one tag per
 # optional program, in HL CS HK order.
-# A lineup pressing (see lineup-disc below) is named for the Half-Life disc it
-# replaces in the library, plus the pressing version, whatever else it carries.
+# A lineup pressing (see lineup-disc below) is named for the disc it replaces
+# in the library: "HL" when it carries Half-Life (whatever else it carries),
+# then the pressing version. Without HL=1 it is the public pressing, and the
+# lineup's optional programs whose flags are off are left out of its receipt.
 ifneq ($(LINEUP),)
-DISC_NAME ?= PSoXide Demo Disc HL $(DISC_VERSION)
+DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(DISC_VERSION))
 endif
 DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),HK))
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
@@ -658,6 +660,7 @@ _lineup-lay: $(SHOT_FILES)
 	python3 tools/lineup.py receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
