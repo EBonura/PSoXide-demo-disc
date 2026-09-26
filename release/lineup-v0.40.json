@@ -43,18 +43,18 @@
       "var": "HLPSX",
       "version_var": "V_HLPSX",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/hl-night/final-6/pgo/hl-psx.cue",
-      "cue_sha256": "258a010aad38adede0f65be5b37305e99afa3b0f601752f9e1eb4bab095392a6",
-      "bin_sha256": "bfbea6945ada5a77af50eb1f9d5fbf0ddba6dd54a392a3e540539291ec1bacc5",
+      "cue": "~/Downloads/ps1 games/Half-Life (hl-psx).cue",
+      "cue_sha256": "c6008c550ef42e218fc270bb465e929c5c7272a2bfa7c1871a98e30d2195492f",
+      "bin_sha256": "d1c083520c71c1b78c10f468b057cd67a675f575747b09d1d44f76aa78c19341",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/hl-psx",
         "local": "~/Desktop/repos/hl-psx",
-        "revision": "d9d324864e807bd1ea9d4cdd6fe54fe0696a6c7e",
-        "ref": "land/hl-night (local)"
+        "revision": "05dcf6281e2e2cca06d931dc4acb9234de8241b7",
+        "ref": "land/hl-final7 (local)"
       },
-      "build": "night checkpoint final-6, cargo hl-build build + pgo (chapter-two tape); the library Half-Life (hl-psx).bin is this bin",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/hl-night/final-6/RECEIPT.md"
+      "build": "final-7n, the library Half-Life (hl-psx).bin (PGO build); interim row until final-8 lands",
+      "receipt": "~/Downloads/ps1 games/Half-Life (hl-psx).release-receipt.md"
     },
     {
       "name": "COUNTER-STRIKE",
