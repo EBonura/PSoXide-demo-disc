@@ -40,6 +40,16 @@ https://www.youtube.com/@Just-Music-Beats
 Used with the artist's permission for this non-commercial release.
 Do not redistribute the audio separately.
 
+Cortex Ignition music (menu and combat tracks) is by Carmelo Miceli.
+
+Celeste Classic Collection is an unofficial, non-commercial fan port of the
+PICO-8 games Celeste and Celeste 2: Lani's Trek by Maddy Thorson and Noel
+Berry, with Celeste 2 music by Lena Raine. PICO-8 is by Lexaloffle Games.
+All rights to the original games remain with their creators.
+
+Quake Shareware data is id Software's, distributed under the shareware
+licence agreement in SLICNSE.TXT, which must accompany it.
+
 Goncharov, used in Magikaaaaarp Pong and GH-PSX, is by magikAAAAArp:
 https://www.youtube.com/@magikAAAAArp/videos
 Included with the band's permission. Individual games retain their own credits.
