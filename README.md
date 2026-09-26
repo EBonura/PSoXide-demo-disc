@@ -18,11 +18,10 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.38** moves the emulator component to the revision with the SPU reverb fix, so
-every game on the current SDK runs at full speed in the browser build as well, and
-user-supplied firmware loading is back in the player. v0.37 brought the Celeste
-Collection to 0.2.3: 60 fps throughout, analog stick, the PICO-8 synthesiser on the
-PS1. See [the changelog](CHANGELOG.md).
+**v0.40** carries the Palermo Comicon update of Cortex Ignition, NitroXide's
+stadium look, VoXide tuned to Minecraft Java Edition and the new Quake lighting
+and near-wall fixes, and moves the hardware tests to a disc of their own. See
+[the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 Every deployment updates both the BIN/CUE download and the playable browser
@@ -30,7 +29,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.38 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.40 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
@@ -110,9 +109,9 @@ claim. See [the dated split validation](docs/repository-split-validation-2026-09
 | Cortex Ignition | current PXBSP project as a whole image, 1 CD-DA track |
 | Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
 | Counter-Strike (cs-psx) | whole image, no CD-DA track, `CS=1` only |
-| Hollow Knight (hk-psx) | whole image, 1 CD-DA track (title music), `HK=1` only |
+| Hollow Knight (hk-psx) | whole image, 4 CD-DA tracks, `HK=1` only |
 | Voxide | whole image, WORLD.PAK assets |
-| NitroXide | whole image, WORLD.PAK arena atlas |
+| NitroXide | data track only (WORLD.PAK arena atlas); plays the menu's CD-DA tracks 2-5 |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
 | GH-PSX | whole image without duplicated CD-DA; borrows Arcade's track |
@@ -328,9 +327,9 @@ When a game gets a new build, the re-run is:
    Counter-Strike, Hollow Knight, Quake, Cortex, VoXide and the Arcade are
    whole images taken as they are. GH-PSX is sliced to its data track (it
    borrows the Arcade's song, so check the two tracks still hash the same),
-   Celeste and PSXcel ride as their image's boot EXE, and NitroXide is lifted
-   from the v0.38 pressing until a new build replaces the row (a new NitroXide
-   build should be made without CD-DA; it plays the menu's tracks 2-5).
+   Celeste and PSXcel ride as their image's boot EXE, and NitroXide is sliced
+   to its data track like GH-PSX (it plays the menu's tracks 2-5, which are the
+   same four songs its standalone image carries).
 2. `make lineup-budget ...` with the same arguments: it verifies the lineup and
    prints the sector table without writing an image.
 3. Commit, tag, `make lineup-disc ...`. The release and component receipts are

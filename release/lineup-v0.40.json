@@ -8,17 +8,17 @@
       "var": "CORTEX_CURRENT",
       "kind": "image",
       "cue": "~/Downloads/ps1 games/Cortex Ignition v0.4b.cue",
-      "cue_sha256": "effdf3f222128528f132b642bd058a81a62cb6678d59889d2a8e6ed420ada57c",
-      "bin_sha256": "8cb9fcada9cf866c9182dcd4ad1a8595f82c66fe3f5774661fbe1d721b1d61c0",
+      "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
+      "bin_sha256": "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
       "version": "Tech demo",
       "source": {
         "repository": "EBonura/PSoXide-editor",
         "local": "~/Desktop/repos/PSoXide-editor",
-        "revision": "a40296ae532ce85baac5add348fb2cb5e20f74e9",
-        "ref": "main"
+        "revision": "1bb7a44c2c40d8811a6a6613f610bff6aa24fab6",
+        "ref": "land/cortex-comicon (on main)"
       },
-      "build": "library build 2026-09-23 (frontend build-project-disc, editor/projects/default = the 0.4b Comicon project, unchanged since a834cd87 which the v0.38 disc carried)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
+      "build": "library build 2026-09-25, the 0.4b Palermo Comicon update (work/cortex-land/disc, byte-identical)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/cortex-land/disc/source-rev.txt"
     },
     {
       "name": "QUAKE SHAREWARE",
@@ -27,15 +27,15 @@
       "kind": "image",
       "cue": "~/Downloads/ps1 games/quake-psx.cue",
       "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "b5f6c4972bb66bca032cdb46eb60925f9d2299212f876362bae997072160083b",
-      "version": "q16e27a9",
+      "bin_sha256": "5cb3bff5694e2fd0f0c5997db6762e0de4a2209cb3faa47eea731712a3e1698d",
+      "version": "q8ae8a27",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/quake-psx",
-        "revision": "16e27a9ee905edf27fbc5770661af063f0aeede9",
-        "ref": "main"
+        "revision": "8ae8a27bb1d0fae9f77ae884e9ff09d14f1728b6",
+        "ref": "land/quake-v040 (local)"
       },
-      "build": "library build 2026-09-24, cargo quake-build build, SDK 894b9ef6",
+      "build": "library build 2026-09-26 (work/quake-finish/disc-ship) from 8ae8a27, cargo quake-build build; land/quake-v040 e253735 (+ licence file and visual-parity re-pin) rebuilds the same bin, cue and exe (work/release-v040)",
       "receipt": "~/Downloads/ps1 games/quake-psx.provenance.json"
     },
     {
@@ -79,18 +79,18 @@
       "var": "HKPSX",
       "version_var": "V_HKPSX",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/hk-next/ship5/hk-psx.cue",
-      "cue_sha256": "157d6bd2cae6d17a88f524ab265b5bd1b61e104c7bf52246145df395eedf40f1",
-      "bin_sha256": "3b61e674bfaaaa0b509d4855205ac23e93c9ae2811b881e1a765e663b696ab6a",
+      "cue": "~/Downloads/ps1 games/hk-psx.cue",
+      "cue_sha256": "9c9aeefbe02051450e05ec9fb82578b1eed917b29b8469f07093986c0e347b1d",
+      "bin_sha256": "a78cbf5aa4a89e234c10e2c2c90d2d4a6296d2a1246b403255ca038a18cedaac",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
         "local": "~/Desktop/repos/hk-psx",
-        "revision": "17663370b940821896e957de8a677f1f626db176",
-        "ref": "feat/area-audio-layout (local)"
+        "revision": "7c32b222b002c2262bd28ebbc2d97ea31c7e4420",
+        "ref": "land/ship7 (local)"
       },
-      "build": "ship5, plain cargo hk-build build with full validation, SDK 894b9ef6; built from 42ac0b1's tree, 1766337 only re-pins docs/BUDGET.md; the library hk-psx.bin is this bin",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/hk-next/ship5/RECEIPT.md"
+      "build": "ship7, plain cargo hk-build build with full validation, SDK aa4afd28; built from 9f84249's tree, 7c32b22 only re-pins docs/BUDGET.md; the library hk-psx.bin is this bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/hk-next/ship7/RECEIPT.md"
     },
     {
       "name": "VOXIDE",
@@ -104,7 +104,7 @@
         "repository": "EBonura/voxide",
         "local": "~/Desktop/repos/voxide",
         "revision": "29b8c33763d09df53167340e01ecc61e43d7b8f7",
-        "ref": "fix/java-parity (local)"
+        "ref": "land/voxide-java (local)"
       },
       "build": "library build 2026-09-24, make disc with PGO hot=500",
       "receipt": "~/Library/Application Support/PSoXide-perf/work/voxide-tuning/final-java/RECEIPT.md",
@@ -116,21 +116,18 @@
       "version_var": "V_NITROXIDE",
       "kind": "image",
       "derive": {
-        "from_disc": "~/Downloads/ps1 games/PSoXide Demo Disc HL v0.38-10-g2a93225.bin",
-        "disc_sha256": "e1428d1192ca3fe6c5ee4355d2329f4a922055d284dd3d3507939429ae4818e6",
-        "image_lba": 47996,
-        "sectors": 1074
+        "data_track_of": "~/Downloads/ps1 games/NitroXide/NitroXide.cue"
       },
-      "payload_fnv1a32": "0x5cb8c0e7",
       "version": "0.2.4",
       "source": {
         "repository": "EBonura/nitroxide",
         "local": "~/Desktop/repos/nitroxide",
-        "revision": "64500c06319b8019ad9b92e58ab74c326f235247",
-        "ref": "feat/arena-look ancestor"
+        "revision": "4eaf4c0f37b6db6c26c2ffb7d4afd36a66c60d9d",
+        "ref": "land/nitro-arena (local)"
       },
-      "build": "the v0.38 disc's NitroXide entry (data track only; it plays the menu's CD-DA tracks 2-5), lifted from that disc byte for byte",
-      "receipt": "~/Downloads/ps1 games/PSoXide Demo Disc HL v0.38-10-g2a93225.components.json"
+      "build": "library build 2026-09-25 (work/nitro-fix/disc, arena-look-3 e0c504d), data track only: it plays the menu's CD-DA tracks 2-5, the same four songs its own image carries; land/nitro-arena 4eaf4c0 rebuilds the same bin",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-v040/receipts/NITROXIDE-RECEIPT.md",
+      "bin_sha256": "30ad352ce38b881b931671f6b4c31570c30be70351ebcbd5be7764e180735041"
     },
     {
       "name": "CELESTE COLLECTION",
