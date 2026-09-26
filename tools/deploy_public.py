@@ -96,7 +96,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     download, web = out / "download", out / "web"
     download.mkdir()
-    for source in (cue, image, ROOT / "release/README.txt"):
+    # Quake's shareware terms require SLICNSE.TXT to accompany its data in every package.
+    licence = ROOT / "release/SLICNSE.TXT"
+    for source in (cue, image, ROOT / "release/README.txt", licence):
         shutil.copy2(source, download / source.name)
     emulator = args.emulator.resolve()
     emulator_revision, emulator_lock_sha256 = selected_emulator(emulator)
@@ -115,6 +117,7 @@ def main():
     for pattern in ("demo-disc.*", "demo-data.*", "track-*.flac", "web-manifest.*"):
         for path in web.glob(pattern):
             path.unlink()
+    shutil.copy2(licence, web / licence.name)
     web_cue = web / "demo-disc.cue"
     web_cue.write_text(re.sub(r'^FILE .*$', 'FILE "demo-disc.bin" BINARY', cue.read_text(), flags=re.M))
     run(sys.executable, ROOT / "tools/web-delivery.py", web_cue, image, web, *TRACK_TITLES)
