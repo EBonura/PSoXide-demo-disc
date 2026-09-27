@@ -343,6 +343,15 @@ When a game gets a new build, the re-run is:
    replayed twice and required byte-identical) and `python3
    tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
    look at a launch frame of every game.
+5. `python3 tools/check_celeste_navigation.py --frontend F --cue C --out D`
+   checks both Celeste games after launch from the actual pressing. It covers
+   pause-menu quits and Select+Start with digital and analog pads, credits
+   entry and Cross exit, then longer analog routes with held buttons and three
+   successive game entries. Pillow is required. The output directory must be
+   new; it retains disc and emulator hashes, route commands, logs and frames.
+   `--suite basic` selects the eight short routes and `--suite stress` the two
+   longer ones. A passing route confirms those emulated inputs only; it does
+   not resolve a console-only controller failure.
 
 `tools/check_quake_headless.py` still holds frame pins keyed by carousel size,
 but its route (two RIGHT presses) assumes Quake sits just before CREDITS, which
