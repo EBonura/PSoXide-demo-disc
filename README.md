@@ -350,7 +350,10 @@ When a game gets a new build, the re-run is:
    successive game entries. Pillow is required. The output directory must be
    new; it retains disc and emulator hashes, route commands, logs and frames.
    `--suite basic` selects the eight short routes and `--suite stress` the two
-   longer ones. A passing route confirms those emulated inputs only; it does
+   longer ones. `--suite save` tests both analog carts after changing SFX
+   volume in the pause menu, requires the changed setting in a fresh memory
+   card file, then checks menu and credits navigation. All twelve routes run
+   by default. A passing route confirms those emulated inputs only; it does
    not resolve a console-only controller failure.
 
 `tools/check_quake_headless.py` still holds frame pins keyed by carousel size,
