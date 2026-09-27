@@ -101,13 +101,30 @@ def stress_route(prefix: list[str], launch: int, cart: int):
     return events, checks
 
 
+def save_route(prefix: list[str], launch: int, cart: int):
+    events = list(prefix)
+    if cart:
+        events.append(f"{launch + 1500}:right:8")
+    events += [f"{launch + t + cart * 100}:cross:12" for t in (1600, 2200, 2800)]
+    start = launch + 3200 + cart * 100
+    # SFX starts at eight on this fresh memory card. Change it to seven, then
+    # wrap up to Quit. Leaving the dirty pause menu must write the card.
+    events += [f"{start}:start:8", f"{start + 160}:left:8", f"{start + 320}:up:8",
+               f"{start + 480}:cross:200", f"{start + 1700}:select:8",
+               f"{start + 2100}:cross:8"]
+    checks = [(launch + 1400, "menu", 0), (start + 100, "pause", None),
+              (start + 300, "pause", None), (start + 1500, "menu", cart),
+              (start + 1900, "credits", None), (start + 2300, "menu", cart)]
+    return events, checks
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--frontend", type=Path, required=True)
     ap.add_argument("--cue", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True, help="new evidence directory")
     ap.add_argument("--jobs", type=int, default=2)
-    ap.add_argument("--suite", choices=("basic", "stress", "all"), default="all")
+    ap.add_argument("--suite", choices=("basic", "stress", "save", "all"), default="all")
     args = ap.parse_args()
     if args.jobs < 1:
         ap.error("--jobs must be positive")
@@ -124,14 +141,19 @@ def main() -> int:
     (args.out / "identity.json").write_text(json.dumps(identity, indent=2) + "\n")
 
     def run(case):
-        cart, chord, digital, stress = case
+        cart, chord, digital, suite = case
         name = f"c{cart + 1}-{'chord' if chord else 'pause'}-{'digital' if digital else 'analog'}"
-        if stress:
-            name = f"c{cart + 1}-stress-analog"
+        if suite != "basic":
+            name = f"c{cart + 1}-{suite}-analog"
         folder = args.out / name
         shots = folder / "shots"
         shots.mkdir(parents=True)
-        events, checks = stress_route(prefix, launch, cart) if stress else route(prefix, launch, cart, chord)
+        if suite == "stress":
+            events, checks = stress_route(prefix, launch, cart)
+        elif suite == "save":
+            events, checks = save_route(prefix, launch, cart)
+        else:
+            events, checks = route(prefix, launch, cart, chord)
         last = max(c[0] for c in checks)
         cmd = [str(frontend), "--config-dir", str(folder / "config"), "launch",
                "--path", str(cue), "--embedded-playtest", "--steps", str((last + 300) * 300_000),
@@ -139,6 +161,9 @@ def main() -> int:
                "--route-screenshot-interval", "100", "--dump-hash"]
         if digital:
             cmd.append("--digital-pad")
+        card = folder / "settings.mcd"
+        if suite == "save":
+            cmd += ["--memcard", str(card)]
         with (folder / "run.log").open("w") as log:
             try:
                 rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, timeout=600).returncode
@@ -158,6 +183,10 @@ def main() -> int:
         # carousel and relaunch must not masquerade as a collection return.
         chainloads = log_text.count("launcher: chain-loading")
         failures = [marker for marker in FAILURE_MARKERS if marker in log_text]
+        if suite == "save":
+            data = card.read_bytes() if card.exists() else b""
+            if len(data) != 128 * 1024 or b"BESLES-00000CELSTCC1" not in data or b"CCS1\x07\x08" not in data:
+                failures.append("changed SFX setting missing from memory card")
         ok = rc == 0 and chainloads == 1 and not failures and all(r["passed"] for r in results)
         result = {"name": name, "passed": ok, "rc": rc, "chainloads": chainloads,
                   "failures": failures, "checks": results, "command": cmd}
@@ -167,10 +196,12 @@ def main() -> int:
 
     cases = []
     if args.suite in ("basic", "all"):
-        cases += [(cart, chord, digital, False) for cart in (0, 1)
+        cases += [(cart, chord, digital, "basic") for cart in (0, 1)
                   for chord in (False, True) for digital in (False, True)]
     if args.suite in ("stress", "all"):
-        cases += [(cart, False, False, True) for cart in (0, 1)]
+        cases += [(cart, False, False, "stress") for cart in (0, 1)]
+    if args.suite in ("save", "all"):
+        cases += [(cart, False, False, "save") for cart in (0, 1)]
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         results = list(pool.map(run, cases))
     (args.out / "results.json").write_text(json.dumps(results, indent=2) + "\n")
