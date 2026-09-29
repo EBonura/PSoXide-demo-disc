@@ -7,9 +7,9 @@ the PSoXide programs burned alongside it.
 | --- | --- |
 | [![Demo Disc outer carousel](assets/readme/v028-carousel.png)](assets/readme/v028-carousel.png) | [![PSoXide Arcade selector](assets/readme/arcade-selector.png)](assets/readme/arcade-selector.png) |
 
-| Quake chain-loaded from the combined disc | Current Cortex Ignition project |
-| --- | --- |
-| [![Quake chain-loaded](assets/readme/quake-chainloaded.png)](assets/readme/quake-chainloaded.png) | [![Current Cortex Ignition gameplay](assets/readme/cortex-current.png)](assets/readme/cortex-current.png) |
+| Current Cortex Ignition project |
+| --- |
+| [![Current Cortex Ignition gameplay](assets/readme/cortex-current.png)](assets/readme/cortex-current.png) |
 
 ```bash
 make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
