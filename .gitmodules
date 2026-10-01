@@ -7,9 +7,6 @@
 [submodule "games/voxide"]
 	path = games/voxide
 	url = https://github.com/EBonura/voxide.git
-[submodule "games/gh-psx"]
-	path = games/gh-psx
-	url = https://github.com/EBonura/gh-psx.git
 [submodule "games/psxcel"]
 	path = games/psxcel
 	url = https://github.com/EBonura/psxcel.git

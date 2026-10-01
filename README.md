@@ -18,9 +18,8 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.40** carries the Palermo Comicon update of Cortex Ignition, NitroXide's
-stadium look, VoXide tuned to Minecraft Java Edition and the new Quake lighting
-and near-wall fixes, and moves the hardware tests to a disc of their own. See
+**v0.41** drops GH-PSX and carries Celeste Classic Collection 0.2.6, with
+complete, ACK-paced controller reads. Everything else is v0.40 as pressed. See
 [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
@@ -29,7 +28,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 python3 tools/deploy_public.py \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.40 \
+  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.41 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
@@ -96,10 +95,10 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 
 ## What is on it
 
-The current layout has nine outer programs plus Credits on the standard
-pressing; Half-Life adds a tenth program. PSoXide Arcade contains three games
+The current layout has seven outer programs plus Credits on the standard
+pressing; Half-Life, Counter-Strike and Hollow Knight are opt-in additions. PSoXide Arcade contains three games
 of its own, and Celeste Collection contains both Celeste Classic games.
-The standard disc has 8 CD-DA tracks; the Half-Life edition has 35. Disc size
+The standard disc has 7 CD-DA tracks. Disc size
 and image hashes are recorded in each build's receipts rather than fixed here.
 Automated evidence is recorded per program and is not an original-hardware
 claim. See [the dated split validation](docs/repository-split-validation-2026-09-05.md).
@@ -114,7 +113,6 @@ claim. See [the dated split validation](docs/repository-split-validation-2026-09
 | NitroXide | data track only (WORLD.PAK arena atlas); plays the menu's CD-DA tracks 2-5 |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
-| GH-PSX | whole image without duplicated CD-DA; borrows Arcade's track |
 | PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; owns 1 CD-DA track |
 | Quake shareware | whole image, no CD-DA track |
 
@@ -136,11 +134,11 @@ Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
-The standard order is Cortex Ignition, Voxide, NitroXide,
-Celeste Collection, PSXcel, GH-PSX, PSoXide Arcade,
-Quake Shareware, then Credits. PSoXide Arcade opens a dedicated
-cabinet selector for Breakout, Space Invaders and Magikarp Pong. The optional
-programs follow Quake Shareware in HL, CS, HK order.
+The standard order is PSXcel, PSoXide Arcade, Celeste Collection,
+NitroXide, Voxide, Quake Shareware, Cortex Ignition, then Credits. PSoXide
+Arcade opens a dedicated cabinet selector for Breakout, Space Invaders and
+Magikarp Pong. The optional programs sit between Voxide and Quake Shareware in
+HK, CS, HL order.
 
 ## The menu
 
@@ -204,16 +202,15 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the standard carousel contains ten visible entries including Cortex
-  Ignition and Credits; the HL edition contains eleven
+- the standard carousel contains eight visible entries including Cortex
+  Ignition and Credits
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
 - PSoXide Arcade owns the Goncharov CD-DA track by
   [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
-  band's permission; both Magikarp Pong and GH-PSX relocate to that one
-  physical copy on the combined disc
+  band's permission; Magikarp Pong relocates to it on the combined disc
 
 ## Building
 
@@ -275,8 +272,7 @@ generated output outside the pinned PSoXide worktree. `games/psoxide-arcade`
 is the private collection repository
 and the canonical owner of `goncharov.cdda` by
 [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
-band's permission; the combined-disc GH-PSX image is built data-only and
-borrows Arcade's relocated track instead of carrying a second copy.
+band's permission.
 
 Two pressings exist. `make disc` builds the default one; `make disc HL=1`
 builds the same disc plus Half-Life, for show-floor demos, under a different
@@ -328,11 +324,11 @@ When a game gets a new build, the re-run is:
    `cue_sha256`, `bin_sha256`, `version`, `source.revision`/`ref`, `build` and
    `receipt`. Nothing else in the repo changes for a game-only update. Half-Life,
    Counter-Strike, Hollow Knight, Quake, Cortex, VoXide and the Arcade are
-   whole images taken as they are. GH-PSX is sliced to its data track (it
-   borrows the Arcade's song, so check the two tracks still hash the same),
-   Celeste and PSXcel ride as their image's boot EXE, and NitroXide is sliced
-   to its data track like GH-PSX (it plays the menu's tracks 2-5, which are the
-   same four songs its standalone image carries).
+   whole images taken as they are. Celeste and PSXcel ride as their image's
+   boot EXE, and NitroXide is sliced to its data track (it plays the menu's
+   tracks 2-5, which are the same four songs its standalone image carries).
+   An input whose library build has since moved on can be lifted back out of
+   the previous pressing with `from_disc` (see `tools/lineup.py`).
 2. `make lineup-budget ...` with the same arguments: it verifies the lineup and
    prints the sector table without writing an image.
 3. Commit, tag, `make lineup-disc ...`. The release and component receipts are

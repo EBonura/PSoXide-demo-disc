@@ -1,14 +1,25 @@
-PSoXide Demo Disc v0.40
-======================
+PSoXide Demo Disc v0.41
+=======================
 
 A little of everything. One PlayStation disc.
 
-Choose from PSXcel, GH-PSX, PSoXide Arcade, Celeste Classic Collection,
-NitroXide, VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
+Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
+VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
 
+What's new in v0.41
+-------------------
+- Celeste Classic Collection 0.2.6: controller reads wait for the pad to
+  acknowledge each byte, and a read that fails partway is thrown away and
+  retried. This targets a DualShock in analog mode opening the Celeste
+  credits by itself, with Cross not closing them. Tested in the emulator;
+  not yet confirmed on a console. Both Celeste games also run one logic
+  update per VBlank, so a slow frame catches up instead of slowing the game.
+- GH-PSX is no longer on the disc.
+- Everything else is the same build as v0.40.
+
 What's new in v0.40
-------------------
+-------------------
 - Cortex Ignition: the Palermo Comicon update. Hitting an enemy in the wrong
   stance only chips it, swapping stance protects you like a dodge, Aletha and
   the enemies show their stance colours, the sword reaches further, attacks
@@ -65,7 +76,7 @@ All rights to the original games remain with their creators.
 Quake Shareware data is id Software's, distributed under the shareware
 licence agreement in SLICNSE.TXT, which must accompany it.
 
-Goncharov, used in Magikaaaaarp Pong and GH-PSX, is by magikAAAAArp:
+Goncharov, used in Magikaaaaarp Pong, is by magikAAAAArp:
 https://www.youtube.com/@magikAAAAArp/videos
 Included with the band's permission. Individual games retain their own credits.
 

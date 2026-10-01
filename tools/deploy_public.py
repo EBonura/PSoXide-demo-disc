@@ -15,7 +15,7 @@ from check_release_chainloads import TOC_LBA, parse_toc, read_user_sector
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_GAMES = [
-    "PSXCEL", "GH-PSX", "PSOXIDE ARCADE", "CELESTE COLLECTION",
+    "PSXCEL", "PSOXIDE ARCADE", "CELESTE COLLECTION",
     "NITROXIDE", "VOXIDE", "QUAKE SHAREWARE", "CORTEX IGNITION",
     "CREDITS",
 ]

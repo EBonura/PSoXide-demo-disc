@@ -144,7 +144,6 @@ GAMES    := $(ROOT)/games
 VOXIDE   := $(GAMES)/voxide/dist/voxide.cue
 PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
 CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
-GHPSX    := $(GAMES)/gh-psx/dist/gh-psx.cue
 ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
 HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
 CSPSX_SOURCE ?= $(GAMES)/cs-psx
@@ -213,7 +212,6 @@ V_VOXIDE    := $(call cargo_version,$(GAMES)/voxide/game/Cargo.toml)
 V_NITROXIDE := $(call cargo_version,$(NITROXIDE_SRC)/game/Cargo.toml)
 V_PSXCEL    := $(call cargo_version,$(GAMES)/psxcel/game/Cargo.toml)
 V_CELESTE   := $(call cargo_version,$(GAMES)/pico8-psx/games/celeste-collection/Cargo.toml)
-V_GHPSX     := $(call cargo_version,$(GAMES)/gh-psx/game/Cargo.toml)
 V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arcade/Makefile 2>/dev/null)
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
@@ -241,9 +239,6 @@ launcher: loader
 # NitroXide streams its arena atlas and voxide streams its sfx bank from
 # WORLD.PAK at boot, so both ship whole images and ride the same disc_base
 # relocation as hello-pack.
-# gh-psx plays CD-DA, so it ships its whole image and needs the SDK with
-# psx_io::disc_base. Every game reaches that SDK through psoxide-link now, and
-# PSOXIDE_FROM below puts them all on this submodule's copy of it.
 # PSOXIDE_FROM on every game that carries its own pin. Each of them records a
 # rev for its standalone build, and those revs drift -- three of them sat eight
 # commits behind a measured SPU fix and nothing said so. A disc built from
@@ -257,8 +252,6 @@ programs:
 	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
 	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
 	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
-	$(MAKE) -C $(GAMES)/gh-psx disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) DIST=$(GAMES)/gh-psx/dist \
-		CDDA_LIST=$(ROOT)/audio/no-cdda.txt
 	$(MAKE) -C $(GAMES)/psoxide-arcade disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
 		DIST=$(GAMES)/psoxide-arcade/dist
 	@$(MAKE) cortex-if-stale
@@ -525,7 +518,7 @@ SHOTS_OUT := $(BUILD)/shots
 SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
-              psxcel-editing ghpsx ghpsx2 breakout breakout2 invaders \
+              psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
@@ -541,7 +534,6 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 # CREDITS.
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--game "PSXCEL=$(PSXCEL)" \
-		--image "GH-PSX=$(GHPSX)" \
 		--image "PSOXIDE ARCADE=$(ARCADE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -567,21 +559,17 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste2.shot" \
 		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
 		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
-		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx.shot" \
-		--shot "GH-PSX=$(SHOTS_OUT)/ghpsx2.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout2.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
 		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
-		--share-cdda "GH-PSX=PSOXIDE ARCADE" \
 		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
 		--version-of "PSXCEL=$(V_PSXCEL)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
-		--version-of "GH-PSX=$(V_GHPSX)" \
 		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
 		$(CORTEX_GATE_ARGS) \
 		--describe "CORTEX IGNITION=A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo." \
@@ -589,7 +577,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Supports 2 players in split screen.|Un clone di Rocket League per la prima PlayStation. Supporta 2 giocatori a schermo diviso." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
-		--describe "GH-PSX=A Guitar Hero-style rhythm game for the original PlayStation. This is a bare-bones, one-song prototype.|Un gioco in stile Guitar Hero per la prima PlayStation. E un prototipo essenziale con una sola canzone." \
 		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
 		--max-sectors $(DISC_MAX_SECTORS)
 
@@ -703,7 +690,7 @@ release-web:
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
 	python3 tools/web-delivery.py "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
 		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
-		"CORTEX IGNITION" "GH-PSX"
+		"GONCHAROV" "CORTEX IGNITION COMBAT" "CORTEX IGNITION MENU"
 	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
 		--repo $(WEB_DISC_REPO) \
 		--title "PSoXide Demo Disc (disc image)" \
