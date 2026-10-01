@@ -441,6 +441,16 @@ program-headless-check:
 		--out "$(BUILD)/program-headless" \
 		--jobs 3
 
+# Return paths inside the linked Celeste collection, reached through this
+# pressing's carousel. Use a fresh output directory for each evidence run.
+.PHONY: celeste-navigation-check
+CELESTE_NAV_CUE ?= $(DIST)/$(DISC_NAME).cue
+CELESTE_NAV_OUT ?= $(BUILD)/celeste-navigation
+celeste-navigation-check:
+	python3 tools/check_celeste_navigation.py \
+		--frontend "$(FRONTEND)" --cue "$(CELESTE_NAV_CUE)" \
+		--out "$(CELESTE_NAV_OUT)"
+
 _quake-headless-check:
 	python3 tools/check_release_chainloads.py \
 		--frontend "$(FRONTEND)" \
