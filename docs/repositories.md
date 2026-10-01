@@ -14,7 +14,6 @@ monorepo commits remain addressable so existing standalone game pins keep workin
 | [nitroxide](https://github.com/EBonura/nitroxide) | Rocket-car soccer demo | SDK, engine, texture/model cookers | Public |
 | [psxcel](https://github.com/EBonura/psxcel) | Spreadsheet demo | SDK and engine | Public |
 | [celeste-collection-psx](https://github.com/EBonura/celeste-collection-psx) | Celeste Classic collection | SDK; emulator libraries for host audio capture | Public |
-| [gh-psx](https://github.com/EBonura/gh-psx) | Rhythm game | SDK and engine; borrows Arcade audio on the combined disc | Private |
 | [psoxide-arcade](https://github.com/EBonura/psoxide-arcade) | Breakout, Invaders and Magikarp Pong collection | SDK, engine and its own nested loader | Private |
 | [quake-psx](https://github.com/EBonura/quake-psx) | Quake port and shareware disc | SDK, engine, audio cooker; separately validated artifact | Public |
 | [hl-psx](https://github.com/EBonura/hl-psx) | Half-Life port | SDK, engine, audio cooker and external game data | Private |

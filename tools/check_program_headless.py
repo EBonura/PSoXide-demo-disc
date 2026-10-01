@@ -124,9 +124,6 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
     celeste, celeste_cross = outer("CELESTE COLLECTION")
     psxcel, _ = outer("PSXCEL")
 
-    gh, gh_cross = outer("GH-PSX")
-    gh.extend((f"{gh_cross + 600}:start:12", f"{gh_cross + 1_000}:cross:12"))
-
     arcade, arcade_cross = outer("PSOXIDE ARCADE")
     inner_ready = arcade_cross + 600
 
@@ -171,13 +168,6 @@ def routes(entries: list[DiscEntry]) -> list[Route]:
         # enough emulated time to reach the delayed launch press before judging
         # the guest, rather than stopping while its card is merely selected.
         Route("psxcel", ",".join(psxcel), 450_000_000),
-        Route(
-            "gh-psx",
-            ",".join(gh),
-            800_000_000,
-            markers=("gh-psx: cdda playing",),
-            cdda_owner="GH-PSX",
-        ),
         Route("arcade-breakout", ",".join(breakout), 700_000_000, launcher_count=2),
         Route(
             "arcade-invaders",

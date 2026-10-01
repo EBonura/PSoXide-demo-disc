@@ -21,7 +21,7 @@ from pathlib import Path
 LOGO = Path(__file__).resolve().parents[1] / "games/PSoXide-editor/assets/branding/psoxide-logo.svg"
 
 GAMES = ["CORTEX IGNITION", "QUAKE SHAREWARE", "VOXIDE", "NITROXIDE",
-         "CELESTE COLLECTION", "PSXCEL", "GH-PSX", "BREAKOUT",
+         "CELESTE COLLECTION", "PSXCEL", "BREAKOUT",
          "SPACE INVADERS", "MAGIKAAAAARP PONG"]
 
 CX = CY = 60.0

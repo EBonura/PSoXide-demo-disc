@@ -790,7 +790,7 @@ class MakeVariantContractTests(unittest.TestCase):
         stamp_at = quake.stdout.index("programs.psoxide-revision.tmp")
         verify_at = quake.stdout.index("tools/quake_disc.py verify")
         self.assertIn(f"DIST={ROOT}/games/voxide/dist", quake.stdout)
-        self.assertIn(f"DIST={ROOT}/games/gh-psx/dist", quake.stdout)
+        self.assertIn(f"DIST={ROOT}/games/psoxide-arcade/dist", quake.stdout)
         self.assertLess(programs_at, coherence_at)
         self.assertLess(coherence_at, stamp_at)
         self.assertLess(stamp_at, verify_at)

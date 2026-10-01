@@ -44,7 +44,7 @@ def run(check=False, check_main=False):
     print("Release component revisions and imported source receipts verified")
 
 
-GAMES = ("voxide", "nitroxide", "psxcel", "pico8-psx", "gh-psx", "psoxide-arcade")
+GAMES = ("voxide", "nitroxide", "psxcel", "pico8-psx", "psoxide-arcade")
 # The optional bring-your-own-assets ports. hl-psx and cs-psx hydrate the shared
 # editor tree like every other game; hk-psx imports only the SDK, through its
 # own sdk.lock.json, so its lock is checked by revision instead.
