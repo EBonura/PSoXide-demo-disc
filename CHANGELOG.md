@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.41
+
+- Celeste Collection 0.2.6: complete, ACK-paced controller reads (SDK psx-pad transport fix) aimed at the SCPH-110 analogue-mode credits loop, and both carts on the psx-tick fixed clock. Emulator-tested; console confirmation pending.
+- GH-PSX leaves the disc: its card, screenshots, submodule and build and check entries are gone. PSoXide Arcade keeps the Goncharov track.
+- Every other program is its v0.40 input, byte for byte, pressed through `release/lineup-v0.41.json`.
+- `make celeste-navigation-check` replays the Celeste return paths through the full pressing.
+
 ## v0.40
 
 - Cortex Ignition: the Palermo Comicon update (wrong-stance hits only chip, stance swaps protect like a dodge, stance colours on Aletha and the enemies, longer sword reach, attacks turn to the locked target after a dash, cheaper enemy deaths, gap-free combat music loop, camera fixes, a New Game intro).
