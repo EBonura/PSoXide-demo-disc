@@ -28,7 +28,7 @@ use psx_gpu::{self as gpu, framebuf::FrameBuffer, Resolution, VideoMode};
 use psx_io::cdda::{CddaClock, CddaEndDetector, CddaStarter};
 use psx_io::cdrom::{self, PlayPosition};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
-use psx_pad::{button, poll_port1, ButtonState};
+use psx_pad::{button, require_analog_port1, AnalogRequirement, ButtonState, PadMode, PadReader};
 use psx_rt::tty;
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, SpuAddr, Voice, Volume};
@@ -329,6 +329,11 @@ static SFX_LAUNCH: &[u8] =
 /// Idle frames before the menu clears itself down to the ball turning over
 /// the carousel. A demo disc spends most of its life unattended.
 const ATTRACT_AFTER: u32 = 60 * 20;
+
+/// Frames between attempts to put a pad that is not in analog mode there.
+/// Each attempt holds the CPU for a few frames (the commands are spaced the
+/// way Sony's libpad spaces them), so not every frame.
+const ANALOG_RECHECK_TICKS: u32 = 60;
 /// Frames the launch fade takes. Long enough to read as deliberate, short
 /// enough that nobody waits for it.
 const FADE_FRAMES: i32 = 14;
@@ -521,6 +526,15 @@ fn main() {
     let mut travel: i32 = 0;
     let mut italian = false;
     let mut prev_held = ButtonState::default();
+    // The disc needs a DualShock in analog mode. Lock it there now, so the
+    // Analog button cannot drop it back to digital mid-menu, and read it
+    // through a PadReader so a packet that fails validation never turns
+    // into a phantom press. A pad that is not in analog mode (a digital
+    // pad, one plugged in later, an empty port) holds the menu on a notice
+    // and is asked again every ANALOG_RECHECK_TICKS.
+    let mut pad_reader = PadReader::port1();
+    let mut analog_ok = require_analog_port1() == AnalogRequirement::Analog;
+    let mut next_analog_check: u32 = ANALOG_RECHECK_TICKS;
     /// Frames since the pad last did anything.
     let mut idle: u32 = 0;
     let mut order = [0usize; MAX_ENTRIES];
@@ -632,8 +646,17 @@ fn main() {
         // key_off: immediate, and owing nothing to envelope behaviour.
         sfx.tick(tick);
 
-        let pad = poll_port1().buttons;
-        let pressed = |b: u16| pad.is_held(b) && !prev_held.is_held(b);
+        let state = pad_reader.poll();
+        if state.mode == PadMode::Analog {
+            analog_ok = true;
+        } else if warp < 0 && tick.wrapping_sub(next_analog_check) < u32::MAX / 2 {
+            analog_ok = require_analog_port1() == AnalogRequirement::Analog;
+            next_analog_check = tick.wrapping_add(ANALOG_RECHECK_TICKS);
+        }
+        let pad = state.buttons;
+        // Buttons still track while the notice is up, so one held through
+        // it does not fire when the pad is accepted.
+        let pressed = |b: u16| analog_ok && pad.is_held(b) && !prev_held.is_held(b);
         // The oldest trick in the book, on press edges: a wrong button starts
         // the sequence over (or counts as its first UP). The final CROSS is
         // swallowed below so completing the code cannot double as "launch
@@ -860,7 +883,7 @@ fn main() {
             // at the index the old selection held, and a key without it kept
             // showing the old entry's text under the new entry's pill.
             let key = (index as u32) << 2 | (unlocked as u32) << 1 | italian as u32;
-            let hide_text = attract || warp >= 0 || debug;
+            let hide_text = attract || warp >= 0 || debug || !analog_ok;
             if hide_text {
                 // Nothing but the ball turning over the carousel.
             } else if entries[index].exe_lba == 0 {
@@ -976,11 +999,32 @@ fn main() {
                     dur_ms,
                 );
             }
+            if !analog_ok && warp < 0 {
+                draw_controller_notice(&small);
+            }
         }
 
         gpu::draw_sync();
         psx_rt::interrupts::wait_vblank();
         fb.swap();
+    }
+}
+
+/// What the menu shows while port 1 holds no DualShock in analog mode.
+fn draw_controller_notice(small: &FontAtlas) {
+    const LINES: [&str; 5] = [
+        "This disc needs an analog controller",
+        "(DualShock) in port 1.",
+        "",
+        "Questo disco richiede un controller",
+        "analogico (DualShock) nella porta 1.",
+    ];
+    let w = 320 - 2 * PANEL_X;
+    paint::text_panel(PANEL_X, PANEL_Y, w, PANEL_H);
+    let top = PANEL_Y + (PANEL_H - LINES.len() as i16 * 12) / 2;
+    for (row, line) in LINES.iter().enumerate() {
+        let x = PANEL_X + (w - line.len() as i16 * 5) / 2;
+        small.draw_text(x, top + row as i16 * 12, line, TRACK_NAME);
     }
 }
 
