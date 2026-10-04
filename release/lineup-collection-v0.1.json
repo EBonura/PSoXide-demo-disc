@@ -1,0 +1,229 @@
+{
+  "schema": 1,
+  "pressing": "collection-v0.1",
+  "note": "The v0.42 public lineup plus WipEout: PSoXide Edition (XA music, d69db48), Hollow Knight, Counter-Strike and Half-Life, and the v1.27 hardware tests, for the private PSoXide Collection disc. Interim rows: Hollow Knight and Half-Life are the current library images with their CD-DA tracks stripped (data track only) until their XA builds arrive, and the hardware tests are data track only (the CD-DA tone is not carried). Private, never published. Hashes gate every input; tools/lineup.py refuses a file that changed.",
+  "programs": [
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Downloads/ps1 games/PSXcel/PSXcel.cue"
+      },
+      "bin_sha256": "08dfbfc7750d4b2e2458346ddf7e418b6db3b6ae7b22e47dc3731e454fc5f045",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/psxcel",
+        "revision": "c08096c14dfc23ea29fc561c5fda4f7073132f9f",
+        "ref": "main"
+      },
+      "build": "library build 2026-09-23; the disc carries the image's boot EXE as a bare program, as before",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/library-builds/MANIFEST.md"
+    },
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/inputs/arcade-0.1.1-pad/psoxide-arcade.cue",
+      "cue_sha256": "e7f2b0b74eca6bb88b938dece7e3d216fb1571fb9bc07e172b1a111314a37fa8",
+      "bin_sha256": "4bdd03d83075272e887914c3465a44780692fccaf7e27aedb3e7384ae82eeaaa",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/arcade",
+        "revision": "e8aec238ccba0d8f6b227e617cd9eb6df2b2b69d",
+        "ref": "dd-analog/arcade-analog-required (local, not pushed)"
+      },
+      "build": "make ROOT=<space-free symlink> disc at dd-analog/arcade-analog-required e8aec23 (4fd3daa plus the analog-required launcher), SDK hotfix cc668b56b (a156a2f plus psx-pad only)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/arcade-fixed.log"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Library/Application Support/PSoXide-perf/work/release-1001/celeste/release-0.2.6/celeste-collection.cue"
+      },
+      "bin_sha256": "be6bbae2d61ba155c316d067830b8de865181a26ab2a98a3e8016467d92b77e3",
+      "version": "0.2.6",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Library/Application Support/PSoXide-perf/work/release-1001/celeste/pico8-psx",
+        "revision": "fabaf73c5d1e934e3316680a7bce07d69b825144",
+        "ref": "release/0.2.6 (local, not yet pushed)"
+      },
+      "build": "make collection-disc at release/0.2.6 (main 82e868d + origin/main 0.2.5 + the ACK-paced controller fix), SDK 65e61eb49; the same bin as release/celeste-collection.bin; the disc carries its boot EXE",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/release-1001/celeste/evidence/BUILD-RECEIPT.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/inputs/nitroxide-d56553e/NitroXide.cue"
+      },
+      "version": "0.3.0",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/nitroxide",
+        "revision": "d56553e32a666c2cee3fa0d4591e467254ebae05",
+        "ref": "main"
+      },
+      "build": "library build 2026-10-03 from main d56553e (CHANGELOG 0.3.0, Cargo.toml still says 0.2.4); data track only: it plays the menu's CD-DA tracks 2-5, the same four songs its own image carries",
+      "receipt": "~/Downloads/ps1 games/NitroXide/NitroXide.cue",
+      "bin_sha256": "7a484feb2d765f8d03f611ac985e773b61844b531b6eedcef55ff31eb4d40c30"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/inputs/voxide-0dfc487/VoXide.cue",
+      "bin_sha256": "109089c461cb4b58b1d48c58093549ebc1195e267bd081d99cda1d10ed3fc46e",
+      "version": "0.3.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/voxide",
+        "revision": "0dfc4877c89ad5a3644d26c79ac2862a26f9f867",
+        "ref": "main"
+      },
+      "build": "library build 2026-10-03 from main 0dfc487 (0.3.1)",
+      "receipt": "~/Downloads/ps1 games/VoXide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/inputs/quake-ddf2fd2/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "59e4a97d9247f24e188a10ff6e7f97cb60a8200833968ed5c0fe07b106bb9eb0",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/quake-psx",
+        "revision": "ddf2fd2a5feb2e3be0880d10caa351499d8c3b17",
+        "ref": "main"
+      },
+      "build": "library build 2026-10-04 from main ddf2fd2 (SDK 4adb872f0, editor f3039de2); disc label stays 0.1.1 as in v0.41 (Cargo.toml says 0.1.0 at both revisions)",
+      "receipt": "~/Downloads/ps1 games/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/inputs/cortex-0.4b/Cortex Ignition v0.4b.cue",
+      "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
+      "bin_sha256": "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "1bb7a44c2c40d8811a6a6613f610bff6aa24fab6",
+        "ref": "land/cortex-comicon (on main)"
+      },
+      "build": "library build 2026-09-25, the 0.4b Palermo Comicon update (work/cortex-land/disc, byte-identical)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/cortex-land/disc/source-rev.txt"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/wipeout-xa/wipeout-psx.cue",
+      "cue_sha256": "730401da7012c05242aafe3767fd88436b5b2b3407d7754f2699a2370e856b42",
+      "bin_sha256": "6c182a494d66128d470bb0cd4e2679d833104cc20642ae27edc2282c0c6e9478",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/wipeout-psx",
+        "revision": "d69db4805bb6604f6aab40453f225edc8317fabe",
+        "ref": "collection/single-disc-2026-10-04 (local, not pushed), d69db48 from the XA main"
+      },
+      "build": "cargo wo build --disc <WipEout (Europe) (v1.1).cue> --sdk-source <PSoXide at 4113f546> --no-publish at d69db48: data track only, 197.1 MB, MUSIC1-3.XA in the ISO root, no CD-DA",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/logs/wo-build.log"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Downloads/ps1 games/hk-psx.cue"
+      },
+      "bin_sha256": "ef056490d8c0d4981ef55f64f81c170c313363f501cdb5478708e2bd7cf15617",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/hk-psx",
+        "revision": "0b2658c18fc70012ccdeb1a2f4bfce039aa4dc06",
+        "ref": "main (inferred: the image does not record its revision)"
+      },
+      "build": "library hk-psx.bin of 2026-10-04 10:35, data track only (its 4 CD-DA tracks are left out)",
+      "receipt": "~/Downloads/ps1 games/hk-psx.cue"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Downloads/ps1 games/cs-psx.cue",
+      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
+      "bin_sha256": "c1e78b4010738f5daddc1e61be97ef0b8984f3d4dea745edd2b7c36a978bddcd",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/cs-psx",
+        "local": "~/Desktop/repos/cs-psx",
+        "revision": "25cb954e1b804f91d83466c0b7429aadd2b55af5",
+        "ref": "main (inferred: the image does not record its revision)"
+      },
+      "build": "library cs-psx.bin of 2026-10-01 20:05; a data-only image already",
+      "receipt": "~/Downloads/ps1 games/cs-psx.cue"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Downloads/ps1 games/Half-Life (hl-psx).cue"
+      },
+      "bin_sha256": "84e8b8a953c510c7c0620c93cbb77575ee105e7ef96ec5c05a849c1f82c01549",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/hl-psx",
+        "revision": "33aaa50e3adb1577a5f63caf2248a70a2b9b00a7",
+        "ref": "main (inferred: the image does not record its revision)"
+      },
+      "build": "library Half-Life (hl-psx).bin of 2026-10-01 22:55, data track only (its 27 CD-DA tracks are left out)",
+      "receipt": "~/Downloads/ps1 games/Half-Life (hl-psx).release-receipt.md"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/hardware-tests-v1.27/hardware-tests.cue"
+      },
+      "bin_sha256": "f9635536f67dac66b8d17dcfae43f0ff68d45ae7cc843962b648eb72d21523a4",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/hwtests",
+        "revision": "1087ac3ca6db6dfe4c5dd945fecfe71282c542a5",
+        "ref": "feat/hwtests-v1.27 (local, not pushed)"
+      },
+      "build": "hardware tests v1.27, data track only (the CD-DA tone track is not carried on the collection)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/hardware-tests-v1.27/SHA256SUMS"
+    }
+  ]
+}
