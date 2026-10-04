@@ -69,12 +69,15 @@ HK ?=
 # WipEout: PSoXide Edition rides the lineup pressings only (make lineup-disc ... WO=1):
 # it is built in its own repository and has no submodule here.
 WO ?=
+# The hardware test suite is likewise lineup-only (HWT=1).
+HWT ?=
 # HL=0 means off, not "0 is a non-empty string, so on". Same for CS and HK.
 override HL := $(filter-out 0,$(HL))
 override CS := $(filter-out 0,$(CS))
 override HK := $(filter-out 0,$(HK))
 override WO := $(filter-out 0,$(WO))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO))
+override HWT := $(filter-out 0,$(HWT))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -135,7 +138,7 @@ DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0)
 RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
@@ -403,6 +406,13 @@ CS_ARGS = --image "COUNTER-STRIKE=$(CSPSX)" \
 	--version-of "COUNTER-STRIKE=$(V_CSPSX)" \
 	--describe "COUNTER-STRIKE=A from-scratch PlayStation port of Counter-Strike 1.6, cooked from your own copy. Bots, the buy menu, bomb and hostage rounds, and two-player split screen. Still in development.|Counter-Strike 1.6 portato su PlayStation da zero, partendo dalla propria copia del gioco. Bot, menu acquisti, bomba, ostaggi e schermo diviso per due giocatori. In sviluppo."
 endif
+ifneq ($(HWT),)
+HWT_ARGS = --image "HARDWARE TESTS=$(HWTESTS)" \
+	--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests.shot" \
+	--shot "HARDWARE TESTS=$(SHOTS_OUT)/hwtests2.shot" \
+	--version-of "HARDWARE TESTS=$(V_HWTESTS)" \
+	--describe "HARDWARE TESTS=A hardware test suite, not a game. The current suite is working and ready to use, displaying real PlayStation measurements as photo-ready codes for checking emulator accuracy.|Una suite di test hardware, non un gioco. E funzionante e pronta all'uso: mostra le misure della vera PlayStation come codici da fotografare per verificare la precisione degli emulatori."
+endif
 ifneq ($(WO),)
 WO_ARGS = --image "WIPEOUT PSOXIDE=$(WIPEOUT)" \
 	--shot "WIPEOUT PSOXIDE=$(SHOTS_OUT)/wipeout1.shot" \
@@ -533,7 +543,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
-              $(if $(WO),wipeout1 wipeout2)
+              $(if $(WO),wipeout1 wipeout2) $(if $(HWT),hwtests hwtests2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
@@ -557,6 +567,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(HL_ARGS) \
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		$(HWT_ARGS) \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
@@ -673,7 +684,7 @@ _lineup-lay: $(SHOT_FILES)
 	python3 tools/lineup.py receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
