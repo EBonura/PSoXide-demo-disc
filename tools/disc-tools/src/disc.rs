@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 
 use crate::util::{fnv1a32, resolve, Error, Result};
-use crate::{bail, ensure};
 
 pub const SECTOR_BYTES: u64 = 2352;
 pub const USER_DATA_AT: u64 = 24;
@@ -23,7 +22,8 @@ pub const TOC_DESC_BYTES: usize = 224;
 pub const TOC_VERSION_AT: usize = 488;
 pub const TOC_VERSION_BYTES: usize = 16;
 pub const TOC_FLAGS_AT: usize = 504;
-pub const TOC_MAX_ENTRIES: usize = (TOC_SECTORS as usize * USER_DATA_BYTES - TOC_HEADER_BYTES) / TOC_ENTRY_BYTES;
+pub const TOC_MAX_ENTRIES: usize =
+    (TOC_SECTORS as usize * USER_DATA_BYTES - TOC_HEADER_BYTES) / TOC_ENTRY_BYTES;
 pub const FLAG_HIDDEN: u32 = 1;
 pub const PSX_EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 pub const BOOT_SCAN_SECTORS: u64 = 64;
@@ -91,7 +91,10 @@ pub fn read_user_sectors(image: &Path, lba: u64, count: u64) -> Result<Vec<u8>> 
     for sector in lba..lba + count {
         match read_user_sector(&mut stream, sector) {
             Ok(chunk) => out.extend(chunk),
-            Err(_) => bail!("{}: ended while reading {count} user-data sectors at LBA {lba}", image.display()),
+            Err(_) => bail!(
+                "{}: ended while reading {count} user-data sectors at LBA {lba}",
+                image.display()
+            ),
         }
     }
     Ok(out)
@@ -105,13 +108,19 @@ pub fn parse_toc(raw: &[u8]) -> Result<Vec<TocEntry>> {
         String::from_utf8_lossy(TOC_MAGIC)
     );
     let count = le32(raw, 8) as usize;
-    ensure!(count != 0 && count <= TOC_MAX_ENTRIES, "invalid combined TOC entry count {count}");
+    ensure!(
+        count != 0 && count <= TOC_MAX_ENTRIES,
+        "invalid combined TOC entry count {count}"
+    );
     let mut entries = Vec::with_capacity(count);
     for index in 0..count {
         let at = TOC_HEADER_BYTES + index * TOC_ENTRY_BYTES;
         let row = &raw[at..at + TOC_ENTRY_BYTES];
         let name = text_field(&row[..TOC_NAME_BYTES])?;
-        ensure!(!entries.iter().any(|e: &TocEntry| e.name == name), "duplicate combined TOC name: {name}");
+        ensure!(
+            !entries.iter().any(|e: &TocEntry| e.name == name),
+            "duplicate combined TOC name: {name}"
+        );
         entries.push(TocEntry {
             exe_lba: le32(row, 24),
             image_lba: le32(row, 28),
@@ -134,12 +143,16 @@ pub fn read_toc(image: &Path) -> Result<Vec<TocEntry>> {
 pub fn parse_exe_at(image: &Path, lba: u64) -> Result<Exe> {
     let mut stream = File::open(image)?;
     let header = read_user_sector(&mut stream, lba)?;
-    ensure!(&header[..8] == PSX_EXE_MAGIC, "no PS-X EXE at {} LBA {lba}", image.display());
+    ensure!(
+        &header[..8] == PSX_EXE_MAGIC,
+        "no PS-X EXE at {} LBA {lba}",
+        image.display()
+    );
     let pc = le32(&header, 0x10);
     let load = le32(&header, 0x18);
     let payload_bytes = le32(&header, 0x1C);
     ensure!(
-        payload_bytes != 0 && payload_bytes as usize % USER_DATA_BYTES == 0,
+        payload_bytes != 0 && (payload_bytes as usize).is_multiple_of(USER_DATA_BYTES),
         "invalid PS-X EXE payload size {payload_bytes}"
     );
     ensure!(
@@ -150,7 +163,14 @@ pub fn parse_exe_at(image: &Path, lba: u64) -> Result<Exe> {
     for offset in 0..(payload_bytes as usize / USER_DATA_BYTES) as u64 {
         payload.extend(read_user_sector(&mut stream, lba + 1 + offset)?);
     }
-    Ok(Exe { lba, pc, load, payload_bytes, header, payload })
+    Ok(Exe {
+        lba,
+        pc,
+        load,
+        payload_bytes,
+        header,
+        payload,
+    })
 }
 
 /// The boot EXE of an imported data track: the first sector in the opening
@@ -163,7 +183,10 @@ pub fn find_boot_exe(image: &Path) -> Result<Exe> {
             return parse_exe_at(image, lba);
         }
     }
-    bail!("no boot PS-X EXE in first {BOOT_SCAN_SECTORS} sectors: {}", image.display())
+    bail!(
+        "no boot PS-X EXE in first {BOOT_SCAN_SECTORS} sectors: {}",
+        image.display()
+    )
 }
 
 pub fn exe_fnv(exe: &Exe) -> u32 {
@@ -176,14 +199,21 @@ fn file_line() -> Regex {
 
 /// Names on the cue's `FILE "x" BINARY` lines, in order, duplicates kept.
 pub fn cue_file_names(text: &str) -> Vec<String> {
-    file_line().captures_iter(text).map(|c| c[1].to_string()).collect()
+    file_line()
+        .captures_iter(text)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
 /// The one BIN a cue names, required to sit beside it and to be a whole
 /// number of raw sectors.
 pub fn image_for_cue(cue: &Path) -> Result<PathBuf> {
     let cue = resolve(cue)?;
-    ensure!(cue.is_file(), "cue is not a regular file: {}", cue.display());
+    ensure!(
+        cue.is_file(),
+        "cue is not a regular file: {}",
+        cue.display()
+    );
     let text = std::fs::read(&cue)?;
     ensure!(text.is_ascii(), "cue is not ASCII: {}", cue.display());
     let text = String::from_utf8_lossy(&text).into_owned();
@@ -193,7 +223,11 @@ pub fn image_for_cue(cue: &Path) -> Result<PathBuf> {
             unique.push(name);
         }
     }
-    ensure!(unique.len() == 1, "cue must reference exactly one unique BIN: {}", cue.display());
+    ensure!(
+        unique.len() == 1,
+        "cue must reference exactly one unique BIN: {}",
+        cue.display()
+    );
     let relative = Path::new(&unique[0]);
     ensure!(
         !relative.is_absolute() && relative.components().count() == 1,
@@ -208,7 +242,11 @@ pub fn image_for_cue(cue: &Path) -> Result<PathBuf> {
         cue.display()
     );
     let size = std::fs::metadata(&image)?.len();
-    ensure!(size != 0 && size % SECTOR_BYTES == 0, "raw BIN size is not a positive whole sector: {}", image.display());
+    ensure!(
+        size != 0 && size % SECTOR_BYTES == 0,
+        "raw BIN size is not a positive whole sector: {}",
+        image.display()
+    );
     Ok(image)
 }
 
@@ -216,7 +254,10 @@ pub fn image_for_cue(cue: &Path) -> Result<PathBuf> {
 pub fn msf_to_sector(msf: &str) -> Result<u64> {
     let parts: Vec<&str> = msf.split(':').collect();
     ensure!(parts.len() == 3, "bad MSF {msf:?}");
-    let number = |s: &str| s.parse::<u64>().map_err(|_| Error(format!("bad MSF {msf:?}")));
+    let number = |s: &str| {
+        s.parse::<u64>()
+            .map_err(|_| Error(format!("bad MSF {msf:?}")))
+    };
     Ok((number(parts[0])? * 60 + number(parts[1])?) * 75 + number(parts[2])?)
 }
 
