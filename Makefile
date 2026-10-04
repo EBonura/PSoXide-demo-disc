@@ -66,11 +66,15 @@ MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 HL ?=
 CS ?=
 HK ?=
+# WipEout: PSoXide Edition rides the lineup pressings only (make lineup-disc ... WO=1):
+# it is built in its own repository and has no submodule here.
+WO ?=
 # HL=0 means off, not "0 is a non-empty string, so on". Same for CS and HK.
 override HL := $(filter-out 0,$(HL))
 override CS := $(filter-out 0,$(CS))
 override HK := $(filter-out 0,$(HK))
-PRIVATE := $(strip $(HL)$(CS)$(HK))
+override WO := $(filter-out 0,$(WO))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -131,7 +135,7 @@ DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0)
 RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
@@ -223,11 +227,12 @@ V_CORTEX_CURRENT := Tech demo
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
 # Only v* tags name pressings; the rolling `web-disc` release tag that feeds
 # the browser emulator would otherwise leak into every version string.
-DISC_VERSION := $(shell git -C $(ROOT) describe --tags --match 'v*' --always --dirty 2>/dev/null)
+DISC_TITLE ?= DEMO DISC
+DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --dirty 2>/dev/null)
 
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) \
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
@@ -398,6 +403,13 @@ CS_ARGS = --image "COUNTER-STRIKE=$(CSPSX)" \
 	--version-of "COUNTER-STRIKE=$(V_CSPSX)" \
 	--describe "COUNTER-STRIKE=A from-scratch PlayStation port of Counter-Strike 1.6, cooked from your own copy. Bots, the buy menu, bomb and hostage rounds, and two-player split screen. Still in development.|Counter-Strike 1.6 portato su PlayStation da zero, partendo dalla propria copia del gioco. Bot, menu acquisti, bomba, ostaggi e schermo diviso per due giocatori. In sviluppo."
 endif
+ifneq ($(WO),)
+WO_ARGS = --image "WIPEOUT PSOXIDE=$(WIPEOUT)" \
+	--shot "WIPEOUT PSOXIDE=$(SHOTS_OUT)/wipeout1.shot" \
+	--shot "WIPEOUT PSOXIDE=$(SHOTS_OUT)/wipeout2.shot" \
+	--version-of "WIPEOUT PSOXIDE=$(V_WIPEOUT)" \
+	--describe "WIPEOUT PSOXIDE=WipEout (1995) rewritten in Rust for the original PlayStation, cooked from your own copy of the game. Tracks, ships, weapons and two-player split screen.|WipEout (1995) riscritto in Rust per la prima PlayStation, partendo dalla propria copia del gioco. Piste, navi, armi e schermo diviso per due."
+endif
 ifneq ($(HK),)
 HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
 	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
@@ -520,7 +532,8 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
-              quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight)
+              quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
+              $(if $(WO),wipeout1 wipeout2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
@@ -538,6 +551,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
 		--image "VOXIDE=$(VOXIDE)" \
+		$(WO_ARGS) \
 		$(HK_ARGS) \
 		$(CS_ARGS) \
 		$(HL_ARGS) \
@@ -659,7 +673,7 @@ _lineup-lay: $(SHOT_FILES)
 	python3 tools/lineup.py receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
