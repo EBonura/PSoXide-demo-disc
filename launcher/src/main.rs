@@ -44,6 +44,13 @@ const DISC_VERSION: &str = match option_env!("DISC_VERSION") {
     None => "DEV",
 };
 
+/// The pressing's name under the logo, `DEMO DISC` unless the build says
+/// otherwise (the private collection disc calls itself `COLLECTION`).
+const DISC_TITLE: &str = match option_env!("DISC_TITLE") {
+    Some(v) => v,
+    None => "DEMO DISC",
+};
+
 /// Where the blob expects to run. Must match `loader.ld`.
 const LOADER_BASE: u32 = 0x801F_0000;
 
@@ -857,7 +864,7 @@ fn main() {
         if warp < 0 {
             paint::header_strip(HEADER_H);
             banner.draw(160 - BANNER_W / 2, BANNER_Y);
-            centred(&font, BANNER_Y + BANNER_H + 2, "DEMO DISC", TITLE);
+            centred(&font, BANNER_Y + BANNER_H + 2, DISC_TITLE, TITLE);
             centred(&small, HEADER_H - 8, DISC_VERSION, HINT);
             if let Some(header) = header {
                 draw_music_panel(
