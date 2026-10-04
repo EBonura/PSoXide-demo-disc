@@ -330,6 +330,14 @@ pub fn is_digest(text: &str) -> bool {
     is_hex(text, 64)
 }
 
+/// An ordered object from pairs.
+pub fn object<const N: usize>(pairs: [(&str, Value); N]) -> Value {
+    let mut map = serde_json::Map::new();
+    for (key, value) in pairs {
+        map.insert(key.to_string(), value);
+    }
+    Value::Object(map)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
