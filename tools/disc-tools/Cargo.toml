@@ -1,0 +1,28 @@
+[package]
+name    = "disc-tools"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "Host tools for the PSoXide demo disc: pressing receipts, release checks, asset cooking."
+
+# Outside any workspace, like mkdisc: it builds for the host with the repo's
+# pinned nightly and shares nothing with the PS1 crates.
+[workspace]
+
+[[bin]]
+name = "disc-tools"
+path = "src/main.rs"
+
+[dependencies]
+# preserve_order keeps object keys in file order, which the receipts and the
+# lineup files rely on (they sort on write, never on read).
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2       = "0.10"
+png        = "0.17"
+flate2     = "1"
+regex      = "1"
+qrcode     = { version = "0.14", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
+rqrr     = "0.8"
