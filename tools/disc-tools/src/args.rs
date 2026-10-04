@@ -64,15 +64,24 @@ impl Args {
 
     /// The last value given, like argparse.
     pub fn get(&self, name: &str) -> Option<&str> {
-        self.values.iter().rev().find(|(n, _)| n == name).map(|(_, v)| v.as_str())
+        self.values
+            .iter()
+            .rev()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn all(&self, name: &str) -> Vec<&str> {
-        self.values.iter().filter(|(n, _)| n == name).map(|(_, v)| v.as_str()).collect()
+        self.values
+            .iter()
+            .filter(|(n, _)| n == name)
+            .map(|(_, v)| v.as_str())
+            .collect()
     }
 
     pub fn require(&self, name: &str) -> Result<&str> {
-        self.get(name).ok_or_else(|| Error(format!("--{name} is required")))
+        self.get(name)
+            .ok_or_else(|| Error(format!("--{name} is required")))
     }
 
     pub fn path(&self, name: &str) -> Option<PathBuf> {
@@ -105,7 +114,15 @@ mod tests {
     #[test]
     fn reads_values_flags_and_repeats() {
         let args = Args::parse(
-            &raw(&["--cue", "a.cue", "--target=Q", "--target", "H", "--sealed", "pos"]),
+            &raw(&[
+                "--cue",
+                "a.cue",
+                "--target=Q",
+                "--target",
+                "H",
+                "--sealed",
+                "pos",
+            ]),
             &["cue", "target"],
             &["sealed"],
         )

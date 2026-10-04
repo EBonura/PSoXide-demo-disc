@@ -95,18 +95,11 @@ pub fn fnv1a32(data: &[u8]) -> u32 {
     digest
 }
 
-pub fn fnv1a64(data: &[u8]) -> u64 {
-    let mut digest: u64 = 0xCBF2_9CE4_8422_2325;
-    for &byte in data {
-        digest = (digest ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01B3);
-    }
-    digest
-}
-
 /// `Path::canonicalize`, but with the path in the message (Python's
 /// `resolve(strict=True)`).
 pub fn resolve(path: &Path) -> Result<PathBuf> {
-    path.canonicalize().map_err(|e| Error(format!("{}: {e}", path.display())))
+    path.canonicalize()
+        .map_err(|e| Error(format!("{}: {e}", path.display())))
 }
 
 /// `Path::canonicalize` that tolerates a path which does not exist yet, like
@@ -116,7 +109,9 @@ pub fn resolve_lenient(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir().map(|c| c.join(path)).unwrap_or_else(|_| path.to_path_buf())
+        std::env::current_dir()
+            .map(|c| c.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
     };
     let mut tail = Vec::new();
     let mut head = absolute.as_path();
@@ -185,7 +180,9 @@ pub fn command_output(program: &str, args: &[&str], dir: Option<&Path>) -> Resul
     if let Some(dir) = dir {
         command.current_dir(dir);
     }
-    let result = command.output().map_err(|e| Error(format!("cannot run {program}: {e}")))?;
+    let result = command
+        .output()
+        .map_err(|e| Error(format!("cannot run {program}: {e}")))?;
     if !result.status.success() {
         bail!(
             "{program} {} failed: {}",
@@ -285,7 +282,10 @@ pub fn write_atomic(path: &Path, text: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let mut name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let mut name = path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_default();
     name.push(".tmp");
     let temporary = path.with_file_name(name);
     fs::write(&temporary, text)?;
@@ -316,7 +316,10 @@ pub fn file_record(path: &Path) -> Result<Value> {
 }
 
 pub fn is_hex(text: &str, length: usize) -> bool {
-    text.len() == length && text.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    text.len() == length
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 pub fn is_revision(text: &str) -> bool {
@@ -327,14 +330,6 @@ pub fn is_digest(text: &str) -> bool {
     is_hex(text, 64)
 }
 
-/// `json!`-style helper: an ordered object from pairs.
-pub fn object<const N: usize>(pairs: [(&str, Value); N]) -> Value {
-    let mut map = serde_json::Map::new();
-    for (key, value) in pairs {
-        map.insert(key.to_string(), value);
-    }
-    Value::Object(map)
-}
 
 #[cfg(test)]
 mod tests {
@@ -355,7 +350,6 @@ mod tests {
     fn fnv_matches_known_vectors() {
         assert_eq!(fnv1a32(b""), 0x811C_9DC5);
         assert_eq!(fnv1a32(b"a"), 0xE40C_292C);
-        assert_eq!(fnv1a64(b"a"), 0xAF63_DC4C_8601_EC8C);
     }
 
     #[test]
@@ -364,4 +358,42 @@ mod tests {
         assert!(!is_revision(&"A".repeat(40)));
         assert!(!is_digest(&"a".repeat(63)));
     }
+}
+
+/// The disc repository this binary belongs to: the nearest ancestor of the
+/// executable that holds `release-components.json`, else of the working
+/// directory. The scripts used their own location for this; a binary has to
+/// look for it, and must not mistake whichever repo it happens to run in.
+pub fn repo_root() -> Result<PathBuf> {
+    let marker = "release-components.json";
+    let mut starts = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        starts.push(exe);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        starts.push(cwd);
+    }
+    for start in starts {
+        for ancestor in start.ancestors().skip(1) {
+            if ancestor.join(marker).is_file() && ancestor.join("Makefile").is_file() {
+                return Ok(ancestor.to_path_buf());
+            }
+        }
+    }
+    bail!("cannot find the disc repository root (no {marker} above the executable or the working directory)")
+}
+
+/// `os.path.expanduser` for the forms the lineup files use: a leading `~/`.
+pub fn expand_home(value: &str) -> PathBuf {
+    if let Some(rest) = value.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    if value == "~" {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home);
+        }
+    }
+    PathBuf::from(value)
 }
