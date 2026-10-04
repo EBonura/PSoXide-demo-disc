@@ -330,7 +330,6 @@ pub fn is_digest(text: &str) -> bool {
     is_hex(text, 64)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
