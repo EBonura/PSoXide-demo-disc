@@ -553,10 +553,9 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
 # `make disc` builds. The program order here is the carousel order: the
-# reverse of v0.39 (Manny, 2026-09-26), PSXcel first and Cortex last before
-# CREDITS.
+# reverse of v0.39 (Manny, 2026-09-26), with PSXcel moved from first to last,
+# just before CREDITS (Manny, 2026-10-05).
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
-		--game "PSXCEL=$(PSXCEL)" \
 		--image "PSOXIDE ARCADE=$(ARCADE)" \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -568,6 +567,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(HWT_ARGS) \
+		--game "PSXCEL=$(PSXCEL)" \
 		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
 		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
 		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
