@@ -33,6 +33,7 @@ use psx_rt::tty;
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, SpuAddr, Voice, Volume};
 use psx_vram::{Clut, TexDepth, Tpage};
+use stick_nav::StickNav;
 
 /// The chain-load blob, linked at `LOADER_BASE` by `loader/loader.ld`.
 const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
@@ -540,6 +541,9 @@ fn main() {
     // pad, one plugged in later, an empty port) holds the menu on a notice
     // and is asked again every ANALOG_RECHECK_TICKS.
     let mut pad_reader = PadReader::port1();
+    // The left stick drives the menu like the d-pad: one press per push, the
+    // stick back near centre before the next.
+    let mut stick = StickNav::new();
     let mut analog_ok = require_analog_port1() == AnalogRequirement::Analog;
     let mut next_analog_check: u32 = ANALOG_RECHECK_TICKS;
     /// Frames since the pad last did anything.
@@ -660,7 +664,9 @@ fn main() {
             analog_ok = require_analog_port1() == AnalogRequirement::Analog;
             next_analog_check = tick.wrapping_add(ANALOG_RECHECK_TICKS);
         }
-        let pad = state.buttons;
+        let pad = ButtonState::from_bits(
+            state.buttons.bits() | stick.update(state.mode, state.sticks),
+        );
         // Buttons still track while the notice is up, so one held through
         // it does not fire when the pad is accepted.
         let pressed = |b: u16| analog_ok && pad.is_held(b) && !prev_held.is_held(b);

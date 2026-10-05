@@ -1,0 +1,13 @@
+[package]
+name    = "stick-nav"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "The left stick as menu d-pad presses, for the launcher."
+
+# A member of the launcher's workspace (a path dependency under its root). It is
+# `no_std` so the console build takes it as is, and `cargo test` in this
+# directory runs the logic on the host.
+
+[dependencies]
+psx-pad = { path = "../../games/PSoXide-editor/sdk/crates/psx-pad" }

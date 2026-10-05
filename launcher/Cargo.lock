@@ -25,6 +25,7 @@ dependencies = [
  "psx-sfx",
  "psx-spu",
  "psx-vram",
+ "stick-nav",
 ]
 
 [[package]]
@@ -148,3 +149,10 @@ dependencies = [
 [[package]]
 name = "psxed-format"
 version = "0.1.0"
+
+[[package]]
+name = "stick-nav"
+version = "0.1.0"
+dependencies = [
+ "psx-pad",
+]

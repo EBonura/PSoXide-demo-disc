@@ -36,6 +36,7 @@ psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
 carousel = { package = "psx-carousel", path = "../games/PSoXide-editor/engine/crates/psx-carousel" }
 psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
 psx-spu  = { path = "../games/PSoXide-editor/sdk/crates/psx-spu" }
+stick-nav = { path = "stick-nav" }
 psx-asset = { path = "../games/PSoXide-editor/sdk/crates/psx-asset" }
 psx-sfx  = { path = "../games/PSoXide-editor/sdk/crates/psx-sfx" }
 disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-editor/engine/crates/psx-disc-toc" }
