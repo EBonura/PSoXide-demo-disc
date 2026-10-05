@@ -134,8 +134,8 @@ Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
 revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
-The standard order is PSXcel, PSoXide Arcade, Celeste Collection,
-NitroXide, Voxide, Quake Shareware, Cortex Ignition, then Credits. PSoXide
+The standard order is PSoXide Arcade, Celeste Collection, NitroXide,
+Voxide, Quake Shareware, Cortex Ignition, PSXcel, then Credits. PSoXide
 Arcade opens a dedicated cabinet selector for Breakout, Space Invaders and
 Magikarp Pong. The optional programs sit between Voxide and Quake Shareware in
 HK, CS, HL order.
@@ -144,7 +144,7 @@ HK, CS, HL order.
 
 A carousel of glossy blue pills under a turning ball of balls, over a
 starfield: the PlayStation demo discs, as closely as flat and gouraud
-triangles get you. Left and right spin the ring, X runs the pill at the front, up or down swaps
+triangles get you. Left and right (the d-pad or the left stick) spin the ring, X runs the pill at the front, up or down swaps
 the description between English and Italian under a drawn flag, and L1 or R1
 skips the music. Titles too long for a pill break across two lines.
 
