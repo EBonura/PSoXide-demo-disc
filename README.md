@@ -218,9 +218,9 @@ real-BIOS or original-console claim:
 
 Install Rust through rustup, Make, Git, an authenticated GitHub CLI, Python 3
 (for the editor and emulator repositories' own `bootstrap-components.py`,
-which `make components` runs, and for the four release gates that are still
-Python: `tools/check_release_chainloads.py`, `check_program_headless.py`,
-`check_celeste_navigation.py` and `check_audio_relocation.py`),
+which `make components` runs, and for the three release gates that are still
+Python: `tools/check_release_chainloads.py`, `check_program_headless.py` and
+`check_celeste_navigation.py`),
 host C/C++ build tools, and `mipsel-none-elf-objdump` on `PATH`. The release
 tools also call `rsvg-convert` (link icons), `flac` (browser delivery),
 `trunk` and `butler` (public deploys) when those steps are run. Native frontend
@@ -361,6 +361,12 @@ When a game gets a new build, the re-run is:
    card file, then checks menu and credits navigation. All twelve routes run
    by default. A passing route confirms those emulated inputs only; it does
    not resolve a console-only controller failure.
+
+6. `disc-tools audio-relocation --cue C --audio-dir audio --input NAME=CUE ...`
+   (one `--input` per program that carries CD-DA, `--no-audio NAME` for the
+   bare games) hashes the four menu songs and every program track in the
+   pressing against the cues they came from. The order of the programs' tracks
+   is read from the disc table, so a reordered carousel needs no edit.
 
 `disc-tools quake headless` still holds frame pins keyed by carousel size,
 but its route (two RIGHT presses) assumes Quake sits just before CREDITS, which
