@@ -34,15 +34,16 @@ use crate::util::{
 };
 
 /// The menu a public pressing must show, in order: the visible table entries
-/// then the launcher's own CREDITS card.
+/// then the launcher's own CREDITS card. PSXcel sits last before CREDITS
+/// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order.
 const PUBLIC_GAMES: [&str; 8] = [
-    "PSXCEL",
     "PSOXIDE ARCADE",
     "CELESTE COLLECTION",
     "NITROXIDE",
     "VOXIDE",
     "QUAKE SHAREWARE",
     "CORTEX IGNITION",
+    "PSXCEL",
     "CREDITS",
 ];
 /// One title per CD-DA track, in disc order, for the browser player.
