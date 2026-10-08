@@ -2,6 +2,8 @@
 
 **[Download the latest version on itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc)**, or [play it in your browser](https://bonnie-studios.itch.io/psoxide).
 
+> **Built with agentic coding.** AI coding agents write most of the code in PSoXide and in the games on this disc. I direct them, review what they produce, and test the results in the emulator and on a real PlayStation.
+
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
