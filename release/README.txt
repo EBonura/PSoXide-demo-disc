@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.41
+PSoXide Demo Disc v0.43
 =======================
 
 A little of everything. One PlayStation disc.
@@ -6,6 +6,22 @@ A little of everything. One PlayStation disc.
 Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.43
+-------------------
+- This disc needs an analog DualShock. The menu switches the pad into analog
+  mode and keeps it there, and asks for a DualShock when it finds a digital
+  pad. The left stick now moves the carousel as well as the D-pad.
+- PSXcel moved to the end of the carousel, just before the credits.
+- NitroXide, VoXide and Quake are fresh builds. VoXide: you respawn in the
+  overworld after dying in the Inferno or the Void, holding L2 repeats block
+  placement, holding jump hops again on landing, the tutorial toast no longer
+  covers the dragon's boss bar, and saving asks before it formats a blank
+  memory card. NitroXide: the now-playing plate stays off the goal banner,
+  fine pitch tile edges no longer snap to a saturated coarse neighbour, and it
+  asks before formatting a blank memory card. Quake is rebuilt on the
+  current shared engine.
+- Cortex Ignition has the newly approved animations and the two-hit R1 combo.
 
 What's new in v0.41
 -------------------

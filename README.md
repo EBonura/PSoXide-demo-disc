@@ -18,9 +18,9 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.41** drops GH-PSX and carries Celeste Classic Collection 0.2.6, with
-complete, ACK-paced controller reads. Everything else is v0.40 as pressed. See
-[the changelog](CHANGELOG.md).
+**v0.43** requires an analog DualShock, lets the left stick drive the
+carousel, moves PSXcel to the end of the carousel and carries a fresh build of
+every program from its repository's main. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
 Every deployment updates both the BIN/CUE download and the playable browser
@@ -28,7 +28,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 disc-tools deploy-public \
-  --cue "/path/to/PSoXide Demo Disc.cue" --version v0.41 \
+  --cue "/path/to/PSoXide Demo Disc v0.43.cue" --version v0.43 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
@@ -43,9 +43,11 @@ check music and input, and confirm the downloadable version. Keep the existing
 page colours unless a change is requested. Update both pages' player-facing
 changelogs when gameplay changes ship.
 
-Google Drive is the third destination only when requested. Upload the private
-Half-Life edition to the personal Bonnie Studios folder, verify completion,
-and return its link. Never include that edition in either public package.
+The two itch.io pages are the only destinations. The private editions (anything
+built with `HL=1`, `CS=1`, `HK=1` or the lineup flags that add WipEout and the
+hardware tests) are for local hardware verification only. They are never
+uploaded, shared on request or handed to anyone, and never go into either
+public package.
 
 The current public destinations are
 [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and the
@@ -282,8 +284,9 @@ and the canonical owner of `goncharov.cdda` by
 band's permission.
 
 Two pressings exist. `make disc` builds the default one; `make disc HL=1`
-builds the same disc plus Half-Life, for show-floor demos, under a different
-name so the two bins cannot be confused. Both carry Quake shareware. The
+builds the same disc plus Half-Life, for local hardware verification only,
+under a different name so the two bins cannot be confused. That edition is
+never distributed. Both carry Quake shareware. The
 private submodules require repository access: a recursive clone fetches all
 submodules, including HL-PSX, even when the standard edition is selected.
 `HL=1` also requires the separately supplied original game data. Public
