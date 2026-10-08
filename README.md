@@ -145,6 +145,10 @@ Voxide, Quake Shareware, Cortex Ignition, PSXcel, then Credits. PSoXide
 Arcade opens a dedicated cabinet selector for Breakout, Space Invaders and
 Magikarp Pong. The optional programs sit between Voxide and Quake Shareware in
 HK, CS, HL order.
+The order lives in the Makefile's `MKDISC_ARGS`, which the public and the
+private lineup pressings both lay out; `tools/disc-tools/tests/carousel_order.rs`
+fails if PSXcel stops being last or a private lineup in `release/` lists its
+programs in another order.
 
 ## The menu
 
