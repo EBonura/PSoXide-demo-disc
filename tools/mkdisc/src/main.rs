@@ -106,7 +106,7 @@ struct Args {
     /// Attribution the menu prints for that track.
     credit: String,
     /// Per menu track, in the same order: `(milli-BPM, first-beat ms)` from
-    /// `tools/beatgrid.py`.
+    /// `disc-tools beatgrid`.
     menu_beats: Vec<(u32, u32)>,
     /// Per menu track, in the same order: the title the menu shows as
     /// "now playing".
@@ -272,12 +272,12 @@ fn print_usage() {
          --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
          --gate        NAME stays off the carousel until the cheat code\n\
          --shot        NAME=<blob> adds a menu backdrop for the program; repeat\n\
-        \x20             for a slideshow (cook the blob with tools/cook-shots.py)\n\
+        \x20             for a slideshow (cook the blob with disc-tools cook-shot)\n\
          --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
         \x20             menu cycles through the tracks in order\n\
          --credit      attribution the menu prints for that track\n\
          --menu-beat   MILLIBPM:PHASEMS for the matching --menu-cdda, from\n\
-        \x20             tools/beatgrid.py; drives the menu's beat pulse\n\
+        \x20             disc-tools beatgrid; drives the menu's beat pulse\n\
          --menu-title  title of the matching --menu-cdda, shown as now playing\n\
          --max-sectors the target blank's capacity; a layout over it is an error\n\
          --dry-run     print the sector budget and stop without writing the image"
@@ -744,7 +744,7 @@ fn run() -> Result<(), String> {
         spectrum_data.extend_from_slice(&data);
     }
 
-    // Screenshots, cooked by tools/cook-shots.py. Grouped by program (in
+    // Screenshots, cooked by disc-tools cook-shot. Grouped by program (in
     // first-appearance order, keeping each program's own slideshow order) and
     // padded to sector boundaries, so the launcher addresses shot `i` as
     // `shots_lba + i * SHOT_SECTORS` with nothing but the table in hand.
@@ -754,7 +754,7 @@ fn run() -> Result<(), String> {
         if bytes.len() != disc_toc::SHOT_BYTES {
             return Err(format!(
                 "--shot {}: {} bytes, but a cooked shot is exactly {} (CLUT then {}x{} \
-                 pixels). Cook it with tools/cook-shots.py.",
+                 pixels). Cook it with disc-tools cook-shot.",
                 path.display(),
                 bytes.len(),
                 disc_toc::SHOT_BYTES,
