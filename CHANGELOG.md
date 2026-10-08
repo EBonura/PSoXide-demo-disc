@@ -6,7 +6,7 @@
 - The disc requires an analog DualShock. The launcher locks the pad in analog mode and shows a notice for a digital pad.
 - The left analog stick moves the carousel (launcher change f659e44).
 - PSXcel moves to the end of the carousel, just before Credits (48e6a33). The public deploy check now demands that order.
-- The disc tools (receipts, components, lineup pressing, Quake pins, web delivery, deploy) are one Rust crate, `tools/disc-tools`. The four release gates that are not ported yet stay Python.
+- The disc tools (receipts, components, lineup pressing, Quake pins, web delivery, deploy) are one Rust crate, `tools/disc-tools`. The three release gates that are not ported yet (chain-loads, program boots, Celeste navigation) stay Python.
 - The README no longer describes a shared private edition: the private editions are local hardware verification builds and are never distributed.
 
 
