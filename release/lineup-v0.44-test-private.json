@@ -1,0 +1,226 @@
+{
+  "schema": 1,
+  "pressing": "v0.44-test-private",
+  "note": "PSoXide Demo Disc v0.44-test, private edition (local test build, not the release). The public programs are fresh builds from each repository origin/main as of 2026-10-08 (NitroXide 0.4.1, VoXide 0.3.2, Half-Life main 8a7f220); Cortex Ignition is the console-tested 0.4b image; WipEout, Hollow Knight, Counter-Strike and the v1.27 hardware tests are the inputs of the v0.43 private pressing. Private, never published, never distributed.",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/arcade/psoxide-arcade.cue",
+      "cue_sha256": "e7f2b0b74eca6bb88b938dece7e3d216fb1571fb9bc07e172b1a111314a37fa8",
+      "bin_sha256": "8c00db88493908e67efed27da2898e7b0874775beba484426373d87fc6cbd51f",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "ea902a997add7324e399274446387992c06b5f2c",
+        "ref": "main"
+      },
+      "build": "make disc on main with the SDK hotfix cc668b56b hydrated from the dd-analog work dir (.psoxide of the e8aec23 build): main pins cc668b56b but that commit is not on GitHub, so a clean bootstrap 404s. Code equals e8aec23 (the image pressed in v0.43 private); only licence and docs differ.",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/arcade-build2.log"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/celeste/celeste-collection.cue"
+      },
+      "bin_sha256": "be6bbae2d61ba155c316d067830b8de865181a26ab2a98a3e8016467d92b77e3",
+      "version": "0.2.6",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "7e97d001c33f10c16a41d3edb2116da4b027743e",
+        "ref": "main"
+      },
+      "build": "make collection-disc on a clean clone of main (SDK 65e61eb49, the ACK-paced controller fix); byte-identical to the console-tested 0.2.6 image (bin be6bbae2); main moved past fabaf73 by README commits only",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/celeste-build.log"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "00c738cd588387ca394f597cbb71dd04f3140a97452e84d3a10f8f1d45d0fa0b",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "817f547d1a5a3000d08c9c922c79f35b3e20f893",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (0.4.1, SDK caaaa1c8, committed PGO profile), no CDDA_DIR: a data track only, since it plays the menu CD-DA tracks 2-5 from the demo disc. The incremental memory-card save branch is not on main and is not in this build.",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/nitroxide-build.log"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/voxide/voxide.cue",
+      "cue_sha256": "416945f50741918a1a19fd88f2900e7ba6641591875db3a87f51653a3525d9a8",
+      "bin_sha256": "143cb55923294a8759be1ae66baaa0f14675566e0f8e105faf4d30bcae56bdda",
+      "version": "0.3.2",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "1be0011a86d2ffe85ac4989f316f8d4d605a6c3a",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (0.3.2, SDK 1855cd21b, committed PGO profile hot=500). The incremental memory-card save push has not landed on main and is not in this build.",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/voxide-build.log"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/wipeout/wipeout-psx.cue",
+      "cue_sha256": "730401da7012c05242aafe3767fd88436b5b2b3407d7754f2699a2370e856b42",
+      "bin_sha256": "252357f61a544980e8da53002b389de05a3a1710b98b2ec435a447e6b88d2672",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/wipeout-psx",
+        "revision": "04357604f599854ab4e7eaea62cbf9cbb3211708",
+        "ref": "collection/pad-reader (local, not pushed): d69db48 plus PadReader, require_analog_port1, SDK 8685299c7"
+      },
+      "build": "cargo wo build --disc <WipEout (Europe) (v1.1).cue> --sdk-source <PSoXide at 8685299c7> --no-publish; normal PGO layout refreshed and bound 106 of 106 functions",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/logs/wo-build.log"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "c80dbc4a6216069c0221ba578d10ab88d53185e2f176aaaf459dbbf7c7b8d88f",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/hk-psx",
+        "revision": "7d7707b107fc75ad53f681a8242b1e49e369da37",
+        "ref": "feat/xa-soundtrack"
+      },
+      "build": "final HK disc with XA soundtrack as data-track files (no CD-DA)",
+      "receipt": "single-disc-2026-10-04/final (hk-validate.log, hk-validate2.log)",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/hk/hk-psx.cue",
+      "cue_sha256": "847e6ea3d0762d2163e0616a19c01b3ae85c469748318c588e14656bbc7f98fb"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/cs/cs-psx.cue",
+      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
+      "bin_sha256": "a5b1d1190e6b9ef86ed85f2d29d72824c3c61c4d253c67a2b4a7a44aa9166018",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/cs-psx",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/cs-psx",
+        "revision": "e3d9ad5fb8f80f114d055d0214994caa062dc3f6",
+        "ref": "collection/pad-reader (local, not pushed): 972f728 plus PadReader, require_analog_port1, SDK 8685299c7"
+      },
+      "build": "cargo cs-build assets then regress at e3d9ad5; dist/cs-psx.bin as built by that run; dust2 regress p50 +2.26% vs main",
+      "receipt": "cook provenance verified in src/cs-psx/data/.hlpsx-cook.json (HL-PSX 972f728 cook, PSoXide tree 74c5005e); disc built by hl-psx-build 2026-10-04"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/hl/hl-psx.cue",
+      "cue_sha256": "429a96485fcb00fdc4916971fcdc9d4e44ab4e0a2cc18dab033a959377d7693d",
+      "bin_sha256": "f537d2d24882863cdc9fd3b5680c092186ef9533d7ca7190302fa3350b67d73b",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/hl-psx (library disc build)",
+        "revision": "8a7f22038a48780d8449438289b0ec0f91cb1fa7",
+        "ref": "main"
+      },
+      "build": "the library Half-Life disc built 2026-10-08 19:00 from main 8a7f220 (exe e17ad935, XA music as data-track files, no CD-DA, analog required at boot), copied byte for byte; hl-psx keeps cooked assets outside git so it is not rebuilt from a clean clone",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/hl-perf-2026-10-08/STATE.md"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "70e95d91b8f09fb561c4da7245c79554a7803b50025bd335155e5110411fbd41",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "ec9051d9054448a346effddf1dc0721b1e6c363e",
+        "ref": "main"
+      },
+      "build": "cargo quake-build build on a clean clone of main (SDK 4adb872f, editor f15f123a, shareware 1.06 data); byte-identical to the v0.43 public Quake image (main moved by README commits only); disc label stays 0.1.1 (Cargo.toml says 0.1.0)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/cortex/Cortex Ignition v0.4b.cue",
+      "cue_sha256": "bf96fbd6fb36b9b5b98e22c5be718b08a2a4f2ae05ad48dd2e01eea69071eb07",
+      "bin_sha256": "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "1bb7a44c2c40d8811a6a6613f610bff6aa24fab6",
+        "ref": "land/cortex-comicon (on main)"
+      },
+      "build": "library build 2026-09-25, the 0.4b Palermo Comicon update (work/cortex-land/disc, byte-identical)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/cortex-land/disc/source-rev.txt"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/hwtests/hardware-tests.cue"
+      },
+      "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
+        "ref": "collection/hwt-disc-base (local, not pushed): 1087ac3c plus the disc base on the raw CD seeks, kept out of line"
+      },
+      "build": "make hardware-tests-disc at the branch head (SDK ae6e1ef1, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
+      "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/psxcel/psxcel.cue"
+      },
+      "bin_sha256": "78522813ff1508901ddbad11c6fbf81a793822b87430a01c78b7792165b46d98",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "ba79cf19d362274da858c2d7f76eee03f47d3383",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK 8adf4b14, editor 06f5bf2a from its components.lock.json); the disc carries the image boot EXE as a bare program. Last before CREDITS, like the public edition.",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/psxcel-build.log"
+    }
+  ]
+}
