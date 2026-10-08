@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.43
+
+- Public pressing from `release/lineup-v0.43.json`: a fresh build of every program from its repository's main (PSXcel c08096c, Celeste Collection fabaf73, NitroXide fa023bd, VoXide 42366f2, Quake ab671da, Cortex Ignition from PSoXide-editor 1212e009). PSoXide Arcade is the analog-required 0.1.1 build (e8aec23) from the v0.43 private edition, because Arcade main still has the launcher that does not enable analog mode.
+- The disc requires an analog DualShock. The launcher locks the pad in analog mode and shows a notice for a digital pad.
+- The left analog stick moves the carousel (launcher change f659e44).
+- PSXcel moves to the end of the carousel, just before Credits (48e6a33). The public deploy check now demands that order.
+- The disc tools (receipts, components, lineup pressing, Quake pins, web delivery, deploy) are one Rust crate, `tools/disc-tools`. The four release gates that are not ported yet stay Python.
+- The README no longer describes a shared private edition: the private editions are local hardware verification builds and are never distributed.
+
+
 ## v0.41
 
 - Celeste Collection 0.2.6: complete, ACK-paced controller reads (SDK psx-pad transport fix) aimed at the SCPH-110 analogue-mode credits loop, and both carts on the psx-tick fixed clock. Emulator-tested; console confirmation pending.

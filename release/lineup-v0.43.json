@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "pressing": "v0.43",
+  "note": "PSoXide Demo Disc v0.43, public pressing. Every program except the Arcade is a fresh build from its repository's origin/main as of 2026-10-08, each on the SDK that main pins. The Arcade is the analog-required rebuild (e8aec23, SDK hotfix cc668b56b) already pressed in the v0.43 private edition, because Arcade main (1a8a9b3) still has the launcher that does not enable analog mode. Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. Hashes gate every input; disc-tools lineup refuses a file that changed.",
+  "programs": [
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/psxcel/psxcel.cue"
+      },
+      "bin_sha256": "f9223628e77ee90a10bc0a942ebd79baffcef2540f8d089fa6ed30d069d8fcd0",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "c08096c14dfc23ea29fc561c5fda4f7073132f9f",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK 8adf4b14, editor 06f5bf2a from its components.lock.json); the disc carries the image's boot EXE as a bare program",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/psxcel-build.log"
+    },
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/arcade/psoxide-arcade.cue",
+      "cue_sha256": "e7f2b0b74eca6bb88b938dece7e3d216fb1571fb9bc07e172b1a111314a37fa8",
+      "bin_sha256": "4bdd03d83075272e887914c3465a44780692fccaf7e27aedb3e7384ae82eeaaa",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/arcade",
+        "revision": "e8aec238ccba0d8f6b227e617cd9eb6df2b2b69d",
+        "ref": "dd-analog/arcade-analog-required (local, not pushed); origin/main is 1a8a9b3, which lacks the analog-required launcher"
+      },
+      "build": "same image as the v0.43 private edition: make ROOT=<space-free symlink> disc at e8aec23 (4fd3daa plus the analog-required launcher), SDK hotfix cc668b56b",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-analog-2026-10-03/arcade-fixed.log"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/celeste/celeste-collection.cue"
+      },
+      "bin_sha256": "8210a3f04f4dcb448cd343331c68d75d49f7c8afa74107cad811583d3bbf930f",
+      "version": "0.2.6",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "fabaf73c5d1e934e3316680a7bce07d69b825144",
+        "ref": "main"
+      },
+      "build": "make collection-disc on a clean clone of main (SDK 65e61eb49, the ACK-paced controller fix); same source as the console-tested 0.2.6, rebuilt at a different checkout path (same EXE size, different layout bytes)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/celeste-build.log"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "706c0c4d6404476863f85f5fab953497f597fb63116e2de38ddcb7706585c2d0",
+      "version": "0.3.0",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "fa023bdffeb54eee6ce4a4098db5eb3bd9da4778",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK caaaa1c8, committed PGO profile), no CDDA_DIR: a data track only, since it plays the menu's CD-DA tracks 2-5 from the demo disc; CHANGELOG says 0.3.0 while Cargo.toml still says 0.2.4",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/nitroxide-build.log"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/voxide/voxide.cue",
+      "cue_sha256": "416945f50741918a1a19fd88f2900e7ba6641591875db3a87f51653a3525d9a8",
+      "bin_sha256": "d6d1ac1bb33832f2a5438126df3f963fa2508c7c33f60823305d216fccde15fb",
+      "version": "0.3.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "42366f2f01a69d8628942e5480acf6490c164cde",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK 1855cd21, committed PGO profile)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/voxide-build.log"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "70e95d91b8f09fb561c4da7245c79554a7803b50025bd335155e5110411fbd41",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "clean clone of origin/main, 2026-10-08",
+        "revision": "ab671da824ce74463f760811e6c901e8a6dee815",
+        "ref": "main"
+      },
+      "build": "cargo quake-build build on a clean clone of main (SDK 4adb872f, editor f15f123a, shareware 1.06 data); disc label stays 0.1.1 as in v0.41 to v0.43 private (Cargo.toml says 0.1.0)",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/cortex/cortex_ignition_tech_demo_0_4b.cue",
+      "cue_sha256": "8c0e3038468b3b31ec54dab917a6c8ffae8a03725fb3fe4627e668b7835d277a",
+      "bin_sha256": "1d3333b26748f2e90d98b1240789709d738fa85c1005562102e8247157fe960a",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "worktree of origin/main, 2026-10-08",
+        "revision": "1212e009d2e9d632601e7d708f491bc8f1113b0d",
+        "ref": "main"
+      },
+      "build": "frontend build-project-disc on a copy of editor/projects/default at main 1212e009 (SDK 38ba81f0e, includes the approved 09-30 animations and two-hit R1 combo that the console-tested 0.4b image 1bb7a44c lacks); guest-symbol-gate PASS",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/cortex-build.log"
+    }
+  ]
+}
