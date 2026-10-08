@@ -14,7 +14,7 @@
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/psoxide-arcade",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/psoxide-arcade",
         "revision": "26af632dbcce070fb3a3c215623621d8394e86d7",
         "ref": "main"
       },
@@ -33,7 +33,7 @@
       "version": "0.2.6",
       "source": {
         "repository": "EBonura/celeste-collection-psx",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/celeste-collection-psx",
         "revision": "25646595f0b34c80d8d357d166c4cbe12886b8ef",
         "ref": "main"
       },
@@ -51,7 +51,7 @@
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/nitroxide",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/nitroxide",
         "revision": "7981e605ef732b695be0e77ddf9c8d619a76b3ab",
         "ref": "main"
       },
@@ -69,7 +69,7 @@
       "version": "0.3.2",
       "source": {
         "repository": "EBonura/voxide",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/voxide",
         "revision": "a33caf624e1f617eead230e5f5a356a90930e28b",
         "ref": "main"
       },
@@ -103,7 +103,7 @@
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
-        "local": "~/Desktop/repos/hk-psx",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/hk",
         "revision": "7d7707b107fc75ad53f681a8242b1e49e369da37",
         "ref": "feat/xa-soundtrack"
       },
@@ -141,7 +141,7 @@
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/hl-psx",
-        "local": "~/Desktop/repos/hl-psx (library disc build)",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/hl-psx",
         "revision": "25f8c220b56f5afd9f098fe13d85b6d2e4140693",
         "ref": "main"
       },
@@ -159,7 +159,7 @@
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/quake-psx",
         "revision": "1d61a00724d0dcea9cf536ddb513e69deceb873b",
         "ref": "main"
       },
@@ -177,7 +177,7 @@
       "version": "0.4b",
       "source": {
         "repository": "EBonura/PSoXide-editor",
-        "local": "~/Desktop/repos/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/disc/games/PSoXide-editor",
         "revision": "1eab4c90ed0342e3616beace092772e80c0f45b2",
         "ref": "land/cortex-comicon (on main)"
       },
@@ -215,7 +215,7 @@
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/psxcel",
-        "local": "clean clone of origin/main, 2026-10-08",
+        "local": "/private/tmp/claude-501/-Users-ebonura-Desktop-repos-PSoXide/f957925b-6f45-4293-a0c1-78fc42fa3cb6/scratchpad/ddsrc/psxcel",
         "revision": "2fcc459edbe5f677f3aaea6af54e01942e8dbbc6",
         "ref": "main"
       },
