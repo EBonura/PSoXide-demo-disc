@@ -2,7 +2,9 @@
 
 **[Download the latest version on itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc)**, or [play it in your browser](https://bonnie-studios.itch.io/psoxide).
 
-> **Built with agentic coding.** AI coding agents write most of the code in PSoXide and in the games on this disc. I direct them, review what they produce, and test the results in the emulator and on a real PlayStation.
+> **Largely written with agentic coding.** I direct the agents and test their work in two places: PSoXide's emulator, which profiles every cycle, and a real PlayStation, which shows me where the emulator is wrong. Working between them is where the accuracy and the speed come from. [How PSoXide is built](https://ebonura.github.io/PSoXide/how-its-built/)
+>
+> **AI-generated content:** code only (the launcher, loader and disc tooling). The menu music is by Just Music, the disc label is built from screenshots of the games, and each game on the disc lists its own content.
 
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
