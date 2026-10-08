@@ -1,5 +1,7 @@
 # PSoXide demo disc
 
+**[Download the latest version on itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc)**, or [play it in your browser](https://bonnie-studios.itch.io/psoxide).
+
 One CD-R that boots on a real PlayStation into a menu, and chain-loads any of
 the PSoXide programs burned alongside it.
 
