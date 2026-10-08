@@ -8,7 +8,7 @@
 # music live outside Git. Cortex uses an exact PSoXide pin so the active editor
 # project remains reproducible as the engine advances.
 
-.PHONY: help disc disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check clean
+.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check clean
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
@@ -26,6 +26,7 @@ QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
 EXAMPLES   := $(PROGRAMS_PSOXIDE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
+DISC_TOOLS := $(ROOT)/tools/disc-tools/target/release/disc-tools
 
 # Menu music, used with the artist's permission. The credit ships on the disc
 # and stays on screen the whole time the track plays; keep the two together.
@@ -33,7 +34,7 @@ MENU_CDDA   := $(ROOT)/audio/knuckle-dust.cdda $(ROOT)/audio/rusted-hammer.cdda 
                $(ROOT)/audio/chainsaw-heart.cdda $(ROOT)/audio/night-crawler.cdda
 MENU_CREDIT := Just Music - YouTube @Just-Music-Beats
 # Tempo and first-beat offset per track, in the same order, measured by
-# tools/beatgrid.py. The menu pulses on these; a guessed tempo drifts.
+# `disc-tools beatgrid`. The menu pulses on these; a guessed tempo drifts.
 MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
 # Shown as "now playing", in the same order as MENU_CDDA. Written out rather
 # than looped: make's foreach splits on whitespace, which takes the titles
@@ -387,6 +388,14 @@ cortex-symbol-check:
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
+# The host tools: pressing receipts, release checks, asset cooking. Plain
+# cargo, no submodule needed, so this builds on a fresh clone before
+# `components` has run. Rebuilds only when its sources change.
+DISC_TOOLS_SRC := $(wildcard $(ROOT)/tools/disc-tools/src/*.rs) $(ROOT)/tools/disc-tools/Cargo.toml
+$(DISC_TOOLS): $(DISC_TOOLS_SRC)
+	cd tools/disc-tools && cargo build --release
+disc-tools: $(DISC_TOOLS)
+
 # Cortex Ignition is on the carousel of both pressings since 2026-09-03 (it
 # used to sit behind the Konami unlock on the standard one). The launcher's
 # unlock sequence still works; nothing is gated by default.
@@ -489,8 +498,8 @@ release-headless-check: release-frontend
 	$(MAKE) disc $(RELEASE_FLAGS)
 	$(MAKE) _release-headless-check $(RELEASE_FLAGS)
 
-_release-headless-check:
-	python3 tools/release_receipt.py verify --receipt "$(RELEASE_RECEIPT)"
+_release-headless-check: $(DISC_TOOLS)
+	$(DISC_TOOLS) release-receipt verify --receipt "$(RELEASE_RECEIPT)"
 	python3 tools/check_release_chainloads.py \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
@@ -509,14 +518,14 @@ _release-headless-check:
 # shows exactly which contract moved, and a repin that rewrote the pins itself
 # would be a verifier agreeing with whatever it was handed. README.md has the
 # full procedure. The chain-load gate resolves Quake by its pressed name.
-quake-repin:
-	@python3 tools/quake_disc.py repin \
+quake-repin: $(DISC_TOOLS)
+	@$(DISC_TOOLS) quake repin \
 		--source "$(QUAKE_SRC)" \
 		--cue "$(QUAKE_CUE)" \
 		--provenance "$(QUAKE_PROVENANCE)"
 
-quake-verify:
-	python3 tools/quake_disc.py verify \
+quake-verify: $(DISC_TOOLS)
+	$(DISC_TOOLS) quake verify \
 		--source "$(QUAKE_SRC)" \
 		--psoxide "$(PSOXIDE)" \
 		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
@@ -546,9 +555,9 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               $(if $(WO),wipeout1 wipeout2) $(if $(HWT),hwtests hwtests2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
-$(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png tools/cook-shots.py
+$(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
 	@mkdir -p "$(SHOTS_OUT)"
-	python3 tools/cook-shots.py "$<" "$@"
+	$(DISC_TOOLS) cook-shot "$<" "$@"
 
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
@@ -608,11 +617,11 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 ifneq ($(PRIVATE),)
 disc-only: release-frontend
 endif
-disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
+disc-only: mkdisc $(DISC_TOOLS) $(SHOT_FILES) $(QUAKE_PREREQS)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) $(MKDISC_ARGS)
 
-	python3 tools/quake_disc.py receipt \
+	$(DISC_TOOLS) quake receipt \
 		--source "$(QUAKE_SRC)" \
 		--psoxide "$(PSOXIDE)" \
 		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
@@ -631,7 +640,7 @@ disc-only: mkdisc $(SHOT_FILES) $(QUAKE_PREREQS)
 		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
 
 ifneq ($(PRIVATE),)
-	python3 tools/release_receipt.py create \
+	$(DISC_TOOLS) release-receipt create \
 		--combined-cue "$(DIST)/$(DISC_NAME).cue" \
 		--frontend "$(FRONTEND)" \
 		--build-command "$(RELEASE_BUILD_COMMAND)" \
@@ -644,7 +653,7 @@ ifneq ($(PRIVATE),)
 		--source "QUAKE SHAREWARE=$(QUAKE_SRC)" \
 		--out "$(RELEASE_RECEIPT)"
 endif
-	python3 tools/components.py --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
+	$(DISC_TOOLS) components --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
 
 
 # A lineup pressing takes every program as it was already built and played,
@@ -656,7 +665,7 @@ endif
 #        DIST=<dir> FRONTEND=<frontend>
 #
 # The lineup file names each input with its sha256, source revision and build
-# receipt; tools/lineup.py refuses any input whose hash moved, derives the few
+# receipt; `disc-tools lineup` refuses any input whose hash moved, derives the few
 # that need it (a data track alone, a boot EXE, an entry lifted from an older
 # pressing) and writes build/lineup/lineup.mk, which points the program and
 # version variables above at them. The launcher, the layout and the mkdisc
@@ -668,9 +677,9 @@ ifneq ($(LINEUP),)
 endif
 
 .PHONY: lineup-prepare lineup-disc _lineup-lay lineup-budget
-lineup-prepare:
+lineup-prepare: $(DISC_TOOLS)
 	@test -n "$(LINEUP)" || { echo "lineup: set LINEUP=release/lineup-<version>.json"; exit 1; }
-	python3 tools/lineup.py prepare --lineup "$(LINEUP)" --out "$(LINEUP_OUT)"
+	$(DISC_TOOLS) lineup prepare --lineup "$(LINEUP)" --out "$(LINEUP_OUT)"
 
 lineup-disc: launcher mkdisc lineup-prepare
 	$(MAKE) _lineup-lay
@@ -678,10 +687,10 @@ lineup-disc: launcher mkdisc lineup-prepare
 lineup-budget: mkdisc lineup-prepare
 	$(MAKE) disc-budget
 
-_lineup-lay: $(SHOT_FILES)
+_lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) $(MKDISC_ARGS)
-	python3 tools/lineup.py receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
+	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
 		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(HWT),,--omit "HARDWARE TESTS") \
@@ -707,13 +716,13 @@ disc-budget: mkdisc $(SHOT_FILES)
 # runs in.
 WEB_DISC_REPO := EBonura/PSoXide
 .PHONY: release-web
-release-web:
+release-web: $(DISC_TOOLS)
 	@test -z "$(PRIVATE)" || { echo "release-web: the HL, CS and HK pressings are never distributed"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
-	python3 tools/web-delivery.py "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
+	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
 		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
 		"GONCHAROV" "CORTEX IGNITION COMBAT" "CORTEX IGNITION MENU"
 	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
@@ -745,9 +754,8 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-carousel
 	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-disc-toc
 	cd tools/mkdisc && cargo test
-	python3 -m unittest discover -s tools -p 'test_quake_disc.py'
-	python3 -m unittest discover -s tools -p 'test_components.py'
-	python3 -m unittest tools/test_release_receipt.py tools/test_release_chainloads.py tools/test_check_program_headless.py
+	cd tools/disc-tools && cargo test
+	python3 -m unittest tools/test_release_chainloads.py tools/test_check_program_headless.py
 
 # Every program on this disc has to be built against one SDK.
 #
@@ -778,11 +786,11 @@ check-locks:
 # check for a deliberate side-branch pressing and says so.
 .PHONY: sdk-on-main
 sdk-on-main: components
-	@python3 tools/components.py --check-main
+	@$(DISC_TOOLS) components --check-main
 
 .PHONY: sdk-coherence
 sdk-coherence:
-	python3 tools/components.py --check --games $(if $(HL),--hl) $(if $(CS),--cs) $(if $(HK),--hk)
+	$(DISC_TOOLS) components --check --games $(if $(HL),--hl) $(if $(CS),--cs) $(if $(HK),--hk)
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its
@@ -807,8 +815,8 @@ clean:
 # Fetching is explicit and pinned. Both authoring and validation use their
 # own repositories; ordinary guests receive the bootstrapped engine tree.
 .PHONY: components verify-components
-components:
-	python3 tools/components.py
-verify-components:
-	python3 tools/components.py --check
+components: $(DISC_TOOLS)
+	$(DISC_TOOLS) components
+verify-components: $(DISC_TOOLS)
+	$(DISC_TOOLS) components --check
 loader programs mkdisc release-frontend cortex-current-if-stale sdk-coherence: components

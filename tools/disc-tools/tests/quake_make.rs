@@ -305,8 +305,7 @@ fn headless_path_requires_the_program_revision_stamp() {
     let links = Links::new();
     let headless = links.dry_run("quake-headless-check", &[]);
     let stamp_at = index_of(&headless, "programs.psoxide-revision");
-    // Was `tools/check_release_chainloads.py`.
-    let replay_at = index_of(&headless, "disc-tools chainloads");
+    let replay_at = index_of(&headless, "tools/check_release_chainloads.py");
     assert!(headless.contains("--target \"QUAKE SHAREWARE\""));
     assert!(stamp_at < replay_at);
 }

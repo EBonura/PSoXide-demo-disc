@@ -27,7 +27,7 @@ Every deployment updates both the BIN/CUE download and the playable browser
 disc. Stage them from the same tested image:
 
 ```sh
-python3 tools/deploy_public.py \
+disc-tools deploy-public \
   --cue "/path/to/PSoXide Demo Disc.cue" --version v0.41 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
@@ -163,7 +163,7 @@ launcher still knows nothing about what it is playing until it reads the
 table. That table now spans two sectors, since the titles and two
 descriptions per program stopped fitting in one.
 
-The whole scene answers the music. `tools/beatgrid.py` fits a tempo and phase
+The whole scene answers the music. `disc-tools beatgrid` fits a tempo and phase
 to each track's onset envelope offline and the numbers ship in the disc table,
 so the grid stays in step for the length of a track rather than drifting out of
 it. On that grid: the ball blows outward on every beat and snaps back, harder
@@ -214,8 +214,14 @@ real-BIOS or original-console claim:
 
 ## Building
 
-Install Rust through rustup, Make, Git, an authenticated GitHub CLI, Python 3,
-host C/C++ build tools, and `mipsel-none-elf-objdump` on `PATH`. Native frontend
+Install Rust through rustup, Make, Git, an authenticated GitHub CLI, Python 3
+(for the editor and emulator repositories' own `bootstrap-components.py`,
+which `make components` runs, and for the four release gates that are still
+Python: `tools/check_release_chainloads.py`, `check_program_headless.py`,
+`check_celeste_navigation.py` and `check_audio_relocation.py`),
+host C/C++ build tools, and `mipsel-none-elf-objdump` on `PATH`. The release
+tools also call `rsvg-convert` (link icons), `flac` (browser delivery),
+`trunk` and `butler` (public deploys) when those steps are run. Native frontend
 builds on Ubuntu also need `pkg-config libasound2-dev libudev-dev
 libxkbcommon-dev`; headless renderer checks need a working GPU backend, such
 as Mesa Vulkan. Private repository/submodule access is required.
@@ -223,14 +229,15 @@ as Mesa Vulkan. Private repository/submodule access is required.
 ```sh
 git clone --recurse-submodules https://github.com/EBonura/PSoXide-demo-disc.git
 cd PSoXide-demo-disc
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install Pillow opencv-python-headless segno qrcode
 make components
 make release-frontend
 ```
 
-The Python packages cover menu-image cooking and the label/QR test suite.
+The host tools (receipts, release checks, menu-image cooking, the label and
+its QR codes) are one Rust crate, `tools/disc-tools`. `make disc-tools` builds
+it; the examples in this file call the binary as `disc-tools`, which is
+`tools/disc-tools/target/release/disc-tools`, and `disc-tools help` lists its
+subcommands. `make check` runs its tests.
 Before `make disc`, provide the validated Quake source/artifacts described
 below and the authorized audio inputs in [audio/README.md](audio/README.md).
 The HL edition additionally needs a local Half-Life installation, found by
@@ -328,22 +335,22 @@ When a game gets a new build, the re-run is:
    boot EXE, and NitroXide is sliced to its data track (it plays the menu's
    tracks 2-5, which are the same four songs its standalone image carries).
    An input whose library build has since moved on can be lifted back out of
-   the previous pressing with `from_disc` (see `tools/lineup.py`).
+   the previous pressing with `from_disc` (see `disc-tools lineup`).
 2. `make lineup-budget ...` with the same arguments: it verifies the lineup and
    prints the sector table without writing an image.
 3. Commit, tag, `make lineup-disc ...`. The release and component receipts are
-   written beside the image; `tools/lineup.py receipt` fails if any pressed entry
+   written beside the image; `disc-tools lineup receipt` fails if any pressed entry
    differs from its lineup input.
 4. `python3 tools/check_release_chainloads.py --frontend F --cue C` (Cortex,
    Quake, Half-Life, Counter-Strike and Hollow Knight, each
-   replayed twice and required byte-identical) and `python3
-   tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
+   replayed twice and required byte-identical) and
+   `python3 tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
    look at a launch frame of every game.
 5. `python3 tools/check_celeste_navigation.py --frontend F --cue C --out D`
    checks both Celeste games after launch from the actual pressing. It covers
    pause-menu quits and Select+Start with digital and analog pads, credits
    entry and Cross exit, then longer analog routes with held buttons and three
-   successive game entries. Pillow is required. The output directory must be
+   successive game entries. The output directory must be
    new; it retains disc and emulator hashes, route commands, logs and frames.
    `--suite basic` selects the eight short routes and `--suite stress` the two
    longer ones. `--suite save` tests both analog carts after changing SFX
@@ -352,7 +359,7 @@ When a game gets a new build, the re-run is:
    by default. A passing route confirms those emulated inputs only; it does
    not resolve a console-only controller failure.
 
-`tools/check_quake_headless.py` still holds frame pins keyed by carousel size,
+`disc-tools quake headless` still holds frame pins keyed by carousel size,
 but its route (two RIGHT presses) assumes Quake sits just before CREDITS, which
 has not been true since Quake moved to card two; no Makefile target runs it.
 

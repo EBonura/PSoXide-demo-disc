@@ -35,7 +35,7 @@ for repo in "${REPOS[@]}"; do
   done < <(git -C "$repo" ls-files '*Cargo.lock' 2>/dev/null)
 done
 
-python3 tools/components.py --check --game-locks || fail=$((fail + 1))
+cargo run -q --release --manifest-path tools/disc-tools/Cargo.toml -- components --check --game-locks || fail=$((fail + 1))
 
 if [ "$fail" -ne 0 ]; then
   echo "check-locks: $fail problem(s). Refresh with: cargo metadata --manifest-path <the manifest> --format-version 1"
