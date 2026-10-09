@@ -23,6 +23,7 @@ mod lineup;
 mod programs;
 mod quake;
 mod receipt;
+mod replay;
 mod shots;
 mod web;
 
