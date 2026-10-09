@@ -12,9 +12,10 @@
 //! reused web build must carry a receipt for that revision, and no file may hit
 //! itch.io's HTML size cap. Nothing is uploaded unless `--publish` is given.
 //!
-//! The emulator's `tools/bootstrap-components.py` belongs to the emulator
-//! repository, so it is still run with `python3`; `trunk` and `butler` are run
-//! as external programs exactly as before.
+//! The emulator's component bootstrap belongs to the emulator repository. A pin
+//! that still ships `tools/bootstrap-components.py` is checked with `python3`,
+//! a newer one with the SDK's `psoxide-components` (see `components`); `trunk`
+//! and `butler` are run as external programs exactly as before.
 
 use std::ffi::OsString;
 use std::fs;
@@ -283,11 +284,7 @@ fn selected_emulator(root: &Path, emulator: &Path, tools: &Tools) -> Result<(Str
         revision == wanted && dirty.is_empty(),
         "web emulator must be the clean revision selected by release-components.json"
     );
-    run_program(
-        Command::new(&tools.python)
-            .arg(emulator.join("tools/bootstrap-components.py"))
-            .arg("--check"),
-    )?;
+    crate::components::bootstrap_tree(&tools.python, emulator, &["--check".to_string()])?;
     let lock_sha256 = sha256_bytes(&fs::read(emulator.join("components.lock.json"))?);
     Ok((revision, lock_sha256))
 }
@@ -632,14 +629,32 @@ mod tests {
     }
 
     impl Fixture {
+        /// An emulator pin that still ships the Python bootstrap.
         fn new() -> Fixture {
+            Fixture::with_pin(true)
+        }
+
+        /// `old_pin` keeps `tools/bootstrap-components.py`; a new pin has only
+        /// the SDK's `psoxide-components` under the ignored `.tools/`.
+        fn with_pin(old_pin: bool) -> Fixture {
             let dir = tempfile::tempdir().unwrap();
             let base = dir.path();
             // The emulator checkout: a clean git repository with a component lock.
             let emulator = base.join("emulator");
             fs::create_dir_all(emulator.join("emu/crates/frontend")).unwrap();
-            fs::write(emulator.join("components.lock.json"), "{\"lock\": 1}\n").unwrap();
+            let sdk = "c".repeat(40);
+            let lock = if old_pin {
+                "{\"lock\": 1}\n".to_string()
+            } else {
+                format!("{{\"components\": {{\"sdk\": {{\"revision\": \"{sdk}\"}}}}}}\n")
+            };
+            fs::write(emulator.join("components.lock.json"), lock).unwrap();
             fs::write(emulator.join("emu/crates/frontend/.keep"), "").unwrap();
+            fs::write(emulator.join(".gitignore"), ".tools/\n").unwrap();
+            if old_pin {
+                fs::create_dir_all(emulator.join("tools")).unwrap();
+                fs::write(emulator.join("tools/bootstrap-components.py"), "# stub\n").unwrap();
+            }
             git_in(base, &["init", "-q", "emulator"]);
             let revision = commit_all(&emulator);
             // The disc repository root: release lock, README and the Quake licence.
@@ -666,6 +681,13 @@ mod tests {
                 &bin.join("python3"),
                 &format!("echo \"$@\" >> '{}'", log("python").display()),
             );
+            if !old_pin {
+                fs::create_dir_all(emulator.join(format!(".tools/sdk-{sdk}/bin"))).unwrap();
+                script(
+                    &emulator.join(format!(".tools/sdk-{sdk}/bin/psoxide-components")),
+                    &format!("echo \"$@\" >> '{}'", log("components").display()),
+                );
+            }
             let trunk = script(
                 &bin.join("trunk"),
                 &format!(
@@ -1185,6 +1207,23 @@ mod tests {
         options.publish = true;
         assert!(f.stage(&options).is_err());
         assert!(f.log("butler").is_none());
+    }
+
+    #[test]
+    fn a_new_emulator_pin_is_checked_with_psoxide_components() {
+        if !have("flac") || !have("git") {
+            return;
+        }
+        let f = Fixture::with_pin(false);
+        f.stage(&f.options("out")).unwrap();
+        let emulator = resolve(&f.path("emulator")).unwrap();
+        assert_eq!(
+            f.log("components").unwrap().trim(),
+            format!("--root {} --check", emulator.display())
+        );
+        // No Python was involved, and trunk still ran after the check.
+        assert!(f.log("python").is_none());
+        assert!(f.log("trunk").is_some());
     }
 
     #[test]
