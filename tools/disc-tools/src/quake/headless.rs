@@ -15,6 +15,7 @@ use serde_json::Value;
 
 use crate::args::Args;
 use crate::disc::{self, le32, text_field, TOC_ENTRY_BYTES, TOC_HEADER_BYTES, TOC_NAME_BYTES};
+use crate::replay::{number, parse_int, pattern, setloc_lba, stdout_core, Csv, Scratch};
 use crate::util::{resolve, sha256_file, Error, Result};
 
 const STEPS: &str = "500000000";
@@ -296,49 +297,6 @@ fn require_runtime_markers(stdout: &str) -> Result<()> {
     Ok(())
 }
 
-/// Python's `str.splitlines()`: every line break the standard library
-/// honours, with the break itself dropped (`\r\n` is one break).
-fn splitlines(text: &str) -> Vec<&str> {
-    let mut lines = Vec::new();
-    let mut start = 0;
-    let mut chars = text.char_indices().peekable();
-    while let Some((at, c)) = chars.next() {
-        if matches!(
-            c,
-            '\n' | '\r'
-                | '\x0b'
-                | '\x0c'
-                | '\x1c'
-                | '\x1d'
-                | '\x1e'
-                | '\u{85}'
-                | '\u{2028}'
-                | '\u{2029}'
-        ) {
-            lines.push(&text[start..at]);
-            start = at + c.len_utf8();
-            if c == '\r' && chars.peek().is_some_and(|(_, next)| *next == '\n') {
-                chars.next();
-                start += 1;
-            }
-        }
-    }
-    if start < text.len() {
-        lines.push(&text[start..]);
-    }
-    lines
-}
-
-/// The emulator's stdout without its `[cli]` housekeeping lines (paths and
-/// timings that legitimately differ between two runs).
-fn stdout_core(stdout: &str) -> String {
-    splitlines(stdout)
-        .into_iter()
-        .filter(|line| !line.starts_with("[cli] "))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 /// What one replay observed, plus the six logs it wrote.
 #[derive(Debug, Clone)]
 struct Replay {
@@ -372,15 +330,6 @@ impl Replay {
             self.display_height.to_string(),
         ]
     }
-}
-
-fn pattern(cell: &'static OnceLock<Regex>, text: &str) -> &'static Regex {
-    cell.get_or_init(|| Regex::new(text).expect("static regex"))
-}
-
-fn number(text: &str, radix: u32) -> Result<u64> {
-    u64::from_str_radix(text, radix)
-        .map_err(|e| Error(format!("bad number {text:?} in emulator output: {e}")))
 }
 
 /// Run the frontend once, headless, and collect what it printed and logged.
@@ -457,123 +406,6 @@ fn run_once(frontend: &Path, cue: &Path, root: &Path, name: &str) -> Result<Repl
         display_height: number(&display[3], 10)?,
         logs,
     })
-}
-
-/// A CSV log read the way Python's `csv.DictReader` reads it: the first
-/// record names the columns, blank lines are skipped, quoted fields may hold
-/// commas, quotes (doubled) and line breaks.
-struct Csv {
-    header: Vec<String>,
-    rows: Vec<Vec<String>>,
-}
-
-impl Csv {
-    fn read(path: &Path) -> Result<Csv> {
-        let bytes = fs::read(path).map_err(|e| Error(format!("{}: {e}", path.display())))?;
-        ensure!(bytes.is_ascii(), "{}: not ASCII", path.display());
-        let text = String::from_utf8_lossy(&bytes).into_owned();
-        let mut records: Vec<Vec<String>> = Vec::new();
-        let (mut record, mut field) = (Vec::new(), String::new());
-        let (mut quoted, mut started) = (false, false);
-        let mut chars = text.chars().peekable();
-        while let Some(c) = chars.next() {
-            match c {
-                '"' if quoted && chars.peek() == Some(&'"') => {
-                    field.push('"');
-                    chars.next();
-                }
-                '"' if !quoted && field.is_empty() => {
-                    quoted = true;
-                    started = true;
-                }
-                '"' if quoted => quoted = false,
-                ',' if !quoted => {
-                    record.push(std::mem::take(&mut field));
-                    started = true;
-                }
-                '\r' | '\n' if !quoted => {
-                    if c == '\r' && chars.peek() == Some(&'\n') {
-                        chars.next();
-                    }
-                    if started || !field.is_empty() {
-                        record.push(std::mem::take(&mut field));
-                        records.push(std::mem::take(&mut record));
-                    }
-                    started = false;
-                }
-                _ => {
-                    field.push(c);
-                    started = true;
-                }
-            }
-        }
-        if started || !field.is_empty() {
-            record.push(field);
-            records.push(record);
-        }
-        let mut records = records.into_iter();
-        let header = records.next().unwrap_or_default();
-        Ok(Csv {
-            header,
-            rows: records.collect(),
-        })
-    }
-
-    /// The cell of `row` under column `name`: an error if the log has no such
-    /// column, `None` if this row is too short to reach it.
-    fn cell<'a>(&self, row: &'a [String], name: &str) -> Result<Option<&'a str>> {
-        let Some(column) = self.header.iter().rposition(|h| h == name) else {
-            bail!("log has no column {name:?}");
-        };
-        Ok(row.get(column).map(String::as_str))
-    }
-
-    /// A cell that must be there, for the numeric columns.
-    fn required<'a>(&self, row: &'a [String], name: &str) -> Result<&'a str> {
-        self.cell(row, name)?
-            .ok_or_else(|| Error(format!("log row has no value for column {name:?}")))
-    }
-}
-
-/// Python's `int(text, radix)` for the plain forms the logs contain.
-fn parse_int(text: &str, radix: u32) -> Result<u64> {
-    let trimmed = text.trim().trim_start_matches('+');
-    let digits = if radix == 16 {
-        trimmed
-            .strip_prefix("0x")
-            .or_else(|| trimmed.strip_prefix("0X"))
-            .unwrap_or(trimmed)
-    } else {
-        trimmed
-    };
-    u64::from_str_radix(digits, radix)
-        .map_err(|_| Error(format!("invalid literal for int(): {text:?}")))
-}
-
-/// One BCD byte, written as hex text, to its value.
-fn bcd(value: &str) -> Result<u64> {
-    let raw = parse_int(value, 16)?;
-    let (high, low) = (raw >> 4, raw & 0x0F);
-    ensure!(high <= 9 && low <= 9, "invalid BCD byte {value}");
-    Ok(high * 10 + low)
-}
-
-/// The LBA a SetLoc (command 0x02) row seeks to, or `None` for any other row.
-fn setloc_lba(csv: &Csv, row: &[String]) -> Result<Option<i64>> {
-    if csv.cell(row, "command")? != Some("0x02")
-        || parse_int(csv.required(row, "param_len")?, 10)? != 3
-    {
-        return Ok(None);
-    }
-    let parts: Vec<u64> = csv
-        .required(row, "params")?
-        .split_whitespace()
-        .map(bcd)
-        .collect::<Result<Vec<_>>>()?;
-    let [minute, second, frame] = parts[..] else {
-        bail!("SetLoc row does not carry three BCD bytes");
-    };
-    Ok(Some(((minute * 60 + second) * 75 + frame) as i64 - 150))
 }
 
 /// What the CD command log shows: Quake's header and payload were
@@ -719,29 +551,6 @@ fn require_identical_replays(first: &Replay, second: &Replay) -> Result<()> {
     Ok(())
 }
 
-/// A scratch directory under the system temp dir, removed when dropped.
-struct Scratch(PathBuf);
-
-impl Scratch {
-    fn new() -> Result<Scratch> {
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_nanos());
-        let path = std::env::temp_dir().join(format!(
-            "psoxide-quake-chainload-{}-{stamp}",
-            std::process::id()
-        ));
-        fs::create_dir(&path)?;
-        Ok(Scratch(path))
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 /// The receipt's `demo_disc_output`, checked against the cue and bin that
 /// will be launched. Returns the bin, the Quake LBA, the image's LBA and its
 /// sector count.
@@ -837,7 +646,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
     require_payload_identity(&payload, &output)?;
     let (entry_pc, load_addr, payload_bytes) = embedded_exe_evidence(&image, quake_lba)?;
 
-    let scratch = Scratch::new()?;
+    let scratch = Scratch::new("psoxide-quake-chainload")?;
     let first = run_once(&frontend, &cue, &scratch.0, "first")?;
     let second = run_once(&frontend, &cue, &scratch.0, "second")?;
     let replays = [("first", &first), ("second", &second)];

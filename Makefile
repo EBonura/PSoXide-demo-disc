@@ -458,8 +458,8 @@ quake-headless-check:
 # ports. The script reads the pressed table and navigates by name, so adding or
 # reordering carousel cards does not silently point a route at the wrong game.
 # It also enters the Arcade collection and starts each of its three guests.
-program-headless-check:
-	python3 tools/check_program_headless.py \
+program-headless-check: $(DISC_TOOLS)
+	$(DISC_TOOLS) programs \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--out "$(BUILD)/program-headless" \
@@ -470,13 +470,13 @@ program-headless-check:
 .PHONY: celeste-navigation-check
 CELESTE_NAV_CUE ?= $(DIST)/$(DISC_NAME).cue
 CELESTE_NAV_OUT ?= $(BUILD)/celeste-navigation
-celeste-navigation-check:
-	python3 tools/check_celeste_navigation.py \
+celeste-navigation-check: $(DISC_TOOLS)
+	$(DISC_TOOLS) celeste-nav \
 		--frontend "$(FRONTEND)" --cue "$(CELESTE_NAV_CUE)" \
 		--out "$(CELESTE_NAV_OUT)"
 
-_quake-headless-check:
-	python3 tools/check_release_chainloads.py \
+_quake-headless-check: $(DISC_TOOLS)
+	$(DISC_TOOLS) chainloads \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--target "QUAKE SHAREWARE"
@@ -500,7 +500,7 @@ release-headless-check: release-frontend
 
 _release-headless-check: $(DISC_TOOLS)
 	$(DISC_TOOLS) release-receipt verify --receipt "$(RELEASE_RECEIPT)"
-	python3 tools/check_release_chainloads.py \
+	$(DISC_TOOLS) chainloads \
 		--frontend "$(FRONTEND)" \
 		--cue "$(DIST)/$(DISC_NAME).cue" \
 		--target "CORTEX IGNITION" --target "QUAKE SHAREWARE" \
@@ -755,7 +755,6 @@ check: sdk-on-main sdk-coherence check-locks quake-verify
 	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-disc-toc
 	cd tools/mkdisc && cargo test
 	cd tools/disc-tools && cargo test
-	python3 -m unittest tools/test_release_chainloads.py tools/test_check_program_headless.py
 
 # Every program on this disc has to be built against one SDK.
 #

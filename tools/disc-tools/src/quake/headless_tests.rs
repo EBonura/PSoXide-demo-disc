@@ -6,6 +6,7 @@ use std::fs;
 use serde_json::{json, Value};
 
 use super::*;
+use crate::replay::{bcd, splitlines};
 
 const QUAKE_LBA: u64 = 50;
 const PAYLOAD_FNV: u32 = 0x1234_5678;

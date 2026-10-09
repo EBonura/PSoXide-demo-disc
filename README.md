@@ -222,9 +222,7 @@ real-BIOS or original-console claim:
 
 Install Rust through rustup, Make, Git, an authenticated GitHub CLI, Python 3
 (for the editor and emulator repositories' own `bootstrap-components.py`,
-which `make components` runs, and for the three release gates that are still
-Python: `tools/check_release_chainloads.py`, `check_program_headless.py` and
-`check_celeste_navigation.py`),
+which `make components` runs),
 host C/C++ build tools, and `mipsel-none-elf-objdump` on `PATH`. The release
 tools also call `rsvg-convert` (link icons), `flac` (browser delivery),
 `trunk` and `butler` (public deploys) when those steps are run. Native frontend
@@ -348,12 +346,12 @@ When a game gets a new build, the re-run is:
 3. Commit, tag, `make lineup-disc ...`. The release and component receipts are
    written beside the image; `disc-tools lineup receipt` fails if any pressed entry
    differs from its lineup input.
-4. `python3 tools/check_release_chainloads.py --frontend F --cue C` (Cortex,
+4. `disc-tools chainloads --frontend F --cue C` (Cortex,
    Quake, Half-Life, Counter-Strike and Hollow Knight, each
    replayed twice and required byte-identical) and
-   `python3 tools/check_program_headless.py --frontend F --cue C --out D` (the rest), then
+   `disc-tools programs --frontend F --cue C --out D` (the rest), then
    look at a launch frame of every game.
-5. `python3 tools/check_celeste_navigation.py --frontend F --cue C --out D`
+5. `disc-tools celeste-nav --frontend F --cue C --out D`
    checks both Celeste games after launch from the actual pressing. It covers
    pause-menu quits and Select+Start with digital and analog pads, credits
    entry and Cross exit, then longer analog routes with held buttons and three
