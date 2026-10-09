@@ -116,7 +116,7 @@ mod tests {
     use sha2::{Digest, Sha256};
 
     // sha256 of the cooked shot for every PNG in assets/shots, generated once
-    // by the retired tools/cook-shots.py running on Pillow 12.0.0.
+    // by the retired cook-shots.py running on Pillow 12.0.0.
     const GOLDEN: [(&str, &str); 26] = [
         (
             "breakout",
