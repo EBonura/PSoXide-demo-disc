@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.44-test-private",
-  "note": "PSoXide Demo Disc v0.44-test, private edition (local test build, not the release), all XA: no CD-DA track. Arcade, Cortex (Graybox Reach), Quake, NitroXide and VoXide are their 2026-10-15 XA builds; WipEout, Hollow Knight, Counter-Strike, Half-Life, Celeste, PSXcel and the v1.27 hardware tests are the inputs of the previous v0.44-test private pressing unchanged. Private, never published, never distributed. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
+  "note": "PSoXide Demo Disc v0.44-test, private edition (local test build, not the release), all XA: no CD-DA track. Arcade, Cortex (Graybox Reach), Quake, NitroXide and VoXide are their 2026-10-15 XA builds; WipEout, Hollow Knight, Counter-Strike, Half-Life, Celeste and PSXcel are the inputs of the previous v0.44-test private pressing unchanged. The v1.27 hardware tests stay in this file but are left out of the pressing (HWT=0): with the XA music inside each image the full set is 362,877 sectors, 2,878 over an 80-minute blank, and the suite has its own disc. Private, never published, never distributed. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",

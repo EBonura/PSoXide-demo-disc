@@ -131,8 +131,11 @@ fn threshold_gameplay(target: &str) -> Option<Threshold> {
 // high-frequency detail in the upper playfield as a visual-semantic oracle.
 // The ROI excludes the HUD and player silhouette. The broken exterior-facing
 // capture measured 92 permille; the foggier 0.4 authored view measures 135.
+// The Graybox Reach project that holds the Cortex slot while the 0.4b project
+// has no XA build measures 105 (2026-10-15, a textured level with the player
+// in view), so the floor sits at 100, above the broken capture.
 const CORTEX_GEOMETRY_EDGE_DELTA: u32 = 24;
-const CORTEX_GEOMETRY_MIN_EDGE_PERMILLE: u64 = 110;
+const CORTEX_GEOMETRY_MIN_EDGE_PERMILLE: u64 = 100;
 
 static TICK_SUMMARY: OnceLock<regex::Regex> = OnceLock::new();
 static ROUTE_SUMMARY: OnceLock<regex::Regex> = OnceLock::new();
