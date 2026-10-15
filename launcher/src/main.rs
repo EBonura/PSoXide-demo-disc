@@ -1161,6 +1161,9 @@ const MUSIC_CREDIT: [&str; 6] = [
     "mululavgmloops.itch.io",
 ];
 
+/// Top of the six rows either page draws, which centres them in the panel.
+const CREDITS_TOP: i16 = 12;
+
 /// Frames each page of the credits card stays up.
 const CREDITS_PAGE_TICKS: u32 = 60 * 6;
 
@@ -1171,12 +1174,12 @@ fn render_credits_links(font: &FontAtlas, icons: &paint::Icons, page: u32) {
     if page == 0 {
         for (row, line) in MUSIC_CREDIT.iter().enumerate() {
             let tint = if row == 0 { TRACK_NAME } else { BLURB };
-            font.draw_text(0, 2 + row as i16 * LINKS_PITCH + LINKS_TEXT_DY, line, tint);
+            font.draw_text(0, CREDITS_TOP + row as i16 * LINKS_PITCH + LINKS_TEXT_DY, line, tint);
         }
         return;
     }
     for (row, (slot, url)) in LINKS.iter().enumerate() {
-        let y = 2 + (row as i16 + 1) * LINKS_PITCH;
+        let y = CREDITS_TOP + row as i16 * LINKS_PITCH;
         icons.draw(*slot, 0, y, BLURB);
         font.draw_text(ICONS_SIZE + 2, y + LINKS_TEXT_DY, url, BLURB);
     }
