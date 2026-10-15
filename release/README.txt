@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.43
+PSoXide Demo Disc v0.44
 =======================
 
 A little of everything. One PlayStation disc.
@@ -7,14 +7,20 @@ Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
 
-What's new in this build
-------------------------
+What's new in v0.44
+-------------------
 - New menu music: six pieces that play in a shuffled order, none twice until
   all six have played. L1 and R1 skip, and the last stop is MUSIC OFF.
   Music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B
   Vol 3, CC BY 4.0, https://mululavgmloops.itch.io/
-- The music is stored as compressed XA audio, so the disc is about 56 MB
-  smaller.
+- All the music is compressed XA audio now, the menu's and each program's
+  own, so the disc has a single data track. The browser version starts much
+  faster because it only fetches the parts of the disc it is using.
+- Celeste Classic Collection can change brightness: DEFAULT, DARKER and
+  BRIGHTER steps in the pause menu.
+- NitroXide has nine cars and a fixed ramp texture. VoXide 0.4.1 adds a
+  LOAD WORLD title, faster TNT chains and a longer view distance. Quake has
+  the latest fixes, including the bridge grunt, wall puffs and the splash.
 
 What's new in v0.43
 -------------------

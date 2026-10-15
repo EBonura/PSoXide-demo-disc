@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.44
+
+- Re-pressed from `release/lineup-v0.44.json` (Public) and `release/lineup-v0.44-private.json` (Private), so every component is the newest library install: Celeste Collection 0.2.6 with the brightness stepper (DEFAULT, DARKER n, BRIGHTER n; main 1fb78a8), NitroXide 0.4.1 (checkpoint 391b2c7: nine cars, ramp texture fix, SFX pass), VoXide 0.4.1 (25cb82d: LOAD WORLD title, faster TNT chains, 20 block view), Quake (checkpoint 20481e32: bridge-grunt fix, splash, wall puffs, death loadout). Private adds the restored WipEout (c9e2780), Hollow Knight (main dd8958f), Counter-Strike (e82d0ad) and Half-Life (400b0cf). Arcade, Cortex (Graybox Reach) and PSXcel keep their previous inputs, byte for byte.
+- The `games/` gitlinks for pico8-psx, nitroxide, voxide, hl-psx, cs-psx and hk-psx move to the same revisions; the Quake pins in the Makefile describe the checkpoint Quake. The hk-psx pin goes through the identity-rewritten archive twin first (af88629), then to main.
+- The carousel-order guard (`tools/disc-tools/tests/carousel_order.rs`) joins from dd/private-order-2026-10-08, and the public lineup now lists its programs in carousel order.
+- The pressing is tagged v0.44, so the launcher header and the file names read v0.44 and `deploy-public` accepts the version.
+
+## Unreleased (folded into v0.44)
 
 - All XA, no CD-DA anywhere: the Public pressing is one data track. Arcade (Goncharov), Cortex (Graybox Reach, two songs), Quake (eight ambient loops, each stored three times so a repeat has no seek gap), NitroXide (six songs) and VoXide (four pieces) each carry their own music as XA inside their own image, in addition to the launcher's six menu songs. A song that two programs would share is stored twice for now (interim design; a shared pool is a later step). The Private edition (Half-Life, Counter-Strike, Hollow Knight and WipEout on top) is data-track only too; the hardware tests are left off it because the all-XA set no longer fits an 80-minute blank with them.
 - The Cortex slot holds the Graybox Reach project: the default 0.4b project does not link on editor main (.data over the image region), so it has no XA build yet.

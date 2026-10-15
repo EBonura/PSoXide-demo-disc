@@ -22,8 +22,8 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.43** requires an analog DualShock, lets the left stick drive the
-carousel, moves PSXcel to the end of the carousel and carries a fresh build of
+**v0.44** requires an analog DualShock, lets the left stick drive the
+carousel, moves PSXcel to the end of the carousel and carries the newest build of
 every program from its repository's main. See [the changelog](CHANGELOG.md).
 
 The public disc includes Quake 1.06 shareware and excludes Half-Life.
@@ -32,7 +32,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 disc-tools deploy-public \
-  --cue "/path/to/PSoXide Demo Disc v0.43.cue" --version v0.43 \
+  --cue "/path/to/PSoXide Demo Disc v0.44.cue" --version v0.44 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
