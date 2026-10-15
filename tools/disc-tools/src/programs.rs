@@ -38,7 +38,9 @@ struct Route {
     steps: u64,
     launcher_count: usize,
     markers: Vec<&'static str>,
-    cdda_owner: Option<&'static str>,
+    /// The program plays XA music, so its CD log has to show a ReadS (0x1B)
+    /// after a Setfilter (0x0D).
+    xa_music: bool,
 }
 
 /// The BIN a cue names: the first `FILE` line, shell-split as Python did.
@@ -164,7 +166,7 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         steps,
         launcher_count,
         markers: markers.to_vec(),
-        cdda_owner: None,
+        xa_music: false,
     };
     Ok(vec![
         route("voxide", &voxide, 450_000_000, 1, &["voxide: boot"]),
@@ -198,13 +200,13 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
             &["invaders: init ok"],
         ),
         Route {
-            cdda_owner: Some("PSOXIDE ARCADE"),
+            xa_music: true,
             ..route(
                 "arcade-magikarp",
                 &magikarp,
                 700_000_000,
                 2,
-                &["magikarp: cdda ok"],
+                &["magikarp: xa ok"],
             )
         },
     ])
@@ -270,24 +272,19 @@ pub(crate) fn require_live_ppm(path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The CD log has to show a Play (0x03) of the relocated track.
-fn require_track(cd_log: &Path, track: u32) -> Result<()> {
-    let expected = format!("{track:02}");
+/// The CD log has to show a ReadS (0x1B) of an XA file: a Setfilter (0x0D)
+/// first, then the read that starts the song.
+fn require_xa_read(cd_log: &Path) -> Result<()> {
     let csv = Csv::read(cd_log)?;
+    let mut filtered = false;
     for row in &csv.rows {
-        if csv.cell(row, "command")? == Some("0x03")
-            && csv.cell(row, "param_len")? == Some("1")
-            && csv
-                .cell(row, "params")?
-                .is_some_and(|params| params.trim() == expected)
-        {
-            return Ok(());
+        match csv.cell(row, "command")? {
+            Some("0x0D") => filtered = true,
+            Some("0x1B") if filtered => return Ok(()),
+            _ => {}
         }
     }
-    bail!(
-        "{}: no Play command for relocated track {expected}",
-        cd_log.display()
-    )
+    bail!("{}: no XA music read (Setfilter then ReadS)", cd_log.display())
 }
 
 fn run_route(
@@ -295,7 +292,6 @@ fn run_route(
     cue: &Path,
     output: &Path,
     route: &Route,
-    entries: &[Row],
 ) -> Result<String> {
     let run_dir = output.join(route.name);
     fs::create_dir_all(&run_dir)?;
@@ -378,11 +374,8 @@ fn run_route(
         _ => bail!("{name}: missing 320x240 display summary"),
     };
     require_live_ppm(&display)?;
-    if let Some(owner) = route.cdda_owner {
-        let Some(owner) = entries.iter().find(|row| row.name == owner) else {
-            bail!("{name}: no {owner} entry in the disc table");
-        };
-        require_track(&cd_log, owner.cdda_track_base + 2)?;
+    if route.xa_music {
+        require_xa_read(&cd_log)?;
     }
     Ok(format!("{name}: PASS {} pc={pc:#010x}", &summary[1]))
 }
@@ -429,7 +422,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
                     break;
                 };
                 // Report every failed route in one pass.
-                match run_route(&frontend, &cue, &out, route, &entries) {
+                match run_route(&frontend, &cue, &out, route) {
                     Ok(line) => println!("{line}"),
                     Err(error) => {
                         let line = format!("{}: FAIL {error}", route.name);
@@ -531,12 +524,16 @@ mod tests {
     }
 
     #[test]
-    fn relocated_track_play_command_is_required() {
+    fn xa_music_needs_a_setfilter_and_a_read() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("cd.csv");
+        fs::write(&log, "command,param_len,params\n0x0D,2,01 00\n0x1B,0,\n").unwrap();
+        require_xa_read(&log).unwrap();
+        // A read with no filter before it is a data read, and a CD-DA Play is neither.
+        fs::write(&log, "command,param_len,params\n0x1B,0,\n0x0D,2,01 00\n").unwrap();
+        assert!(require_xa_read(&log).is_err());
         fs::write(&log, "command,param_len,params\n0x03,1,07\n").unwrap();
-        require_track(&log, 7).unwrap();
-        assert!(require_track(&log, 8).is_err());
+        assert!(require_xa_read(&log).is_err());
     }
 
     #[test]
@@ -569,7 +566,7 @@ mod tests {
         assert_eq!(all[0].name, "voxide");
         assert!(all.iter().all(|route| route.presses.contains(":cross:12")));
         let magikarp = all.last().unwrap();
-        assert_eq!(magikarp.cdda_owner, Some("PSOXIDE ARCADE"));
+        assert!(magikarp.xa_music);
         assert_eq!(magikarp.launcher_count, 2);
         // A table missing a program cannot produce a route at all.
         let short = toc_rows(&table(&["VOXIDE"], false)).unwrap();
