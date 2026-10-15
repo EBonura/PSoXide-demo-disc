@@ -15,6 +15,11 @@
 //!
 //! Titles are per CD-DA track in disc order; missing ones fall back to
 //! "TRACK NN". Requires the `flac` CLI.
+//!
+//! A disc with no CD-DA tracks (its audio is XA, inside the data track) is not
+//! split at all: `weblazy` stages the raw image for the page to read with
+//! HTTP Range requests, split into numbered files if it is over the host's
+//! file size cap. Titles are ignored there.
 
 use std::fs;
 use std::io::{Read, Write};
@@ -326,12 +331,35 @@ fn deliver(cue_text: &str, disc: &[u8], outdir: &Path, titles: &[String]) -> Res
     ))
 }
 
+/// Whether a cue describes a disc whose only track is the data track, which
+/// the page reads lazily instead of as gzip plus FLAC pieces.
+pub fn is_lazy_disc(cue_text: &str) -> Result<bool> {
+    let tracks = parse_cue(cue_text)?;
+    Ok(tracks.len() == 1 && tracks[0].kind.starts_with("MODE2"))
+}
+
+/// The file the lazy delivery serves the image as.
+pub const LAZY_IMAGE_NAME: &str = "demo-disc.bin";
+
 pub fn run(args: &[String]) -> Result<i32> {
     ensure!(
         args.len() >= 3,
         "usage: disc-tools web-delivery <disc.cue> <disc.bin> <outdir> [TITLE ...]"
     );
     let cue = fs::read_to_string(&args[0]).map_err(|e| Error(format!("{}: {e}", args[0])))?;
+    if is_lazy_disc(&cue)? {
+        println!(
+            "{}",
+            crate::weblazy::deliver(
+                Path::new(&args[1]),
+                Path::new(&args[2]),
+                LAZY_IMAGE_NAME,
+                crate::deploy::ITCH_FILE_LIMIT,
+                crate::weblazy::DEFAULT_BOOT_SECTORS,
+            )?
+        );
+        return Ok(0);
+    }
     let disc = fs::read(&args[1]).map_err(|e| Error(format!("{}: {e}", args[1])))?;
     println!("{}", deliver(&cue, &disc, Path::new(&args[2]), &args[3..])?);
     Ok(0)
@@ -406,6 +434,15 @@ mod tests {
             manifest_lines(&manifest),
             "data demo-data.bin.gz 10 99 7\ntrack 2 track-02.flac 5 50 9 TWO WORDS\n"
         );
+    }
+
+    #[test]
+    fn only_a_lone_data_track_is_a_lazy_disc() {
+        assert!(!is_lazy_disc(CUE).unwrap());
+        let data_only = "FILE \"d.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";
+        assert!(is_lazy_disc(data_only).unwrap());
+        assert!(!is_lazy_disc(&data_only.replace("MODE2/2352", "AUDIO")).unwrap());
+        assert!(!is_lazy_disc("").unwrap());
     }
 
     #[test]

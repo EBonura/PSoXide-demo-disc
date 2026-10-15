@@ -720,17 +720,20 @@ release-web: $(DISC_TOOLS)
 	@test -z "$(PRIVATE)" || { echo "release-web: the HL, CS and HK pressings are never distributed"; exit 1; }
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
-	cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
-	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web" \
+	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web" \
 		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
 		"GONCHAROV" "CORTEX IGNITION COMBAT" "CORTEX IGNITION MENU"
+	@# A CD-DA pressing keeps its raw image as a release asset too. A pressing whose
+	@# audio is XA is delivered as that image already (or as numbered parts).
+	@[ -e "$(BUILD)/web/demo-disc.bin" ] || [ -e "$(BUILD)/web/demo-disc.bin.001" ] || cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
 	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
 		--repo $(WEB_DISC_REPO) \
 		--title "PSoXide Demo Disc (disc image)" \
 		--notes "The public pressing as a raw disc image plus the browser emulator's split delivery."
-	gh release upload web-disc --repo $(WEB_DISC_REPO) "$(BUILD)/web/demo-disc.bin" "$(BUILD)/web/demo-disc.cue" \
-		"$(BUILD)/web/web-manifest.txt" "$(BUILD)/web/demo-data.bin.gz" $(BUILD)/web/track-*.flac --clobber
+	@# Everything in the staging directory is the delivery: the split pieces and
+	@# manifest, or the lazy image, its parts and its header sidecar.
+	find "$(BUILD)/web" -maxdepth 1 -type f -print0 | xargs -0 gh release upload web-disc --repo $(WEB_DISC_REPO) --clobber
 
 # Push the public pressing to itch.io from this machine: the ~200 MB bin is
 # too big for GitHub, so CI cannot carry it. Needs butler on PATH and a

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The browser player's emulator pin (`web_player` in `release-components.json`) moves to aad98fb: the demo disc boots on its data track alone with music decoded on a time budget, and a disc whose audio is XA is read lazily over HTTP Range requests.
+- `disc-tools web-delivery` (and so `deploy-public`) delivers a disc with no CD-DA tracks as the raw image plus a gzipped sector-header sidecar and a manifest `image` line, instead of a gzipped data track. An image over itch.io's 200 MB file limit is split into numbered parts, which needs the emulator branch `feat/web-lazy-image-parts-2026-10-15` or later. A disc with CD-DA tracks is delivered exactly as before (gzip data track and FLAC pieces, byte for byte).
+- `make release-web` reads the image from `dist/` and uploads every file of the delivery.
+
 ## v0.43
 
 - Public pressing from `release/lineup-v0.43.json`: a fresh build of every program from its repository's main (PSXcel c08096c, Celeste Collection fabaf73, NitroXide fa023bd, VoXide 42366f2, Quake ab671da, Cortex Ignition from PSoXide-editor 1212e009). PSoXide Arcade is the analog-required 0.1.1 build (e8aec23) from the v0.43 private edition, because Arcade main still has the launcher that does not enable analog mode.

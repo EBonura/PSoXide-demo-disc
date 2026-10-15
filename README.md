@@ -38,6 +38,12 @@ disc-tools deploy-public \
 
 This builds the browser emulator with Trunk, verifies the public game and audio
 layout, and proves the streamed audio/data reconstruct the original image.
+A disc with CD-DA tracks ships as a gzipped data track plus FLAC pieces. A disc
+whose music is XA (a single data track) ships as the raw image and a small
+sector-header sidecar, which the page reads lazily over HTTP Range requests;
+an image over itch.io's 200 MB file limit is split into `demo-disc.bin.001`,
+`.002`, ... and needs an emulator that reads split images
+(`feat/web-lazy-image-parts-2026-10-15` or later).
 Omit `--publish` to prepare packages for review. `make itch` only updates the
 download; the older `make release-web` only stages GitHub delivery assets.
 Neither is a complete deployment on its own.

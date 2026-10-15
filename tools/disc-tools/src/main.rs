@@ -26,6 +26,7 @@ mod receipt;
 mod replay;
 mod shots;
 mod web;
+mod weblazy;
 
 use util::Result;
 

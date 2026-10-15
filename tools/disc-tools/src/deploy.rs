@@ -59,7 +59,7 @@ const TRACK_TITLES: [&str; 7] = [
 ];
 const WEB_RECEIPT: &str = "emulator-build.json";
 /// itch.io refuses HTML5 files at 200 MB and over.
-const ITCH_FILE_LIMIT: u64 = 200_000_000;
+pub(crate) const ITCH_FILE_LIMIT: u64 = 200_000_000;
 const DOWNLOAD_TARGET: &str = "bonnie-studios/psoxide-demo-disc:psx";
 const PLAYABLE_TARGET: &str = "bonnie-studios/psoxide:html5";
 
@@ -147,11 +147,14 @@ fn public_image(cue: &Path) -> Result<PathBuf> {
         .captures_iter(&text)
         .map(|c| (c[1].to_string(), c[2].to_string()))
         .collect();
-    let mut expected = vec![("01".to_string(), "MODE2/2352".to_string())];
+    let data = ("01".to_string(), "MODE2/2352".to_string());
+    let mut expected = vec![data.clone()];
     expected.extend((2..TRACK_TITLES.len() + 2).map(|n| (format!("{n:02}"), "AUDIO".to_string())));
+    // A pressing whose music is XA inside the data track has no CD-DA tracks
+    // at all; the page then reads its image lazily (see `weblazy`).
     ensure!(
-        tracks == expected,
-        "expected the public disc's {}-track layout",
+        tracks == expected || tracks == [data],
+        "expected the public disc's {}-track layout (or a data track alone)",
         expected.len()
     );
     Ok(image)
@@ -427,8 +430,10 @@ fn stage(root: &Path, options: &Options, tools: &Tools) -> Result<()> {
         fs::remove_file(&path).map_err(|e| Error(format!("{}: {e}", path.display())))?;
     }
     copy2(&licence, &web.join("SLICNSE.TXT"))?;
-    let web_cue = web.join("demo-disc.cue");
     let cue_text = read_text(&cue)?;
+    // The cue the delivery tool reads. A lazy delivery serves the bare image
+    // and never fetches a cue, so it is written for the tool and then removed.
+    let web_cue = web.join("demo-disc.cue");
     let file_line = Regex::new(r"(?m)^FILE .*$")?;
     let rewritten =
         file_line.replace_all(&cue_text, regex::NoExpand(r#"FILE "demo-disc.bin" BINARY"#));
@@ -440,6 +445,9 @@ fn stage(root: &Path, options: &Options, tools: &Tools) -> Result<()> {
     ];
     delivery.extend(TRACK_TITLES.iter().map(|t| t.to_string()));
     crate::web::run(&delivery)?;
+    if crate::web::is_lazy_disc(&cue_text)? {
+        fs::remove_file(&web_cue)?;
+    }
     // web-delivery decodes every FLAC and reconstructs the original BIN before
     // writing its manifest. Neither public package can silently use an old disc.
     let oversized = oversized_files(&web, ITCH_FILE_LIMIT)?;
@@ -815,6 +823,12 @@ mod tests {
             &public_rows(),
         );
         assert!(public_image(&crlf).is_ok());
+        // XA music leaves the data track alone on the disc.
+        let data_only = adjacent_disc(dir.path(), &public_cue(0), &public_rows());
+        assert_eq!(
+            public_image(&data_only).unwrap(),
+            dir.path().join("disc.bin")
+        );
     }
 
     #[test]
@@ -848,10 +862,14 @@ mod tests {
         padded.push(("EXTRA HIDDEN", 1, 1, FLAG_HIDDEN));
         assert!(message(&public_cue(7), &padded).contains("does not match the public collection"));
         // Wrong track layout.
-        assert!(message(&public_cue(6), &public_rows()).contains("8-track layout"));
-        assert!(message(&public_cue(8), &public_rows()).contains("8-track layout"));
+        assert!(message(&public_cue(6), &public_rows())
+            .contains("8-track layout (or a data track alone)"));
+        assert!(message(&public_cue(8), &public_rows())
+            .contains("8-track layout (or a data track alone)"));
         let data_audio = public_cue(7).replace("TRACK 03 AUDIO", "TRACK 03 MODE2/2352");
-        assert!(message(&data_audio, &public_rows()).contains("8-track layout"));
+        assert!(
+            message(&data_audio, &public_rows()).contains("8-track layout (or a data track alone)")
+        );
         // BIN naming.
         let two = format!("{}FILE \"other.bin\" BINARY\n", public_cue(7));
         assert!(message(&two, &public_rows()).contains("one adjacent BIN"));
@@ -1100,6 +1118,58 @@ mod tests {
             f.log("butler").is_none(),
             "nothing may be uploaded without --publish"
         );
+    }
+
+    /// A pressing whose music is XA has only the data track. Its web package
+    /// serves the bare image and a header sidecar for Range reads: no gzip data
+    /// track, no FLAC pieces, no cue.
+    #[test]
+    fn a_data_track_only_disc_stages_the_lazy_web_package() {
+        if !have("git") {
+            eprintln!("skipping: git is not installed");
+            return;
+        }
+        std::env::set_var("NO_COLOR", "1");
+        let f = Fixture::new();
+        let mut image = public_disc(&public_rows());
+        image.truncate(40 * SECTOR_BYTES as usize);
+        fs::write(f.path("disc/disc.bin"), &image).unwrap();
+        fs::write(f.path("disc/disc.cue"), public_cue(0)).unwrap();
+        f.stage(&f.options("out")).unwrap();
+        let web = resolve(&f.path("out")).unwrap().join("web");
+        assert_eq!(fs::read(web.join("demo-disc.bin")).unwrap(), image);
+        for kept in [
+            "index.html",
+            "app.wasm",
+            "demo-disc.hdr.gz",
+            "web-manifest.txt",
+            "emulator-build.json",
+        ] {
+            assert!(
+                web.join(kept).is_file(),
+                "{kept} should be in the web package"
+            );
+        }
+        for gone in [
+            "demo-disc.cue",
+            "demo-data.bin.gz",
+            "track-02.flac",
+            "track-09.flac",
+        ] {
+            assert!(
+                !web.join(gone).exists(),
+                "{gone} should not be in the web package"
+            );
+        }
+        let manifest = fs::read_to_string(web.join("web-manifest.txt")).unwrap();
+        assert!(
+            manifest.starts_with(&format!("image demo-disc.bin {} ", 40 * SECTOR_BYTES)),
+            "{manifest}"
+        );
+        assert_eq!(manifest.lines().count(), 1);
+        // The receipt covers the image and the sidecar.
+        let lock_sha = sha256_bytes(b"{\"lock\": 1}\n");
+        verify_web_build(&web, &f.revision, &lock_sha).unwrap();
     }
 
     #[test]
