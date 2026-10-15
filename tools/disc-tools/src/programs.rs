@@ -169,7 +169,10 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         xa_music: false,
     };
     Ok(vec![
-        route("voxide", &voxide, 450_000_000, 1, &["voxide: boot"]),
+        // VoXide 0.4.0 opens on a splash that fades through black, so a stop at
+        // 450M steps can land on a black frame (it did on the 11-card private
+        // pressing); 1.2G steps is the title menu on every pressing.
+        route("voxide", &voxide, 1_200_000_000, 1, &["voxide: boot"]),
         // NitroXide and Celeste sit mid-carousel on the 13-card pressing,
         // six moves from either end, so the launch press lands at route tick
         // 2000; 450M steps stopped 19 ticks later, before the chain-load.
