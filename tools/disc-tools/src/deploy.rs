@@ -47,16 +47,6 @@ const PUBLIC_GAMES: [&str; 8] = [
     "PSXCEL",
     "CREDITS",
 ];
-/// One title per CD-DA track, in disc order, for the browser player.
-///
-/// The menu music is XA inside the data track, so these are the CD-DA the
-/// programs still carry: the arcade's song and Cortex's two. When those move
-/// to XA too the disc has no audio tracks and the page reads it lazily.
-const TRACK_TITLES: [&str; 3] = [
-    "GONCHAROV",
-    "CORTEX IGNITION COMBAT",
-    "CORTEX IGNITION MENU",
-];
 const WEB_RECEIPT: &str = "emulator-build.json";
 /// itch.io refuses HTML5 files at 200 MB and over.
 pub(crate) const ITCH_FILE_LIMIT: u64 = 200_000_000;
@@ -119,7 +109,7 @@ fn read_text(path: &Path) -> Result<String> {
 }
 
 /// The BIN beside `cue`, once the disc is proven to be the public collection:
-/// one adjacent BIN, the public menu, and the public track layout.
+/// one adjacent BIN, the public menu, and a lone data track (no CD-DA).
 fn public_image(cue: &Path) -> Result<PathBuf> {
     let text = read_text(cue)?;
     let file_line = Regex::new(r#"(?m)^FILE "([^"]+)" BINARY$"#)?;
@@ -147,15 +137,13 @@ fn public_image(cue: &Path) -> Result<PathBuf> {
         .captures_iter(&text)
         .map(|c| (c[1].to_string(), c[2].to_string()))
         .collect();
+    // The public disc carries no CD-DA: every program's music is XA inside the
+    // data track, so the cue is one data track and the page reads the image
+    // lazily (see `weblazy`).
     let data = ("01".to_string(), "MODE2/2352".to_string());
-    let mut expected = vec![data.clone()];
-    expected.extend((2..TRACK_TITLES.len() + 2).map(|n| (format!("{n:02}"), "AUDIO".to_string())));
-    // A pressing whose music is XA inside the data track has no CD-DA tracks
-    // at all; the page then reads its image lazily (see `weblazy`).
     ensure!(
-        tracks == expected || tracks == [data],
-        "expected the public disc's {}-track layout (or a data track alone)",
-        expected.len()
+        tracks == [data],
+        "expected the public disc to be one data track with no CD-DA (all music is XA)"
     );
     Ok(image)
 }
@@ -438,12 +426,11 @@ fn stage(root: &Path, options: &Options, tools: &Tools) -> Result<()> {
     let rewritten =
         file_line.replace_all(&cue_text, regex::NoExpand(r#"FILE "demo-disc.bin" BINARY"#));
     fs::write(&web_cue, rewritten.as_bytes())?;
-    let mut delivery: Vec<String> = vec![
+    let delivery: Vec<String> = vec![
         web_cue.display().to_string(),
         image.display().to_string(),
         web.display().to_string(),
     ];
-    delivery.extend(TRACK_TITLES.iter().map(|t| t.to_string()));
     crate::web::run(&delivery)?;
     if crate::web::is_lazy_disc(&cue_text)? {
         fs::remove_file(&web_cue)?;
@@ -561,9 +548,12 @@ mod tests {
         )
     }
 
-    /// 40 data sectors then seven 3-sector audio tracks, as bytes.
+    /// A pressing with CD-DA tracks, which the public layout refuses.
+    const LEGACY_AUDIO_TRACKS: usize = 3;
+
+    /// 40 data sectors, as bytes: the public disc is a data track alone.
     fn public_disc(rows: &[(&str, u32, u32, u32)]) -> Vec<u8> {
-        let mut image = blank_image(40 + 7 * 3);
+        let mut image = blank_image(40);
         write_toc(&mut image, rows);
         for (i, byte) in image
             .iter_mut()
@@ -680,7 +670,7 @@ mod tests {
             // The public disc.
             fs::create_dir_all(base.join("disc")).unwrap();
             fs::write(base.join("disc/disc.bin"), public_disc(&public_rows())).unwrap();
-            fs::write(base.join("disc/disc.cue"), public_cue(TRACK_TITLES.len())).unwrap();
+            fs::write(base.join("disc/disc.cue"), public_cue(0)).unwrap();
             // Fake programs: each logs what it was called with.
             let bin = base.join("bin");
             fs::create_dir_all(&bin).unwrap();
@@ -814,21 +804,15 @@ mod tests {
     #[test]
     fn public_image_accepts_exactly_the_public_collection() {
         let dir = tempfile::tempdir().unwrap();
-        let cue = adjacent_disc(dir.path(), &public_cue(TRACK_TITLES.len()), &public_rows());
+        let cue = adjacent_disc(dir.path(), &public_cue(0), &public_rows());
         assert_eq!(public_image(&cue).unwrap(), dir.path().join("disc.bin"));
         // A CRLF cue reads the same (Python's read_text translates newlines).
         let crlf = adjacent_disc(
             dir.path(),
-            &public_cue(TRACK_TITLES.len()).replace('\n', "\r\n"),
+            &public_cue(0).replace('\n', "\r\n"),
             &public_rows(),
         );
         assert!(public_image(&crlf).is_ok());
-        // XA music leaves the data track alone on the disc.
-        let data_only = adjacent_disc(dir.path(), &public_cue(0), &public_rows());
-        assert_eq!(
-            public_image(&data_only).unwrap(),
-            dir.path().join("disc.bin")
-        );
     }
 
     #[test]
@@ -839,43 +823,39 @@ mod tests {
                 .unwrap_err()
                 .0
         };
+        let menu = "does not match the public collection";
         // Wrong menu: a card swapped, one missing, one extra, one hidden.
         let mut swapped = public_rows();
         swapped[2].0 = "SOMETHING ELSE";
-        assert!(message(&public_cue(TRACK_TITLES.len()), &swapped).contains("does not match the public collection"));
-        assert!(message(&public_cue(TRACK_TITLES.len()), &public_rows()[..6])
-            .contains("does not match the public collection"));
+        assert!(message(&public_cue(0), &swapped).contains(menu));
+        assert!(message(&public_cue(0), &public_rows()[..6]).contains(menu));
         let mut extra = public_rows();
         extra.push(("HALF-LIFE", 1, 1, 0));
-        assert!(message(&public_cue(TRACK_TITLES.len()), &extra).contains("does not match the public collection"));
+        assert!(message(&public_cue(0), &extra).contains(menu));
         let mut hidden = public_rows();
         hidden[3].3 = FLAG_HIDDEN;
-        assert!(message(&public_cue(TRACK_TITLES.len()), &hidden).contains("does not match the public collection"));
+        assert!(message(&public_cue(0), &hidden).contains(menu));
         // A reordered menu is not the public menu either.
         let mut reordered = public_rows();
         reordered.swap(0, 1);
-        assert!(
-            message(&public_cue(TRACK_TITLES.len()), &reordered).contains("does not match the public collection")
-        );
+        assert!(message(&public_cue(0), &reordered).contains(menu));
         // The entry count the table claims must be right even when the menu is.
         let mut padded = public_rows();
         padded.push(("EXTRA HIDDEN", 1, 1, FLAG_HIDDEN));
-        assert!(message(&public_cue(TRACK_TITLES.len()), &padded).contains("does not match the public collection"));
-        // Wrong track layout.
-        assert!(message(&public_cue(TRACK_TITLES.len() - 1), &public_rows())
-            .contains("4-track layout (or a data track alone)"));
-        assert!(message(&public_cue(TRACK_TITLES.len() + 1), &public_rows())
-            .contains("4-track layout (or a data track alone)"));
-        let data_audio = public_cue(TRACK_TITLES.len()).replace("TRACK 03 AUDIO", "TRACK 03 MODE2/2352");
-        assert!(
-            message(&data_audio, &public_rows()).contains("4-track layout (or a data track alone)")
-        );
+        assert!(message(&public_cue(0), &padded).contains(menu));
+        // Any CD-DA track is refused: the public disc's music is all XA.
+        let no_cdda = "one data track with no CD-DA";
+        assert!(message(&public_cue(1), &public_rows()).contains(no_cdda));
+        assert!(message(&public_cue(LEGACY_AUDIO_TRACKS), &public_rows()).contains(no_cdda));
+        let data_audio =
+            public_cue(LEGACY_AUDIO_TRACKS).replace("TRACK 03 AUDIO", "TRACK 03 MODE2/2352");
+        assert!(message(&data_audio, &public_rows()).contains(no_cdda));
         // BIN naming.
-        let two = format!("{}FILE \"other.bin\" BINARY\n", public_cue(TRACK_TITLES.len()));
+        let two = format!("{}FILE \"other.bin\" BINARY\n", public_cue(0));
         assert!(message(&two, &public_rows()).contains("one adjacent BIN"));
-        let nested = public_cue(TRACK_TITLES.len()).replace("\"disc.bin\"", "\"sub/disc.bin\"");
+        let nested = public_cue(0).replace("\"disc.bin\"", "\"sub/disc.bin\"");
         assert!(message(&nested, &public_rows()).contains("one adjacent BIN"));
-        let none = public_cue(TRACK_TITLES.len()).replace("FILE \"disc.bin\" BINARY", "");
+        let none = public_cue(0).replace("FILE \"disc.bin\" BINARY", "");
         assert!(message(&none, &public_rows()).contains("one adjacent BIN"));
     }
 
@@ -991,12 +971,12 @@ mod tests {
         options.version = "nonsense".to_string();
         options.cue = f.path("disc/missing.cue");
         assert!(f.stage(&options).is_err());
-        fs::write(f.path("disc/disc.cue"), public_cue(TRACK_TITLES.len() + 2)).unwrap();
+        fs::write(f.path("disc/disc.cue"), public_cue(LEGACY_AUDIO_TRACKS)).unwrap();
         options.cue = f.path("disc/disc.cue");
-        assert!(f.stage(&options).unwrap_err().0.contains("track layout"));
+        assert!(f.stage(&options).unwrap_err().0.contains("no CD-DA"));
         assert!(!f.path("out").exists());
         // A non-empty output directory is refused, and left as it was.
-        fs::write(f.path("disc/disc.cue"), public_cue(TRACK_TITLES.len())).unwrap();
+        fs::write(f.path("disc/disc.cue"), public_cue(0)).unwrap();
         fs::create_dir_all(f.path("busy")).unwrap();
         fs::write(f.path("busy/earlier-release.txt"), "keep me").unwrap();
         let error = f.stage(&f.options("busy")).unwrap_err();
@@ -1005,12 +985,12 @@ mod tests {
         assert!(f.log("trunk").is_none() && f.log("butler").is_none());
         // An existing but empty directory is fine to stage into.
         fs::create_dir_all(f.path("empty")).unwrap();
-        assert!(f.stage(&f.options("empty")).is_ok() || !have("flac"));
+        assert!(f.stage(&f.options("empty")).is_ok());
     }
 
     #[test]
     fn staging_builds_both_packages_and_publishes_nothing() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             eprintln!("skipping: flac or git is not installed");
             return;
         }
@@ -1029,7 +1009,8 @@ mod tests {
             fs::read_to_string(out.join("download/SLICNSE.TXT")).unwrap(),
             "quake licence\n"
         );
-        // The web package: the licence too, the fresh delivery, no stale disc files.
+        // The web package: the licence too, the fresh lazy delivery (the image,
+        // its header sidecar and manifests), no stale disc files.
         assert_eq!(
             fs::read_to_string(out.join("web/SLICNSE.TXT")).unwrap(),
             "quake licence\n"
@@ -1038,10 +1019,10 @@ mod tests {
             "index.html",
             "app.wasm",
             "style.css",
-            "demo-data.bin.gz",
+            "demo-disc.bin",
+            "demo-disc.hdr.gz",
             "web-manifest.txt",
             "web-manifest.json",
-            "demo-disc.cue",
             "emulator-build.json",
         ] {
             assert!(
@@ -1049,16 +1030,19 @@ mod tests {
                 "{kept} should be in the web package"
             );
         }
-        assert!(!out.join("web/demo-disc.bin").exists());
-        assert!(!out.join("web/track-09.flac").exists());
-        assert!(out.join("web/track-02.flac").is_file());
-        let web_cue = fs::read_to_string(out.join("web/demo-disc.cue")).unwrap();
-        assert!(web_cue.starts_with("FILE \"demo-disc.bin\" BINARY\n  TRACK 01 MODE2/2352"));
+        for gone in [
+            "demo-disc.cue",
+            "demo-data.bin.gz",
+            "track-02.flac",
+            "track-09.flac",
+        ] {
+            assert!(
+                !out.join("web").join(gone).exists(),
+                "{gone} should not be in the web package"
+            );
+        }
         let manifest = fs::read_to_string(out.join("web/web-manifest.txt")).unwrap();
-        assert!(
-            manifest.contains(" GONCHAROV\n")
-                && manifest.trim_end().ends_with("CORTEX IGNITION MENU")
-        );
+        assert!(manifest.starts_with("image demo-disc.bin "), "{manifest}");
         // The receipt matches the locked emulator and the files that are there.
         let lock_sha = sha256_bytes(b"{\"lock\": 1}\n");
         verify_web_build(&out.join("web"), &f.revision, &lock_sha).unwrap();
@@ -1174,7 +1158,7 @@ mod tests {
 
     #[test]
     fn publish_pushes_download_then_web_and_checks_status() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             eprintln!("skipping: flac or git is not installed");
             return;
         }
@@ -1210,7 +1194,7 @@ mod tests {
 
     #[test]
     fn a_failed_push_stops_before_the_second_upload() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             return;
         }
         let mut f = Fixture::new();
@@ -1236,7 +1220,7 @@ mod tests {
 
     #[test]
     fn the_emulator_must_be_the_clean_selected_revision() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             return;
         }
         // A dirty checkout (even an untracked file) is refused.
@@ -1281,7 +1265,7 @@ mod tests {
 
     #[test]
     fn a_new_emulator_pin_is_checked_with_psoxide_components() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             return;
         }
         let f = Fixture::with_pin(false);
@@ -1298,7 +1282,7 @@ mod tests {
 
     #[test]
     fn a_reused_web_build_needs_a_matching_receipt() {
-        if !have("flac") || !have("git") {
+        if !have("git") {
             return;
         }
         let f = Fixture::new();
@@ -1341,7 +1325,11 @@ mod tests {
         );
         let out = resolve(&f.path("out3")).unwrap();
         assert!(out.join("web/assets/frontend.js").is_file());
-        assert!(!out.join("web/demo-disc.bin").exists());
+        // The older disc in the reused build is replaced by this one.
+        assert_ne!(
+            fs::read(out.join("web/demo-disc.bin")).unwrap(),
+            b"an older disc"
+        );
         assert!(
             reused.join("demo-disc.bin").exists(),
             "the source build is left untouched"
