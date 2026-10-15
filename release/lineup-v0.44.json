@@ -4,25 +4,6 @@
   "note": "PSoXide Demo Disc v0.44, public pressing, all XA: no CD-DA track. Celeste is the library 0.2.6 build with the brightness stepper (main 1fb78a8), NitroXide, VoXide 0.4.1 and Quake are their 2026-10-15 checkpoint installs; Arcade and Cortex (Graybox Reach) keep the XA builds of the v0.44-test pressing; PSXcel is the v0.43 bare EXE, byte for byte. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. The local fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed.",
   "programs": [
     {
-      "name": "PSXCEL",
-      "var": "PSXCEL",
-      "version_var": "V_PSXCEL",
-      "kind": "game",
-      "derive": {
-        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/psxcel-v043-public/psxcel.cue"
-      },
-      "bin_sha256": "f9223628e77ee90a10bc0a942ebd79baffcef2540f8d089fa6ed30d069d8fcd0",
-      "version": "0.2.0",
-      "source": {
-        "repository": "EBonura/psxcel",
-        "local": "~/Desktop/repos/psxcel",
-        "revision": "db34253c6f52fc7c709654d10060ff68f2402e21",
-        "ref": "main"
-      },
-      "build": "make disc on a clean clone of main (SDK ee4a4b95, editor 4352b10a from its components.lock.json); the disc carries the image's boot EXE as a bare program",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/psxcel-build.log"
-    },
-    {
       "name": "PSOXIDE ARCADE",
       "var": "ARCADE",
       "version_var": "V_ARCADE",
@@ -130,6 +111,25 @@
       },
       "build": "frontend build-project-disc --project editor/projects/graybox-reach on feat/engine-xa-music-2026-10-15 (SDK 36ead4b, emulator 6edde550): the two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. The default (0.4b) project does not link on editor main, so Graybox Reach stands in the Cortex slot.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/cortex-xa/RESULT.md"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/psxcel-v043-public/psxcel.cue"
+      },
+      "bin_sha256": "f9223628e77ee90a10bc0a942ebd79baffcef2540f8d089fa6ed30d069d8fcd0",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/psxcel",
+        "revision": "db34253c6f52fc7c709654d10060ff68f2402e21",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK ee4a4b95, editor 4352b10a from its components.lock.json); the disc carries the image's boot EXE as a bare program",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/psxcel-build.log"
     }
   ]
 }
