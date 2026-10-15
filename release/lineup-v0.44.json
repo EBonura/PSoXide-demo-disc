@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "pressing": "v0.44",
+  "note": "PSoXide Demo Disc v0.44, public pressing, all XA: no CD-DA track. Celeste is the library 0.2.6 build with the brightness stepper (main 1fb78a8), NitroXide, VoXide 0.4.1 and Quake are their 2026-10-15 checkpoint installs; Arcade and Cortex (Graybox Reach) keep the XA builds of the v0.44-test pressing; PSXcel is the v0.43 bare EXE, byte for byte. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. The local fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed.",
+  "programs": [
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/psxcel-v043-public/psxcel.cue"
+      },
+      "bin_sha256": "f9223628e77ee90a10bc0a942ebd79baffcef2540f8d089fa6ed30d069d8fcd0",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/psxcel",
+        "revision": "db34253c6f52fc7c709654d10060ff68f2402e21",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK ee4a4b95, editor 4352b10a from its components.lock.json); the disc carries the image's boot EXE as a bare program",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/psxcel-build.log"
+    },
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/arcade/psoxide-arcade-xa.cue",
+      "cue_sha256": "24c32a1226c4480b4b6a128c5750cc446726b1f11306029898a0321d5ba60d33",
+      "bin_sha256": "2c2037944ff396ee98fe8e9ef70d254dcc74945d0674e7e62fad0a4e4a021861",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/psoxide-arcade",
+        "revision": "3ddcc275d07e14dfb541ef243431396085b8d16a",
+        "ref": "feat/arcade-xa-music-2026-10-15"
+      },
+      "build": "make disc on feat/arcade-xa-music-2026-10-15 (SDK e6ec267, editor 9ad78b3, emulator 9e00783): Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Receipt in campaign-2026-10-15/arcade-xa/RESULT.md.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/arcade-xa/RESULT.md"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "03eb01007ae59818a2bbdb4994e6d05bdd95cb8096012b11d90dfaf7b1763668",
+      "version": "0.2.6",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/pico8-psx",
+        "revision": "1fb78a8ca0a9a8495f7314d20448a65c42a39908",
+        "ref": "main"
+      },
+      "build": "the library Celeste Classic Collection build of 2026-10-11 (make collection-disc from main 18bbd78: 0.2.6 with the DEFAULT/DARKER n/BRIGHTER n brightness stepper, the palette address fix and the card-save SDK repin), copied byte for byte. Main moved to 1fb78a8 by one test-only commit (tests/classic-first-three-rooms.toml), so the source is the same.",
+      "receipt": "/Users/ebonura/Downloads/ps1 games/Celeste Classic Collection (no INSTALLED.json; provenance in campaign-2026-10-15/lost-audit/demo/REPORT.md section 4)"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "150cf58467d62b6cc98faf07bfa231ce5b26a0a85179ef00cd2e543a3f93845f",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/nitroxide",
+        "revision": "391b2c7de273fb3830417349d6ce56377c6e7dbd",
+        "ref": "checkpoint/nitroxide-2026-10-15"
+      },
+      "build": "the library NitroXide install of 2026-10-15 (INSTALLED.json): make compile (committed PGO layout, 100 percent bound) and make pack with MUSIC_DIR, six songs as MUSIC1.XA and MUSIC2.XA, one data track, no CD-DA; nine cars, wall ramp texture fix, SFX pass.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/checkpoints/nitroxide.md"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "d26a7455f156cec78584da29f4873748e1bb242a5892e93a8e1094e33acfefbe",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/voxide",
+        "revision": "25cb82d8904ee4dc4bebd2a40b96ef05cb982a6d",
+        "ref": "feat/voxide-0.4.1-2026-10-15"
+      },
+      "build": "the library VoXide 0.4.1 install of 2026-10-15 (INSTALLED.json): PGO hot=500+profi re-collected at 20 blocks, title LOAD WORLD, TNT chain speed-up, four XA pieces, one data track, no CD-DA. Built from 7dfecb6, the pre-rewrite twin of 25cb82d with identical source.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/voxide-041/"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "2f421d4a3485139304e02248e618fd6eeb15d999cabf0180293f8af75b64d04d",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/quake-psx",
+        "revision": "20481e32956aa0f41d83c2fc0916f0ae80117794",
+        "ref": "checkpoint/quake-2026-10-15"
+      },
+      "build": "the library Quake install of 2026-10-15 (quake-psx.provenance.json): cargo quake-build disc from checkpoint/quake-2026-10-15 (shareware 1.06 data, SDK 5e112a78, editor fb2a9ab): bridge-grunt fix, XA music (eight loops stored three times), leaf contents, death loadout, mover speeds, splash, wall puffs, RLE logo; one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/cortex/Cortex Graybox Reach XA.cue",
+      "cue_sha256": "6569b490b367f437fc890eb6c2a1c1cd1458aa9b789b7b7dd9a5f0160ae0a15e",
+      "bin_sha256": "0581a485b4cd1647427f221ad469a1ec2290aa75df35646a2d947d509b1ca787",
+      "version": "Graybox Reach",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "84e7512d77b64106ff835e97bb04c32407b3f772",
+        "ref": "feat/engine-xa-music-2026-10-15"
+      },
+      "build": "frontend build-project-disc --project editor/projects/graybox-reach on feat/engine-xa-music-2026-10-15 (SDK 36ead4b, emulator 6edde550): the two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. The default (0.4b) project does not link on editor main, so Graybox Reach stands in the Cortex slot.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/cortex-xa/RESULT.md"
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "schema": 1,
+  "pressing": "v0.44-private",
+  "note": "PSoXide Demo Disc v0.44, private edition (local, never published or distributed), all XA: no CD-DA track. The public inputs are those of lineup-v0.44.json. WipEout (restore build), Hollow Knight, Counter-Strike and Half-Life are the library installs of 2026-10-13 to 2026-10-15. The v1.27 hardware tests stay in this file but are left out of the pressing (HWT=0); the suite has its own disc. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/arcade/psoxide-arcade-xa.cue",
+      "cue_sha256": "24c32a1226c4480b4b6a128c5750cc446726b1f11306029898a0321d5ba60d33",
+      "bin_sha256": "2c2037944ff396ee98fe8e9ef70d254dcc74945d0674e7e62fad0a4e4a021861",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/psoxide-arcade",
+        "revision": "3ddcc275d07e14dfb541ef243431396085b8d16a",
+        "ref": "feat/arcade-xa-music-2026-10-15"
+      },
+      "build": "make disc on feat/arcade-xa-music-2026-10-15 (SDK e6ec267, editor 9ad78b3, emulator 9e00783): Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Receipt in campaign-2026-10-15/arcade-xa/RESULT.md.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/arcade-xa/RESULT.md"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "03eb01007ae59818a2bbdb4994e6d05bdd95cb8096012b11d90dfaf7b1763668",
+      "version": "0.2.6",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/pico8-psx",
+        "revision": "1fb78a8ca0a9a8495f7314d20448a65c42a39908",
+        "ref": "main"
+      },
+      "build": "the library Celeste Classic Collection build of 2026-10-11 (make collection-disc from main 18bbd78: 0.2.6 with the DEFAULT/DARKER n/BRIGHTER n brightness stepper, the palette address fix and the card-save SDK repin), copied byte for byte. Main moved to 1fb78a8 by one test-only commit (tests/classic-first-three-rooms.toml), so the source is the same.",
+      "receipt": "/Users/ebonura/Downloads/ps1 games/Celeste Classic Collection (no INSTALLED.json; provenance in campaign-2026-10-15/lost-audit/demo/REPORT.md section 4)"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "150cf58467d62b6cc98faf07bfa231ce5b26a0a85179ef00cd2e543a3f93845f",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/nitroxide",
+        "revision": "391b2c7de273fb3830417349d6ce56377c6e7dbd",
+        "ref": "checkpoint/nitroxide-2026-10-15"
+      },
+      "build": "the library NitroXide install of 2026-10-15 (INSTALLED.json): make compile (committed PGO layout, 100 percent bound) and make pack with MUSIC_DIR, six songs as MUSIC1.XA and MUSIC2.XA, one data track, no CD-DA; nine cars, wall ramp texture fix, SFX pass.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/checkpoints/nitroxide.md"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "d26a7455f156cec78584da29f4873748e1bb242a5892e93a8e1094e33acfefbe",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/voxide",
+        "revision": "25cb82d8904ee4dc4bebd2a40b96ef05cb982a6d",
+        "ref": "feat/voxide-0.4.1-2026-10-15"
+      },
+      "build": "the library VoXide 0.4.1 install of 2026-10-15 (INSTALLED.json): PGO hot=500+profi re-collected at 20 blocks, title LOAD WORLD, TNT chain speed-up, four XA pieces, one data track, no CD-DA. Built from 7dfecb6, the pre-rewrite twin of 25cb82d with identical source.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/voxide-041/"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/wipeout/WipEout PSoXide.cue",
+      "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
+      "bin_sha256": "511e87e17066f97eb3024c3249f7b35abb4f2e7d8f5a7255868497d5c0a5b80c",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/wipeout-restore/repo",
+        "revision": "c9e2780cc85e97d3347a61ec9aba048a4d9542bd",
+        "ref": "feat/restore-options-2026-10-15"
+      },
+      "build": "the library WipEout PSoXide install of 2026-10-15 (wipeout-restore/INSTALLED.md): NTSC US cook from the user's WipEout (USA), US soundtrack as two XA files, PGO order bound 187 of 187; restore of the options, HUD size, ENHANCEMENTS page and remastered pilot emblems. Private, cooked from the user's own disc.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/wipeout-restore/INSTALLED.md"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "c5ad410d724b33c34296f0b4f9c8f7cafed77739edb9b13e6a12e9d912437a66",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/hk-psx",
+        "revision": "dd8958f0b4e1859340b1b154824df47ef7da62d5",
+        "ref": "main"
+      },
+      "build": "the library Hollow Knight disc of 2026-10-13 from main dd8958f (XA soundtrack as data-track files, no CD-DA), copied byte for byte; the cooked game assets stay outside git.",
+      "receipt": "campaign-2026-10-15/lost-audit/demo/REPORT.md section 4 (library hk-psx.bin, BIN c5ad410d)",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/hk/hk-psx.cue",
+      "cue_sha256": "847e6ea3d0762d2163e0616a19c01b3ae85c469748318c588e14656bbc7f98fb"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/cs/cs-psx.cue",
+      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
+      "bin_sha256": "e8806d1d41f53e9f58f2f5050d57ceb6ba710c64478aaad4597cbc6b961d9de2",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/cs-psx",
+        "local": "~/Desktop/repos/cs-psx",
+        "revision": "e82d0ad498332c1920d4ea5c21b06085bcd286fe",
+        "ref": "main"
+      },
+      "build": "the library Counter-Strike disc of 2026-10-13 from main e82d0ad, copied byte for byte; cooked from the user's own Half-Life/CS data, kept outside git.",
+      "receipt": "campaign-2026-10-15/lost-audit/demo/REPORT.md section 4 (library cs-psx.bin, BIN e8806d1d)"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/hl/Half-Life (hl-psx).cue",
+      "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
+      "bin_sha256": "0cb1b82194974a30e55e48227b4775db07b9c4f03c1e6a2168bb0f47acd61776",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/hl-psx",
+        "revision": "400b0cfb64e9b708965381b5d549671344d82e36",
+        "ref": "main"
+      },
+      "build": "the library Half-Life disc of 2026-10-13 built from main 400b0cf (XA music as data-track files, no CD-DA, analog required at boot), copied byte for byte; hl-psx keeps cooked assets outside git so it is not rebuilt from a clean clone. Not the in-flight integ/hl-focus lanes.",
+      "receipt": "campaign-2026-10-15/lost-audit/demo/REPORT.md section 4 (library Half-Life (hl-psx).bin, BIN 0cb1b821)"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "2f421d4a3485139304e02248e618fd6eeb15d999cabf0180293f8af75b64d04d",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/quake-psx",
+        "revision": "20481e32956aa0f41d83c2fc0916f0ae80117794",
+        "ref": "checkpoint/quake-2026-10-15"
+      },
+      "build": "the library Quake install of 2026-10-15 (quake-psx.provenance.json): cargo quake-build disc from checkpoint/quake-2026-10-15 (shareware 1.06 data, SDK 5e112a78, editor fb2a9ab): bridge-grunt fix, XA music (eight loops stored three times), leaf contents, death loadout, mover speeds, splash, wall puffs, RLE logo; one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/cortex/Cortex Graybox Reach XA.cue",
+      "cue_sha256": "6569b490b367f437fc890eb6c2a1c1cd1458aa9b789b7b7dd9a5f0160ae0a15e",
+      "bin_sha256": "0581a485b4cd1647427f221ad469a1ec2290aa75df35646a2d947d509b1ca787",
+      "version": "Graybox Reach",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "84e7512d77b64106ff835e97bb04c32407b3f772",
+        "ref": "feat/engine-xa-music-2026-10-15"
+      },
+      "build": "frontend build-project-disc --project editor/projects/graybox-reach on feat/engine-xa-music-2026-10-15 (SDK 36ead4b, emulator 6edde550): the two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. The default (0.4b) project does not link on editor main, so Graybox Reach stands in the Cortex slot.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/cortex-xa/RESULT.md"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/hwtests/hardware-tests.cue"
+      },
+      "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
+        "ref": "collection/hwt-disc-base (local, not pushed): 48ca026d plus the disc base on the raw CD seeks, kept out of line"
+      },
+      "build": "make hardware-tests-disc at the branch head (SDK 5c3955fd, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
+      "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/psxcel-v043/psxcel.cue"
+      },
+      "bin_sha256": "78522813ff1508901ddbad11c6fbf81a793822b87430a01c78b7792165b46d98",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/psxcel",
+        "revision": "2fcc459edbe5f677f3aaea6af54e01942e8dbbc6",
+        "ref": "main"
+      },
+      "build": "make disc on a clean clone of main (SDK ee4a4b95, editor 4352b10a from its components.lock.json); the disc carries the image boot EXE as a bare program. Last before CREDITS, like the public edition.",
+      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/psxcel-build.log"
+    }
+  ]
+}
