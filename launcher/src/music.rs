@@ -97,11 +97,14 @@ impl Music {
         let seed = (counter(Timer::Timer2) as u32) << 16
             ^ counter(Timer::Timer1) as u32
             ^ counter(Timer::Timer0) as u32 * 0x9E37;
+        // SAFETY: the launcher drives the CD controller through its
+        // `SectorReader` only before music starts and not at all while a
+        // song plays, so this player is the one owner while it matters.
+        let mut player = Player::new(unsafe { Cd::steal() });
+        // The drive's own mixer has to pass the song to the SPU; 0x80 is unity.
+        player.set_volume(0x80, 0x80);
         Music {
-            // SAFETY: the launcher drives the CD controller through its
-            // `SectorReader` only before music starts and not at all while a
-            // song plays, so this player is the one owner while it matters.
-            player: Player::new(unsafe { Cd::steal() }),
+            player,
             files,
             list: Playlist::new(usable, seed),
             clock: SongClock::new(crate::TICKS_HZ),
