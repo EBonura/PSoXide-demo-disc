@@ -1,8 +1,8 @@
 //! Compare every audio sector of a pressing with the cue it was taken from.
 //!
-//! The pressing owns the menu songs (tracks 2 to 5, from `--audio-dir`) and
-//! then each program's own tracks, in the order the table's `cdda_track_base`
-//! gives them. For each `--input NAME=CUE` that carries audio, the track base in
+//! The menu songs are XA files inside the data track and own no CD-DA track,
+//! so the pressing's audio is each program's own tracks, in the order the
+//! table's `cdda_track_base` gives them, starting at track 2. For each `--input NAME=CUE` that carries audio, the track base in
 //! the table must be the running count, every source track must sit in the
 //! pressing with the same pregap and length, and the sector bytes must hash
 //! the same. Entries that carry no audio are named with `--no-audio` and must
@@ -22,14 +22,6 @@ use sha2::{Digest, Sha256};
 use crate::args::Args;
 use crate::disc::{image_for_cue, read_toc, SECTOR_BYTES};
 use crate::util::{expand_home, hex, Error, Result};
-
-/// The four menu songs, in the order the launcher plays them.
-const MENU_SONGS: [&str; 4] = [
-    "knuckle-dust",
-    "rusted-hammer",
-    "chainsaw-heart",
-    "night-crawler",
-];
 
 #[derive(Debug, Clone)]
 struct Track {
@@ -118,9 +110,8 @@ fn digest_sectors(image: &Path, start: u64, end: u64) -> Result<String> {
 }
 
 pub fn run(args: &[String]) -> Result<i32> {
-    let args = Args::parse(args, &["cue", "audio-dir", "input", "no-audio"], &[])?;
+    let args = Args::parse(args, &["cue", "input", "no-audio"], &[])?;
     let combined_cue = args.require_path("cue")?;
-    let audio_dir = args.require_path("audio-dir")?;
     let (combined, tracks) = parse_cue(&combined_cue)?;
     let entries = read_toc(&combined)?;
     let base_of = |name: &str| -> Result<u32> {
@@ -130,28 +121,7 @@ pub fn run(args: &[String]) -> Result<i32> {
             .map(|e| e.cdda_track_base)
             .ok_or_else(|| Error(format!("{name}: not in the disc table")))
     };
-    ensure!(
-        tracks.len() > MENU_SONGS.len(),
-        "the pressing has no room for the menu songs"
-    );
-
     let mut report: Vec<Value> = Vec::new();
-    for (offset, song) in MENU_SONGS.iter().enumerate() {
-        let number = offset + 2;
-        let track = &tracks[number - 1];
-        ensure!(track.audio, "track {number} is not audio");
-        let raw = fs::read(audio_dir.join(format!("{song}.cdda")))
-            .map_err(|e| Error(format!("{song}.cdda: {e}")))?;
-        let mut expected = raw.clone();
-        expected.resize(
-            raw.len().div_ceil(SECTOR_BYTES as usize) * SECTOR_BYTES as usize,
-            0,
-        );
-        let want = hex(&Sha256::digest(&expected));
-        let got = digest_sectors(&combined, track.index01, track.end)?;
-        ensure!(want == got, "menu song {song} differs from track {number}");
-        report.push(json!({"owner": "LAUNCHER", "track": number, "sha256": want}));
-    }
 
     // (table base, name, cue) for every input that carries audio.
     let mut inputs: Vec<(u32, String, PathBuf)> = Vec::new();
@@ -163,7 +133,7 @@ pub fn run(args: &[String]) -> Result<i32> {
     }
     inputs.sort_by_key(|(base, name, _)| (*base, name.clone()));
 
-    let mut base: u32 = MENU_SONGS.len() as u32;
+    let mut base: u32 = 0;
     for (table_base, name, cue) in &inputs {
         let (source, original) = parse_cue(cue)?;
         if original.len() <= 1 {

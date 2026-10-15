@@ -1,40 +1,35 @@
 # Menu music
 
-Four tracks by **Just Music** (<https://www.youtube.com/@Just-Music-Beats>),
-used with the artist's written permission, cycled by the menu in this order:
+Music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B
+Vol 3, CC BY 4.0, <https://mululavgmloops.itch.io/>
 
-| Track | Length | Disc track |
+The launcher plays six pieces made by chaining loops from those three packs
+(seed 20261015, 4 s crossfades; each piece draws from one pack):
+
+| Song | Title on screen | Loops, in order |
 | --- | --- | --- |
-| KNUCKLE DUST | 3:10 | 32 |
-| RUSTED HAMMER | 4:04 | 33 |
-| CHAINSAW HEART | 3:06 | 34 |
-| NIGHT CRAWLER | 2:40 | 35 |
+| 0 | JUNGLE 1 A | Air, Samanbaia, Frog, Return, Jungle (Vol 1) |
+| 1 | JUNGLE 1 B | Jungle, Bubbles, Manana, Board, Tomate (Vol 1) |
+| 2 | JUNGLE 2 A | Crassula, Monstera, Brunfelsia, Rhipsalis, Dracaena (Vol 2) |
+| 3 | JUNGLE 2 B | Dracaena, Dypsis, Echeveria, Zamioculca (Vol 2) |
+| 4 | JUNGLE DNB A | Pera, Semente, Jumbo, Jaca, Lona (D&B Vol 3) |
+| 5 | JUNGLE DNB B | Lona, Corda, Sapo, Mamba (D&B Vol 3) |
 
-Source: WAV masters sent by the artist on 2026-07-29 (WeTransfer), which
-replace the earlier YouTube MP3 rips; these cuts run longer than the YouTube
-versions. The `.cdda` files here are those WAVs (48 kHz 16-bit stereo)
-resampled to raw 44.1 kHz 16-bit stereo PCM and zero-padded to a whole number
-of 2352-byte sectors, which is what `mkdisc --menu-cdda` expects:
+The pieces were loudness-matched (-15 LUFS integrated) before encoding. The
+license (CC BY 4.0) asks for the author, the work, the license and a link; the
+launcher's Credits and Links card carries them, and so do the repository
+README, the CHANGELOG and the release notes. Keep those in step.
 
-```sh
-ffmpeg -i track.wav -ar 44100 -ac 2 -f s16le -acodec pcm_s16le track.cdda
-python3 -c 'import os;p="track.cdda";r=os.path.getsize(p)%2352;r and open(p,"ab").write(b"\0"*(2352-r))'
-```
+## What is in `launcher/`
 
-Re-measure the beat grid after any re-cut (`python3 tools/beatgrid.py
-audio/*.cdda`) and refresh `MENU_BEATS` in the Makefile; the WAV masters'
-first-beat offsets differ from the MP3 rips'.
+- `MUSIC1.XA`, `MUSIC2.XA`: the six songs, `psx-audio-cook xa-pack`, 37.8 kHz
+  stereo, single speed, four to a file (two interleave slots are empty).
+- `songs.rs`: the generated table (file, channel, milliseconds per song) the
+  launcher compiles in.
+- `music.json`: the pack manifest.
+- `menu.spectrum`: the level-meter animation of every song (`mkdisc analyse`).
 
-## Permission terms (email, 2026-07-30)
-
-- Tracks covered: the four above, for this project only.
-- Non-commercial use only, no resale.
-- Credit as: Just Music - YouTube channel `@Just-Music-Beats`. The menu shows
-  the playing track's name from the disc table and the credit line
-  `Just Music - YouTube @Just-Music-Beats` along the bottom, so both halves
-  of the attribution are on screen at once; this file is the long form.
-- Scope: the demo disc **without the Half-Life port**, and the YouTube video
-  of the disc running on real hardware. The layout that carries hl-psx is for
-  local hardware verification only and must never be distributed (this also
-  matches the Half-Life assets themselves being undistributable). Any copy
-  that leaves the house, including the artist's, must be cut without hl-psx.
+The source WAVs are not in the repository (about 190 MB at 37.8 kHz); rebuild
+with `make music`, see the README. The previous menu music (Just Music, under
+a permission scoped to the old pressings) is gone from the disc and from the
+tree; it stays in git history.

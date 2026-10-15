@@ -110,7 +110,9 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 The current layout has seven outer programs plus Credits on the standard
 pressing; Half-Life, Counter-Strike and Hollow Knight are opt-in additions. PSoXide Arcade contains three games
 of its own, and Celeste Collection contains both Celeste Classic games.
-The standard disc has 7 CD-DA tracks. Disc size
+The menu music is XA inside the launcher's own ISO (`MUSIC1.XA`, `MUSIC2.XA`,
+six songs) and owns no CD-DA track. The standard disc has 3 CD-DA tracks (the
+arcade's Goncharov and Cortex's two), until those programs move to XA too. Disc size
 and image hashes are recorded in each build's receipts rather than fixed here.
 Automated evidence is recorded per program and is not an original-hardware
 claim. See [the dated split validation](docs/repository-split-validation-2026-09-05.md).
@@ -122,7 +124,7 @@ claim. See [the dated split validation](docs/repository-split-validation-2026-09
 | Counter-Strike (cs-psx) | whole image, no CD-DA track, `CS=1` only |
 | Hollow Knight (hk-psx) | whole image, 4 CD-DA tracks, `HK=1` only |
 | Voxide | whole image, WORLD.PAK assets |
-| NitroXide | data track only (WORLD.PAK arena atlas); plays the menu's CD-DA tracks 2-5 |
+| NitroXide | data track only (WORLD.PAK arena atlas); the pinned v0.43 build looks for the old menu CD-DA tracks 2-5 and, finding fewer than five tracks, plays nothing until its own XA build lands |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
 | PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; owns 1 CD-DA track |
@@ -152,6 +154,36 @@ Arcade opens a dedicated cabinet selector for Breakout, Space Invaders and
 Magikarp Pong. The optional programs sit between Voxide and Quake Shareware in
 HK, CS, HL order.
 
+## Menu music
+
+Music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B
+Vol 3, CC BY 4.0, <https://mululavgmloops.itch.io/>. The loops are chained
+into six pieces (JUNGLE 1 A and B, JUNGLE 2 A and B, JUNGLE DNB A and B). The
+credit is on the launcher's Credits and Links card (it turns between the music
+credit and the links), in `audio/README.md`, the CHANGELOG and the release notes.
+
+The pieces are packed with the SDK's `psx-audio-cook xa-pack` (37.8 kHz stereo,
+two files, 35,100 sectors) and ride in the launcher's ISO. The launcher finds
+`MUSIC1.XA` and `MUSIC2.XA` in the root directory, plays them with
+`psx_io::cd::xa::Player`, and stops the song before it loads a program, since
+a song is a read in progress. Authoring again (only when the songs change):
+
+```sh
+make music MUSIC_WAVS="a.wav b.wav ..." XA_COOK=/path/to/psx-audio-cook
+```
+
+`XA_COOK` needs a `psx-audio-cook` that has `xa-pack`; that is SDK branch
+`feat/shared-xa-encoder-2026-10-15` until it reaches main, and it is not in
+the pinned SDK. The command writes `audio/launcher/` (the XA files, the song
+table `songs.rs` that the launcher compiles in, and `menu.spectrum`); commit
+those. The song order of `MUSIC_WAVS` is the song numbering of the table, the
+titles in the Makefile and the spectrum file.
+
+No program on the disc borrows the menu songs by CD-DA track number any more.
+The old convention (the menu songs are CD-DA tracks 2 to 5) is gone from
+`mkdisc`; builds of Quake and NitroXide from before that carry the convention
+and find fewer than five CD-DA tracks, which they treat as no music.
+
 ## The menu
 
 A carousel of glossy blue pills under a turning ball of balls, over a
@@ -161,9 +193,11 @@ the description between English and Italian under a drawn flag, and L1 or R1
 skips the music. Titles too long for a pill break across two lines.
 
 Top left is a music panel: what is playing, a sixteen-band level meter, and the L1/R1
-label. The meter is not keeping time, it is listening: `mkdisc` runs an FFT
-over each track at disc-build time and ships the result in a `SPECTRUM.BIN`
-region the launcher reads at boot. Bands are normalised per band rather than
+label. The six songs play as a shuffled playlist, none twice until all have
+played; L1 and R1 walk the shuffle and then a MUSIC OFF slot. The meter is not
+keeping time, it is listening: `mkdisc analyse` runs an FFT over each song
+when the music is authored and the result ships in a `SPECTRUM.BIN`
+region the launcher reads at boot, indexed by song time from the XA player. Bands are normalised per band rather than
 globally, because a drum and bass track has so much more energy at 60 Hz than
 at 12 kHz that a single scale leaves the top half of the meter permanently
 flat. Only that control is labelled on screen. The rest a PlayStation owner
@@ -175,10 +209,12 @@ launcher still knows nothing about what it is playing until it reads the
 table. That table now spans two sectors, since the titles and two
 descriptions per program stopped fitting in one.
 
-The whole scene answers the music. `disc-tools beatgrid` fits a tempo and phase
-to each track's onset envelope offline and the numbers ship in the disc table,
-so the grid stays in step for the length of a track rather than drifting out of
-it. On that grid: the ball blows outward on every beat and snaps back, harder
+The whole scene answers the music. With a measured tempo, `disc-tools
+beatgrid` fits a tempo and phase to a song's onset envelope offline and the
+numbers ship in the disc table, so the grid stays in step for the length of a
+song rather than drifting out of it. The current six songs ship without a grid
+(they chain loops of different tempos, so there is no single tempo to fit) and
+the scene follows the level meter alone. With a grid: the ball blows outward on every beat and snaps back, harder
 on the downbeat; the pills flash on the downbeat only; the starfield twinkles
 on the offbeat, in the gaps the other two leave; and the ball's idle spin rides
 the bar, quickest just after the downbeat.
@@ -343,8 +379,7 @@ When a game gets a new build, the re-run is:
    `receipt`. Nothing else in the repo changes for a game-only update. Half-Life,
    Counter-Strike, Hollow Knight, Quake, Cortex, VoXide and the Arcade are
    whole images taken as they are. Celeste and PSXcel ride as their image's
-   boot EXE, and NitroXide is sliced to its data track (it plays the menu's
-   tracks 2-5, which are the same four songs its standalone image carries).
+   boot EXE, and NitroXide is sliced to its data track.
    An input whose library build has since moved on can be lifted back out of
    the previous pressing with `from_disc` (see `disc-tools lineup`).
 2. `make lineup-budget ...` with the same arguments: it verifies the lineup and
@@ -370,10 +405,10 @@ When a game gets a new build, the re-run is:
    by default. A passing route confirms those emulated inputs only; it does
    not resolve a console-only controller failure.
 
-6. `disc-tools audio-relocation --cue C --audio-dir audio --input NAME=CUE ...`
+6. `disc-tools audio-relocation --cue C --input NAME=CUE ...`
    (one `--input` per program that carries CD-DA, `--no-audio NAME` for the
-   bare games) hashes the four menu songs and every program track in the
-   pressing against the cues they came from. The order of the programs' tracks
+   bare games) hashes every program track in the pressing against the cues
+   they came from. The order of the programs' tracks
    is read from the disc table, so a reordered carousel needs no edit.
 
 `disc-tools quake headless` still holds frame pins keyed by carousel size,

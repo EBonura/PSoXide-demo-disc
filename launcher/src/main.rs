@@ -343,9 +343,12 @@ static mut READER: SectorReader = SectorReader::new();
 static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
     [0; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize];
 
-/// Room for every menu track's level-meter data. Read once at boot rather
-/// than per track, so skipping stays as quick as the drive allows.
-const SPECTRUM_MAX_SECTORS: usize = 192;
+/// Room for every menu song's level-meter data. Read once at boot rather
+/// than per song, so skipping stays as quick as the drive allows. 37,484
+/// frames of 16 bands (the six songs, 21 minutes) take 293 sectors; this is
+/// 320, 640 KiB of .bss, and `read_spectrum` turns the meter off and says so
+/// if a pressing carries more.
+const SPECTRUM_MAX_SECTORS: usize = 320;
 static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
     [0; SECTOR_WORDS * SPECTRUM_MAX_SECTORS];
 

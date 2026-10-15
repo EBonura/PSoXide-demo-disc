@@ -7,6 +7,15 @@ Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
 
+What's new in this build
+------------------------
+- New menu music: six pieces that play in a shuffled order, none twice until
+  all six have played. L1 and R1 skip, and the last stop is MUSIC OFF.
+  Music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B
+  Vol 3, CC BY 4.0, https://mululavgmloops.itch.io/
+- The music is stored as compressed XA audio, so the disc is about 56 MB
+  smaller.
+
 What's new in v0.43
 -------------------
 - This disc needs an analog DualShock. The menu switches the pad into analog

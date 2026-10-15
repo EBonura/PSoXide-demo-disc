@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The launcher's menu music is XA, not CD-DA. Six songs (Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B Vol 3, CC BY 4.0, https://mululavgmloops.itch.io/) replace the four Just Music songs: they ride in the launcher's ISO as `MUSIC1.XA` and `MUSIC2.XA`, play through `psx_io::cd::xa::Player` as a shuffled playlist (no repeats until all six have played; L1/R1 and MUSIC OFF as before), and the level meter is timed off XA song time. The credits card shows the attribution. `audio/*.cdda` and `--menu-cdda` are gone; `mkdisc analyse` writes the level-meter file and `make music` re-authors the songs. The pressing has 3 CD-DA tracks instead of 7 (about 56 MB smaller).
+- The component tuple moves to SDK 4e97cf3, editor 0e9d552, emulator ca42a30 (the coherent set from 2026-10-08) so the launcher has the XA player. The launcher follows the SDK renames (`Deadzone::is_outside`, the dropped Gouraud line wrapper).
+- No tempo grid is pressed for the new songs (loops of different tempos chained together have no single tempo); `disc-tools beatgrid` now reads WAV files at any sample rate and takes `--bpm LOW:HIGH`.
+- `mkdisc` no longer enforces "menu songs are the first CD-DA tracks"; the borrowing convention for NitroXide and Quake is gone from the layout.
+- The public deploy check expects the 3 remaining CD-DA tracks.
 - The browser player's emulator pin (`web_player` in `release-components.json`) moves to aad98fb: the demo disc boots on its data track alone with music decoded on a time budget, and a disc whose audio is XA is read lazily over HTTP Range requests.
 - `disc-tools web-delivery` (and so `deploy-public`) delivers a disc with no CD-DA tracks as the raw image plus a gzipped sector-header sidecar and a manifest `image` line, instead of a gzipped data track. An image over itch.io's 200 MB file limit is split into numbered parts, which needs the emulator branch `feat/web-lazy-image-parts-2026-10-15` or later. A disc with CD-DA tracks is delivered exactly as before (gzip data track and FLAC pieces, byte for byte).
 - `make release-web` reads the image from `dist/` and uploads every file of the delivery.

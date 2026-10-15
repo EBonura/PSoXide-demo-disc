@@ -48,11 +48,11 @@ const PUBLIC_GAMES: [&str; 8] = [
     "CREDITS",
 ];
 /// One title per CD-DA track, in disc order, for the browser player.
-const TRACK_TITLES: [&str; 7] = [
-    "KNUCKLE DUST",
-    "RUSTED HAMMER",
-    "CHAINSAW HEART",
-    "NIGHT CRAWLER",
+///
+/// The menu music is XA inside the data track, so these are the CD-DA the
+/// programs still carry: the arcade's song and Cortex's two. When those move
+/// to XA too the disc has no audio tracks and the page reads it lazily.
+const TRACK_TITLES: [&str; 3] = [
     "GONCHAROV",
     "CORTEX IGNITION COMBAT",
     "CORTEX IGNITION MENU",
@@ -680,7 +680,7 @@ mod tests {
             // The public disc.
             fs::create_dir_all(base.join("disc")).unwrap();
             fs::write(base.join("disc/disc.bin"), public_disc(&public_rows())).unwrap();
-            fs::write(base.join("disc/disc.cue"), public_cue(7)).unwrap();
+            fs::write(base.join("disc/disc.cue"), public_cue(TRACK_TITLES.len())).unwrap();
             // Fake programs: each logs what it was called with.
             let bin = base.join("bin");
             fs::create_dir_all(&bin).unwrap();
@@ -814,12 +814,12 @@ mod tests {
     #[test]
     fn public_image_accepts_exactly_the_public_collection() {
         let dir = tempfile::tempdir().unwrap();
-        let cue = adjacent_disc(dir.path(), &public_cue(7), &public_rows());
+        let cue = adjacent_disc(dir.path(), &public_cue(TRACK_TITLES.len()), &public_rows());
         assert_eq!(public_image(&cue).unwrap(), dir.path().join("disc.bin"));
         // A CRLF cue reads the same (Python's read_text translates newlines).
         let crlf = adjacent_disc(
             dir.path(),
-            &public_cue(7).replace('\n', "\r\n"),
+            &public_cue(TRACK_TITLES.len()).replace('\n', "\r\n"),
             &public_rows(),
         );
         assert!(public_image(&crlf).is_ok());
@@ -842,40 +842,40 @@ mod tests {
         // Wrong menu: a card swapped, one missing, one extra, one hidden.
         let mut swapped = public_rows();
         swapped[2].0 = "SOMETHING ELSE";
-        assert!(message(&public_cue(7), &swapped).contains("does not match the public collection"));
-        assert!(message(&public_cue(7), &public_rows()[..6])
+        assert!(message(&public_cue(TRACK_TITLES.len()), &swapped).contains("does not match the public collection"));
+        assert!(message(&public_cue(TRACK_TITLES.len()), &public_rows()[..6])
             .contains("does not match the public collection"));
         let mut extra = public_rows();
         extra.push(("HALF-LIFE", 1, 1, 0));
-        assert!(message(&public_cue(7), &extra).contains("does not match the public collection"));
+        assert!(message(&public_cue(TRACK_TITLES.len()), &extra).contains("does not match the public collection"));
         let mut hidden = public_rows();
         hidden[3].3 = FLAG_HIDDEN;
-        assert!(message(&public_cue(7), &hidden).contains("does not match the public collection"));
+        assert!(message(&public_cue(TRACK_TITLES.len()), &hidden).contains("does not match the public collection"));
         // A reordered menu is not the public menu either.
         let mut reordered = public_rows();
         reordered.swap(0, 1);
         assert!(
-            message(&public_cue(7), &reordered).contains("does not match the public collection")
+            message(&public_cue(TRACK_TITLES.len()), &reordered).contains("does not match the public collection")
         );
         // The entry count the table claims must be right even when the menu is.
         let mut padded = public_rows();
         padded.push(("EXTRA HIDDEN", 1, 1, FLAG_HIDDEN));
-        assert!(message(&public_cue(7), &padded).contains("does not match the public collection"));
+        assert!(message(&public_cue(TRACK_TITLES.len()), &padded).contains("does not match the public collection"));
         // Wrong track layout.
-        assert!(message(&public_cue(6), &public_rows())
-            .contains("8-track layout (or a data track alone)"));
-        assert!(message(&public_cue(8), &public_rows())
-            .contains("8-track layout (or a data track alone)"));
-        let data_audio = public_cue(7).replace("TRACK 03 AUDIO", "TRACK 03 MODE2/2352");
+        assert!(message(&public_cue(TRACK_TITLES.len() - 1), &public_rows())
+            .contains("4-track layout (or a data track alone)"));
+        assert!(message(&public_cue(TRACK_TITLES.len() + 1), &public_rows())
+            .contains("4-track layout (or a data track alone)"));
+        let data_audio = public_cue(TRACK_TITLES.len()).replace("TRACK 03 AUDIO", "TRACK 03 MODE2/2352");
         assert!(
-            message(&data_audio, &public_rows()).contains("8-track layout (or a data track alone)")
+            message(&data_audio, &public_rows()).contains("4-track layout (or a data track alone)")
         );
         // BIN naming.
-        let two = format!("{}FILE \"other.bin\" BINARY\n", public_cue(7));
+        let two = format!("{}FILE \"other.bin\" BINARY\n", public_cue(TRACK_TITLES.len()));
         assert!(message(&two, &public_rows()).contains("one adjacent BIN"));
-        let nested = public_cue(7).replace("\"disc.bin\"", "\"sub/disc.bin\"");
+        let nested = public_cue(TRACK_TITLES.len()).replace("\"disc.bin\"", "\"sub/disc.bin\"");
         assert!(message(&nested, &public_rows()).contains("one adjacent BIN"));
-        let none = public_cue(7).replace("FILE \"disc.bin\" BINARY", "");
+        let none = public_cue(TRACK_TITLES.len()).replace("FILE \"disc.bin\" BINARY", "");
         assert!(message(&none, &public_rows()).contains("one adjacent BIN"));
     }
 
@@ -991,12 +991,12 @@ mod tests {
         options.version = "nonsense".to_string();
         options.cue = f.path("disc/missing.cue");
         assert!(f.stage(&options).is_err());
-        fs::write(f.path("disc/disc.cue"), public_cue(3)).unwrap();
+        fs::write(f.path("disc/disc.cue"), public_cue(TRACK_TITLES.len() + 2)).unwrap();
         options.cue = f.path("disc/disc.cue");
         assert!(f.stage(&options).unwrap_err().0.contains("track layout"));
         assert!(!f.path("out").exists());
         // A non-empty output directory is refused, and left as it was.
-        fs::write(f.path("disc/disc.cue"), public_cue(7)).unwrap();
+        fs::write(f.path("disc/disc.cue"), public_cue(TRACK_TITLES.len())).unwrap();
         fs::create_dir_all(f.path("busy")).unwrap();
         fs::write(f.path("busy/earlier-release.txt"), "keep me").unwrap();
         let error = f.stage(&f.options("busy")).unwrap_err();
@@ -1056,7 +1056,7 @@ mod tests {
         assert!(web_cue.starts_with("FILE \"demo-disc.bin\" BINARY\n  TRACK 01 MODE2/2352"));
         let manifest = fs::read_to_string(out.join("web/web-manifest.txt")).unwrap();
         assert!(
-            manifest.contains(" KNUCKLE DUST\n")
+            manifest.contains(" GONCHAROV\n")
                 && manifest.trim_end().ends_with("CORTEX IGNITION MENU")
         );
         // The receipt matches the locked emulator and the files that are there.
