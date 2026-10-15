@@ -28,17 +28,40 @@ EXAMPLES   := $(PROGRAMS_PSOXIDE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 DISC_TOOLS := $(ROOT)/tools/disc-tools/target/release/disc-tools
 
-# Menu music, used with the artist's permission. The credit ships on the disc
-# and stays on screen the whole time the track plays; keep the two together.
-MENU_CDDA   := $(ROOT)/audio/knuckle-dust.cdda $(ROOT)/audio/rusted-hammer.cdda \
-               $(ROOT)/audio/chainsaw-heart.cdda $(ROOT)/audio/night-crawler.cdda
-MENU_CREDIT := Just Music - YouTube @Just-Music-Beats
-# Tempo and first-beat offset per track, in the same order, measured by
-# `disc-tools beatgrid`. The menu pulses on these; a guessed tempo drifts.
-MENU_BEATS  := 176010:359 175000:168 173860:150 174360:325
-# Shown as "now playing", in the same order as MENU_CDDA. Written out rather
-# than looped: make's foreach splits on whitespace, which takes the titles
-# apart at their spaces.
+# Menu music: six songs by Mulula VGM Loops (Ambient Jungle Vol 1, Vol 2 and
+# Ambient Jungle D&B Vol 3), CC BY 4.0, mixed into pieces and packed as XA
+# files that ride in the launcher's own ISO (audio/launcher). The credit has
+# to ship with the disc and stay one tap away in the menu: the launcher's
+# credits card carries the full attribution, and this short form is the
+# table's. Keep audio/README.md, README.md, CHANGELOG.md and release/README.txt
+# in step with it.
+MENU_XA_DIR   := $(ROOT)/audio/launcher
+MENU_XA       := $(MENU_XA_DIR)/MUSIC1.XA $(MENU_XA_DIR)/MUSIC2.XA
+MENU_SONGS_RS := $(MENU_XA_DIR)/songs.rs
+MENU_SPECTRUM := $(MENU_XA_DIR)/menu.spectrum
+MENU_CREDIT   := Music: Mulula VGM Loops, CC BY 4.0
+# The song titles, in the order the songs were packed (the table's song
+# numbers). Written out rather than looped: make's foreach splits on
+# whitespace, which takes the titles apart at their spaces.
+#
+# No tempo grid (--menu-beat) is pressed for these: they are loops of
+# different tempos chained end to end, so a song has no single beat to pulse
+# on (`disc-tools beatgrid` on three windows of each gave tempos that
+# disagreed by 20 to 50 BPM). The menu follows the level-meter data instead,
+# which is measured from the audio and needs no tempo.
+
+# Re-author the music (only when the songs change): pack the mixed WAVs into
+# XA files, write the song table the launcher compiles in, and analyse the
+# level meter. The WAVs are not in the repository (115 MB); the XA files and
+# the analysis are, as the .cdda files were. XA_COOK is a psx-audio-cook
+# that has `xa-pack` (SDK branch feat/shared-xa-encoder-2026-10-15 until it
+# lands on main, so it is not part of the pinned SDK yet).
+#   make music MUSIC_WAVS="a.wav b.wav ..." XA_COOK=/path/to/psx-audio-cook
+.PHONY: music
+music: mkdisc
+	@test -n "$(MUSIC_WAVS)" -a -x "$(XA_COOK)" || { echo "music: set MUSIC_WAVS (the song WAVs, in song order) and XA_COOK (a psx-audio-cook with xa-pack)"; exit 1; }
+	$(XA_COOK) xa-pack "$(MENU_XA_DIR)" MUSIC $(MUSIC_WAVS) --manifest "$(MENU_XA_DIR)/music.json" --rust "$(MENU_SONGS_RS)"
+	$(MKDISC) analyse "$(MENU_SPECTRUM)" $(MUSIC_WAVS)
 
 # One public pressing and private ones. The menu music permission is scoped to
 # the disc without Half-Life, and hl-psx is private until its own release, so HL
@@ -236,7 +259,7 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
@@ -577,10 +600,11 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(HWT_ARGS) \
 		--game "PSXCEL=$(PSXCEL)" \
-		$(foreach t,$(MENU_CDDA),--menu-cdda "$(t)") \
-		$(foreach b,$(MENU_BEATS),--menu-beat $(b)) \
-		--menu-title "KNUCKLE DUST" --menu-title "RUSTED HAMMER" \
-		--menu-title "CHAINSAW HEART" --menu-title "NIGHT CRAWLER" \
+		$(foreach t,$(MENU_XA),--menu-xa "$(t)") \
+		--menu-spectrum "$(MENU_SPECTRUM)" \
+		--menu-title "JUNGLE 1 A" --menu-title "JUNGLE 1 B" \
+		--menu-title "JUNGLE 2 A" --menu-title "JUNGLE 2 B" \
+		--menu-title "JUNGLE DNB A" --menu-title "JUNGLE DNB B" \
 		--credit "$(MENU_CREDIT)" \
 		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-menu.shot" \
 		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-gameplay.shot" \
@@ -722,7 +746,6 @@ release-web: $(DISC_TOOLS)
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
 	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web" \
-		"KNUCKLE DUST" "RUSTED HAMMER" "CHAINSAW HEART" "NIGHT CRAWLER" \
 		"GONCHAROV" "CORTEX IGNITION COMBAT" "CORTEX IGNITION MENU"
 	@# A CD-DA pressing keeps its raw image as a release asset too. A pressing whose
 	@# audio is XA is delivered as that image already (or as numbered parts).

@@ -1,12 +1,13 @@
-//! Turn a CD-DA track into a level-meter animation.
+//! Turn a song's PCM into a level-meter animation.
 //!
 //! The menu's meter used to be one beat envelope with the bars lagging each
 //! other, which keeps time but is not listening: it does the same thing under
-//! a breakdown as under a drop. This analyses the audio instead, once, at
-//! disc-build time, and ships the result alongside the track.
+//! a breakdown as under a drop. This analyses the audio instead, once, when
+//! the music is authored (`mkdisc analyse`), and the disc ships the result
+//! alongside the songs.
 //!
 //! Output is one byte per band per frame, [`FRAME_RATE`] frames a second,
-//! bands low to high. The guest looks up a frame by the CD clock and draws it.
+//! bands low to high. The guest looks up a frame by song time and draws it.
 //!
 //! Bands are normalised per band across the whole track rather than globally.
 //! A drum and bass track has far more energy at 60 Hz than at 12 kHz, so a
@@ -19,7 +20,6 @@ pub const BANDS: usize = 16;
 /// Frames a second. Two display frames each at 60 Hz.
 pub const FRAME_RATE: u32 = 30;
 
-const SAMPLE_RATE: u32 = 44_100;
 /// Samples per analysis window. Power of two for the transform, and long
 /// enough that the lowest band has something to measure.
 const WINDOW: usize = 2048;
@@ -70,10 +70,10 @@ fn fft(re: &mut [f32; WINDOW], im: &mut [f32; WINDOW]) {
 }
 
 /// Which FFT bin each band starts at, log-spaced across the audible range.
-fn band_edges() -> [usize; BANDS + 1] {
+fn band_edges(rate: u32) -> [usize; BANDS + 1] {
     let mut edges = [0usize; BANDS + 1];
     let ratio = (HIGH_HZ / LOW_HZ).powf(1.0 / BANDS as f32);
-    let bin_hz = SAMPLE_RATE as f32 / WINDOW as f32;
+    let bin_hz = rate as f32 / WINDOW as f32;
     let mut hz = LOW_HZ;
     let mut previous = 0usize;
     for (i, edge) in edges.iter_mut().enumerate() {
@@ -89,19 +89,19 @@ fn band_edges() -> [usize; BANDS + 1] {
     edges
 }
 
-/// Analyse `pcm` (raw 44.1 kHz 16-bit stereo, as the disc carries it) into
-/// one byte per band per frame.
-pub fn analyse(pcm: &[u8]) -> Vec<u8> {
-    let (raw, count) = band_energies(pcm);
+/// Analyse `pcm` (raw 16-bit stereo at `rate` samples a second) into one byte
+/// per band per frame.
+pub fn analyse(pcm: &[u8], rate: u32) -> Vec<u8> {
+    let (raw, count) = band_energies(pcm, rate);
     normalise(&raw, count)
 }
 
 /// Per-frame, per-band loudness in decibels, before any scaling.
-fn band_energies(pcm: &[u8]) -> (Vec<f32>, usize) {
+fn band_energies(pcm: &[u8], rate: u32) -> (Vec<f32>, usize) {
     let frames = pcm.len() / 4;
-    let hop = (SAMPLE_RATE / FRAME_RATE) as usize;
+    let hop = (rate / FRAME_RATE) as usize;
     let count = frames / hop;
-    let edges = band_edges();
+    let edges = band_edges(rate);
 
     // Hann window, so a drum hit landing at the edge of a window still counts.
     let mut hann = [0.0f32; WINDOW];
@@ -170,6 +170,9 @@ fn normalise(raw: &[f32], count: usize) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    /// The rate the tests analyse at: the launcher music's.
+    const SAMPLE_RATE: u32 = 37_800;
+
     /// A pure tone as raw stereo PCM.
     fn tone(hz: f32, seconds: f32) -> Vec<u8> {
         let frames = (SAMPLE_RATE as f32 * seconds) as usize;
@@ -185,7 +188,7 @@ mod tests {
 
     #[test]
     fn a_frame_is_one_byte_per_band_thirty_times_a_second() {
-        let data = analyse(&tone(1000.0, 2.0));
+        let data = analyse(&tone(1000.0, 2.0), SAMPLE_RATE);
         assert_eq!(data.len() % BANDS, 0);
         let frames = data.len() / BANDS;
         // Two seconds, less the tail that cannot fill a whole hop.
@@ -198,7 +201,7 @@ mod tests {
         // per-band scaling to stretch, so the normalised output says nothing
         // about where the tone sat.
         let pick = |hz: f32| {
-            let (raw, count) = band_energies(&tone(hz, 3.0));
+            let (raw, count) = band_energies(&tone(hz, 3.0), SAMPLE_RATE);
             let at = (count / 2) * BANDS;
             let frame = &raw[at..at + BANDS];
             frame
@@ -236,14 +239,14 @@ mod tests {
 
     #[test]
     fn silence_analyses_without_dividing_by_zero() {
-        let data = analyse(&vec![0u8; 44_100 * 4]);
+        let data = analyse(&vec![0u8; SAMPLE_RATE as usize * 4], SAMPLE_RATE);
         assert_eq!(data.len() / BANDS, 30);
         assert!(data.iter().all(|v| *v == 0 || *v == 255));
     }
 
     #[test]
     fn bands_are_log_spaced_and_never_empty() {
-        let edges = band_edges();
+        let edges = band_edges(SAMPLE_RATE);
         for i in 0..BANDS {
             assert!(edges[i + 1] > edges[i], "band {i} is empty");
         }

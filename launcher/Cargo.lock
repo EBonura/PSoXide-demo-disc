@@ -12,11 +12,14 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 name = "launcher"
 version = "0.1.0"
 dependencies = [
+ "playlist",
  "psx-asset",
  "psx-carousel",
  "psx-disc-toc",
+ "psx-fmv",
  "psx-font",
  "psx-gpu",
+ "psx-hw",
  "psx-io",
  "psx-math",
  "psx-pack",
@@ -29,10 +32,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "playlist"
+version = "0.1.0"
+
+[[package]]
 name = "psx-asset"
 version = "0.1.0"
 dependencies = [
  "psx-gte",
+ "psx-hw",
  "psxed-format",
 ]
 
@@ -46,6 +54,19 @@ dependencies = [
 [[package]]
 name = "psx-disc-toc"
 version = "0.1.0"
+
+[[package]]
+name = "psx-fmv"
+version = "0.1.0"
+dependencies = [
+ "psx-gpu",
+ "psx-hw",
+ "psx-io",
+ "psx-pack",
+ "psx-rt",
+ "psx-spu",
+ "psx-vram",
+]
 
 [[package]]
 name = "psx-font"
@@ -62,6 +83,7 @@ dependencies = [
 name = "psx-gpu"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "psx-hw",
  "psx-io",
 ]
@@ -71,6 +93,7 @@ name = "psx-gte"
 version = "0.1.0"
 dependencies = [
  "psx-gte-core",
+ "psx-hw",
 ]
 
 [[package]]

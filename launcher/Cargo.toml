@@ -40,3 +40,6 @@ stick-nav = { path = "stick-nav" }
 psx-asset = { path = "../games/PSoXide-editor/sdk/crates/psx-asset" }
 psx-sfx  = { path = "../games/PSoXide-editor/sdk/crates/psx-sfx" }
 disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-editor/engine/crates/psx-disc-toc" }
+playlist = { path = "playlist" }
+psx-fmv  = { path = "../games/PSoXide-editor/sdk/crates/psx-fmv" }
+psx-hw   = { path = "../games/PSoXide-editor/crates/psx-hw" }

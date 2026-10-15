@@ -13,10 +13,13 @@
 //! ```text
 //! 21   SYSTEM.CNF     boot record, points the BIOS at PSX.EXE
 //! 22   DEMOTOC.BIN    the table the launcher reads (fixed LBA, see disc-toc)
-//! 23+  PSX.EXE        the launcher
+//! 26+  SPECTRUM.BIN   level-meter data for the menu songs
+//! ..   SHOTS.BIN      menu backdrops
+//! ..   PSX.EXE        the launcher
 //! ..   bare EXEs      programs with no disc data of their own
+//! ..   MUSIC*.XA      the menu songs, XA-ADPCM files in the launcher's ISO
 //! ..   game images    each game's whole data track, verbatim but re-addressed
-//! ..   audio tracks   every game's CD-DA, in the same order
+//! ..   audio tracks   every game's CD-DA, in program order
 //! ```
 //!
 //! Usage:
@@ -32,6 +35,7 @@
 
 mod cue;
 mod spectrum;
+mod wav;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -59,6 +63,10 @@ const PREGAP_FRAMES: u32 = 150;
 
 const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 
+/// Bytes of one raw XA sector as `psx-audio-cook` writes it: the 8-byte
+/// subheader and the 2328 bytes that follow.
+const XA_SECTOR_BYTES: usize = 2336;
+
 /// FNV-1a-32 over `bytes`: the payload checksum the chain loader recomputes
 /// over RAM before jumping. Must match the loader's implementation.
 fn fnv1a32(bytes: &[u8]) -> u32 {
@@ -70,8 +78,12 @@ fn fnv1a32(bytes: &[u8]) -> u32 {
     hash
 }
 
-/// Pre-analysed level-meter data for every menu track, end to end.
+/// Pre-analysed level-meter data for every menu song, end to end.
 const SPECTRUM_FILE_NAME: &str = "SPECTRUM.BIN";
+
+/// Magic of an analysis file (`mkdisc analyse`): the magic, a song count, one
+/// u32 frame count per song, then the frames of every song end to end.
+const ANALYSIS_MAGIC: &[u8; 8] = b"PSXSPEC1";
 
 /// Cooked menu-backdrop screenshots, one after another on sector boundaries.
 const SHOTS_FILE_NAME: &str = "SHOTS.BIN";
@@ -100,16 +112,18 @@ struct Args {
     descriptions: Vec<(String, String, String)>,
     /// `NAME=VERSION`, the version each program's own source declares.
     versions: Vec<(String, String)>,
-    /// Raw 44.1 kHz stereo PCM the menu cycles through behind itself, in the
-    /// order given.
-    menu_cdda: Vec<PathBuf>,
-    /// Attribution the menu prints for that track.
+    /// XA-ADPCM song files (`psx-audio-cook xa-pack`) the launcher's ISO
+    /// carries for the menu to play, in file order.
+    menu_xa: Vec<PathBuf>,
+    /// The analysis file (`mkdisc analyse`) holding every menu song's meter.
+    menu_spectrum: Option<PathBuf>,
+    /// Attribution the menu prints for the music.
     credit: String,
-    /// Per menu track, in the same order: `(milli-BPM, first-beat ms)` from
+    /// Per menu song, in song order: `(milli-BPM, first-beat ms)` from
     /// `disc-tools beatgrid`.
     menu_beats: Vec<(u32, u32)>,
-    /// Per menu track, in the same order: the title the menu shows as
-    /// "now playing".
+    /// Per menu song, in the same order: the title the menu shows as
+    /// "now playing". Their count is the number of songs.
     menu_titles: Vec<String>,
     /// Display names pressed onto the disc but held off the carousel until
     /// the cheat code reveals them.
@@ -131,7 +145,8 @@ fn parse_args() -> Result<Args, String> {
     let mut shared_cdda = Vec::new();
     let mut descriptions = Vec::new();
     let mut versions = Vec::new();
-    let mut menu_cdda = Vec::new();
+    let mut menu_xa: Vec<PathBuf> = Vec::new();
+    let mut menu_spectrum: Option<PathBuf> = None;
     let mut credit = String::new();
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
     let mut menu_titles: Vec<String> = Vec::new();
@@ -208,9 +223,19 @@ fn parse_args() -> Result<Args, String> {
                     italian.trim().to_string(),
                 ));
             }
-            "--menu-cdda" => menu_cdda.push(PathBuf::from(
-                it.next().ok_or("--menu-cdda takes a path".to_string())?,
+            "--menu-xa" => menu_xa.push(PathBuf::from(
+                it.next().ok_or("--menu-xa takes a path".to_string())?,
             )),
+            "--menu-spectrum" => {
+                menu_spectrum = Some(PathBuf::from(
+                    it.next().ok_or("--menu-spectrum takes a path".to_string())?,
+                ))
+            }
+            "--menu-cdda" => {
+                return Err("--menu-cdda is gone: the menu songs are XA files now, give them \
+                            with --menu-xa and their meter with --menu-spectrum"
+                    .to_string())
+            }
             "--credit" => credit = it.next().ok_or("--credit takes a string".to_string())?,
             "--menu-title" => {
                 menu_titles.push(it.next().ok_or("--menu-title takes a string".to_string())?)
@@ -249,7 +274,8 @@ fn parse_args() -> Result<Args, String> {
         shared_cdda,
         descriptions,
         versions,
-        menu_cdda,
+        menu_xa,
+        menu_spectrum,
         credit,
         menu_beats,
         menu_titles,
@@ -273,12 +299,14 @@ fn print_usage() {
          --gate        NAME stays off the carousel until the cheat code\n\
          --shot        NAME=<blob> adds a menu backdrop for the program; repeat\n\
         \x20             for a slideshow (cook the blob with disc-tools cook-shot)\n\
-         --menu-cdda   raw 44.1 kHz stereo PCM for the menu; repeat it and the\n\
-        \x20             menu cycles through the tracks in order\n\
-         --credit      attribution the menu prints for that track\n\
-         --menu-beat   MILLIBPM:PHASEMS for the matching --menu-cdda, from\n\
+         --menu-xa     an XA song file (psx-audio-cook xa-pack) for the launcher's\n\
+        \x20             ISO; repeat it for every file of the pack\n\
+         --menu-spectrum  the level-meter file `mkdisc analyse` wrote for the songs\n\
+         --credit      attribution the menu prints for the music\n\
+         --menu-beat   MILLIBPM:PHASEMS per song, in song order, from\n\
         \x20             disc-tools beatgrid; drives the menu's beat pulse\n\
-         --menu-title  title of the matching --menu-cdda, shown as now playing\n\
+         --menu-title  title of each song, in song order, shown as now playing;\n\
+        \x20             their count is the song count\n\
          --max-sectors the target blank's capacity; a layout over it is an error\n\
          --dry-run     print the sector budget and stop without writing the image"
     );
@@ -422,34 +450,6 @@ fn msf(frames: u32) -> String {
 }
 
 /// One audio track's final position on the demo disc.
-/// NitroXide plays the launcher's menu songs, and it finds them by convention
-/// rather than by being told: CD-DA is addressed by track number, so it assumes
-/// the menu music is tracks 2 through 5 and reads GetTN only to check the disc
-/// has that many. Nothing hands it a base. That works because this laying-out
-/// puts all the menu audio down before any program's, which makes the menu
-/// songs the first audio tracks on the disc wherever NitroXide sits in the
-/// running order.
-///
-/// It is a convention, so it can be broken from this side without NitroXide
-/// noticing: it would play the wrong four tracks rather than fail. This is the
-/// check that stops that being silent. It compares placement rather than
-/// trusting the loop order above, so interleaving or reordering trips it too.
-fn check_menu_tracks_lead(placed: &[PlacedAudio], menu_count: usize) -> Result<(), String> {
-    let (menu, games) = placed.split_at(menu_count.min(placed.len()));
-    let Some(last_menu) = menu.iter().map(|t| t.index01).max() else {
-        return Ok(());
-    };
-    match games.iter().map(|t| t.index01).min() {
-        Some(first_game) if first_game <= last_menu => Err(format!(
-            "menu audio must be the first CD-DA on the disc, so NitroXide's \
-             tracks 2-{} are the menu songs: a program's track starts at LBA \
-             {first_game}, at or before the last menu track at LBA {last_menu}",
-            menu_count + 1
-        )),
-        _ => Ok(()),
-    }
-}
-
 struct PlacedAudio {
     index00: u32,
     index01: u32,
@@ -700,7 +700,88 @@ fn check_budget(budget: &Budget, max_sectors: Option<u32>) -> Result<(), String>
     }
 }
 
+
+/// Split an analysis file into its meter bytes and the frame count of each
+/// song.
+fn parse_analysis(bytes: &[u8]) -> Result<(Vec<u8>, Vec<u32>), String> {
+    if bytes.get(..8) != Some(ANALYSIS_MAGIC) {
+        return Err("not a mkdisc analysis file (run `mkdisc analyse`)".into());
+    }
+    let word = |at: usize| -> Result<u32, String> {
+        bytes
+            .get(at..at + 4)
+            .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+            .ok_or_else(|| "truncated".to_string())
+    };
+    let songs = word(8)? as usize;
+    if songs > disc_toc::MAX_MENU_TRACKS {
+        return Err(format!(
+            "{songs} songs, the table holds {}",
+            disc_toc::MAX_MENU_TRACKS
+        ));
+    }
+    let mut frames = Vec::with_capacity(songs);
+    for song in 0..songs {
+        frames.push(word(12 + 4 * song)?);
+    }
+    let data_at = 12 + 4 * songs;
+    let want = frames.iter().sum::<u32>() as usize * spectrum::BANDS;
+    let data = bytes
+        .get(data_at..)
+        .filter(|d| d.len() == want)
+        .ok_or_else(|| {
+            format!(
+                "the frame counts want {want} bytes of meter data, the file holds {}",
+                bytes.len().saturating_sub(data_at)
+            )
+        })?;
+    Ok((data.to_vec(), frames))
+}
+
+/// `mkdisc analyse OUT.spectrum SONG.wav...`: the level-meter animation of
+/// every song, as one file `--menu-spectrum` reads. Run once when the music is
+/// authored; the WAVs themselves stay out of the repository.
+fn analyse_command(args: &[String]) -> Result<(), String> {
+    let (out, songs) = args
+        .split_first()
+        .filter(|(_, songs)| !songs.is_empty())
+        .ok_or("usage: mkdisc analyse OUT.spectrum SONG.wav...")?;
+    if songs.len() > disc_toc::MAX_MENU_TRACKS {
+        return Err(format!(
+            "{} songs, the table holds {}",
+            songs.len(),
+            disc_toc::MAX_MENU_TRACKS
+        ));
+    }
+    let mut frames = Vec::new();
+    let mut data = Vec::new();
+    for path in songs {
+        let bytes = fs::read(path).map_err(|e| format!("read {path}: {e}"))?;
+        let wav = wav::parse(&bytes).map_err(|e| format!("{path}: {e}"))?;
+        let meter = spectrum::analyse(&wav.stereo_pcm, wav.rate);
+        println!(
+            "{path}: {} Hz, {} frames of meter",
+            wav.rate,
+            meter.len() / spectrum::BANDS
+        );
+        frames.push((meter.len() / spectrum::BANDS) as u32);
+        data.extend_from_slice(&meter);
+    }
+    let mut file = Vec::new();
+    file.extend_from_slice(ANALYSIS_MAGIC);
+    file.extend_from_slice(&(frames.len() as u32).to_le_bytes());
+    for f in &frames {
+        file.extend_from_slice(&f.to_le_bytes());
+    }
+    file.extend_from_slice(&data);
+    fs::write(out, file).map_err(|e| format!("write {out}: {e}"))
+}
+
 fn run() -> Result<(), String> {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw.first().map(String::as_str) == Some("analyse") {
+        return analyse_command(&raw[1..]);
+    }
     let args = parse_args()?;
 
     let launcher =
@@ -720,28 +801,55 @@ fn run() -> Result<(), String> {
     // Bare EXEs ride inside the launcher's own ISO, so their LBAs follow from
     // the file order. Whole images are appended after the ISO ends, which the
     // ISO's own length decides -- so build the ISO first, then place them.
-    let mut menu_audio = Vec::new();
-    for path in &args.menu_cdda {
+    // The menu songs: XA files that ride in the launcher's own ISO, found by
+    // the launcher through the root directory by name.
+    let mut menu_xa: Vec<(String, Vec<u8>)> = Vec::new();
+    for path in &args.menu_xa {
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
-        if bytes.len() % SECTOR_BYTES != 0 {
+        if bytes.is_empty() || bytes.len() % XA_SECTOR_BYTES != 0 {
             return Err(format!(
-                "{}: {} bytes is not a whole number of {SECTOR_BYTES}-byte CD-DA sectors. \
-                 Pad it, or the last sector will be a click.",
+                "{}: {} bytes is not a whole number of {XA_SECTOR_BYTES}-byte XA sectors; \
+                 give it a file psx-audio-cook xa-pack wrote",
                 path.display(),
                 bytes.len()
             ));
         }
-        menu_audio.push(bytes);
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| format!("{}: no file name", path.display()))?
+            .to_ascii_uppercase();
+        menu_xa.push((name, bytes));
     }
-    // Analysed here rather than by a separate tool: mkdisc already has the
-    // PCM in hand, and a meter that disagrees with the track on the disc is
-    // exactly the kind of drift a build step prevents.
-    let mut spectrum_data = Vec::new();
-    let mut spectrum_frames = Vec::new();
-    for bytes in &menu_audio {
-        let data = spectrum::analyse(bytes);
-        spectrum_frames.push((data.len() / spectrum::BANDS) as u32);
-        spectrum_data.extend_from_slice(&data);
+    let song_count = args.menu_titles.len();
+    if song_count > disc_toc::MAX_MENU_TRACKS {
+        return Err(format!(
+            "{song_count} --menu-title against the {} songs the table holds",
+            disc_toc::MAX_MENU_TRACKS
+        ));
+    }
+    if menu_xa.is_empty() != (song_count == 0) {
+        return Err(
+            "--menu-xa and --menu-title come together: the files hold the songs, the titles \
+             name them"
+                .to_string(),
+        );
+    }
+    // The meter data was analysed when the music was authored (the source
+    // WAVs are not in the repository), so it travels as a file of its own.
+    let (spectrum_data, spectrum_frames) = match &args.menu_spectrum {
+        Some(path) => {
+            let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+            parse_analysis(&bytes).map_err(|e| format!("{}: {e}", path.display()))?
+        }
+        None => (Vec::new(), Vec::new()),
+    };
+    if !spectrum_frames.is_empty() && spectrum_frames.len() != song_count {
+        return Err(format!(
+            "{} has {} songs but there are {song_count} --menu-title",
+            args.menu_spectrum.as_ref().unwrap().display(),
+            spectrum_frames.len()
+        ));
     }
 
     // Screenshots, cooked by disc-tools cook-shot. Grouped by program (in
@@ -869,6 +977,11 @@ fn run() -> Result<(), String> {
         for (name, bytes) in &iso_files {
             builder.add_file(name, bytes.clone());
         }
+        for (name, bytes) in &menu_xa {
+            builder
+                .add_xa_file(name, bytes.clone())
+                .expect("lengths were checked when the files were read");
+        }
         builder.build_bin()
     };
 
@@ -881,17 +994,10 @@ fn run() -> Result<(), String> {
     // settled before hundreds of megabytes get written: an optional program
     // that does not fit fails here with each share named, not at the burner.
     let mut budget = vec![(
-        String::from("launcher ISO (menu, bare EXEs)"),
+        String::from("launcher ISO (menu, bare EXEs, XA)"),
         iso_frames,
         0u32,
     )];
-    if !menu_audio.is_empty() {
-        let frames = menu_audio
-            .iter()
-            .map(|bytes| PREGAP_FRAMES + (bytes.len() / SECTOR_BYTES) as u32)
-            .sum();
-        budget.push((String::from("menu music"), frames, menu_audio.len() as u32));
-    }
     for (index, _, image, _, _) in &images {
         budget.push((
             args.programs[*index].name.clone(),
@@ -906,11 +1012,11 @@ fn run() -> Result<(), String> {
     }
 
     let mut image_lba = iso_frames;
-    // Game audio numbers from AFTER the menu's tracks: the menu music is
-    // placed innermost (see the concatenation below), so every game's base
-    // shifts by the menu track count. All of the bases are computed right
-    // here and travel through disc_base, so the shift costs nothing.
-    let mut cdda_track_base = menu_audio.len() as u32;
+    // The menu music is XA inside the launcher's ISO and owns no CD-DA track,
+    // so the first game's audio is track 2 and every base counts only the
+    // games' own tracks. Nothing on the disc reads a track by a fixed number
+    // any more: the old "menu songs are tracks 2-5" convention is gone.
+    let mut cdda_track_base = 0u32;
     for (index, path, image, payload_fnv, boot_exe_lba) in &images {
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
         let program = &args.programs[*index];
@@ -949,20 +1055,6 @@ fn run() -> Result<(), String> {
     apply_versions(&mut entries, &names, &args.versions)?;
     apply_gates(&mut entries, &names, &args.gates)?;
     apply_shots(&mut entries, &names, &shot_spans)?;
-    // The menu's tracks come FIRST among the audio, immediately after the
-    // data. They used to go last so adding one could not shift a game's
-    // base, but last physically means the outer edge of the burn, and the
-    // v0.2 console run showed the PS1 drive fighting exactly that region:
-    // the first menu track locked after six ~1.5 s servo retries and the
-    // further-out ones never locked at all, while every inner track read
-    // fine. The menu music plays whenever the disc is on the menu, so it
-    // gets the comfortable radius; the bases above absorb the shift.
-    let menu_track = if menu_audio.is_empty() {
-        0
-    } else {
-        // Track 1 is the data track, so audio starts at 2.
-        2
-    };
     // The menu draws the credit as one centred line at the 8-pixel font, so a
     // long one runs off both edges. Same silent-clipping trap as the blurbs.
     const CREDIT_COLUMNS: usize = 39;
@@ -979,11 +1071,10 @@ fn run() -> Result<(), String> {
         ("--menu-beat", args.menu_beats.len()),
         ("--menu-title", args.menu_titles.len()),
     ] {
-        if given != 0 && given != menu_audio.len() {
+        if given != 0 && given != song_count {
             return Err(format!(
-                "{given} {flag} against {} --menu-cdda: they pair up in order, so give one \
-                 per track or none at all",
-                menu_audio.len()
+                "{given} {flag} against {song_count} songs: they pair up in order, so give one \
+                 per song or none at all"
             ));
         }
     }
@@ -997,18 +1088,22 @@ fn run() -> Result<(), String> {
             ));
         }
     }
-    if !menu_audio.is_empty() && args.credit.is_empty() {
+    if song_count != 0 && args.credit.is_empty() {
         return Err(
-            "--menu-cdda without --credit: the menu has nowhere to attribute the \
-                    track, which is the one thing an attribution licence asks for"
+            "--menu-xa without --credit: the menu has nowhere to attribute the \
+                    music, which is the one thing an attribution licence asks for"
                 .to_string(),
         );
     }
 
+    // The table's first field says which CD-DA track the menu plays; the menu
+    // has none any more, so it is 0 and the song count is what the launcher
+    // reads. (A table with its own song section is the pool design in the XA
+    // migration plan; this reuses the fields that already exist.)
     let toc = disc_toc::encode(
         &entries,
-        menu_track,
-        menu_audio.len() as u32,
+        0,
+        song_count as u32,
         &args.credit,
         &args.menu_beats,
         &args
@@ -1043,24 +1138,8 @@ fn run() -> Result<(), String> {
         lba += (image.data.len() / SECTOR_BYTES) as u32;
     }
 
-    // All audio follows all data: the menu's tracks first (innermost radius,
-    // see the menu_track note above), then each game's in program order.
+    // All CD-DA follows all data, each game's in program order.
     let mut placed_audio = Vec::new();
-    for bytes in &menu_audio {
-        // A real two-second pregap, like every game image's audio carries.
-        // These tracks used to start flush at INDEX 01 with no pause
-        // region at all, and the v0.4 console overlay showed what that
-        // costs on silicon: Play accepted, then STAT 0x42 -- seeking --
-        // on every poll forever, for all four tracks. A drive approaches
-        // a track from before its start; with no pause there is nothing
-        // to land in (and track 2's approach lay inside the DATA track,
-        // a type transition Red Book pads for exactly this reason).
-        let index00 = (disc.len() / SECTOR_BYTES) as u32;
-        disc.resize(disc.len() + (PREGAP_FRAMES as usize) * SECTOR_BYTES, 0);
-        let index01 = (disc.len() / SECTOR_BYTES) as u32;
-        placed_audio.push(PlacedAudio { index00, index01 });
-        disc.extend_from_slice(bytes);
-    }
     for (_, _, image, _, _) in &images {
         let base = (disc.len() / SECTOR_BYTES) as u32;
         for track in &image.audio {
@@ -1071,8 +1150,6 @@ fn run() -> Result<(), String> {
         }
         disc.extend_from_slice(&image.audio_bytes);
     }
-
-    check_menu_tracks_lead(&placed_audio, menu_audio.len())?;
 
     fs::write(&args.out, &disc).map_err(|e| format!("write {}: {e}", args.out.display()))?;
     let cue_path = args.out.with_extension("cue");
@@ -1106,15 +1183,10 @@ fn run() -> Result<(), String> {
             shots_bin.len() / 1024
         );
     }
-    if menu_track != 0 {
+    if song_count != 0 {
         println!(
-            "menu music on CD-DA track{} {menu_track}{}, credited as {:?}",
-            if menu_audio.len() > 1 { "s" } else { "" },
-            if menu_audio.len() > 1 {
-                format!("-{}", menu_track + menu_audio.len() as u32 - 1)
-            } else {
-                String::new()
-            },
+            "menu music: {song_count} song(s) in {} XA file(s), credited as {:?}",
+            menu_xa.len(),
             args.credit
         );
     }
@@ -1152,13 +1224,6 @@ mod tests {
         }
     }
 
-    fn at(index01: u32) -> PlacedAudio {
-        PlacedAudio {
-            index00: index01.saturating_sub(150),
-            index01,
-        }
-    }
-
     fn row(name: &str, sectors: u32, tracks: u32) -> (String, u32, u32) {
         (name.to_string(), sectors, tracks)
     }
@@ -1187,27 +1252,6 @@ mod tests {
         assert!(check_budget(&fits, None).is_ok());
         let over = [row("launcher", 1, 0), row("GAME", 1, 99)];
         assert!(check_budget(&over, None).unwrap_err().contains("100 tracks"));
-    }
-
-    #[test]
-    fn menu_audio_leading_the_disc_is_accepted() {
-        let placed = [at(1000), at(2000), at(3000), at(4000), at(9000), at(9500)];
-        assert!(check_menu_tracks_lead(&placed, 4).is_ok());
-    }
-
-    #[test]
-    fn a_program_track_before_the_menu_songs_is_an_error() {
-        // What a future layout change would look like: some game's audio laid
-        // down first, which silently moves the menu off tracks 2-5 and leaves
-        // NitroXide playing whatever landed there.
-        let placed = [at(9000), at(9500), at(1000), at(2000), at(3000), at(4000)];
-        let err = check_menu_tracks_lead(&placed, 4).unwrap_err();
-        assert!(err.contains("first CD-DA"), "{err}");
-    }
-
-    #[test]
-    fn a_disc_with_no_menu_music_has_nothing_to_check() {
-        assert!(check_menu_tracks_lead(&[at(9000)], 0).is_ok());
     }
 
     #[test]
@@ -1410,5 +1454,29 @@ mod tests {
         assert!(text.contains("TRACK 02 AUDIO\n    INDEX 00 01:00:00\n    INDEX 01 01:02:00"));
         // No pregap means no INDEX 00 line.
         assert!(text.contains("TRACK 03 AUDIO\n    INDEX 01 01:30:00"));
+    }
+
+    #[test]
+    fn an_analysis_file_round_trips_its_songs() {
+        let mut file = Vec::new();
+        file.extend_from_slice(ANALYSIS_MAGIC);
+        file.extend_from_slice(&2u32.to_le_bytes());
+        file.extend_from_slice(&1u32.to_le_bytes());
+        file.extend_from_slice(&2u32.to_le_bytes());
+        file.extend(std::iter::repeat_n(7u8, 3 * spectrum::BANDS));
+        let (data, frames) = parse_analysis(&file).expect("valid");
+        assert_eq!(frames, vec![1, 2]);
+        assert_eq!(data.len(), 3 * spectrum::BANDS);
+    }
+
+    #[test]
+    fn an_analysis_file_that_disagrees_with_itself_is_an_error() {
+        let mut file = Vec::new();
+        file.extend_from_slice(ANALYSIS_MAGIC);
+        file.extend_from_slice(&1u32.to_le_bytes());
+        file.extend_from_slice(&5u32.to_le_bytes());
+        file.extend(std::iter::repeat_n(0u8, 3));
+        assert!(parse_analysis(&file).unwrap_err().contains("want"));
+        assert!(parse_analysis(b"nonsense").is_err());
     }
 }

@@ -71,7 +71,7 @@ impl StickNav {
         let (x, y) = sticks.left_centered();
         match self.latch {
             Latch::Centre => {
-                if self.enter.outside(x, y) {
+                if self.enter.is_outside(x, y) {
                     let bit = dominant(x, y);
                     self.latch = Latch::Held(bit);
                     bit & DPAD
@@ -80,7 +80,7 @@ impl StickNav {
                 }
             }
             Latch::Held(bit) => {
-                if self.exit.outside(x, y) {
+                if self.exit.is_outside(x, y) {
                     bit
                 } else {
                     self.latch = Latch::Centre;

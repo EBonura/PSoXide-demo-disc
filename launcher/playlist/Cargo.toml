@@ -1,0 +1,12 @@
+[package]
+name    = "playlist"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "The launcher's shuffled song order and song clock."
+
+# A member of the launcher's workspace (a path dependency under its root). It is
+# `no_std` and touches no hardware, so `cargo test` in this directory runs the
+# logic on the host.
+
+[dependencies]
