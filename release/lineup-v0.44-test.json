@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.44-test",
-  "note": "PSoXide Demo Disc v0.44-test, public pressing: the v0.43 public inputs unchanged (every program is the v0.43 build), with the launcher on XA menu music (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. The `local` fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed. The Arcade input is the build from main with the analog-required launcher (code equal to e8aec23, the image the v0.43 pressing carried), because the v0.43 image file itself no longer exists on this machine; its bin hash differs, its code does not.",
+  "note": "PSoXide Demo Disc v0.44-test, public pressing, all XA: no CD-DA track. Arcade, Cortex (Graybox Reach), Quake, NitroXide and VoXide are their 2026-10-15 XA builds and each carries its own music; PSXcel and Celeste are the v0.43 bare EXEs. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. The `local` fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed.",
   "programs": [
     {
       "name": "PSXCEL",
@@ -27,18 +27,18 @@
       "var": "ARCADE",
       "version_var": "V_ARCADE",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/inputs/arcade/psoxide-arcade.cue",
-      "cue_sha256": "e7f2b0b74eca6bb88b938dece7e3d216fb1571fb9bc07e172b1a111314a37fa8",
-      "bin_sha256": "8c00db88493908e67efed27da2898e7b0874775beba484426373d87fc6cbd51f",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/arcade/psoxide-arcade-xa.cue",
+      "cue_sha256": "24c32a1226c4480b4b6a128c5750cc446726b1f11306029898a0321d5ba60d33",
+      "bin_sha256": "2c2037944ff396ee98fe8e9ef70d254dcc74945d0674e7e62fad0a4e4a021861",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/psoxide-arcade",
         "local": "~/Desktop/repos/psoxide-arcade",
-        "revision": "26af632dbcce070fb3a3c215623621d8394e86d7",
-        "ref": "main"
+        "revision": "3ddcc275d07e14dfb541ef243431396085b8d16a",
+        "ref": "feat/arcade-xa-music-2026-10-15"
       },
-      "build": "make disc on main with the SDK hotfix cc668b56b hydrated from the dd-analog work dir (.psoxide of the e8aec23 build): main pins cc668b56b but that commit is not on GitHub, so a clean bootstrap 404s. Code equals e8aec23 (the image pressed in v0.43 private); only licence and docs differ.",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/dd-test-2026-10-08/logs/arcade-build2.log"
+      "build": "make disc on feat/arcade-xa-music-2026-10-15 (SDK e6ec267, editor 9ad78b3, emulator 9e00783): Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Receipt in campaign-2026-10-15/arcade-xa/RESULT.md.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/arcade-xa/RESULT.md"
     },
     {
       "name": "CELESTE COLLECTION",
@@ -64,72 +64,72 @@
       "var": "NITROXIDE",
       "version_var": "V_NITROXIDE",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/nitroxide/NitroXide.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/nitroxide/NitroXide.cue",
       "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
-      "bin_sha256": "706c0c4d6404476863f85f5fab953497f597fb63116e2de38ddcb7706585c2d0",
-      "version": "0.3.0",
+      "bin_sha256": "81b561c18158b20f0b98894e533e31eba48842e8c2badc6db0f93e0341475622",
+      "version": "0.4.1",
       "source": {
         "repository": "EBonura/nitroxide",
         "local": "~/Desktop/repos/nitroxide",
-        "revision": "f91f7fab681885bed484e85aeacd4418d6c4c896",
-        "ref": "main"
+        "revision": "b820580cb6ee411ee6f2a0d4cdcd5e7e587f944f",
+        "ref": "feat/nitroxide-xa-music-2026-10-15"
       },
-      "build": "make disc on a clean clone of main (SDK e663de61, committed PGO profile), no CDDA_DIR: a data track only, since it plays the menu's CD-DA tracks 2-5 from the demo disc; CHANGELOG says 0.3.0 while Cargo.toml still says 0.2.4",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/nitroxide-build.log"
+      "build": "make compile and make pack with MUSIC_DIR on feat/nitroxide-xa-music-2026-10-15 (SDK EBonura/PSoXide integ/xa-pack-game-bytes-2026-10-15 5cec9331, committed PGO layout): six songs as MUSIC1.XA and MUSIC2.XA, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/nitroxide-music/RESULT.md"
     },
     {
       "name": "VOXIDE",
       "var": "VOXIDE",
       "version_var": "V_VOXIDE",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/voxide/voxide.cue",
-      "cue_sha256": "416945f50741918a1a19fd88f2900e7ba6641591875db3a87f51653a3525d9a8",
-      "bin_sha256": "d6d1ac1bb33832f2a5438126df3f963fa2508c7c33f60823305d216fccde15fb",
-      "version": "0.3.1",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "b0bbeb4f8e092bfc6d6a3e2df3c2b10bbbc2c35f41c63e5a5f1fb16eb059c220",
+      "version": "0.4.0",
       "source": {
         "repository": "EBonura/voxide",
         "local": "~/Desktop/repos/voxide",
-        "revision": "637f2f3daf92500170d9e627a87e4cc24038317e",
-        "ref": "main"
+        "revision": "591c43f8289304cd0001d1e8bc1927340854933e",
+        "ref": "release/0.4.0-rc"
       },
-      "build": "make disc on a clean clone of main (SDK ca31a35a, committed PGO profile)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/voxide-build.log"
+      "build": "release/0.4.0-rc: the image is the release/voxide.bin committed in 591c43f (built from a698fc5, identical tree), four XA music pieces in the one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/voxide-music/ (INSTALLED.json beside the input)"
     },
     {
       "name": "QUAKE SHAREWARE",
       "var": "QUAKE_CUE",
       "version_var": "QUAKE_VERSION",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/quake/quake-psx.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/quake/quake-psx.cue",
       "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "70e95d91b8f09fb561c4da7245c79554a7803b50025bd335155e5110411fbd41",
+      "bin_sha256": "09d18fa28cf0f74912646e9c2142a5a54175c6ce3c9076ccc1aaaf6883e56c52",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/quake-psx",
-        "revision": "53ccff63b1bded765aafb3a6b34e33afbb102d90",
-        "ref": "main"
+        "revision": "c033e9ed2b68bf6ba1a437c0d33d827ec26f8cca",
+        "ref": "feat/quake-xa-music-2026-10-15"
       },
-      "build": "cargo quake-build build on a clean clone of main (SDK b389cedd, editor aacfcf64, shareware 1.06 data); disc label stays 0.1.1 as in v0.41 to v0.43 private (Cargo.toml says 0.1.0)",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/quake/quake-psx.provenance.json"
+      "build": "cargo quake-build disc on feat/quake-xa-music-2026-10-15 (shareware 1.06 data, SDK 5e112a78): eight ambient loops, each stored three times end to end, in MUSIC1.XA and MUSIC2.XA inside the image, no CD-DA; no borrowing from the launcher. Disc label stays 0.1.1.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/quake/quake-psx.provenance.json"
     },
     {
       "name": "CORTEX IGNITION",
       "var": "CORTEX_CURRENT",
       "version_var": "V_CORTEX_CURRENT",
       "kind": "image",
-      "cue": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/inputs/cortex/cortex_ignition_tech_demo_0_4b.cue",
-      "cue_sha256": "8c0e3038468b3b31ec54dab917a6c8ffae8a03725fb3fe4627e668b7835d277a",
-      "bin_sha256": "1d3333b26748f2e90d98b1240789709d738fa85c1005562102e8247157fe960a",
-      "version": "0.4b",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-all-xa/inputs/cortex/Cortex Graybox Reach XA.cue",
+      "cue_sha256": "6569b490b367f437fc890eb6c2a1c1cd1458aa9b789b7b7dd9a5f0160ae0a15e",
+      "bin_sha256": "0581a485b4cd1647427f221ad469a1ec2290aa75df35646a2d947d509b1ca787",
+      "version": "Graybox Reach",
       "source": {
         "repository": "EBonura/PSoXide-editor",
         "local": "~/Desktop/repos/PSoXide-editor",
-        "revision": "309fdf932374a7fc89a407d1b1d06ee4c309293e",
-        "ref": "main"
+        "revision": "84e7512d77b64106ff835e97bb04c32407b3f772",
+        "ref": "feat/engine-xa-music-2026-10-15"
       },
-      "build": "frontend build-project-disc on a copy of editor/projects/default at main 309fdf93 (SDK 6518a5eb6, includes the approved 09-30 animations and two-hit R1 combo that the console-tested 0.4b image 1eab4c90 lacks); guest-symbol-gate PASS",
-      "receipt": "~/Library/Application Support/PSoXide-perf/work/demodisc-public-2026-10-08/logs/cortex-build.log"
+      "build": "frontend build-project-disc --project editor/projects/graybox-reach on feat/engine-xa-music-2026-10-15 (SDK 36ead4b, emulator 6edde550): the two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. The default (0.4b) project does not link on editor main, so Graybox Reach stands in the Cortex slot.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/cortex-xa/RESULT.md"
     }
   ]
 }

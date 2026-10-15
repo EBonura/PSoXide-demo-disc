@@ -38,12 +38,11 @@ disc-tools deploy-public \
 
 This builds the browser emulator with Trunk, verifies the public game and audio
 layout, and proves the streamed audio/data reconstruct the original image.
-A disc with CD-DA tracks ships as a gzipped data track plus FLAC pieces. A disc
-whose music is XA (a single data track) ships as the raw image and a small
-sector-header sidecar, which the page reads lazily over HTTP Range requests;
+The public disc has no CD-DA track (`deploy-public` refuses one). It ships as
+the raw image and a small sector-header sidecar, which the page reads lazily over HTTP Range requests;
 an image over itch.io's 200 MB file limit is split into `demo-disc.bin.001`,
-`.002`, ... and needs an emulator that reads split images
-(`feat/web-lazy-image-parts-2026-10-15` or later).
+`.002`, ... and needs an emulator that reads split images (the
+`web_player` pin is the parts build, b309c31, from `feat/web-lazy-image-parts-2026-10-15`).
 Omit `--publish` to prepare packages for review. `make itch` only updates the
 download; the older `make release-web` only stages GitHub delivery assets.
 Neither is a complete deployment on its own.
@@ -110,25 +109,27 @@ That is safe in place: Mode 2 Form 1 ECC is computed with those bytes zeroed.
 The current layout has seven outer programs plus Credits on the standard
 pressing; Half-Life, Counter-Strike and Hollow Knight are opt-in additions. PSoXide Arcade contains three games
 of its own, and Celeste Collection contains both Celeste Classic games.
-The menu music is XA inside the launcher's own ISO (`MUSIC1.XA`, `MUSIC2.XA`,
-six songs) and owns no CD-DA track. The standard disc has 3 CD-DA tracks (the
-arcade's Goncharov and Cortex's two), until those programs move to XA too. Disc size
-and image hashes are recorded in each build's receipts rather than fixed here.
-Automated evidence is recorded per program and is not an original-hardware
-claim. See [the dated split validation](docs/repository-split-validation-2026-09-05.md).
+Every disc has one data track and no CD-DA. The menu music is XA inside the
+launcher's own ISO (`MUSIC1.XA`, `MUSIC2.XA`, six songs) and each program that
+has music carries its own XA files inside its image (interim design: a song
+shared by two programs is stored twice until the shared pool described in
+`xa-migration/PLAN.md` lands). Disc size and image hashes are recorded in each
+build's receipts rather than fixed here. Automated evidence is recorded per
+program and is not an original-hardware claim. See [the dated split
+validation](docs/repository-split-validation-2026-09-05.md).
 
 | Program | How it ships |
 | --- | --- |
-| Cortex Ignition | current PXBSP project as a whole image, 1 CD-DA track |
-| Half-Life | whole image, 27 CD-DA tracks, `HL=1` only |
-| Counter-Strike (cs-psx) | whole image, no CD-DA track, `CS=1` only |
-| Hollow Knight (hk-psx) | whole image, 4 CD-DA tracks, `HK=1` only |
-| Voxide | whole image, WORLD.PAK assets |
-| NitroXide | data track only (WORLD.PAK arena atlas); the pinned v0.43 build looks for the old menu CD-DA tracks 2-5 and, finding fewer than five tracks, plays nothing until its own XA build lands |
+| Cortex Ignition | the Graybox Reach project as a whole image, two songs as XA after UI.PAK (the default 0.4b project does not link on editor main yet, so Graybox Reach holds this slot) |
+| Half-Life | whole image, music as XA, `HL=1` only |
+| Counter-Strike (cs-psx) | whole image, no music, `CS=1` only |
+| Hollow Knight (hk-psx) | whole image, music as XA, `HK=1` only |
+| Voxide | whole image, WORLD.PAK assets and four XA music pieces |
+| NitroXide | whole image, WORLD.PAK arena atlas and six XA songs |
 | Celeste Classic Collection | bare EXE |
 | PSXcel | bare EXE |
-| PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; owns 1 CD-DA track |
-| Quake shareware | whole image, no CD-DA track |
+| PSoXide Arcade | whole collection image: Breakout, Space Invaders and Magikarp Pong; Goncharov as XA |
+| Quake shareware | whole image, eight ambient loops as XA |
 
 Celeste and PSXcel never read the disc after boot, so they ride as bare EXEs
 and do not care which SDK built them: a `_start` that ignores the loader's
@@ -256,9 +257,10 @@ real-BIOS or original-console claim:
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
-- PSoXide Arcade owns the Goncharov CD-DA track by
+- PSoXide Arcade owns the Goncharov song by
   [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
-  band's permission; Magikarp Pong relocates to it on the combined disc
+  band's permission; it is `MUSIC1.XA` inside the Arcade image and Magikarp
+  Pong finds it through the relocated ISO
 
 ## Building
 
@@ -323,7 +325,7 @@ cannot silently change the SDK contract of the pinned Quake image. The Cortex
 project is staged from `games/PSoXide-editor` under `build/`, keeping
 generated output outside the pinned PSoXide worktree. `games/psoxide-arcade`
 is the private collection repository
-and the canonical owner of `goncharov.cdda` by
+and the canonical owner of the Goncharov song (`goncharov.cdda` in history) by
 [magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
 band's permission.
 

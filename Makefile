@@ -138,12 +138,12 @@ DISC_MAX_SECTORS ?= 359999
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 8dca59135901d3887e248695917aecca3e1ec357
-QUAKE_EXPECTED_PSOXIDE_REV ?= 88e40e969706b7bf2fce109b43985966fab762f7
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 4b3413b265904c16e346e94c0e7fe093a02ae8c7887c6c0fc08a655f33f8ac80
+QUAKE_EXPECTED_REV ?= c033e9ed2b68bf6ba1a437c0d33d827ec26f8cca
+QUAKE_EXPECTED_PSOXIDE_REV ?= fb2a9ab476d19faa0ccfc84b767fbead9a370bb5
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= bdcb41bef77220fddb73e8d7159ed913a83a94bfc29b4c66a72234622d76d945
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 0e9520189368f9a0b192e79c62ab83995f44b5beaf467defbf40feb89e72ddbd
-QUAKE_EXPECTED_EXE_SHA256 ?= 6472466feb485d2367f1056d515e8f91d8f917187eaf95b7f3d50947caa0874c
+QUAKE_EXPECTED_BIN_SHA256 ?= 09d18fa28cf0f74912646e9c2142a5a54175c6ce3c9076ccc1aaaf6883e56c52
+QUAKE_EXPECTED_EXE_SHA256 ?= 08139044c53934fba2ca32e5a2e55dc117ad9f2fb63f04dddfcb43c5074ebb43
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 FRONTEND ?= $(EMULATOR)/target/release/frontend
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
@@ -745,8 +745,7 @@ release-web: $(DISC_TOOLS)
 	$(MAKE) disc
 	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
 	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
-	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web" \
-		"GONCHAROV" "CORTEX IGNITION COMBAT" "CORTEX IGNITION MENU"
+	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web"
 	@# A CD-DA pressing keeps its raw image as a release asset too. A pressing whose
 	@# audio is XA is delivered as that image already (or as numbered parts).
 	@[ -e "$(BUILD)/web/demo-disc.bin" ] || [ -e "$(BUILD)/web/demo-disc.bin.001" ] || cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
