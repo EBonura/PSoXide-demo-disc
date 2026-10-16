@@ -144,6 +144,31 @@ impl Playlist {
     }
 }
 
+/// `frames * 1000 / ticks_per_second`, wrapped to `u32`, in 32-bit operations:
+/// whole seconds of frames and a remainder below `ticks_per_second`, so the
+/// remainder's product is at most `ticks_per_second * 1000` (a frame rate, not
+/// above four million). Equal to the `u64` expression for every input.
+pub const fn millis_of_frames(frames: u32, ticks_per_second: u32) -> u32 {
+    let whole = frames / ticks_per_second;
+    let part = frames % ticks_per_second;
+    whole
+        .wrapping_mul(1000)
+        .wrapping_add(part * 1000 / ticks_per_second)
+}
+
+/// `ceil(millis * sectors_per_second / 1000)`, wrapped to `u32`, in 32-bit
+/// operations: the sectors of a song `millis` long on a drive reading
+/// `sectors_per_second` (75 or 150). Whole seconds of the length and a
+/// remainder below a thousand milliseconds keep every product in a word.
+/// Equal to the `u64` expression for every input.
+pub const fn sectors_for_millis(millis: u32, sectors_per_second: u32) -> u32 {
+    let whole = millis / 1000;
+    let part = millis % 1000;
+    whole
+        .wrapping_mul(sectors_per_second)
+        .wrapping_add((part * sectors_per_second).div_ceil(1000))
+}
+
 /// Newest reading further than this from the running time is a seek or a
 /// restart, not jitter: take it whole.
 const SNAP_MS: u32 = 80;
@@ -186,7 +211,7 @@ impl SongClock {
         }
         let frames = tick.wrapping_sub(self.anchor_tick);
         self.anchor_ms
-            .saturating_add((frames as u64 * 1000 / self.ticks_per_second as u64) as u32)
+            .saturating_add(millis_of_frames(frames, self.ticks_per_second))
     }
 
     /// The drive says the song is `song_ms` in, at frame `tick`.
@@ -216,6 +241,43 @@ impl SongClock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_32_bit_time_conversions_match_the_wide_forms() {
+        let mut state = 0x2545_f491u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let edges = [0, 1, 2, 59, 60, 61, 74, 75, 76, 149, 150, 151, 999, 1000, 1001];
+        for rate in [30u32, 50, 60, 75, 150] {
+            for frames in edges
+                .into_iter()
+                .chain([u32::MAX, u32::MAX - 1, 1 << 31, (1 << 31) - 1])
+                .chain((0..100_000).map(|_| next()))
+            {
+                let wide = (u64::from(frames) * 1000 / u64::from(rate)) as u32;
+                assert_eq!(millis_of_frames(frames, rate), wide, "{frames} at {rate}");
+            }
+            for frames in 0..200_000 {
+                let wide = (u64::from(frames) * 1000 / u64::from(rate)) as u32;
+                assert_eq!(millis_of_frames(frames, rate), wide, "{frames} at {rate}");
+            }
+        }
+        for rate in [75u32, 150] {
+            for millis in edges
+                .into_iter()
+                .chain([u32::MAX, u32::MAX - 1, 1 << 31, (1 << 31) - 1])
+                .chain((0..100_000).map(|_| next()))
+                .chain(0..300_000)
+            {
+                let wide = (u64::from(millis) * u64::from(rate)).div_ceil(1000) as u32;
+                assert_eq!(sectors_for_millis(millis, rate), wide, "{millis} at {rate}");
+            }
+        }
+    }
 
     fn play_through(list: &mut Playlist, songs: usize) -> [u8; MAX_SONGS] {
         let mut heard = [0u8; MAX_SONGS];

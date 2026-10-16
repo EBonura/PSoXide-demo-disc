@@ -43,7 +43,7 @@ const RETRY_TICKS: u32 = 60;
 /// measurement; it only shifts when the visuals land against the audio.
 const HEAD_LEAD_MS: u32 = 40;
 /// Sectors a second a single-speed XA file is read at.
-const SECTORS_PER_SECOND: u64 = 75;
+const SECTORS_PER_SECOND: u32 = 75;
 
 /// What the music is doing right now.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -246,7 +246,7 @@ impl Music {
     fn song(&self, n: u8) -> Option<Song> {
         let (file_index, channel, ms) = *pack::XA_SONGS.get(n as usize)?;
         let (lba, sectors) = self.files.get(file_index as usize).copied().flatten()?;
-        let own = (ms as u64 * SECTORS_PER_SECOND).div_ceil(1000) as u32;
+        let own = playlist::sectors_for_millis(ms, SECTORS_PER_SECOND);
         let span = own.min(sectors.saturating_sub(END_GUARD_SECTORS));
         let speed = if pack::XA_SPEED_DOUBLE {
             DriveSpeed::Double
