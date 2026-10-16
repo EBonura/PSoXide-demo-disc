@@ -88,6 +88,14 @@ const HL_GAMEPLAY_TRIANGLES: u64 = 200;
 const HL_GAMEPLAY_QUADS: u64 = 100;
 const HL_GAMEPLAY_MIN_FRAMES: usize = 30;
 const HL_GAMEPLAY_MIN_HASHES: usize = 8;
+// Remeasured 2026-10-16 on hl-psx b5a58b2 (integ/hl-focus) from the 12-card
+// private pressing, same route: New Game starts from the menu at route tick
+// ~2000, the world shows its first textured frames at ~3000 (67 frames in
+// 3000-3999 clear 200/100 with 368 distinct hashes, 48 more in 4000-4999), and
+// ~4900 route ticks pass per billion steps. The old 700M-step budget stopped
+// at tick ~3400 on the loading screens (0 frames); 1.5 billion steps reach
+// tick ~7300 with 200+ qualifying frames and keep the thresholds unchanged.
+const HL_STEPS: u64 = 1_500_000_000;
 
 /// Per entry: minimum textured triangles, quads and rects in one frame, the
 /// frames and distinct frame hashes that must clear them, and what they prove.
@@ -268,10 +276,10 @@ fn route_for(target: &str, index: usize, count: usize) -> String {
 
 /// The intro and panels push Cortex's gameplay past the default budget.
 fn steps_for(target: &str, steps: u64) -> u64 {
-    if target == "CORTEX IGNITION" {
-        steps.max(CORTEX_STEPS)
-    } else {
-        steps
+    match target {
+        "CORTEX IGNITION" => steps.max(CORTEX_STEPS),
+        "HALF-LIFE" => steps.max(HL_STEPS),
+        _ => steps,
     }
 }
 
@@ -820,6 +828,13 @@ mod tests {
              1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,\
              3400:cross:12"
         );
+    }
+
+    #[test]
+    fn half_life_gets_enough_steps_to_leave_its_loading_screens() {
+        assert_eq!(steps_for("HALF-LIFE", DEFAULT_STEPS), HL_STEPS);
+        assert_eq!(steps_for("HALF-LIFE", 2 * HL_STEPS), 2 * HL_STEPS);
+        assert_eq!(steps_for("QUAKE SHAREWARE", DEFAULT_STEPS), DEFAULT_STEPS);
     }
 
     #[test]
