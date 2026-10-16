@@ -33,7 +33,7 @@
       "version": "0.2.7",
       "source": {
         "repository": "EBonura/celeste-collection-psx",
-        "local": "~/Desktop/repos/pico8-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste",
         "revision": "eabf204fec0349e1cb1e56f6f4177134fedb24ca",
         "ref": "chore/celeste-0.2.7-2026-10-16"
       },
@@ -51,7 +51,7 @@
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/nitroxide",
-        "local": "~/Desktop/repos/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/src/nitroxide",
         "revision": "863765d257ebab25609b0af125373297a1666c71",
         "ref": "chore/sdk-40f0222-2026-10-16"
       },
@@ -87,7 +87,7 @@
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/wipeout-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/wipeout-restore/repo",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/src/wipeout-psx",
         "revision": "f08be05c23ba87fa668bdcd85b0b622a38cb8765",
         "ref": "feat/wall-2097-and-polish-2026-10-16"
       },
@@ -123,7 +123,7 @@
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/cs-psx",
-        "local": "~/Desktop/repos/cs-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/src/cs-psx",
         "revision": "2fb98e8544a6b37e1ef8d2cee1c09e404d5aa50a",
         "ref": "feat/cs-pending-2026-10-16"
       },
@@ -159,7 +159,7 @@
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
-        "local": "~/Desktop/repos/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/src/quake-psx",
         "revision": "e05f786dcdf51c5e4aad8be0bd4dd917a6813269",
         "ref": "integ/quake-2026-10-16"
       },
