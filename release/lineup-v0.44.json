@@ -33,12 +33,12 @@
       "version": "0.2.7",
       "source": {
         "repository": "EBonura/celeste-collection-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste-repo",
         "revision": "eabf204fec0349e1cb1e56f6f4177134fedb24ca",
         "ref": "chore/celeste-0.2.7-2026-10-16"
       },
       "build": "make collection-disc on chore/celeste-0.2.7-2026-10-16 (0.2.7: the main 1fb78a8 code with the DEFAULT/DARKER n/BRIGHTER n brightness stepper, the palette address fix and the card-save SDK repin, VERSION bumped). Differs from the library 0.2.6 build of main 18bbd78 in three sectors only.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste/ (dist/celeste-collection.bin, release/)"
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste-repo/ (dist/celeste-collection.bin, release/)"
     },
     {
       "name": "NITROXIDE",
