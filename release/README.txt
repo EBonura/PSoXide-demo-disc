@@ -87,7 +87,7 @@ How to play
 Extract the download and keep the CUE and BIN together with their original
 names. Open the CUE in your PlayStation emulator and set up your controller.
 For an original PlayStation, use a setup that can load homebrew discs.
-When writing a CD-R, select the CUE so the music tracks are included.
+When writing a CD-R, write the CUE file.
 
 Left/right: choose a game. Cross: play. Up/down: English/Italian description.
 L1/R1: change menu music. Follow each game's prompts for its own controls.
@@ -95,10 +95,24 @@ To switch games, return to the disc menu where supported or restart the disc.
 
 Credits
 -------
-Menu music: four tracks by Just Music
-https://www.youtube.com/@Just-Music-Beats
-Used with the artist's permission for this non-commercial release.
-Do not redistribute the audio separately.
+Menu and NitroXide music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and
+Ambient Jungle D&B Vol 3, CC BY 4.0, https://mululavgmloops.itch.io/
+
+VoXide music: Mulula VGM Loops, Simple Piano Music Vol 1 (Aranha, Melodia,
+Nulo, Pianeta, Side Label, Talher), CC BY 4.0, https://mululavgmloops.itch.io/
+
+Quake music: Mulula VGM Loops, Eerie Ambiences Vol 1, CC BY 4.0,
+https://mululavgmloops.itch.io/
+
+NitroXide crowd sounds: Gregor Quendel, Free Crowd Cheering Sounds, CC BY 4.0,
+https://opengameart.org/
+NitroXide tyre squeal loop: Tom Haigh, CC BY 3.0,
+https://opengameart.org/content/car-tire-squeal-skid-loop
+NitroXide cars: Pavel 3D, Low Poly City Vehicles Pack, CC BY 4.0,
+https://pavel-3d.itch.io/low-poly-city-vehicles-pack
+
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
 
 Cortex Ignition music (menu and combat tracks) is by Carmelo Miceli.
 
