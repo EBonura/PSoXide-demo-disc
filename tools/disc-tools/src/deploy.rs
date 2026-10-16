@@ -275,8 +275,18 @@ fn selected_emulator(root: &Path, emulator: &Path, tools: &Tools) -> Result<(Str
         revision == wanted && dirty.is_empty(),
         "web emulator must be the clean revision selected by release-components.json"
     );
-    crate::components::bootstrap_tree(&tools.python, emulator, &["--check".to_string()])?;
-    let lock_sha256 = sha256_bytes(&fs::read(emulator.join("components.lock.json"))?);
+    let lock_bytes = fs::read(emulator.join("components.lock.json"))?;
+    // An emulator that vendors its SDK carries the crates in git, so there is no
+    // checkout to bootstrap; the older component tool would refuse to replace the
+    // committed files. The emulator's own CI (`make check-sdk`) proves the copy.
+    let vendored = serde_json::from_slice::<Value>(&lock_bytes)
+        .ok()
+        .and_then(|lock| lock["components"]["sdk"]["vendored"].as_bool())
+        .unwrap_or(false);
+    if !vendored {
+        crate::components::bootstrap_tree(&tools.python, emulator, &["--check".to_string()])?;
+    }
+    let lock_sha256 = sha256_bytes(&lock_bytes);
     Ok((revision, lock_sha256))
 }
 
@@ -1277,6 +1287,32 @@ mod tests {
         );
         // No Python was involved, and trunk still ran after the check.
         assert!(f.log("python").is_none());
+        assert!(f.log("trunk").is_some());
+    }
+
+    #[test]
+    fn a_vendored_sdk_needs_no_component_bootstrap() {
+        if !have("git") {
+            return;
+        }
+        let f = Fixture::with_pin(false);
+        let emulator = f.path("emulator");
+        let sdk = "c".repeat(40);
+        fs::write(
+            emulator.join("components.lock.json"),
+            format!("{{\"components\": {{\"sdk\": {{\"revision\": \"{sdk}\", \"vendored\": true}}}}}}\n"),
+        )
+        .unwrap();
+        let revision = commit_all(&emulator);
+        fs::write(
+            f.path("root/release-components.json"),
+            format!("{{\"components\": {{\"emulator\": {{\"revision\": \"{revision}\"}}}}}}"),
+        )
+        .unwrap();
+        commit_all(&f.path("root"));
+        f.stage(&f.options("out")).unwrap();
+        // Neither bootstrap tool ran, and trunk still built the player.
+        assert!(f.log("components").is_none() && f.log("python").is_none());
         assert!(f.log("trunk").is_some());
     }
 

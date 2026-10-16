@@ -1,7 +1,7 @@
 //! Prove that what is about to be uploaded is the public edition and nothing
 //! else.
 //!
-//!     disc-tools public-only [--allow TEXT]... [--same-disc] PATH...
+//!     disc-tools public-only [--allow TEXT]... [--same-disc] [--standalone TEXT] PATH...
 //!
 //! Every PATH is a staged file or a directory of them (the itch.io download
 //! folder, the HTML5 folder, the Celeste package). The Half-Life, Hollow
@@ -20,6 +20,10 @@
 //!   record, which name the pressed programs;
 //! * with `--same-disc`, every disc image found must be byte-identical to the
 //!   others (the download BIN and the web parts are one pressing).
+//!
+//! `--standalone TEXT` is for a single-game package (the Celeste disc): its
+//! images are not the demo disc, so the table of contents is replaced by two
+//! rules, the ISO holds only SYSTEM.CNF and PSX.EXE, and the image contains TEXT.
 //!
 //! `--allow TEXT` excuses a search hit whose surrounding 48 bytes contain TEXT
 //! (case-insensitive), and each excused hit is printed. It exists for text that
@@ -386,28 +390,53 @@ fn judge_hits(
     }
 }
 
-fn check_image(report: &mut Report, image: &Image, allow: &[String]) -> Result<()> {
+fn check_image(
+    report: &mut Report,
+    image: &Image,
+    allow: &[String],
+    standalone: Option<&str>,
+) -> Result<()> {
     let label = &image.label;
-    // Table of contents: exactly the public programs, none hidden.
-    let raw = image.user_bytes(TOC_LBA, TOC_SECTORS)?;
-    match parse_public_toc(&raw) {
-        Ok(toc) => {
-            if toc.menu == PUBLIC_GAMES && toc.visible == PUBLIC_GAMES.len() - 1 && toc.claimed == toc.visible
-            {
-                report.ok(format!(
-                    "{label}: table of contents is the public menu ({})",
-                    toc.menu.join(", ")
-                ));
-            } else {
-                report.fail(format!(
-                    "{label}: table of contents is not the public menu: claimed {}, visible {}, menu {}",
-                    toc.claimed,
-                    toc.visible,
-                    toc.menu.join(", ")
-                ));
-            }
+    if let Some(expect) = standalone {
+        // A single-game disc: one boot EXE and nothing else, and it is that game.
+        let mut whole = Vec::new();
+        image.stream(|_, chunk| whole.extend_from_slice(chunk))?;
+        let lower = whole.to_ascii_lowercase();
+        let wanted = expect.to_ascii_lowercase();
+        if lower.windows(wanted.len()).any(|w| w == wanted.as_bytes()) {
+            report.ok(format!("{label}: is the standalone game ('{expect}' found)"));
+        } else {
+            report.fail(format!("{label}: '{expect}' not found in the image"));
         }
-        Err(error) => report.fail(format!("{label}: table of contents: {error}")),
+        match iso_listing(image) {
+            Ok(paths) if paths == ["/SYSTEM.CNF", "/PSX.EXE"] => {
+                report.ok(format!("{label}: ISO holds SYSTEM.CNF and PSX.EXE only"))
+            }
+            Ok(paths) => report.fail(format!("{label}: ISO holds {}", paths.join(" "))),
+            Err(error) => report.fail(format!("{label}: ISO listing: {error}")),
+        }
+    } else {
+        // Table of contents: exactly the public programs, none hidden.
+        let raw = image.user_bytes(TOC_LBA, TOC_SECTORS)?;
+        match parse_public_toc(&raw) {
+            Ok(toc) => {
+                if toc.menu == PUBLIC_GAMES && toc.visible == PUBLIC_GAMES.len() - 1 && toc.claimed == toc.visible
+                {
+                    report.ok(format!(
+                        "{label}: table of contents is the public menu ({})",
+                        toc.menu.join(", ")
+                    ));
+                } else {
+                    report.fail(format!(
+                        "{label}: table of contents is not the public menu: claimed {}, visible {}, menu {}",
+                        toc.claimed,
+                        toc.visible,
+                        toc.menu.join(", ")
+                    ));
+                }
+            }
+            Err(error) => report.fail(format!("{label}: table of contents: {error}")),
+        }
     }
     // ISO directory listing.
     match iso_listing(image) {
@@ -482,7 +511,7 @@ fn check_file(report: &mut Report, file: &Path, allow: &[String]) -> Result<()> 
 }
 
 pub fn run(args: &[String]) -> Result<i32> {
-    let args = Args::parse(args, &["allow"], &["same-disc"])?;
+    let args = Args::parse(args, &["allow", "standalone"], &["same-disc"])?;
     ensure!(!args.positional.is_empty(), "name the staged files or folders to check");
     let allow: Vec<String> = args.all("allow").iter().map(|s| s.to_string()).collect();
     let paths: Vec<PathBuf> = args.positional.iter().map(PathBuf::from).collect();
@@ -502,7 +531,7 @@ pub fn run(args: &[String]) -> Result<i32> {
     }
     let mut digests = Vec::new();
     for image in &images {
-        check_image(&mut report, image, &allow)?;
+        check_image(&mut report, image, &allow, args.get("standalone"))?;
         digests.push((image.label.clone(), image.sha256()?));
     }
     if args.has("same-disc") {
