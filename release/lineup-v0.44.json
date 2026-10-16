@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "pressing": "v0.44",
-  "note": "PSoXide Demo Disc v0.44, public pressing, all XA: no CD-DA track. Celeste is the library 0.2.6 build with the brightness stepper (main 1fb78a8), NitroXide, VoXide 0.4.1 and Quake are their 2026-10-15 checkpoint installs; Arcade and Cortex (Graybox Reach) keep the XA builds of the v0.44-test pressing; PSXcel is the v0.43 bare EXE, byte for byte. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it. The local fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed.",
+  "note": "PSoXide Demo Disc v0.44, public pressing, all XA: no CD-DA track. Celeste is 0.2.7 (main 1fb78a8 code with the brightness stepper, palette fix and card-save repin); NitroXide (SDK pad engine, background settings save), VoXide 0.4.1 and Quake (integ/quake-2026-10-16) are the library installs of 2026-10-15 and 2026-10-16; Arcade and Cortex (Graybox Reach) keep the XA builds of the v0.44-test pressing; PSXcel is the v0.43 bare EXE, byte for byte. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). The local fields name checkouts on the build machine that hold each revision. Hashes gate every input; disc-tools lineup refuses a file that changed.",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
       "var": "ARCADE",
       "version_var": "V_ARCADE",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/arcade/psoxide-arcade-xa.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/arcade/psoxide-arcade-xa.cue",
       "cue_sha256": "24c32a1226c4480b4b6a128c5750cc446726b1f11306029898a0321d5ba60d33",
       "bin_sha256": "2c2037944ff396ee98fe8e9ef70d254dcc74945d0674e7e62fad0a4e4a021861",
       "version": "0.1.1",
@@ -27,43 +27,43 @@
       "version_var": "V_CELESTE",
       "kind": "game",
       "derive": {
-        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/celeste/Celeste Classic Collection.cue"
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/celeste/Celeste Classic Collection.cue"
       },
-      "bin_sha256": "03eb01007ae59818a2bbdb4994e6d05bdd95cb8096012b11d90dfaf7b1763668",
-      "version": "0.2.6",
+      "bin_sha256": "55fe9ee03fcd6a35393a08f3019496b43177da2eb764854af5365abd1d058236",
+      "version": "0.2.7",
       "source": {
         "repository": "EBonura/celeste-collection-psx",
         "local": "~/Desktop/repos/pico8-psx",
-        "revision": "1fb78a8ca0a9a8495f7314d20448a65c42a39908",
-        "ref": "main"
+        "revision": "eabf204fec0349e1cb1e56f6f4177134fedb24ca",
+        "ref": "chore/celeste-0.2.7-2026-10-16"
       },
-      "build": "the library Celeste Classic Collection build of 2026-10-11 (make collection-disc from main 18bbd78: 0.2.6 with the DEFAULT/DARKER n/BRIGHTER n brightness stepper, the palette address fix and the card-save SDK repin), copied byte for byte. Main moved to 1fb78a8 by one test-only commit (tests/classic-first-three-rooms.toml), so the source is the same.",
-      "receipt": "/Users/ebonura/Downloads/ps1 games/Celeste Classic Collection (no INSTALLED.json; provenance in campaign-2026-10-15/lost-audit/demo/REPORT.md section 4)"
+      "build": "make collection-disc on chore/celeste-0.2.7-2026-10-16 (0.2.7: the main 1fb78a8 code with the DEFAULT/DARKER n/BRIGHTER n brightness stepper, the palette address fix and the card-save SDK repin, VERSION bumped). Differs from the library 0.2.6 build of main 18bbd78 in three sectors only.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-final/celeste/ (dist/celeste-collection.bin, release/)"
     },
     {
       "name": "NITROXIDE",
       "var": "NITROXIDE",
       "version_var": "V_NITROXIDE",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/nitroxide/NitroXide.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/nitroxide/NitroXide.cue",
       "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
-      "bin_sha256": "150cf58467d62b6cc98faf07bfa231ce5b26a0a85179ef00cd2e543a3f93845f",
+      "bin_sha256": "2ded4e84a6d2a9e2d95bedd956a16772911d23633c1e6fd4078606c0a7a8922a",
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/nitroxide",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/nitroxide",
-        "revision": "391b2c7de273fb3830417349d6ce56377c6e7dbd",
-        "ref": "checkpoint/nitroxide-2026-10-15"
+        "local": "~/Desktop/repos/nitroxide",
+        "revision": "863765d257ebab25609b0af125373297a1666c71",
+        "ref": "chore/sdk-40f0222-2026-10-16"
       },
-      "build": "the library NitroXide install of 2026-10-15 (INSTALLED.json): make compile (committed PGO layout, 100 percent bound) and make pack with MUSIC_DIR, six songs as MUSIC1.XA and MUSIC2.XA, one data track, no CD-DA; nine cars, wall ramp texture fix, SFX pass.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/checkpoints/nitroxide.md"
+      "build": "the library NitroXide install of 2026-10-16 (INSTALLED.json): make compile (regenerated PGO layout, 91 of 91 placed functions bound) and make pack with MUSIC_DIR, six songs as MUSIC1.XA and MUSIC2.XA, one data track, no CD-DA; SDK 5219afbe, the SDK interrupt-driven pad engine, background settings save.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/nitroxide/INSTALLED.json"
     },
     {
       "name": "VOXIDE",
       "var": "VOXIDE",
       "version_var": "V_VOXIDE",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/voxide/VoXide.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/voxide/VoXide.cue",
       "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
       "bin_sha256": "d26a7455f156cec78584da29f4873748e1bb242a5892e93a8e1094e33acfefbe",
       "version": "0.4.1",
@@ -81,25 +81,25 @@
       "var": "QUAKE_CUE",
       "version_var": "QUAKE_VERSION",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/quake/quake-psx.cue",
       "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "2f421d4a3485139304e02248e618fd6eeb15d999cabf0180293f8af75b64d04d",
+      "bin_sha256": "6728e703c17c199216c39fdac639c2a02fe363f3aaab60f2d5075bda2e704c8f",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v044/src/quake-psx",
-        "revision": "20481e32956aa0f41d83c2fc0916f0ae80117794",
-        "ref": "checkpoint/quake-2026-10-15"
+        "local": "~/Desktop/repos/quake-psx",
+        "revision": "e05f786dcdf51c5e4aad8be0bd4dd917a6813269",
+        "ref": "integ/quake-2026-10-16"
       },
-      "build": "the library Quake install of 2026-10-15 (quake-psx.provenance.json): cargo quake-build disc from checkpoint/quake-2026-10-15 (shareware 1.06 data, SDK 5e112a78, editor fb2a9ab): bridge-grunt fix, XA music (eight loops stored three times), leaf contents, death loadout, mover speeds, splash, wall puffs, RLE logo; one data track, no CD-DA.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/quake/quake-psx.provenance.json"
+      "build": "the library Quake install of 2026-10-16 (quake-psx.provenance.json): cargo quake-build disc from integ/quake-2026-10-16 (shareware 1.06 data): RAM pass, weapons and monsters fixes, survival, view and messages fixes, 64-bit divide cleanup; XA music, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/quake/quake-psx.provenance.json"
     },
     {
       "name": "CORTEX IGNITION",
       "var": "CORTEX_CURRENT",
       "version_var": "V_CORTEX_CURRENT",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/cortex/Cortex Graybox Reach XA.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/cortex/Cortex Graybox Reach XA.cue",
       "cue_sha256": "6569b490b367f437fc890eb6c2a1c1cd1458aa9b789b7b7dd9a5f0160ae0a15e",
       "bin_sha256": "0581a485b4cd1647427f221ad469a1ec2290aa75df35646a2d947d509b1ca787",
       "version": "Graybox Reach",
@@ -118,7 +118,7 @@
       "version_var": "V_PSXCEL",
       "kind": "game",
       "derive": {
-        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v044/inputs/psxcel-v043-public/psxcel.cue"
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-final/inputs/psxcel-v043-public/psxcel.cue"
       },
       "bin_sha256": "f9223628e77ee90a10bc0a942ebd79baffcef2540f8d089fa6ed30d069d8fcd0",
       "version": "0.2.0",

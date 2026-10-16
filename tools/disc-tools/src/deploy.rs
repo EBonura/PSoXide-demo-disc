@@ -37,7 +37,7 @@ use crate::util::{
 /// The menu a public pressing must show, in order: the visible table entries
 /// then the launcher's own CREDITS card. PSXcel sits last before CREDITS
 /// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order.
-const PUBLIC_GAMES: [&str; 8] = [
+pub(crate) const PUBLIC_GAMES: [&str; 8] = [
     "PSOXIDE ARCADE",
     "CELESTE COLLECTION",
     "NITROXIDE",
@@ -62,13 +62,13 @@ fn repo_root() -> Result<PathBuf> {
 /// What the table says: how many entries it claims, and the menu the launcher
 /// will draw. Hidden entries are not shown, and CREDITS follows the last
 /// visible one, as `check_release_chainloads.parse_toc` computed it.
-struct PublicToc {
-    claimed: usize,
-    visible: usize,
-    menu: Vec<String>,
+pub(crate) struct PublicToc {
+    pub(crate) claimed: usize,
+    pub(crate) visible: usize,
+    pub(crate) menu: Vec<String>,
 }
 
-fn parse_public_toc(raw: &[u8]) -> Result<PublicToc> {
+pub(crate) fn parse_public_toc(raw: &[u8]) -> Result<PublicToc> {
     ensure!(
         raw.len() == TOC_SECTORS as usize * USER_DATA_BYTES && &raw[..8] == TOC_MAGIC,
         "missing {} at LBA {TOC_LBA}",

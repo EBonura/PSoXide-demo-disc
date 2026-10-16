@@ -21,6 +21,7 @@ mod icons;
 mod label;
 mod lineup;
 mod programs;
+mod publiconly;
 mod quake;
 mod receipt;
 mod replay;
@@ -78,6 +79,11 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "deploy-public",
         deploy::run,
         "stage (and optionally publish) the public itch.io packages",
+    ),
+    (
+        "public-only",
+        publiconly::run,
+        "fail if a staged public package holds Half-Life, Hollow Knight, Counter-Strike or WipEout",
     ),
     (
         "web-delivery",

@@ -16,11 +16,14 @@ What's new in v0.44
 - All the music is compressed XA audio now, the menu's and each program's
   own, so the disc has a single data track. The browser version starts much
   faster because it only fetches the parts of the disc it is using.
-- Celeste Classic Collection can change brightness: DEFAULT, DARKER and
-  BRIGHTER steps in the pause menu.
-- NitroXide has nine cars and a fixed ramp texture. VoXide 0.4.1 adds a
+- Celeste Classic Collection 0.2.7 can change brightness: DEFAULT, DARKER and
+  BRIGHTER steps in the pause menu and in Settings.
+- NitroXide has nine cars and a fixed ramp texture, reads the pads from an
+  interrupt, and saves its settings in the background. VoXide 0.4.1 adds a
   LOAD WORLD title, faster TNT chains and a longer view distance. Quake has
-  the latest fixes, including the bridge grunt, wall puffs and the splash.
+  the latest fixes, including the bridge grunt, wall puffs and the splash,
+  and needs less memory.
+- The disc menu no longer does 64-bit arithmetic for the song clock.
 
 What's new in v0.43
 -------------------
@@ -77,7 +80,7 @@ What's new in v0.40
 
 The collection is still in development. Celeste 2 can miss occasional frame
 deadlines; this release does not claim locked 60 fps throughout either game.
-This public download contains no Half-Life game data.
+Only the programs listed above are on this disc.
 
 How to play
 -----------

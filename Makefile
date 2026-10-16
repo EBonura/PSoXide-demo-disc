@@ -138,14 +138,19 @@ DISC_MAX_SECTORS ?= 359999
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= 20481e32956aa0f41d83c2fc0916f0ae80117794
+QUAKE_EXPECTED_REV ?= e05f786dcdf51c5e4aad8be0bd4dd917a6813269
 QUAKE_EXPECTED_PSOXIDE_REV ?= fb2a9ab476d19faa0ccfc84b767fbead9a370bb5
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 42da6c12598448ff65490c9a5737bb06ff566b307b2d46a33a23a2c35fa95a0c
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 34589273ad85d8ff65a130de78c75591e8f4a0d6f810fec74ab828f3f1dc79fa
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 2f421d4a3485139304e02248e618fd6eeb15d999cabf0180293f8af75b64d04d
-QUAKE_EXPECTED_EXE_SHA256 ?= e28eb0860e6c9fcb6ee42c47c0576632d8283e9d63bac19f8643fdc992e3a7b3
+QUAKE_EXPECTED_BIN_SHA256 ?= 6728e703c17c199216c39fdac639c2a02fe363f3aaab60f2d5075bda2e704c8f
+QUAKE_EXPECTED_EXE_SHA256 ?= 2884b76a43a4b1573352edb2d9dcd14ce8d9f078c3e292fe6c95596884d5e416
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
-FRONTEND ?= $(EMULATOR)/target/release/frontend
+# The emulator package was renamed from `frontend` to `psoxide-emulator` after the
+# component tuple's pin, and the web player runs ahead of the tuple (see
+# `web_player` in release-components.json). Name the package and its binary from
+# whichever emulator is checked out.
+EMULATOR_PACKAGE ?= $(or $(shell sed -n 's/^name *= *"\(.*\)"/\1/p' $(EMULATOR)/emu/crates/frontend/Cargo.toml 2>/dev/null | head -1),frontend)
+FRONTEND ?= $(EMULATOR)/target/release/$(EMULATOR_PACKAGE)
 HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
 # The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
@@ -512,7 +517,7 @@ _quake-headless-check: $(DISC_TOOLS)
 # logs as well as a final PC and sampled execution inside that entry's
 # checksummed PS-X EXE.
 release-frontend:
-	cd $(EMULATOR) && cargo build --locked --release -p frontend
+	cd $(EMULATOR) && cargo build --locked --release -p $(EMULATOR_PACKAGE)
 
 # With no flags this is the HL pressing, as it always was; with any of HL, CS
 # or HK it is exactly that combination, and the replay covers what it carries.
