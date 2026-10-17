@@ -22,7 +22,7 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.44** requires an analog DualShock, lets the left stick drive the
+**v0.45** requires an analog DualShock, lets the left stick drive the
 carousel, moves PSXcel to the end of the carousel and carries the newest build of
 every program from its repository's main. See [the changelog](CHANGELOG.md).
 
@@ -32,7 +32,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 disc-tools deploy-public \
-  --cue "/path/to/PSoXide Demo Disc v0.44.cue" --version v0.44 \
+  --cue "/path/to/PSoXide Demo Disc v0.45.cue" --version v0.45 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 

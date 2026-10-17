@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.44
+PSoXide Demo Disc v0.45
 =======================
 
 A little of everything. One PlayStation disc.
@@ -6,6 +6,26 @@ A little of everything. One PlayStation disc.
 Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.45
+-------------------
+- Every program is its newest build, including ones that are not finished.
+- Celeste Classic Collection 0.2.8: the pad is read through the shared pad
+  code, a neGcon works like a digital pad, and the sound and maths no longer
+  use 64-bit integers. The sound is the same as before.
+- NitroXide: sound effects go through the shared mixer, placed in stereo.
+  The net is always cut at the near plane, frames cost less with the same
+  picture, and the dotted line under the goal glow is gone.
+- VoXide 0.4.1 has far fewer slow frames: three-frame stalls on a recorded
+  play dropped from 131 to 38. A starved chunk stream now waits for a frame
+  with room instead of stalling the one it is in.
+- Quake: Chthon's lava balls fly at you and light the walls, rockets light
+  the walls they pass, the pentagram and quad glow on you, messages are
+  centred, the end-of-level camera comes from the map, nailgun frames are
+  shown one at a time, and sounds follow you as you move. The image is
+  smaller, so it has more memory left.
+- PSoXide Arcade, PSXcel and the disc menu are rebuilt on the current SDK.
+  They look and play the same. Cortex Ignition is unchanged.
 
 What's new in v0.44
 -------------------
