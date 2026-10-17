@@ -179,6 +179,11 @@ RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
+# A panic is a BREAK at the faulting instruction (-Cpanic=immediate-abort): core::fmt, the panic Location records and
+# their file names stay out of the image, and psx-rt's exception handler records Cause/EPC/BadVAddr
+# (__psx_rt_fault_*; `psoxide-size faults` reads them from a RAM dump). PSOXIDE_PANIC_MESSAGES=1 restores the
+# formatted panic.
+PANIC_RUSTFLAGS = $(if $(filter-out 0,$(PSOXIDE_PANIC_MESSAGES)),,-Zunstable-options -Cpanic=immediate-abort)
 LOADER_EXE  := $(OUT)/loader.exe
 LAUNCHER_EXE := $(OUT)/launcher.exe
 
@@ -230,7 +235,7 @@ help:
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="$(PANIC_RUSTFLAGS) -Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 # Each program's own version, read from the source that declares it rather than
@@ -272,7 +277,7 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="$(PANIC_RUSTFLAGS) -Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 # The hardware test suite left the demo disc on 2026-09-25; it has a disc of
