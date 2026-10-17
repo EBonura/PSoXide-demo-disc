@@ -149,6 +149,24 @@
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hl/Half-Life (hl-psx).provenance.json"
     },
     {
+      "name": "OCARINA OF TIME",
+      "var": "OOTPSX",
+      "version_var": "V_OOTPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/Ocarina of Time (oot-psx).cue",
+      "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
+      "bin_sha256": "2f2ad6debf87ce6cc2797378767e9ab174179c15417bcdfd124d0932806a461c",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/oot-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/oot-psx.git",
+        "revision": "a7dd3a446d905133b06d568c8cef390e36c0d4d5",
+        "ref": "main"
+      },
+      "build": "the library Ocarina of Time install of 2026-10-17 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on a7dd3a4 (main 424ca93 only adds a test feature and journeys; the shipping disc is byte identical), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/INSTALLED.json"
+    },
+    {
       "name": "QUAKE SHAREWARE",
       "var": "QUAKE_CUE",
       "version_var": "QUAKE_VERSION",

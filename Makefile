@@ -102,13 +102,18 @@ HK ?=
 WO ?=
 # The hardware test suite is likewise lineup-only (HWT=1).
 HWT ?=
+# Ocarina of Time rides the lineup pressings only (make lineup-disc ... OOT=1):
+# it is built from the owner's own ROM in its own repository, has no submodule
+# here, and is on the Private edition only.
+OOT ?=
 # HL=0 means off, not "0 is a non-empty string, so on". Same for CS and HK.
 override HL := $(filter-out 0,$(HL))
 override CS := $(filter-out 0,$(CS))
 override HK := $(filter-out 0,$(HK))
 override WO := $(filter-out 0,$(WO))
 override HWT := $(filter-out 0,$(HWT))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT))
+override OOT := $(filter-out 0,$(OOT))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -174,7 +179,7 @@ DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0)
 RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
@@ -259,6 +264,7 @@ V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arc
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
 V_HKPSX     := $(call cargo_version,$(HKPSX_SOURCE)/game/Cargo.toml)
+V_OOTPSX    := 0.1.0
 # Build revisions are recorded in the release receipt.
 V_CORTEX_CURRENT := Tech demo
 
@@ -464,6 +470,13 @@ WO_ARGS = --image "WIPEOUT PSOXIDE=$(WIPEOUT)" \
 	--version-of "WIPEOUT PSOXIDE=$(V_WIPEOUT)" \
 	--describe "WIPEOUT PSOXIDE=WipEout (1995) rewritten in Rust for the original PlayStation, cooked from your own copy of the game. Tracks, ships, weapons and two-player split screen.|WipEout (1995) riscritto in Rust per la prima PlayStation, partendo dalla propria copia del gioco. Piste, navi, armi e schermo diviso per due."
 endif
+ifneq ($(OOT),)
+OOT_ARGS = --image "OCARINA OF TIME=$(OOTPSX)" \
+	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot1.shot" \
+	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot2.shot" \
+	--version-of "OCARINA OF TIME=$(V_OOTPSX)" \
+	--describe "OCARINA OF TIME=An early from-scratch PlayStation port of Ocarina of Time, cooked from your own ROM. The opening and Kokiri Forest can be explored. Still in development and slow.|Un primo port di Ocarina of Time per PlayStation, fatto da zero partendo dalla propria ROM. Si esplorano l'inizio e la Foresta Kokiri. In sviluppo e lento."
+endif
 ifneq ($(HK),)
 HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
 	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
@@ -587,7 +600,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
-              $(if $(WO),wipeout1 wipeout2) $(if $(HWT),hwtests hwtests2)
+              $(if $(WO),wipeout1 wipeout2) $(if $(OOT),oot1 oot2) $(if $(HWT),hwtests hwtests2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
@@ -608,6 +621,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(HK_ARGS) \
 		$(CS_ARGS) \
 		$(HL_ARGS) \
+		$(OOT_ARGS) \
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(HWT_ARGS) \
@@ -729,7 +743,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(HWT),,--omit "HARDWARE TESTS") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
