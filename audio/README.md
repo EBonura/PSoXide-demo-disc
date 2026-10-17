@@ -29,7 +29,10 @@ README, the CHANGELOG and the release notes. Keep those in step.
 - `music.json`: the pack manifest.
 - `menu.spectrum`: the level-meter animation of every song (`mkdisc analyse`).
 
-The source WAVs are not in the repository (about 190 MB at 37.8 kHz); rebuild
-with `make music`, see the README. The previous menu music (Just Music, under
+The source WAVs are not in the repository (about 190 MB at 37.8 kHz); a fresh
+clone presses the disc from the files above. `make music` rebuilds them and
+`make music-check` proves the rebuild is byte for byte what is committed, see
+the README. NitroXide carries the same six songs (its own copy of the same two
+XA files). The previous menu music (Just Music, under
 a permission scoped to the old pressings) is gone from the disc and from the
 tree; it stays in git history.

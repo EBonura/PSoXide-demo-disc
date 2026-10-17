@@ -54,14 +54,21 @@ MENU_CREDIT   := Music: Mulula VGM Loops, CC BY 4.0
 # XA files, write the song table the launcher compiles in, and analyse the
 # level meter. The WAVs are not in the repository (115 MB); the XA files and
 # the analysis are, as the .cdda files were. XA_COOK is a psx-audio-cook
-# that has `xa-pack` (SDK branch feat/shared-xa-encoder-2026-10-15 until it
-# lands on main, so it is not part of the pinned SDK yet).
+# that has `xa-pack` (on the SDK's main since 2026-10-16, and in the editor
+# workspace's `psx-audio-cook`; build the one `tools/audio-cook` of NitroXide
+# wraps if the pinned SDK predates it).
 #   make music MUSIC_WAVS="a.wav b.wav ..." XA_COOK=/path/to/psx-audio-cook
+#   make music-check <same arguments>   cook again, fail if any committed byte changes
 .PHONY: music
 music: mkdisc
 	@test -n "$(MUSIC_WAVS)" -a -x "$(XA_COOK)" || { echo "music: set MUSIC_WAVS (the song WAVs, in song order) and XA_COOK (a psx-audio-cook with xa-pack)"; exit 1; }
 	$(XA_COOK) xa-pack "$(MENU_XA_DIR)" MUSIC $(MUSIC_WAVS) --manifest "$(MENU_XA_DIR)/music.json" --rust "$(MENU_SONGS_RS)"
 	$(MKDISC) analyse "$(MENU_SPECTRUM)" $(MUSIC_WAVS)
+
+# Maintainer proof that audio/launcher is what the WAVs cook to.
+.PHONY: music-check
+music-check: music
+	@git diff --exit-code -- "$(MENU_XA_DIR)" && echo "music-check: the cook is byte-identical to the committed music"
 
 # One public pressing and private ones. The menu music permission is scoped to
 # the disc without Half-Life, and hl-psx is private until its own release, so HL
