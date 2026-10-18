@@ -78,6 +78,7 @@
     },
     {
       "name": "WIPEOUT PSOXIDE",
+      "library": "WipEout PSoXide.cue",
       "var": "WIPEOUT",
       "version_var": "V_WIPEOUT",
       "kind": "image",
@@ -96,6 +97,7 @@
     },
     {
       "name": "HOLLOW KNIGHT",
+      "library": "hk-psx.cue",
       "var": "HKPSX",
       "version_var": "V_HKPSX",
       "kind": "image",
@@ -114,6 +116,7 @@
     },
     {
       "name": "COUNTER-STRIKE",
+      "library": "cs-psx.cue",
       "var": "CSPSX",
       "version_var": "V_CSPSX",
       "kind": "image",
@@ -132,6 +135,7 @@
     },
     {
       "name": "HALF-LIFE",
+      "library": "Half-Life (hl-psx).cue",
       "var": "HLPSX",
       "version_var": "V_HLPSX",
       "kind": "image",
@@ -150,6 +154,7 @@
     },
     {
       "name": "OCARINA OF TIME",
+      "library": "Ocarina of Time (oot-psx)/Ocarina of Time (oot-psx).cue",
       "var": "OOTPSX",
       "version_var": "V_OOTPSX",
       "kind": "image",

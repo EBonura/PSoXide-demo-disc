@@ -20,15 +20,23 @@ use crate::replay::{
 use crate::util::{fnv1a32, resolve, sha256_file, Error, Result};
 
 const DEFAULT_STEPS: u64 = 700_000_000;
-/// Every pressing carries the core entries; HL=1, CS=1 and HK=1 add the others.
+/// Every pressing carries the core entries; the Private flags add the others.
 const CORE_TARGETS: [&str; 2] = ["CORTEX IGNITION", "QUAKE SHAREWARE"];
-const OPTIONAL_TARGETS: [&str; 3] = ["HALF-LIFE", "COUNTER-STRIKE", "HOLLOW KNIGHT"];
-const TARGETS: [&str; 5] = [
+const OPTIONAL_TARGETS: [&str; 5] = [
+    "HALF-LIFE",
+    "COUNTER-STRIKE",
+    "HOLLOW KNIGHT",
+    "WIPEOUT PSOXIDE",
+    "OCARINA OF TIME",
+];
+const TARGETS: [&str; 7] = [
     "CORTEX IGNITION",
     "QUAKE SHAREWARE",
     "HALF-LIFE",
     "COUNTER-STRIKE",
     "HOLLOW KNIGHT",
+    "WIPEOUT PSOXIDE",
+    "OCARINA OF TIME",
 ];
 
 /// Markers the target must print exactly once after the launcher's own two.
@@ -64,7 +72,7 @@ fn target_failures(target: &str) -> &'static [&'static str] {
 }
 
 /// Every target must be seen reading from the disc after the loader finished.
-const REQUIRE_RUNTIME_READ: [&str; 5] = TARGETS;
+const REQUIRE_RUNTIME_READ: [&str; 7] = TARGETS;
 
 // These are deliberately below the accepted Cortex 0.4 gameplay load
 // (259-294 textured triangles and 115 quads in the integration replay), but
@@ -96,6 +104,11 @@ const HL_GAMEPLAY_MIN_HASHES: usize = 8;
 // at tick ~3400 on the loading screens (0 frames); 1.5 billion steps reach
 // tick ~7300 with 200+ qualifying frames and keep the thresholds unchanged.
 const HL_STEPS: u64 = 1_500_000_000;
+// WipEout: the race starts near route tick 4300 and the route throttles to ~7500
+// (about 300M steps per 1000 ticks). OoT: the walk to Link's house ends near
+// route tick 15000 (about 250M steps per 1000 ticks).
+const WIPEOUT_STEPS: u64 = 2_800_000_000;
+const OOT_STEPS: u64 = 4_200_000_000;
 
 /// Per entry: minimum textured triangles, quads and rects in one frame, the
 /// frames and distinct frame hashes that must clear them, and what they prove.
@@ -128,6 +141,22 @@ fn threshold_gameplay(target: &str) -> Option<Threshold> {
             min_frames: 30,
             min_hashes: 8,
             what: "textured de_dust2 gameplay",
+        }),
+        "WIPEOUT PSOXIDE" => Some(Threshold {
+            triangles: 150,
+            quads: 150,
+            rects: 0,
+            min_frames: 3000,
+            min_hashes: 1000,
+            what: "textured race frames",
+        }),
+        "OCARINA OF TIME" => Some(Threshold {
+            triangles: 0,
+            quads: 25,
+            rects: 0,
+            min_frames: 2500,
+            min_hashes: 800,
+            what: "textured title-to-cutscene frames",
         }),
         _ => None,
     }
@@ -251,6 +280,33 @@ fn launcher_route(index: usize, count: usize) -> (Vec<String>, i64) {
     (events, cross_tick)
 }
 
+/// WipEout PSoXide (the US cook): the press list the WipEout journey gates use
+/// from a cold boot (skip the intro, START, one player, Venom, single race,
+/// team, pilot, Firestar, then throttle with a steady rhythm of L2 presses), as
+/// `tick:button[:frames]`. Under the chain-load the intro movie plays unskipped
+/// and the title ignores input for its first ten loops, so the walk starts
+/// `WIPEOUT_ROUTE_OFFSET` ticks after the launching CROSS: that offset was found
+/// by replay (500 reached the race; the standalone timing, 0, only reached the
+/// attract demo).
+const WIPEOUT_RACE_ROUTE: &str = "80:cross,779:start,869:l1:20,869:r1:20,869:select:20,\
+879:cross,959:cross,1019:down,1039:cross,1119:cross,1199:cross,1279:down,1299:down,\
+1319:down,1339:down,1359:down,1379:down,1419:cross,1941:triangle,2183:r2:5000,\
+2483:l2,2783:l2,3083:l2,3383:l2,3683:l2,3983:l2,4283:l2,4583:l2,4883:l2,5183:l2,\
+5483:l2,5783:l2,6083:l2,6383:l2,6683:l2";
+const WIPEOUT_ROUTE_OFFSET: i64 = 500;
+
+/// `tick:rest` events with `by` added to every tick.
+fn shifted(route: &str, by: i64) -> Vec<String> {
+    route
+        .split(',')
+        .map(|event| {
+            let (tick, rest) = event.split_once(':').expect("route event has a tick");
+            let tick: i64 = tick.parse().expect("route tick is a number");
+            format!("{}:{rest}", tick + by)
+        })
+        .collect()
+}
+
 fn route_for(target: &str, index: usize, count: usize) -> String {
     let (mut events, cross_tick) = launcher_route(index, count);
     if matches!(
@@ -263,6 +319,21 @@ fn route_for(target: &str, index: usize, count: usize) -> String {
         events.extend(
             [400, 800, 1200, 1600, 2000, 2400]
                 .map(|offset| format!("{}:cross:12", cross_tick + offset)),
+        );
+    }
+    if target == "WIPEOUT PSOXIDE" {
+        events.extend(shifted(
+            WIPEOUT_RACE_ROUTE,
+            cross_tick + WIPEOUT_ROUTE_OFFSET,
+        ));
+    }
+    if target == "OCARINA OF TIME" {
+        // Title, file select and the opening cutscenes up to Link's house.
+        events.push(format!("{}:cross:20", cross_tick + 1_000));
+        events.extend(
+            (2_000..=11_960)
+                .step_by(120)
+                .map(|offset| format!("{}:cross:6", cross_tick + offset)),
         );
     }
     if target == "CORTEX IGNITION" {
@@ -279,6 +350,8 @@ fn steps_for(target: &str, steps: u64) -> u64 {
     match target {
         "CORTEX IGNITION" => steps.max(CORTEX_STEPS),
         "HALF-LIFE" => steps.max(HL_STEPS),
+        "WIPEOUT PSOXIDE" => steps.max(WIPEOUT_STEPS),
+        "OCARINA OF TIME" => steps.max(OOT_STEPS),
         _ => steps,
     }
 }
@@ -835,6 +908,21 @@ mod tests {
         assert_eq!(steps_for("HALF-LIFE", DEFAULT_STEPS), HL_STEPS);
         assert_eq!(steps_for("HALF-LIFE", 2 * HL_STEPS), 2 * HL_STEPS);
         assert_eq!(steps_for("QUAKE SHAREWARE", DEFAULT_STEPS), DEFAULT_STEPS);
+    }
+
+    #[test]
+    fn wipeout_and_oot_walk_their_own_menus_after_the_launcher() {
+        // Index 4 of 13 is four cards ahead: LEFT x4, CROSS at 1400.
+        let wipeout = route_for("WIPEOUT PSOXIDE", 4, 13);
+        assert!(wipeout
+            .starts_with("400:left:8,600:left:8,800:left:8,1000:left:8,1400:cross:12,1980:cross,"));
+        assert!(wipeout.contains(",2679:start,"));
+        assert!(wipeout.ends_with(",8583:l2"));
+        // Index 8 of 13 is five cards behind: RIGHT x5, CROSS at 1600.
+        let oot = route_for("OCARINA OF TIME", 8, 13);
+        assert!(oot.starts_with("400:right:8,"));
+        assert!(oot.contains(",1600:cross:12,2600:cross:20,3600:cross:6,3720:cross:6,"));
+        assert!(oot.ends_with(",13560:cross:6"));
     }
 
     #[test]

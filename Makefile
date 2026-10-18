@@ -555,6 +555,77 @@ _release-headless-check: $(DISC_TOOLS)
 		$(if $(HL),--target HALF-LIFE) $(if $(CS),--target COUNTER-STRIKE) \
 		$(if $(HK),--target "HOLLOW KNIGHT")
 
+# The Private pressing in one command (never distributed: Half-Life, Hollow
+# Knight, Counter-Strike, Ocarina of Time and WipEout PSoXide ride only here):
+#
+#   make press-private FRONTEND=<psoxide-emulator>
+#
+# 1. lineup refresh: takes the newest library build of the five library-fed
+#    programs (each row's "library" path in the lineup file), copies it into
+#    the lineup inputs and rewrites its hashes. If anything moved the run stops
+#    here: the lineup's revision and build text are a human's to update, and the
+#    launcher version is read from a clean tree, so commit the lineup and run
+#    this again (nothing moves the second time).
+# 2. clean-tree check, then the sector budget (fails, writing no image, when the
+#    layout is over an 80-minute CD-R; prints the spare sectors otherwise).
+# 3. lineup-disc: the pressing and its two receipts, into PRIVATE_DIST.
+# 4. gates on the pressed image: the independent programs boot, and every
+#    chain-load replays twice byte-identical (Cortex, Quake, Half-Life,
+#    Counter-Strike, Hollow Knight, WipEout PSoXide to a race, Ocarina of Time
+#    to Link's house).
+# 5. only with INSTALL=1: copy the image, cue and receipts into the games
+#    library and remove the older Private pressings there.
+#
+# The launcher shows PRIVATE_VERSION, not what `git describe` says, so a commit
+# made after the version tag does not change what the disc says.
+PRIVATE_LINEUP ?= release/lineup-v0.45-private.json
+PRIVATE_VERSION ?= v0.45
+PRIVATE_NAME ?= PSoXide Demo Disc $(PRIVATE_VERSION) Private
+PRIVATE_DIST ?= $(BUILD)/private-press
+PRIVATE_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 HWT=0
+PRIVATE_ARGS = LINEUP=$(PRIVATE_LINEUP) $(PRIVATE_FLAGS) DISC_NAME="$(PRIVATE_NAME)" DISC_VERSION=$(PRIVATE_VERSION) DIST="$(PRIVATE_DIST)" FRONTEND="$(FRONTEND)"
+PRIVATE_EVIDENCE ?= $(PRIVATE_DIST)/evidence
+
+.PHONY: press-private private-refresh private-budget private-gates private-install
+private-refresh: $(DISC_TOOLS)
+	$(DISC_TOOLS) lineup refresh --lineup "$(PRIVATE_LINEUP)" --library "$(PSOXIDE_LIB)"
+
+private-budget:
+	$(MAKE) disc-budget $(PRIVATE_ARGS)
+
+private-gates: $(DISC_TOOLS)
+	@mkdir -p "$(PRIVATE_EVIDENCE)"
+	$(DISC_TOOLS) programs --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
+		--out "$(PRIVATE_EVIDENCE)/programs" --jobs 2
+	$(DISC_TOOLS) chainloads --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
+		--artifact-dir "$(PRIVATE_EVIDENCE)/chainloads"
+
+private-install:
+	@test -f "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" || { echo "private-install: press first"; exit 1; }
+	for ext in bin cue components.json release-receipt.json; do \
+		cp -c "$(PRIVATE_DIST)/$(PRIVATE_NAME).$$ext" "$(PSOXIDE_LIB)/$(PRIVATE_NAME).$$ext" || exit 1; \
+	done
+	@# one copy per pressing in the library: older Private pressings go
+	for old in "$(PSOXIDE_LIB)"/PSoXide\ Demo\ Disc\ v*\ Private.*; do \
+		case "$$old" in "$(PSOXIDE_LIB)/$(PRIVATE_NAME)."*) ;; *) echo "removing $$old"; rm -f "$$old";; esac; \
+	done
+
+press-private: $(DISC_TOOLS)
+	@test -x "$(FRONTEND)" || { echo "press-private: FRONTEND=$(FRONTEND) is not an executable"; exit 1; }
+	$(MAKE) private-refresh
+	@if [ -n "$$(git -C $(ROOT) status --porcelain --untracked-files=no)" ]; then \
+		echo "press-private: the tree is not clean (the refresh moved an input, or there are edits)."; \
+		echo "  update source.revision and build text in $(PRIVATE_LINEUP), commit, and run again."; \
+		git -C $(ROOT) status --short --untracked-files=no; exit 1; \
+	fi
+	$(MAKE) private-budget
+	rm -rf "$(PRIVATE_DIST)"
+	$(MAKE) lineup-disc $(PRIVATE_ARGS)
+	$(MAKE) private-gates $(PRIVATE_ARGS)
+	@if [ -n "$(INSTALL)" ]; then $(MAKE) private-install $(PRIVATE_ARGS); fi
+	@echo "press-private: $(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+	@shasum -a 256 "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
 #
