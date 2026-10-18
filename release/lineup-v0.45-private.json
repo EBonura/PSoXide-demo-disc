@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.45-private",
-  "note": "PSoXide Demo Disc v0.45, private edition (local, never published or distributed), all XA: no CD-DA track. The public inputs are those of lineup-v0.45.json. WipEout, Hollow Knight, Counter-Strike and Half-Life are their library builds of 2026-10-16 and 2026-10-17. The hardware tests stay in this file but are left out of the pressing (HWT=0). Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
+  "note": "PSoXide Demo Disc v0.45, private edition (local, never published or distributed), all XA: no CD-DA track. The public inputs are those of lineup-v0.45.json. WipEout (2026-10-16), Hollow Knight, Counter-Strike and Ocarina of Time (2026-10-17) and Half-Life (2026-10-16) are their library builds. The hardware tests stay in this file but are left out of the pressing (HWT=0). Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -10,15 +10,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.cue",
       "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
-      "bin_sha256": "1aa58d7be01d3e0e0c48e68ef24450b0b34d0b9f02737ec51e252fbddb84f96a",
+      "bin_sha256": "6e7b81c214b49e1d8e924da032ef1318c3add8c68055375903a922cbf71f9cdc",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/psoxide-arcade",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psoxide-arcade.git",
-        "revision": "a1745c67a3a6fa52b8f3894ebcb7397374cd6241",
-        "ref": "chore/editor-c096eee0-2026-10-16"
+        "revision": "e016f097db1ff51cf333b9262c64495207925fa7",
+        "ref": "main"
       },
-      "build": "the library Arcade install of 2026-10-16 (psoxide-arcade.provenance.json): make disc on chore/editor-c096eee0-2026-10-16, SDK b5365b18, editor c096eee0; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA.",
+      "build": "make disc on psoxide-arcade main e016f09 (panic=immediate-abort), SDK b5365b18, editor c096eee0, emulator 9e007839; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Shot cooks and card cooks run as the repo recipe (Pillow scripts).",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.provenance.json"
     },
     {
@@ -99,15 +99,15 @@
       "var": "HKPSX",
       "version_var": "V_HKPSX",
       "kind": "image",
-      "bin_sha256": "30434798672878b475b31acd55d1edfd5e0c154177740810da951fd9497eff8b",
+      "bin_sha256": "2cdcc864d9de6ba5a5113da087010a9f7d825f5f5b9a8f21c62f58adac86a57d",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hk-psx.git",
-        "revision": "15ec4f6d1e038a7d0e61a5b8649a9c759e64fd9e",
-        "ref": "perf/hk-frame-time-2026-10-17"
+        "revision": "db78669c06a3160cfc13009b05cfec1910fd6c77",
+        "ref": "lane/hk-m3-2026-10-17"
       },
-      "build": "the library Hollow Knight install of 2026-10-17 (hk-psx.provenance.json): perf/hk-frame-time-2026-10-17, disc built from 02d5c58; XA soundtrack as data-track files, no CD-DA.",
+      "build": "the library Hollow Knight install of 2026-10-17 20:10 (hk-psx.provenance.json): lane/hk-m3-2026-10-17 db78669, main 2a19d3a plus the generic native components; SDK 355dc911, emulator b3848054; XA soundtrack as data-track files, no CD-DA.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.provenance.json",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.cue",
       "cue_sha256": "847e6ea3d0762d2163e0616a19c01b3ae85c469748318c588e14656bbc7f98fb"
@@ -119,15 +119,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/cs/cs-psx.cue",
       "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
-      "bin_sha256": "ad631ed637024d1db5a2edbbeb6378af90774868161b327af7736be7514a0e07",
+      "bin_sha256": "966b089684e7e901214c745d63442a7b3a4e9051853c1ccfd5b03a1f99031069",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/cs-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/cs-psx.git",
-        "revision": "db5ac25c4cd32935899496d678ef348fbab0d0c3",
-        "ref": "chore/editor-c096eee0-2026-10-16"
+        "revision": "d607325c4705f44c5ac9c46214fdd86c84f319cc",
+        "ref": "chore/abort-panics-2026-10-17"
       },
-      "build": "the library Counter-Strike install of 2026-10-16 (cs-psx.provenance.json): chore/editor-c096eee0-2026-10-16 db5ac25 (main cd9fc04 builds identical); SDK b5365b18, editor c096eee0. Cooked from the user's own Half-Life/CS data.",
+      "build": "the library Counter-Strike install of 2026-10-17 17:00 (cs-psx.provenance.json): chore/abort-panics-2026-10-17 d607325 (main cd9fc04 plus panic=immediate-abort); SDK b5365b18, editor c096eee0. Cooked from the user's own Half-Life/CS data.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/cs/cs-psx.provenance.json"
     },
     {
@@ -155,15 +155,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/Ocarina of Time (oot-psx).cue",
       "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
-      "bin_sha256": "2f2ad6debf87ce6cc2797378767e9ab174179c15417bcdfd124d0932806a461c",
+      "bin_sha256": "9f271b202808bc307b1850116a8ab56b6b0173855a0377badc0d656ae527713e",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/oot-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/oot-psx.git",
-        "revision": "a7dd3a446d905133b06d568c8cef390e36c0d4d5",
-        "ref": "main"
+        "revision": "9432197dcc85429ac0e5a1a5a5e8716f56e62376",
+        "ref": "feat/oot-features-2026-10-17"
       },
-      "build": "the library Ocarina of Time install of 2026-10-17 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on a7dd3a4 (main 424ca93 only adds a test feature and journeys; the shipping disc is byte identical), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
+      "build": "the library Ocarina of Time install of 2026-10-17 22:30 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on 9432197 (Dungeon owner and Deku Tree floor web; Mido passage restored), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/INSTALLED.json"
     },
     {
@@ -173,15 +173,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.cue",
       "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "7740cd01d79495a5b9d790e4bc46e47091e529152c8ffb1e22748b66e69c0da2",
+      "bin_sha256": "62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/quake-psx.git",
-        "revision": "68a641dbbb7daf2a0a862ad33c4719db3b9e639e",
+        "revision": "c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621",
         "ref": "main"
       },
-      "build": "the library Quake install of 2026-10-17 (quake-psx.provenance.json): main 68a641d, panic=immediate-abort, +12.8 KB heap, respatialization back; shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "build": "the library Quake install of 2026-10-18 (quake-psx.provenance.json): main c14ec10 (save and load, 6 KB more save buffer), PSoXide c096eee0, SDK b5365b18; shareware 1.06 data, XA music, one data track, no CD-DA.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.provenance.json"
     },
     {
@@ -229,15 +229,15 @@
       "derive": {
         "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.cue"
       },
-      "bin_sha256": "bcc62bad42b2dfd3aaf42f1d47c028ff894582791670f9f29d3a1d505ba9f2c3",
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/psxcel",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psxcel.git",
-        "revision": "bbbaf105513dcdf0505f71bcf8eb3484a537dd4f",
-        "ref": "chore/editor-c096eee0-2026-10-16"
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
       },
-      "build": "the library PSXcel install of 2026-10-16 (PSXcel.provenance.json): make disc, SDK b5365b18, editor c096eee0; the disc carries the image's boot EXE as a bare program.",
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.provenance.json"
     }
   ]

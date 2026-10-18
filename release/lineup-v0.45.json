@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.45",
-  "note": "PSoXide Demo Disc v0.45, public pressing, all XA: no CD-DA track. Every program is its library build of 2026-10-17 (Celeste 0.2.8 from the pressed main release disc, Quake main 68a641d); Cortex (Graybox Reach) keeps the XA build of v0.44, the library holds only the CD-DA twin. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). Hashes gate every input; disc-tools lineup refuses a file that changed.",
+  "note": "PSoXide Demo Disc v0.45, public pressing, all XA: no CD-DA track. Every program is its library build of 2026-10-17 or 2026-10-18 (Celeste 0.2.8 from the pressed main release disc, Quake main c14ec10 with save and load, Arcade e016f09 built for this pressing); Cortex (Graybox Reach) keeps the XA build of v0.44, the library holds only the CD-DA twin. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). Hashes gate every input; disc-tools lineup refuses a file that changed.",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -10,15 +10,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.cue",
       "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
-      "bin_sha256": "1aa58d7be01d3e0e0c48e68ef24450b0b34d0b9f02737ec51e252fbddb84f96a",
+      "bin_sha256": "6e7b81c214b49e1d8e924da032ef1318c3add8c68055375903a922cbf71f9cdc",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/psoxide-arcade",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psoxide-arcade.git",
-        "revision": "a1745c67a3a6fa52b8f3894ebcb7397374cd6241",
-        "ref": "chore/editor-c096eee0-2026-10-16"
+        "revision": "e016f097db1ff51cf333b9262c64495207925fa7",
+        "ref": "main"
       },
-      "build": "the library Arcade install of 2026-10-16 (psoxide-arcade.provenance.json): make disc on chore/editor-c096eee0-2026-10-16, SDK b5365b18, editor c096eee0; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA.",
+      "build": "make disc on psoxide-arcade main e016f09 (panic=immediate-abort), SDK b5365b18, editor c096eee0, emulator 9e007839; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Shot cooks and card cooks run as the repo recipe (Pillow scripts).",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.provenance.json"
     },
     {
@@ -83,15 +83,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.cue",
       "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
-      "bin_sha256": "7740cd01d79495a5b9d790e4bc46e47091e529152c8ffb1e22748b66e69c0da2",
+      "bin_sha256": "62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/quake-psx.git",
-        "revision": "68a641dbbb7daf2a0a862ad33c4719db3b9e639e",
+        "revision": "c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621",
         "ref": "main"
       },
-      "build": "the library Quake install of 2026-10-17 (quake-psx.provenance.json): main 68a641d, panic=immediate-abort, +12.8 KB heap, respatialization back; shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "build": "the library Quake install of 2026-10-18 (quake-psx.provenance.json): main c14ec10 (save and load, 6 KB more save buffer), PSoXide c096eee0, SDK b5365b18; shareware 1.06 data, XA music, one data track, no CD-DA.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.provenance.json"
     },
     {
@@ -120,15 +120,15 @@
       "derive": {
         "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.cue"
       },
-      "bin_sha256": "bcc62bad42b2dfd3aaf42f1d47c028ff894582791670f9f29d3a1d505ba9f2c3",
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/psxcel",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psxcel.git",
-        "revision": "bbbaf105513dcdf0505f71bcf8eb3484a537dd4f",
-        "ref": "chore/editor-c096eee0-2026-10-16"
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
       },
-      "build": "the library PSXcel install of 2026-10-16 (PSXcel.provenance.json): make disc, SDK b5365b18, editor c096eee0; the disc carries the image's boot EXE as a bare program.",
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.provenance.json"
     }
   ]
