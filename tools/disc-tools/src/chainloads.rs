@@ -193,6 +193,68 @@ struct Entry {
 struct Exe {
     load: u64,
     payload_bytes: u64,
+    /// The EXE the boot program chains into (load address, payload bytes).
+    game: Option<(u64, u64)>,
+}
+
+impl Exe {
+    /// Whether `pc` lies in the boot payload or in the EXE it chains into.
+    fn contains(&self, pc: u64) -> bool {
+        (self.load <= pc && pc < self.load + self.payload_bytes)
+            || self
+                .game
+                .is_some_and(|(load, bytes)| load <= pc && pc < load + bytes)
+    }
+}
+
+/// Programs whose boot EXE hands over to another EXE in the same image (the
+/// Half-Life startup movie runs HLGAME.EXE), by its name in the image's root.
+fn chained_exe_name(target: &str) -> Option<&'static str> {
+    match target {
+        "HALF-LIFE" => Some("HLGAME.EXE"),
+        _ => None,
+    }
+}
+
+/// Load address and payload size of `name` in the root directory of the
+/// ISO 9660 image that starts at `image_lba` of the pressed disc.
+fn root_file_exe(image: &Path, image_lba: u64, name: &str) -> Result<(u64, u64)> {
+    let pvd = disc::read_user_sectors(image, image_lba + 16, 1)?;
+    ensure!(
+        &pvd[1..6] == b"CD001",
+        "no ISO 9660 volume descriptor at LBA {}",
+        image_lba + 16
+    );
+    let root_lba = u64::from(disc::le32(&pvd, 156 + 2));
+    let root_bytes = u64::from(disc::le32(&pvd, 156 + 10));
+    let sectors = root_bytes.div_ceil(USER_DATA_BYTES as u64);
+    let dir = disc::read_user_sectors(image, image_lba + root_lba, sectors)?;
+    let mut at = 0;
+    while at < dir.len() {
+        let len = usize::from(dir[at]);
+        if len == 0 {
+            // Records never straddle a sector: skip to the next one.
+            at = (at / USER_DATA_BYTES + 1) * USER_DATA_BYTES;
+            continue;
+        }
+        let name_len = usize::from(dir[at + 32]);
+        let found = String::from_utf8_lossy(&dir[at + 33..at + 33 + name_len]).into_owned();
+        if found.trim_end_matches(";1").eq_ignore_ascii_case(name) {
+            let lba = u64::from(disc::le32(&dir, at + 2));
+            let header = disc::read_user_sectors(image, image_lba + lba, 1)?;
+            ensure!(
+                &header[..8] == disc::PSX_EXE_MAGIC,
+                "{name}: no PS-X EXE at LBA {}",
+                image_lba + lba
+            );
+            return Ok((
+                u64::from(disc::le32(&header, 0x18)),
+                u64::from(disc::le32(&header, 0x1C)),
+            ));
+        }
+        at += len;
+    }
+    bail!("{name} not found in the root of the image at LBA {image_lba}")
 }
 
 /// The visible entries and the carousel's card names (CREDITS last).
@@ -255,9 +317,14 @@ fn parse_exe(image: &Path, entry: &Entry) -> Result<Exe> {
         entry.name,
         entry.payload_fnv
     );
+    let game = match chained_exe_name(&entry.name) {
+        Some(name) => Some(root_file_exe(image, entry.image_lba, name)?),
+        None => None,
+    };
     Ok(Exe {
         load,
         payload_bytes,
+        game,
     })
 }
 
@@ -598,14 +665,14 @@ fn run_once(
     };
     let pc_final = parse_int(&tick[3], 16)?;
     ensure!(
-        exe.load <= pc_final && pc_final < exe.load + exe.payload_bytes,
+        exe.contains(pc_final),
         "{name}: final PC {pc_final:#010x} outside payload"
     );
     let csv = Csv::read(&pc)?;
     let mut samples = 0;
     for row in &csv.rows {
         let sampled = parse_int(csv.required(row, "pc")?, 16)?;
-        if exe.load <= sampled && sampled < exe.load + exe.payload_bytes {
+        if exe.contains(sampled) {
             samples += unsigned(&csv, row, "samples")?;
         }
     }
@@ -1061,6 +1128,21 @@ mod tests {
     }
 
     #[test]
+    fn chained_exe_range_counts_as_payload() {
+        let exe = Exe {
+            load: 0x8001_0000,
+            payload_bytes: 0x800,
+            game: Some((0x8001_0000, 0xB5000)),
+        };
+        assert!(exe.contains(0x8007_da10));
+        assert!(!exe.contains(0x801e_0000));
+        let boot_only = Exe { game: None, ..exe };
+        assert!(!boot_only.contains(0x8007_da10));
+        assert_eq!(chained_exe_name("HALF-LIFE"), Some("HLGAME.EXE"));
+        assert_eq!(chained_exe_name("COUNTER-STRIKE"), None);
+    }
+
+    #[test]
     fn cd_log_must_show_loader_and_runtime_reads() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("cd.csv");
@@ -1082,6 +1164,7 @@ mod tests {
         let exe = Exe {
             load: 0x8001_0000,
             payload_bytes: 2048,
+            game: None,
         };
         // 00:03:05 is LBA 80; payload ends at 50 + 1 + 1 = 52.
         assert_eq!(cd_evidence(&log, &entry, exe).unwrap(), (6, Some(80)));
