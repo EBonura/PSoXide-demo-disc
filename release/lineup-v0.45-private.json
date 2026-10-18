@@ -84,16 +84,16 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/wipeout/WipEout PSoXide.cue",
       "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
-      "bin_sha256": "ae3b29b92548d9f2e35c231a28b74b4bd53257c42bc559eb3ac4749091fdfc0d",
+      "bin_sha256": "3b308a704943fd0a68725f6810de06c38015fc8fc4ec7123597671f8d31846d6",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/wipeout-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/wipeout-psx.git",
-        "revision": "61bdaddb6541c08242d7cd2e3e57b831b5be4a8e",
-        "ref": "chore/sdk-40f0222-2026-10-16"
+        "revision": "e6195fc30bba9c7def2c3ab1f2e3e70ab7ca128f",
+        "ref": "main"
       },
-      "build": "the library WipEout PSoXide install of 2026-10-16 (sdk-repin/wipeout-INSTALLED.md): feat/wall-2097-and-polish f08be05c plus the SDK 5219afbe pin, fix/no64 and a regenerated PGO layout (185 of 185 bound). NTSC US cook from the user's own WipEout (USA).",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/sdk-repin/wipeout-INSTALLED.md"
+      "build": "the library WipEout PSoXide install of 2026-10-18 12:48 (WipEout PSoXide.provenance.json): main e6195fc (shipping build, US cook, panic=immediate-abort), SDK 5219afbe, committed PGO layout. NTSC US cook from the user's own WipEout (USA).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/wipeout/WipEout PSoXide.provenance.json"
     },
     {
       "name": "HOLLOW KNIGHT",
@@ -101,15 +101,15 @@
       "var": "HKPSX",
       "version_var": "V_HKPSX",
       "kind": "image",
-      "bin_sha256": "2cdcc864d9de6ba5a5113da087010a9f7d825f5f5b9a8f21c62f58adac86a57d",
+      "bin_sha256": "a00985e78973fb56b880c66860bdc8914f876e1a31a83d1d56c03fbbb923f70c",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hk-psx.git",
-        "revision": "db78669c06a3160cfc13009b05cfec1910fd6c77",
-        "ref": "lane/hk-m3-2026-10-17"
+        "revision": "a7b4b156fc95c5ab0b7f601b1d52884a1c6525f9",
+        "ref": "main"
       },
-      "build": "the library Hollow Knight install of 2026-10-17 20:10 (hk-psx.provenance.json): lane/hk-m3-2026-10-17 db78669, main 2a19d3a plus the generic native components; SDK 355dc911, emulator b3848054; XA soundtrack as data-track files, no CD-DA.",
+      "build": "the library Hollow Knight install of 2026-10-18 19:10 (hk-psx.provenance.json): main a7b4b15 (cbf459a plus the state-driven route runner and the Hornet milestone; Hornet art not in this build); SDK 355dc911, emulator b3848054; XA soundtrack as data-track files, no CD-DA.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.provenance.json",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.cue",
       "cue_sha256": "847e6ea3d0762d2163e0616a19c01b3ae85c469748318c588e14656bbc7f98fb"
@@ -141,15 +141,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hl/Half-Life (hl-psx).cue",
       "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
-      "bin_sha256": "9a92ab57522ad2c275b43df01cbe7c295af51897720357f01aba850c0b3045c1",
+      "bin_sha256": "075e1f03d28ec27cc3fd88b26be1167bb20538d2faf9de7268e3a010009991c0",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/hl-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hl-psx.git",
-        "revision": "f1ce8a00952e69784d6e29a1d950c0560faa4e4c",
-        "ref": "integ/hl-focus-2026-10-15"
+        "revision": "1b4dbd4a6ece24a3beb869ed4ad8e55cfc45cc93",
+        "ref": "fix/hl-intro-chainload-lib-2026-10-18"
       },
-      "build": "the library Half-Life install of 2026-10-16 (provenance json): integ/hl-focus-2026-10-15 f1ce8a0, pass 4 plus the startup movie; separate boot EXE for the intro, game image HLGAME.EXE.",
+      "build": "the library Half-Life install of 2026-10-18 (provenance json): fix/hl-intro-chainload-lib-2026-10-18 1b4dbd4 (integ/hl-focus f1ce8a0, pass 4 plus the startup movie, plus the intro chain-load fix a304602); the intro hands HLGAME.EXE the launcher's disc bases; separate boot EXE for the intro, game image HLGAME.EXE.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hl/Half-Life (hl-psx).provenance.json"
     },
     {
@@ -160,15 +160,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/Ocarina of Time (oot-psx).cue",
       "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
-      "bin_sha256": "9f271b202808bc307b1850116a8ab56b6b0173855a0377badc0d656ae527713e",
+      "bin_sha256": "ecd172930636b67c5459fb233e42f8f6c2ebca4492905932778875622c6fd0c1",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/oot-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/oot-psx.git",
-        "revision": "9432197dcc85429ac0e5a1a5a5e8716f56e62376",
-        "ref": "feat/oot-features-2026-10-17"
+        "revision": "cff5b0df634cea18a24607887b922f3d66a0810e",
+        "ref": "main"
       },
-      "build": "the library Ocarina of Time install of 2026-10-17 22:30 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on 9432197 (Dungeon owner and Deku Tree floor web; Mido passage restored), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
+      "build": "the library Ocarina of Time install of 2026-10-18 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on main cff5b0d (Deku Tree enemies: Deku Baba, Skulltula, Skullwalltula), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/INSTALLED.json"
     },
     {
