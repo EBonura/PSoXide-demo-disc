@@ -591,7 +591,7 @@ private-refresh: $(DISC_TOOLS)
 	$(DISC_TOOLS) lineup refresh --lineup "$(PRIVATE_LINEUP)" --library "$(PSOXIDE_LIB)"
 
 private-budget:
-	$(MAKE) disc-budget $(PRIVATE_ARGS)
+	$(MAKE) lineup-budget $(PRIVATE_ARGS)
 
 private-gates: $(DISC_TOOLS)
 	@mkdir -p "$(PRIVATE_EVIDENCE)"
