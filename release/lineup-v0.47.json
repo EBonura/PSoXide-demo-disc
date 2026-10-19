@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "pressing": "v0.47",
+  "note": "PSoXide Demo Disc v0.47, public pressing, all XA: no CD-DA track. Every program is its library build of 2026-10-17 or 2026-10-18 (Celeste 0.2.8 from the pressed main release disc, Quake main c14ec10 with save and load, Arcade e016f09 built for this pressing); Cortex is the 0.4b build with XA music (the library's Cortex Ignition). Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). Hashes gate every input; disc-tools lineup refuses a file that changed. Cortex Ignition is the 0.4b build again (the v0.43 public line, now with XA music), replacing Graybox Reach; every other row is still its v0.45 input and is the coordinator's to refresh.",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.cue",
+      "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
+      "bin_sha256": "6e7b81c214b49e1d8e924da032ef1318c3add8c68055375903a922cbf71f9cdc",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psoxide-arcade.git",
+        "revision": "e016f097db1ff51cf333b9262c64495207925fa7",
+        "ref": "main"
+      },
+      "build": "make disc on psoxide-arcade main e016f09 (panic=immediate-abort), SDK b5365b18, editor c096eee0, emulator 9e007839; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Shot cooks and card cooks run as the repo recipe (Pillow scripts).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.provenance.json"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx main (the pressed 0.2.8 disc: brightness stepper, text palette fix, 32-bit sound and fixed-point maths, SDK b5365b18). The library still holds 0.2.7 (579f14f8).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/celeste/SOURCE.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "26dbce63e0bf91fd0298c88c834df01874bac86da0577696194112379fe39c26",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/nitroxide.git",
+        "revision": "9b70726c490e611e11e885a682acce633c83c8e6",
+        "ref": "main"
+      },
+      "build": "the library NitroXide install of 2026-10-17 (INSTALLED.json): make compile and make pack on main 9b70726 with the committed XA music; the goal-post glow edge fix over feb0cd9.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/nitroxide/INSTALLED.json"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "faed048249e473f7d9a95d0eeafed7c3b84cff2501d527b485026e86a421c4cd",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/voxide.git",
+        "revision": "b6d2af3fe066585142d389f31f96c7d974a1a3f1",
+        "ref": "perf/voxide-retune-2026-10-17"
+      },
+      "build": "the library VoXide install of 2026-10-17 (INSTALLED.json): the frame retune on SDK b5365b18 / editor c096eee0, built with make gate-disc; three-vblank frames on the Manny tape 131 -> 38.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/voxide/INSTALLED.json"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/quake-psx.git",
+        "revision": "c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621",
+        "ref": "main"
+      },
+      "build": "the library Quake install of 2026-10-18 (quake-psx.provenance.json): main c14ec10 (save and load, 6 KB more save buffer), PSoXide c096eee0, SDK b5365b18; shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-cortex-hl/inputs/cortex/Cortex Ignition.cue",
+      "cue_sha256": "3871cb7970444bbda89e0816bf345b26911c9d0bbe709e09abcf27153f1a21ac",
+      "bin_sha256": "f836c1d1519aa9c2c660bad4b42a7c95d4814a9a3514dcdc06b8dd16ee724d72",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-cortex-hl/editor",
+        "revision": "066fe3a2",
+        "ref": "cortex/0.4b-xa-2026-10-19"
+      },
+      "build": "frontend build-project-disc --project editor/projects/default on cortex/0.4b-xa-2026-10-19 (SDK 6518a5eb6, emulator 3f45f0eb): the v0.43 public Cortex line (editor main 309fdf93: the Palermo Comicon update, the approved 09-30 animations, the two-hit R1 combo) with its two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. Poll-bound replay against the plain 309fdf93 CD-DA build: VRAM and display hashes and dump-hw frames byte-identical at five stop polls; same frame count and 30 fps.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-cortex-hl/inputs/cortex/Cortex Ignition.provenance.json"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.cue"
+      },
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psxcel.git",
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
+      },
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.provenance.json"
+    }
+  ]
+}
