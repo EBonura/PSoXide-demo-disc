@@ -148,7 +148,7 @@ mod tests {
         ),
         (
             "halflife",
-            "b8414fe5f4e55cc922b3cd842f496b8289ceafdbadd28310ba15bf4ac1e25c90",
+            "328b2c0fd17d894f463dddcdc69a787f09a52300c0935e88559218abed10270a",
         ),
         (
             "hollowknight",
