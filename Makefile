@@ -8,7 +8,7 @@
 # music live outside Git. Cortex uses an exact PSoXide pin so the active editor
 # project remains reproducible as the engine advances.
 
-.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check clean
+.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check chainload-probe clean
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
@@ -930,6 +930,15 @@ relocation-check: launcher mkdisc
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
 	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."
+
+# The chain loader must hand the CD drive over quiet: a plain Pause leaves its
+# second response (INT2, 1.2 to 3.9 million clocks later on the console) to land
+# in the next program. tools/chainload-probe is the payload that checks for it
+# after the launcher chain-loads it. FRONTEND must carry the emulator's silicon
+# Pause model (PSoXide-emulator dddd281 or later).
+chainload-probe: launcher mkdisc
+	@test -n "$(FRONTEND)" || { echo "chainload-probe: set FRONTEND to a psoxide-emulator with the silicon Pause model"; exit 1; }
+	sh tools/chainload_probe.sh "$(LAUNCHER_EXE)" "$(FRONTEND)"
 
 clean:
 	rm -rf $(BUILD) $(ROOT)/dist

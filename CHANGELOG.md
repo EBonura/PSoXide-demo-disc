@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The chain loader hands the CD drive to the program it loads quiet. A Pause answers twice, and on the console the second answer comes 1.2 to 3.9 million system clocks after the first, so the old loader (a plain Pause after the last chunk, then the checksum and the jump) could leave an INT2 to land in the first moments of the next program. The editor pin (9ae15ba7, SDK 3cf22179) ends the last read with a proved stop and acknowledges the controller before the jump. `tools/chainload-probe` is a payload that checks for it (entry state, an 8 million clock watch with no command sent, an immediate read, and a control that a plain stop() does leave an INT2) and `make chainload-probe` presses it behind the launcher and chain-loads it on an emulator with the silicon Pause model: the old loader fails it (a stray INT2 114,512 clocks into the watch), the new one passes. The launcher's own reads and its song stop need no change: its song stop already waits for the second response, and the loader's first command cancels anything pending.
+- The component tuple moves to SDK 3cf22179 and editor 9ae15ba7 (emulator unchanged at dddd2814).
+
 ## v0.45
 
 - Re-pressed from `release/lineup-v0.45.json` (Public) and `release/lineup-v0.45-private.json` (Private), so every component is its newest library build of 2026-10-16 and 2026-10-17, finished or not. Public: Arcade 0.1.1 (a1745c6, SDK b5365b18 repin), Celeste Collection 0.2.8 (main a061d2c, the pressed release disc; the library still holds 0.2.7), NitroXide 0.4.1 (main 9b70726), VoXide 0.4.1 (b6d2af3, the frame retune), Quake (main 68a641d), Cortex Ignition (Graybox Reach, the v0.44 XA build; the library holds only the CD-DA twin) and PSXcel (bbbaf10, SDK repin). Private adds WipEout (main e6195fc), Hollow Knight (main a7b4b15, Hornet milestone), Ocarina of Time (main cff5b0d, Deku Tree enemies), Counter-Strike (d607325, panic=immediate-abort) and Half-Life (1b4dbd4: pass 4, the startup movie and the intro chain-load fix for a relocated disc).
