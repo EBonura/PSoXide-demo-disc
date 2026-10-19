@@ -14,7 +14,7 @@
    "version": "0.1.1",
    "source": {
     "repository": "EBonura/psoxide-arcade",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psoxide-arcade.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/psoxide-arcade.git",
     "revision": "e016f097db1ff51cf333b9262c64495207925fa7",
     "ref": "main"
    },
@@ -33,7 +33,7 @@
    "version": "0.2.8",
    "source": {
     "repository": "EBonura/celeste-collection-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/celeste-collection-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/celeste-collection-psx.git",
     "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
     "ref": "main"
    },
@@ -51,7 +51,7 @@
    "version": "0.4.1",
    "source": {
     "repository": "EBonura/nitroxide",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/nitroxide.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/nitroxide.git",
     "revision": "9b70726c490e611e11e885a682acce633c83c8e6",
     "ref": "main"
    },
@@ -69,7 +69,7 @@
    "version": "0.4.1",
    "source": {
     "repository": "EBonura/voxide",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/voxide.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/voxide.git",
     "revision": "b6d2af3fe066585142d389f31f96c7d974a1a3f1",
     "ref": "perf/voxide-retune-2026-10-17"
    },
@@ -87,7 +87,7 @@
    "version": "0.1.0",
    "source": {
     "repository": "EBonura/wipeout-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/wipeout-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/wipeout-psx.git",
     "revision": "719bd1b38f252d605a2767324d433fa4575acd72",
     "ref": "main"
    },
@@ -103,7 +103,7 @@
    "version": "0.1.0",
    "source": {
     "repository": "EBonura/hk-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hk-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/hk-psx.git",
     "revision": "1c2c23adb3f873dbd9ec5f733996458fdba94ba2",
     "ref": "main"
    },
@@ -122,7 +122,7 @@
    "version": "0.2.0",
    "source": {
     "repository": "EBonura/cs-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/cs-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/cs-psx.git",
     "revision": "d607325c4705f44c5ac9c46214fdd86c84f319cc",
     "ref": "chore/abort-panics-2026-10-17"
    },
@@ -140,7 +140,7 @@
    "version": "0.2.0 DIAG",
    "source": {
     "repository": "EBonura/hl-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hl-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/hl-psx.git",
     "revision": "d10c7b10436c516508953b27e74976a488fafead",
     "ref": "main"
    },
@@ -157,7 +157,7 @@
    "version": "0.1.0 DIAG",
    "source": {
     "repository": "EBonura/oot-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/oot-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/oot-psx.git",
     "revision": "eeac567",
     "ref": "fix/oot-console-freeze-2026-10-18"
    },
@@ -174,7 +174,7 @@
    "version": "0.1.1 DIAG",
    "source": {
     "repository": "EBonura/quake-psx",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/quake-psx.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/quake-psx.git",
     "revision": "c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621",
     "ref": "main"
    },
@@ -230,7 +230,7 @@
    "version": "0.2.0",
    "source": {
     "repository": "EBonura/psxcel",
-    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psxcel.git",
+    "local": "~/Desktop/repos/campaign-2026-10-15/demo-v046-diag/src/psxcel.git",
     "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
     "ref": "main (chore/abort-panics-2026-10-17)"
    },
