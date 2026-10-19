@@ -133,6 +133,10 @@ struct Args {
     /// Sectors the target blank holds. A layout over it is an error that names
     /// every program's share, rather than a burn that runs off the disc.
     max_sectors: Option<u32>,
+    /// Zero-filled data sectors appended after the last program, so the outermost
+    /// stretch of the pressing (where silicon reads are least reliable) holds nothing
+    /// that matters. They count against `--max-sectors`.
+    tail_filler: u32,
     /// Print the sector budget and stop before writing the image.
     dry_run: bool,
 }
@@ -152,6 +156,7 @@ fn parse_args() -> Result<Args, String> {
     let mut menu_titles: Vec<String> = Vec::new();
     let mut gates: Vec<String> = Vec::new();
     let mut max_sectors = None;
+    let mut tail_filler = 0u32;
     let mut dry_run = false;
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
@@ -257,6 +262,12 @@ fn parse_args() -> Result<Args, String> {
                     format!("--max-sectors wants a sector count, got {value:?}")
                 })?);
             }
+            "--tail-filler" => {
+                let value = it.next().ok_or("--tail-filler takes a sector count")?;
+                tail_filler = value.parse::<u32>().map_err(|_| {
+                    format!("--tail-filler wants a sector count, got {value:?}")
+                })?;
+            }
             "--dry-run" => dry_run = true,
             "--help" | "-h" => {
                 print_usage();
@@ -282,6 +293,7 @@ fn parse_args() -> Result<Args, String> {
         gates,
         shots,
         max_sectors,
+        tail_filler,
         dry_run,
     })
 }
@@ -1005,6 +1017,9 @@ fn run() -> Result<(), String> {
             image.audio.len() as u32,
         ));
     }
+    if args.tail_filler != 0 {
+        budget.push((String::from("tail filler (outer edge)"), args.tail_filler, 0));
+    }
     print!("{}", budget_table(&budget, args.max_sectors));
     check_budget(&budget, args.max_sectors)?;
     if args.dry_run {
@@ -1136,6 +1151,20 @@ fn run() -> Result<(), String> {
     for (_, _, image, _, _) in &images {
         place_data_track(&mut disc, &image.data, lba)?;
         lba += (image.data.len() / SECTOR_BYTES) as u32;
+    }
+
+    // The tail filler: a zero-data Form 1 sector (the ISO's own empty system-area sector 1,
+    // already encoded with its EDC/ECC) repeated, re-addressed like every placed sector.
+    if args.tail_filler != 0 {
+        let template: Vec<u8> = disc[SECTOR_BYTES..2 * SECTOR_BYTES].to_vec();
+        if template[0x18..0x818].iter().any(|b| *b != 0) {
+            return Err("the ISO's system-area sector 1 is not empty: no filler template".to_string());
+        }
+        for _ in 0..args.tail_filler {
+            let at = disc.len();
+            disc.extend_from_slice(&template);
+            rewrite_sector_msf(&mut disc[at..at + SECTOR_BYTES], (at / SECTOR_BYTES) as u32);
+        }
     }
 
     // All CD-DA follows all data, each game's in program order.

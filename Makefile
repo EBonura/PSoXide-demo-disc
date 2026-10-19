@@ -733,6 +733,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
 		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
+		$(if $(TAIL_FILLER),--tail-filler $(TAIL_FILLER)) \
 		--max-sectors $(DISC_MAX_SECTORS)
 
 ifneq ($(PRIVATE),)
