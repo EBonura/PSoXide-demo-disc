@@ -42,7 +42,7 @@ The public disc has no CD-DA track (`deploy-public` refuses one). It ships as
 the raw image and a small sector-header sidecar, which the page reads lazily over HTTP Range requests;
 an image over itch.io's 200 MB file limit is split into `demo-disc.bin.001`,
 `.002`, ... and needs an emulator that reads split images (the
-`web_player` pin is the parts build, b309c31, from `feat/web-lazy-image-parts-2026-10-15`).
+`web_player` pin in `release-components.json` is that parts build, and since d4d8006e it also carries the on-screen touch controller).
 Omit `--publish` to prepare packages for review. `make itch` only updates the
 download; the older `make release-web` only stages GitHub delivery assets.
 Neither is a complete deployment on its own.
