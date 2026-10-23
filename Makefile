@@ -235,7 +235,7 @@ help:
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 # Each program's own version, read from the source that declares it rather than

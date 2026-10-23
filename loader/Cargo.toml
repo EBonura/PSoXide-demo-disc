@@ -27,7 +27,11 @@ codegen-units = 1
 lto           = true
 opt-level     = "s"
 
+[build-dependencies]
+chainload-layout = { path = "../chainload-layout" }
+
 [dependencies]
+chainload-layout = { path = "../chainload-layout" }
 carousel = { package = "psx-carousel", path = "../games/PSoXide-editor/engine/crates/psx-carousel" }
 psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
 psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }

@@ -26,6 +26,7 @@ codegen-units = 1
 lto           = true
 
 [dependencies]
+chainload-layout = { path = "../chainload-layout" }
 psx-font = { path = "../games/PSoXide-editor/sdk/crates/psx-font" }
 psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
 psx-pack = { path = "../games/PSoXide-editor/sdk/crates/psx-pack" }

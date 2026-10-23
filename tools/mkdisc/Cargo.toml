@@ -11,5 +11,7 @@ name = "mkdisc"
 path = "src/main.rs"
 
 [dependencies]
+chainload-layout = { path = "../../chainload-layout" }
+psx-chainloader  = { path = "../../games/PSoXide-editor/engine/crates/psx-chainloader" }
 disc-toc = { package = "psx-disc-toc", path = "../../games/PSoXide-editor/engine/crates/psx-disc-toc" }
 psx-iso  = { path = "../../games/PSoXide-sdk/crates/psx-iso" }
