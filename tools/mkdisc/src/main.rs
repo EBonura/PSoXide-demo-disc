@@ -1376,6 +1376,33 @@ mod tests {
         assert!(check_clear_of_loader(&h, Path::new("edge")).is_ok());
     }
 
+    /// The boot EXE of every program on the v0.47 Private pressing plus the
+    /// current Half-Life intro: `(name, load address, payload bytes)`, read from
+    /// the pressed images. A change to `chainload-layout` that would strand any
+    /// of them fails here instead of at the next pressing.
+    const PRESSED_PROGRAMS: [(&str, u32, u32); 12] = [
+        ("PSOXIDE ARCADE", 0x8001_0000, 110_592),
+        ("CELESTE COLLECTION", 0x8001_0000, 587_776),
+        ("NITROXIDE", 0x8001_0000, 1_363_968),
+        ("VOXIDE", 0x8001_0000, 733_184),
+        ("WIPEOUT PSOXIDE", 0x8001_0000, 546_816),
+        ("HOLLOW KNIGHT", 0x8001_0000, 1_024_000),
+        ("COUNTER-STRIKE", 0x8001_0000, 604_160),
+        ("HALF-LIFE", 0x801E_0000, 75_776),
+        ("OCARINA OF TIME", 0x8001_0000, 1_728_512),
+        ("QUAKE SHAREWARE", 0x8001_0000, 559_104),
+        ("CORTEX IGNITION", 0x8001_0000, 1_134_592),
+        ("PSXCEL", 0x8001_0000, 260_096),
+    ];
+
+    #[test]
+    fn every_pressed_program_clears_the_loader_and_the_stack() {
+        for (name, load_addr, payload_bytes) in PRESSED_PROGRAMS {
+            let h = header(load_addr, payload_bytes);
+            check_clear_of_loader(&h, Path::new(name)).unwrap_or_else(|e| panic!("{e}"));
+        }
+    }
+
     #[test]
     fn the_memory_map_names_each_program_and_flags_an_overlap() {
         let rows = vec![
