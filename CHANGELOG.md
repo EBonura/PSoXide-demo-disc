@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The browser player pin moves to the build whose Reset restarts the game in place, whose Library pick of the loaded disc restarts it without a download, whose Back resumes the game, and whose keyboard, touchscreen and gamepads present an analog DualShock from the first poll (no F9 step for the demo disc).
 - The browser package of an XA disc is the compact delivery: `demo-disc.pxi` (index, 30 KB for v0.48) and `demo-disc.pxw` (deflated 32-sector chunks, 178 MiB against the 318 MiB image) instead of the raw image and a 330 KB header sidecar. `deploy-public` builds `webdisc` from the emulator checkout (the `web_player` pin must contain `psx-webdisc`, 4d32b426), packs, and has the packer read every file back and compare each sector with the image. `public-only` cannot scan deflated chunks, so it ties the index to a scanned image by game-image hash and sector count and checks the payload sizes; check the web folder together with the download folder. `web-delivery` on its own still writes the raw lazy image.
 
 ## v0.44
