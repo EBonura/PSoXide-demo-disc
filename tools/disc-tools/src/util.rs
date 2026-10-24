@@ -373,15 +373,17 @@ mod tests {
 /// look for it, and must not mistake whichever repo it happens to run in.
 pub fn repo_root() -> Result<PathBuf> {
     let marker = "release-components.json";
+    // The executable's own path is a file, so its ancestors start one up; the
+    // working directory is itself a candidate (running from the repository root).
     let mut starts = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
-        starts.push(exe);
+        starts.push(exe.parent().map(Path::to_path_buf).unwrap_or(exe));
     }
     if let Ok(cwd) = std::env::current_dir() {
         starts.push(cwd);
     }
     for start in starts {
-        for ancestor in start.ancestors().skip(1) {
+        for ancestor in start.ancestors() {
             if ancestor.join(marker).is_file() && ancestor.join("Makefile").is_file() {
                 return Ok(ancestor.to_path_buf());
             }

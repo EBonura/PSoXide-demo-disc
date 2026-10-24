@@ -24,6 +24,7 @@ mod programs;
 mod publiconly;
 mod quake;
 mod receipt;
+mod release;
 mod replay;
 mod shots;
 mod web;
@@ -79,6 +80,11 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "deploy-public",
         deploy::run,
         "stage (and optionally publish) the public itch.io packages",
+    ),
+    (
+        "release",
+        release::run,
+        "check, stage, verify and push the public demo disc to both itch.io channels",
     ),
     (
         "public-only",

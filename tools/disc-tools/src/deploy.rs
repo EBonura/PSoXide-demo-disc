@@ -50,8 +50,8 @@ pub(crate) const PUBLIC_GAMES: [&str; 8] = [
 const WEB_RECEIPT: &str = "emulator-build.json";
 /// itch.io refuses HTML5 files at 200 MB and over.
 pub(crate) const ITCH_FILE_LIMIT: u64 = 200_000_000;
-const DOWNLOAD_TARGET: &str = "bonnie-studios/psoxide-demo-disc:psx";
-const PLAYABLE_TARGET: &str = "bonnie-studios/psoxide:html5";
+pub(crate) const DOWNLOAD_TARGET: &str = "bonnie-studios/psoxide-demo-disc:psx";
+pub(crate) const PLAYABLE_TARGET: &str = "bonnie-studios/psoxide:html5";
 
 /// The repository this binary belongs to; the release lock, the licence and
 /// the README are read from here.
@@ -110,7 +110,7 @@ fn read_text(path: &Path) -> Result<String> {
 
 /// The BIN beside `cue`, once the disc is proven to be the public collection:
 /// one adjacent BIN, the public menu, and a lone data track (no CD-DA).
-fn public_image(cue: &Path) -> Result<PathBuf> {
+pub(crate) fn public_image(cue: &Path) -> Result<PathBuf> {
     let text = read_text(cue)?;
     let file_line = Regex::new(r#"(?m)^FILE "([^"]+)" BINARY$"#)?;
     let files: Vec<&str> = file_line
@@ -149,7 +149,7 @@ fn public_image(cue: &Path) -> Result<PathBuf> {
 }
 
 /// A release version such as `v0.34`, `v1.2.3` or `v0.34-rc.1`.
-fn valid_version(version: &str) -> Result<bool> {
+pub(crate) fn valid_version(version: &str) -> Result<bool> {
     Ok(Regex::new(r"\Av[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:[-.][A-Za-z0-9.]+)?\z")?.is_match(version))
 }
 
@@ -157,7 +157,7 @@ fn valid_version(version: &str) -> Result<bool> {
 /// Python's `sorted(rglob("*"))` order: path components compared one by one, so
 /// `a/b` sorts before `a-c`. Directory symlinks are listed (as non-files) but
 /// not entered, as `rglob` does.
-fn files_under(directory: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
+pub(crate) fn files_under(directory: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
     fn walk(directory: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
@@ -225,7 +225,7 @@ fn verify_web_build(directory: &Path, revision: &str, lock_sha256: &str) -> Resu
 
 /// The external programs the tool runs. They are fields so the tests can point
 /// them at fake scripts; a real run uses the names the original used.
-struct Tools {
+pub(crate) struct Tools {
     python: OsString,
     trunk: OsString,
     cargo: OsString,
@@ -233,7 +233,7 @@ struct Tools {
 }
 
 impl Tools {
-    fn real() -> Tools {
+    pub(crate) fn real() -> Tools {
         Tools {
             python: "python3".into(),
             trunk: "trunk".into(),
@@ -244,7 +244,7 @@ impl Tools {
 }
 
 /// Run a program with the caller's stdio; a nonzero exit is an error.
-fn run_program(command: &mut Command) -> Result<()> {
+pub(crate) fn run_program(command: &mut Command) -> Result<()> {
     let shown = format!("{:?}", command.get_program());
     let status = command
         .status()
@@ -256,7 +256,7 @@ fn run_program(command: &mut Command) -> Result<()> {
 /// Build the compact-disc packer from the emulator checkout the page is built
 /// from, so the format the page reads is the one the packer writes. Returns the
 /// binary's path.
-fn build_webdisc(emulator: &Path, tools: &Tools) -> Result<PathBuf> {
+pub(crate) fn build_webdisc(emulator: &Path, tools: &Tools) -> Result<PathBuf> {
     run_program(
         Command::new(&tools.cargo)
             .args(["build", "--release", "-p", "psx-webdisc", "--bin", "webdisc"])

@@ -64,6 +64,39 @@ The current public destinations are
 [itch.io](https://bonnie-studios.itch.io/psoxide-demo-disc) and the
 [browser emulator](https://bonnie-studios.itch.io/psoxide).
 
+## Releasing to itch
+
+One command takes a pressed Public disc to both itch.io pages, the playable
+build (`bonnie-studios/psoxide:html5`) and the download
+(`bonnie-studios/psoxide-demo-disc:psx`):
+
+```sh
+./release-public.sh --version v0.48 \
+  --cue "$HOME/Downloads/ps1 games/PSoXide Demo Disc v0.48.cue" --dry-run
+```
+
+Drop `--dry-run` for the real thing. It runs `disc-tools release`, which, in order:
+
+1. refuses unless this repository is clean, on `main` and level with `origin/main`;
+2. clones the emulator fresh and checks out the `web_player` pin of
+   `release-components.json`;
+3. reuses the Public disc (`--cue`), or presses it with `--lineup <json> --frontend <frontend>`;
+4. runs `deploy-public` into an empty `build/release-<version>/out` (`--work` moves it),
+   without `--publish`;
+5. runs `public-only` on the web and download folders together, then `webdisc verify`
+   of the compact payload against the download BIN;
+6. runs the browser journey suite of the pinned emulator (`tools/web-journeys/run.mjs`,
+   Node and Chrome) against the web folder (`--chrome` names another Chrome);
+7. prints a summary, then waits for you to type the version. Anything else cancels.
+   It re-hashes both folders so nothing changed since the checks, runs `butler push
+   ... --userversion <version>` for both channels and `butler status` for both.
+
+`--dry-run` stops before step 7 and prints the exact butler commands instead; it also
+downgrades the repository-state refusals of step 1 to warnings so a branch can rehearse
+a release. `--emulator-source` clones the emulator from another URL or path. `butler`
+must be installed and logged in. The private editions are never released this way:
+`public-only` fails on them.
+
 ## How it boots
 
 The BIOS reads `SYSTEM.CNF`, loads `PSX.EXE` (the launcher), and runs it. The
