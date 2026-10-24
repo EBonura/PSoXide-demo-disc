@@ -16,6 +16,12 @@
 //! * every staged file, every disc image byte and the decompressed web header
 //!   sidecar are searched, case-insensitively, for the four programs' names
 //!   and repository names;
+//! * a compact web delivery (`*.pxi` index, `*.pxw` payload, see the emulator's
+//!   psx-webdisc) hides its sectors inside deflate streams, so the scan cannot
+//!   read them; instead its index names the FNV-1a 64 hash of the image it was
+//!   packed from, and one of the disc images scanned here (the download BIN, or
+//!   the raw web parts) must have that hash and length, and the payload files
+//!   must add up to the size the index names;
 //! * no staged file may be a component receipt, release receipt or provenance
 //!   record, which name the pressed programs;
 //! * with `--same-disc`, every disc image found must be byte-identical to the
@@ -72,6 +78,56 @@ const RECEIPT_MARKERS: &[&str] = &[
 ];
 
 const CONTEXT: usize = 48;
+
+/// What a compact web index says about the image it was packed from (see
+/// psx-webdisc's index header: magic, version, chunk sectors, sector count,
+/// time bias, image hash, part size, payload size).
+struct CompactIndex {
+    file: PathBuf,
+    sectors: u64,
+    hash: u64,
+    part_bytes: u64,
+    payload_bytes: u64,
+}
+
+fn parse_compact_index(file: &Path) -> Result<CompactIndex> {
+    let mut head = [0u8; 38];
+    File::open(file)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .map_err(|e| Error(format!("{}: {e}", file.display())))?;
+    ensure!(
+        &head[..4] == b"PXWD" && head[4] == 1,
+        "{}: not a version 1 compact disc index",
+        file.display()
+    );
+    let u32_at = |at: usize| u64::from(u32::from_le_bytes(head[at..at + 4].try_into().expect("4")));
+    let u64_at = |at: usize| u64::from_le_bytes(head[at..at + 8].try_into().expect("8"));
+    Ok(CompactIndex {
+        file: file.to_path_buf(),
+        sectors: u32_at(6),
+        hash: u64_at(14),
+        part_bytes: u64_at(22),
+        payload_bytes: u64_at(30),
+    })
+}
+
+/// The payload files that belong to the index `file` (`NAME.pxi` names
+/// `NAME.pxw` or `NAME.pxw.001`...), as sizes in order.
+fn compact_payload_sizes(index: &Path) -> Result<Vec<u64>> {
+    let base = index.with_extension("pxw");
+    if base.is_file() {
+        return Ok(vec![fs::metadata(&base)?.len()]);
+    }
+    let mut sizes = Vec::new();
+    for n in 1.. {
+        let part = PathBuf::from(format!("{}.{n:03}", base.display()));
+        match fs::metadata(&part) {
+            Ok(meta) => sizes.push(meta.len()),
+            Err(_) => break,
+        }
+    }
+    Ok(sizes)
+}
 
 /// One disc image, possibly in numbered parts, read as a single byte range.
 struct Image {
@@ -138,10 +194,19 @@ impl Image {
         Ok(())
     }
 
-    fn sha256(&self) -> Result<String> {
+    /// SHA-256 and the game-image hash (FNV-1a 64, which the emulator and the
+    /// compact index record) of the whole image, in one pass.
+    fn digests(&self) -> Result<(String, u64)> {
         let mut hasher = Sha256::new();
-        self.stream(|_, chunk| hasher.update(chunk))?;
-        Ok(hex(&hasher.finalize()))
+        let mut fnv = 0xcbf2_9ce4_8422_2325u64;
+        self.stream(|_, chunk| {
+            hasher.update(chunk);
+            for &byte in chunk {
+                fnv ^= u64::from(byte);
+                fnv = fnv.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        })?;
+        Ok((hex(&hasher.finalize()), fnv))
     }
 }
 
@@ -471,12 +536,39 @@ fn check_image(
     Ok(())
 }
 
-fn check_file(report: &mut Report, file: &Path, allow: &[String]) -> Result<()> {
+fn is_compact_payload(lower: &str) -> bool {
+    lower.ends_with(".pxw")
+        || lower.rsplit_once('.').is_some_and(|(s, t)| {
+            s.ends_with(".pxw") && !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit())
+        })
+}
+
+fn check_file(
+    report: &mut Report,
+    compact: &mut Vec<CompactIndex>,
+    file: &Path,
+    allow: &[String],
+) -> Result<()> {
     let name = file
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let lower = name.to_ascii_lowercase();
+    if FORBIDDEN.iter().any(|t| lower.contains(t)) {
+        report.fail(format!("{}: the file name names a private program", file.display()));
+        return Ok(());
+    }
+    // A compact web delivery: tied to a scanned image by hash (see `run`).
+    if lower.ends_with(".pxi") {
+        match parse_compact_index(file) {
+            Ok(index) => compact.push(index),
+            Err(error) => report.fail(error.to_string()),
+        }
+        return Ok(());
+    }
+    if is_compact_payload(&lower) {
+        return Ok(());
+    }
     // Disc images are checked as images.
     if lower.ends_with(".bin") || lower.rsplit_once('.').is_some_and(|(s, t)| {
         s.ends_with(".bin") && !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit())
@@ -526,13 +618,57 @@ pub fn run(args: &[String]) -> Result<i32> {
         images.len(),
         args.positional.join(", ")
     ));
+    let mut compact = Vec::new();
     for file in &files {
-        check_file(&mut report, file, &allow)?;
+        check_file(&mut report, &mut compact, file, &allow)?;
     }
     let mut digests = Vec::new();
+    let mut games = Vec::new();
     for image in &images {
         check_image(&mut report, image, &allow, args.get("standalone"))?;
-        digests.push((image.label.clone(), image.sha256()?));
+        let (sha, game) = image.digests()?;
+        digests.push((image.label.clone(), sha));
+        games.push((image.label.clone(), game, image.len() / SECTOR_BYTES));
+    }
+    for index in &compact {
+        let shown = index.file.display();
+        match games
+            .iter()
+            .find(|(_, game, sectors)| *game == index.hash && *sectors == index.sectors)
+        {
+            Some((label, _, _)) => report.ok(format!(
+                "{shown}: compact web delivery is the scanned image {label}"
+            )),
+            None => report.fail(format!(
+                "{shown}: compact web delivery matches none of the {} scanned disc image(s) \
+                 (image hash {}, {} sectors); check it together with the download folder",
+                games.len(),
+                index.hash,
+                index.sectors
+            )),
+        }
+        match compact_payload_sizes(&index.file) {
+            Ok(sizes)
+                if sizes.iter().sum::<u64>() == index.payload_bytes
+                    && (index.part_bytes == 0
+                        || sizes.split_last().is_none_or(|(_, whole)| {
+                            whole.iter().all(|&size| size == index.part_bytes)
+                        })) =>
+            {
+                report.ok(format!(
+                    "{shown}: payload is {} file(s), {} bytes, as the index says",
+                    sizes.len(),
+                    index.payload_bytes
+                ))
+            }
+            Ok(sizes) => report.fail(format!(
+                "{shown}: payload files total {} bytes in {} file(s), the index says {}",
+                sizes.iter().sum::<u64>(),
+                sizes.len(),
+                index.payload_bytes
+            )),
+            Err(error) => report.fail(format!("{shown}: {error}")),
+        }
     }
     if args.has("same-disc") {
         match digests.split_first() {
@@ -603,5 +739,48 @@ mod tests {
     #[test]
     fn clean_bytes_pass() {
         assert!(scan_bytes(b"Celeste Quake VoXide NitroXide PSXcel Cortex Arcade").is_empty());
+    }
+
+    fn index_header(sectors: u32, hash: u64, part: u64, payload: u64) -> Vec<u8> {
+        let mut head = b"PXWD".to_vec();
+        head.extend([1, 32]);
+        head.extend(sectors.to_le_bytes());
+        head.extend(150u32.to_le_bytes());
+        head.extend(hash.to_le_bytes());
+        head.extend(part.to_le_bytes());
+        head.extend(payload.to_le_bytes());
+        head.extend([0u8; 16]);
+        head
+    }
+
+    #[test]
+    fn a_compact_index_names_its_image_and_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("demo-disc.pxi");
+        fs::write(&file, index_header(141_902, 0xdead_beef_0123_4567, 0, 187_011_930)).unwrap();
+        let index = parse_compact_index(&file).unwrap();
+        assert_eq!(index.sectors, 141_902);
+        assert_eq!(index.hash, 0xdead_beef_0123_4567);
+        assert_eq!(index.payload_bytes, 187_011_930);
+        fs::write(&file, b"nope").unwrap();
+        assert!(parse_compact_index(&file).is_err());
+        let mut wrong = index_header(1, 1, 0, 1);
+        wrong[4] = 2;
+        fs::write(&file, wrong).unwrap();
+        assert!(parse_compact_index(&file).is_err());
+    }
+
+    #[test]
+    fn payload_files_are_found_whole_or_in_parts() {
+        let dir = tempfile::tempdir().unwrap();
+        let index = dir.path().join("d.pxi");
+        assert!(compact_payload_sizes(&index).unwrap().is_empty());
+        fs::write(dir.path().join("d.pxw.001"), [0u8; 10]).unwrap();
+        fs::write(dir.path().join("d.pxw.002"), [0u8; 4]).unwrap();
+        assert_eq!(compact_payload_sizes(&index).unwrap(), vec![10, 4]);
+        fs::write(dir.path().join("d.pxw"), [0u8; 7]).unwrap();
+        assert_eq!(compact_payload_sizes(&index).unwrap(), vec![7]);
+        assert!(is_compact_payload("d.pxw") && is_compact_payload("d.pxw.012"));
+        assert!(!is_compact_payload("d.pxi") && !is_compact_payload("d.bin.001"));
     }
 }

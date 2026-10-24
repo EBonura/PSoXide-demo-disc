@@ -39,10 +39,12 @@ disc-tools deploy-public \
 This builds the browser emulator with Trunk, verifies the public game and audio
 layout, and proves the streamed audio/data reconstruct the original image.
 The public disc has no CD-DA track (`deploy-public` refuses one). It ships as
-the raw image and a small sector-header sidecar, which the page reads lazily over HTTP Range requests;
-an image over itch.io's 200 MB file limit is split into `demo-disc.bin.001`,
-`.002`, ... and needs an emulator that reads split images (the
-`web_player` pin in `release-components.json` is that parts build, and since d4d8006e it also carries the on-screen touch controller).
+a compact index (`demo-disc.pxi`) and a payload (`demo-disc.pxw`) of deflated 32-sector chunks,
+which the page reads lazily over HTTP Range requests and caches in IndexedDB. Sync, header, EDC and ECC are
+rebuilt on read; `deploy-public` builds the packer (`webdisc`, crate `psx-webdisc`) from the emulator checkout
+at the `web_player` pin and the packer reads its files back and compares every sector with the image.
+A payload that reaches itch.io's 200 MB file limit is split into `demo-disc.pxw.001`, `.002`, ... (the 0.48
+disc packs to 178 MiB, one file). The pin in `release-components.json` must be an emulator that has `psx-webdisc`.
 Omit `--publish` to prepare packages for review. `make itch` only updates the
 download; the older `make release-web` only stages GitHub delivery assets.
 Neither is a complete deployment on its own.

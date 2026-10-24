@@ -31,10 +31,12 @@
 //! With `PART_BYTES` the image is the files `FILE.001`, `FILE.002`, ... of
 //! that many bytes each, the last one shorter.
 
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use std::process::Command;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -347,6 +349,221 @@ fn verify(outdir: &Path, d: &Delivered, headers: &[u8]) -> Result<()> {
     Ok(())
 }
 
+/// What the compact delivery wrote, from the packer's report.
+struct Compact {
+    stem: String,
+    index_file: String,
+    index_bytes: u64,
+    index_fnv: u32,
+    payload_file: String,
+    payload_bytes: u64,
+    part: u64,
+    image_bytes: u64,
+    hash: u64,
+    chunks: u64,
+    boot_chunks: u64,
+    boot_bytes: u64,
+    kinds: String,
+}
+
+impl Compact {
+    fn from_report(stem: &str, report: &HashMap<String, String>) -> Result<Compact> {
+        let text = |key: &str| -> Result<String> {
+            report
+                .get(key)
+                .cloned()
+                .ok_or_else(|| Error(format!("webdisc did not report {key}")))
+        };
+        let number = |key: &str| -> Result<u64> {
+            text(key)?
+                .parse()
+                .map_err(|_| Error(format!("webdisc reported a non-number for {key}")))
+        };
+        Ok(Compact {
+            stem: stem.to_string(),
+            index_file: text("index_file")?,
+            index_bytes: number("index_bytes")?,
+            index_fnv: number("index_fnv32")? as u32,
+            payload_file: text("payload_file")?,
+            payload_bytes: number("payload_bytes")?,
+            part: number("part_bytes")?,
+            image_bytes: number("image_bytes")?,
+            hash: number("image_hash")?,
+            chunks: number("chunks")?,
+            boot_chunks: number("boot_chunks")?,
+            boot_bytes: number("boot_bytes")?,
+            kinds: text("kinds")?,
+        })
+    }
+
+    /// The payload's file names: the file itself, or `.001`... when split.
+    fn payload_files(&self) -> Vec<String> {
+        if self.part == 0 {
+            return vec![self.payload_file.clone()];
+        }
+        (1..=self.payload_bytes.div_ceil(self.part))
+            .map(|n| format!("{}.{n:03}", self.payload_file))
+            .collect()
+    }
+
+    /// `compact INDEX_FILE INDEX_BYTES INDEX_FNV32 PAYLOAD_FILE BOOT_BYTES PART_BYTES`,
+    /// read by the emulator's `web_stream::parse_manifest` and by the page's
+    /// early prefetch in `index.html`.
+    fn manifest_line(&self) -> String {
+        format!(
+            "compact {} {} {} {} {} {}\n",
+            self.index_file,
+            self.index_bytes,
+            self.index_fnv,
+            self.payload_file,
+            self.boot_bytes,
+            self.part
+        )
+    }
+
+    fn manifest_json(&self) -> Value {
+        json!({
+            "version": 2,
+            "compact": {
+                "name": self.stem,
+                "index": {
+                    "file": self.index_file,
+                    "bytes": self.index_bytes,
+                    "fnv": self.index_fnv,
+                },
+                "payload": {
+                    "file": self.payload_file,
+                    "files": self.payload_files(),
+                    "bytes": self.payload_bytes,
+                    "part_bytes": self.part,
+                },
+                "image_bytes": self.image_bytes,
+                "game_image_hash": self.hash,
+                "chunks": self.chunks,
+                "boot_chunks": self.boot_chunks,
+                "boot_bytes": self.boot_bytes,
+                "sector_kinds": self.kinds,
+            },
+        })
+    }
+}
+
+/// Run `webdisc pack` (the emulator checkout's `psx-webdisc` tool) and read its
+/// `key value` report. The tool reads every file it wrote back and compares
+/// each sector with the image, and exits nonzero on any difference.
+fn run_pack(
+    webdisc: &Path,
+    image: &Path,
+    outdir: &Path,
+    stem: &str,
+    extra: &[String],
+) -> Result<HashMap<String, String>> {
+    let output = Command::new(webdisc)
+        .arg("pack")
+        .arg(image)
+        .arg(outdir)
+        .arg(stem)
+        .args(extra)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .map_err(|e| Error(format!("cannot run {}: {e}", webdisc.display())))?;
+    ensure!(
+        output.status.success(),
+        "webdisc pack failed ({})",
+        output.status
+    );
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.split_once(' '))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect())
+}
+
+/// Stage the compact delivery of `image` in `outdir`: `<stem>.pxi` (index),
+/// `<stem>.pxw` (payload, in numbered parts if it would reach `limit`),
+/// `web-manifest.txt` and its JSON twin. `webdisc` is the packer binary built
+/// from the emulator checkout the page is built from, so the page and the
+/// format always agree. Returns the one-line summary.
+pub fn deliver_compact(
+    webdisc: &Path,
+    image: &Path,
+    outdir: &Path,
+    stem: &str,
+    limit: u64,
+    boot_sectors: u64,
+) -> Result<String> {
+    let len = fs::metadata(image)
+        .map_err(|e| Error(format!("{}: {e}", image.display())))?
+        .len();
+    ensure!(len > 0, "{}: empty image", image.display());
+    ensure!(
+        len.is_multiple_of(SECTOR_BYTES),
+        "{}: not whole {SECTOR}-byte sectors",
+        image.display()
+    );
+    ensure!(boot_sectors > 0, "boot sectors must be at least 1");
+    fs::create_dir_all(outdir)?;
+    // Never write over the file being read.
+    let source = fs::metadata(image)?;
+    for file in [format!("{stem}.pxi"), format!("{stem}.pxw")] {
+        if let Ok(existing) = fs::metadata(outdir.join(&file)) {
+            ensure!(
+                !(existing.dev() == source.dev() && existing.ino() == source.ino()),
+                "{file} in the output directory is the source image; read it from elsewhere"
+            );
+        }
+    }
+    let boot = boot_sectors.to_string();
+    let mut args = vec!["--boot-sectors".to_string(), boot];
+    let mut report = run_pack(webdisc, image, outdir, stem, &args)?;
+    let mut delivered = Compact::from_report(stem, &report)?;
+    if delivered.payload_bytes >= limit {
+        // Too big for one file on this host: pack again in numbered parts.
+        fs::remove_file(outdir.join(&delivered.payload_file))?;
+        args.extend(["--part-bytes".to_string(), (limit - 1).to_string()]);
+        report = run_pack(webdisc, image, outdir, stem, &args)?;
+        delivered = Compact::from_report(stem, &report)?;
+    }
+    ensure!(
+        delivered.image_bytes == len,
+        "webdisc packed {} bytes of a {len} byte image",
+        delivered.image_bytes
+    );
+    let index = fs::read(outdir.join(&delivered.index_file))?;
+    ensure!(
+        index.len() as u64 == delivered.index_bytes && fnv1a32(&index) == delivered.index_fnv,
+        "the index on disk is not the one webdisc reported"
+    );
+    let mut written = 0;
+    for file in delivered.payload_files() {
+        let size = fs::metadata(outdir.join(&file))
+            .map_err(|e| Error(format!("{file}: {e}")))?
+            .len();
+        ensure!(size < limit, "{file}: {size} bytes is over the host cap {limit}");
+        written += size;
+    }
+    ensure!(
+        written == delivered.payload_bytes,
+        "payload files total {written} bytes, expected {}",
+        delivered.payload_bytes
+    );
+    fs::write(outdir.join("web-manifest.txt"), delivered.manifest_line())?;
+    fs::write(
+        outdir.join("web-manifest.json"),
+        dumps(&delivered.manifest_json(), 1, false),
+    )?;
+    Ok(format!(
+        "web compact delivery: {} MiB image as {} MiB payload in {} file(s), index {} KiB, boot {} chunks ({} KiB), {}, round trip OK",
+        len / 1024 / 1024,
+        delivered.payload_bytes / 1024 / 1024,
+        delivered.payload_files().len(),
+        delivered.index_bytes / 1024,
+        delivered.boot_chunks,
+        delivered.boot_bytes / 1024,
+        delivered.kinds
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +722,102 @@ mod tests {
         assert!(error.0.contains("whole"), "{error}");
         fs::write(&src, b"").unwrap();
         assert!(deliver(&src, &dir.path().join("o"), "d.bin", 200_000_000, 410).is_err());
+    }
+
+    // ----- compact delivery ---------------------------------------------------
+
+    use std::os::unix::fs::PermissionsExt;
+
+    /// A stand-in for `webdisc pack`: writes a payload of `payload` bytes (one
+    /// file, or numbered parts when told a part size) and reports like the real
+    /// one. The real tool is tested in the emulator repository.
+    fn fake_webdisc(dir: &Path, payload: u64, image_bytes: u64) -> std::path::PathBuf {
+        let path = dir.join("webdisc");
+        let script = format!(
+            r#"#!/bin/sh
+image="$2"; out="$3"; name="$4"; part=0
+while [ $# -gt 0 ]; do [ "$1" = --part-bytes ] && part="$2"; shift; done
+printf 'INDEX' > "$out/$name.pxi"
+if [ "$part" = 0 ]; then
+  head -c {payload} /dev/zero > "$out/$name.pxw"
+else
+  left={payload}; n=1
+  while [ $left -gt 0 ]; do
+    take=$left; [ $take -gt $part ] && take=$part
+    head -c $take /dev/zero > "$out/$name.pxw.00$n"
+    left=$((left - take)); n=$((n + 1))
+  done
+fi
+echo "index_file $name.pxi"
+echo "index_bytes 5"
+echo "index_fnv32 {fnv}"
+echo "payload_file $name.pxw"
+echo "payload_bytes {payload}"
+echo "part_bytes $part"
+echo "image_bytes {image_bytes}"
+echo "image_hash 99"
+echo "chunks 7"
+echo "boot_chunks 2"
+echo "boot_bytes 1234"
+echo "kinds form1=1 form2=2 form2_no_edc=0 verbatim=0"
+"#,
+            fnv = fnv1a32(b"INDEX")
+        );
+        fs::write(&path, script).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn a_compact_delivery_that_fits_is_one_file_and_one_manifest_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = write_disc(dir.path(), 70);
+        let tool = fake_webdisc(dir.path(), 5000, (70 * SECTOR) as u64);
+        let out = dir.path().join("web");
+        let summary = deliver_compact(&tool, &src, &out, "demo-disc", 200_000_000, 410).unwrap();
+        assert!(summary.ends_with("round trip OK"), "{summary}");
+        let text = fs::read_to_string(out.join("web-manifest.txt")).unwrap();
+        assert_eq!(
+            text,
+            format!("compact demo-disc.pxi 5 {} demo-disc.pxw 1234 0\n", fnv1a32(b"INDEX"))
+        );
+        let json: Value =
+            serde_json::from_str(&fs::read_to_string(out.join("web-manifest.json")).unwrap())
+                .unwrap();
+        assert_eq!(json["compact"]["payload"]["files"][0], "demo-disc.pxw");
+        assert_eq!(json["compact"]["game_image_hash"], 99);
+    }
+
+    #[test]
+    fn a_compact_payload_over_the_cap_is_repacked_in_parts() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = write_disc(dir.path(), 70);
+        let tool = fake_webdisc(dir.path(), 5000, (70 * SECTOR) as u64);
+        let out = dir.path().join("web");
+        deliver_compact(&tool, &src, &out, "demo-disc", 3000, 410).unwrap();
+        assert!(!out.join("demo-disc.pxw").exists());
+        assert_eq!(fs::metadata(out.join("demo-disc.pxw.001")).unwrap().len(), 2999);
+        assert_eq!(fs::metadata(out.join("demo-disc.pxw.002")).unwrap().len(), 2001);
+        let text = fs::read_to_string(out.join("web-manifest.txt")).unwrap();
+        assert!(text.trim_end().ends_with(" demo-disc.pxw 1234 2999"), "{text}");
+    }
+
+    #[test]
+    fn a_compact_delivery_refuses_a_packer_that_packed_another_image() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = write_disc(dir.path(), 70);
+        let tool = fake_webdisc(dir.path(), 5000, 1234 * SECTOR as u64);
+        let error = deliver_compact(&tool, &src, &dir.path().join("web"), "d", 200_000_000, 410)
+            .unwrap_err();
+        assert!(error.0.contains("packed"), "{error}");
+        assert!(deliver_compact(
+            &dir.path().join("no-such-tool"),
+            &src,
+            &dir.path().join("web2"),
+            "d",
+            200_000_000,
+            410
+        )
+        .is_err());
     }
 }

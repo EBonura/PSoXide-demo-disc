@@ -228,6 +228,7 @@ fn verify_web_build(directory: &Path, revision: &str, lock_sha256: &str) -> Resu
 struct Tools {
     python: OsString,
     trunk: OsString,
+    cargo: OsString,
     butler: OsString,
 }
 
@@ -236,6 +237,7 @@ impl Tools {
         Tools {
             python: "python3".into(),
             trunk: "trunk".into(),
+            cargo: "cargo".into(),
             butler: "butler".into(),
         }
     }
@@ -249,6 +251,23 @@ fn run_program(command: &mut Command) -> Result<()> {
         .map_err(|e| Error(format!("cannot run {shown}: {e}")))?;
     ensure!(status.success(), "{shown} failed ({status})");
     Ok(())
+}
+
+/// Build the compact-disc packer from the emulator checkout the page is built
+/// from, so the format the page reads is the one the packer writes. Returns the
+/// binary's path.
+fn build_webdisc(emulator: &Path, tools: &Tools) -> Result<PathBuf> {
+    run_program(
+        Command::new(&tools.cargo)
+            .args(["build", "--release", "-p", "psx-webdisc", "--bin", "webdisc"])
+            .current_dir(emulator),
+    )?;
+    let target = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| emulator.join("target"));
+    let binary = target.join("release/webdisc");
+    ensure!(binary.is_file(), "cargo did not produce {}", binary.display());
+    Ok(binary)
 }
 
 /// The emulator checkout's revision and the hash of its component lock, once it
@@ -429,21 +448,35 @@ fn stage(root: &Path, options: &Options, tools: &Tools) -> Result<()> {
     }
     copy2(&licence, &web.join("SLICNSE.TXT"))?;
     let cue_text = read_text(&cue)?;
-    // The cue the delivery tool reads. A lazy delivery serves the bare image
-    // and never fetches a cue, so it is written for the tool and then removed.
-    let web_cue = web.join("demo-disc.cue");
-    let file_line = Regex::new(r"(?m)^FILE .*$")?;
-    let rewritten =
-        file_line.replace_all(&cue_text, regex::NoExpand(r#"FILE "demo-disc.bin" BINARY"#));
-    fs::write(&web_cue, rewritten.as_bytes())?;
-    let delivery: Vec<String> = vec![
-        web_cue.display().to_string(),
-        image.display().to_string(),
-        web.display().to_string(),
-    ];
-    crate::web::run(&delivery)?;
     if crate::web::is_lazy_disc(&cue_text)? {
-        fs::remove_file(&web_cue)?;
+        // An XA disc (all of its music inside the data track) ships in the
+        // compact format: the page reads deflated chunks by range request and
+        // never fetches a cue or the raw image.
+        let webdisc = build_webdisc(&emulator, tools)?;
+        println!(
+            "{}",
+            crate::weblazy::deliver_compact(
+                &webdisc,
+                &image,
+                &web,
+                crate::web::LAZY_STEM,
+                ITCH_FILE_LIMIT,
+                crate::weblazy::DEFAULT_BOOT_SECTORS,
+            )?
+        );
+    } else {
+        // The cue the delivery tool reads.
+        let web_cue = web.join("demo-disc.cue");
+        let file_line = Regex::new(r"(?m)^FILE .*$")?;
+        let rewritten =
+            file_line.replace_all(&cue_text, regex::NoExpand(r#"FILE "demo-disc.bin" BINARY"#));
+        fs::write(&web_cue, rewritten.as_bytes())?;
+        let delivery: Vec<String> = vec![
+            web_cue.display().to_string(),
+            image.display().to_string(),
+            web.display().to_string(),
+        ];
+        crate::web::run(&delivery)?;
     }
     // web-delivery decodes every FLAC and reconstructs the original BIN before
     // writing its manifest. Neither public package can silently use an old disc.
@@ -658,7 +691,7 @@ mod tests {
             };
             fs::write(emulator.join("components.lock.json"), lock).unwrap();
             fs::write(emulator.join("emu/crates/frontend/.keep"), "").unwrap();
-            fs::write(emulator.join(".gitignore"), ".tools/\n").unwrap();
+            fs::write(emulator.join(".gitignore"), ".tools/\ntarget/\n").unwrap();
             if old_pin {
                 fs::create_dir_all(emulator.join("tools")).unwrap();
                 fs::write(emulator.join("tools/bootstrap-components.py"), "# stub\n").unwrap();
@@ -711,6 +744,32 @@ mod tests {
                     log = log("trunk").display()
                 ),
             );
+            // `cargo build -p psx-webdisc` produces a stand-in packer that
+            // copies the image as its payload and reports like the real one.
+            script(
+                &bin.join("webdisc-fake"),
+                &format!(
+                    "image=\"$2\"; out=\"$3\"; name=\"$4\"\n\
+                     cp \"$image\" \"$out/$name.pxw\"\n\
+                     printf INDEX > \"$out/$name.pxi\"\n\
+                     size=$(wc -c < \"$image\" | tr -d ' ')\n\
+                     echo \"index_file $name.pxi\"; echo index_bytes 5; echo index_fnv32 {fnv}\n\
+                     echo \"payload_file $name.pxw\"; echo \"payload_bytes $size\"; echo part_bytes 0\n\
+                     echo \"image_bytes $size\"; echo image_hash 7; echo chunks 2; echo boot_chunks 1\n\
+                     echo boot_bytes 100; echo kinds form1=1",
+                    fnv = crate::util::fnv1a32(b"INDEX")
+                ),
+            );
+            let cargo = script(
+                &bin.join("cargo"),
+                &format!(
+                    "echo \"$PWD|$*\" >> '{log}'\n\
+                     mkdir -p target/release\n\
+                     cp '{fake}' target/release/webdisc",
+                    log = log("cargo").display(),
+                    fake = bin.join("webdisc-fake").display()
+                ),
+            );
             let butler = script(
                 &bin.join("butler"),
                 &format!("echo \"$@\" >> '{}'", log("butler").display()),
@@ -721,6 +780,7 @@ mod tests {
                 tools: Tools {
                     python,
                     trunk,
+                    cargo,
                     butler,
                 },
             }
@@ -1019,8 +1079,8 @@ mod tests {
             fs::read_to_string(out.join("download/SLICNSE.TXT")).unwrap(),
             "quake licence\n"
         );
-        // The web package: the licence too, the fresh lazy delivery (the image,
-        // its header sidecar and manifests), no stale disc files.
+        // The web package: the licence too, the fresh compact delivery (the
+        // index, the payload and manifests), no stale disc files.
         assert_eq!(
             fs::read_to_string(out.join("web/SLICNSE.TXT")).unwrap(),
             "quake licence\n"
@@ -1029,8 +1089,8 @@ mod tests {
             "index.html",
             "app.wasm",
             "style.css",
-            "demo-disc.bin",
-            "demo-disc.hdr.gz",
+            "demo-disc.pxi",
+            "demo-disc.pxw",
             "web-manifest.txt",
             "web-manifest.json",
             "emulator-build.json",
@@ -1041,6 +1101,8 @@ mod tests {
             );
         }
         for gone in [
+            "demo-disc.bin",
+            "demo-disc.hdr.gz",
             "demo-disc.cue",
             "demo-data.bin.gz",
             "track-02.flac",
@@ -1052,7 +1114,16 @@ mod tests {
             );
         }
         let manifest = fs::read_to_string(out.join("web/web-manifest.txt")).unwrap();
-        assert!(manifest.starts_with("image demo-disc.bin "), "{manifest}");
+        assert!(manifest.starts_with("compact demo-disc.pxi "), "{manifest}");
+        // The packer was built from the emulator checkout the page comes from.
+        let built = f.log("cargo").unwrap();
+        assert_eq!(
+            built.trim(),
+            format!(
+                "{}|build --release -p psx-webdisc --bin webdisc",
+                resolve(&f.path("emulator")).unwrap().display()
+            )
+        );
         // The receipt matches the locked emulator and the files that are there.
         let lock_sha = sha256_bytes(b"{\"lock\": 1}\n");
         verify_web_build(&out.join("web"), &f.revision, &lock_sha).unwrap();
@@ -1115,8 +1186,8 @@ mod tests {
     }
 
     /// A pressing whose music is XA has only the data track. Its web package
-    /// serves the bare image and a header sidecar for Range reads: no gzip data
-    /// track, no FLAC pieces, no cue.
+    /// serves a compact index and payload for Range reads: no gzip data track,
+    /// no FLAC pieces, no cue, no raw image.
     #[test]
     fn a_data_track_only_disc_stages_the_lazy_web_package() {
         if !have("git") {
@@ -1131,11 +1202,11 @@ mod tests {
         fs::write(f.path("disc/disc.cue"), public_cue(0)).unwrap();
         f.stage(&f.options("out")).unwrap();
         let web = resolve(&f.path("out")).unwrap().join("web");
-        assert_eq!(fs::read(web.join("demo-disc.bin")).unwrap(), image);
+        assert_eq!(fs::read(web.join("demo-disc.pxw")).unwrap(), image);
         for kept in [
             "index.html",
             "app.wasm",
-            "demo-disc.hdr.gz",
+            "demo-disc.pxi",
             "web-manifest.txt",
             "emulator-build.json",
         ] {
@@ -1145,6 +1216,8 @@ mod tests {
             );
         }
         for gone in [
+            "demo-disc.bin",
+            "demo-disc.hdr.gz",
             "demo-disc.cue",
             "demo-data.bin.gz",
             "track-02.flac",
@@ -1157,11 +1230,14 @@ mod tests {
         }
         let manifest = fs::read_to_string(web.join("web-manifest.txt")).unwrap();
         assert!(
-            manifest.starts_with(&format!("image demo-disc.bin {} ", 40 * SECTOR_BYTES)),
+            manifest.starts_with(&format!(
+                "compact demo-disc.pxi 5 {} demo-disc.pxw 100 0",
+                crate::util::fnv1a32(b"INDEX")
+            )),
             "{manifest}"
         );
         assert_eq!(manifest.lines().count(), 1);
-        // The receipt covers the image and the sidecar.
+        // The receipt covers the index and the payload.
         let lock_sha = sha256_bytes(b"{\"lock\": 1}\n");
         verify_web_build(&web, &f.revision, &lock_sha).unwrap();
     }
@@ -1362,10 +1438,8 @@ mod tests {
         let out = resolve(&f.path("out3")).unwrap();
         assert!(out.join("web/assets/frontend.js").is_file());
         // The older disc in the reused build is replaced by this one.
-        assert_ne!(
-            fs::read(out.join("web/demo-disc.bin")).unwrap(),
-            b"an older disc"
-        );
+        assert!(!out.join("web/demo-disc.bin").exists());
+        assert!(out.join("web/demo-disc.pxw").is_file());
         assert!(
             reused.join("demo-disc.bin").exists(),
             "the source build is left untouched"

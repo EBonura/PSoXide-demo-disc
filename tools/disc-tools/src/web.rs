@@ -341,6 +341,9 @@ pub fn is_lazy_disc(cue_text: &str) -> Result<bool> {
 /// The file the lazy delivery serves the image as.
 pub const LAZY_IMAGE_NAME: &str = "demo-disc.bin";
 
+/// The stem of the compact delivery's files (`demo-disc.pxi`, `demo-disc.pxw`).
+pub const LAZY_STEM: &str = "demo-disc";
+
 pub fn run(args: &[String]) -> Result<i32> {
     ensure!(
         args.len() >= 3,

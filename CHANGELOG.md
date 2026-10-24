@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The browser package of an XA disc is the compact delivery: `demo-disc.pxi` (index, 30 KB for v0.48) and `demo-disc.pxw` (deflated 32-sector chunks, 178 MiB against the 318 MiB image) instead of the raw image and a 330 KB header sidecar. `deploy-public` builds `webdisc` from the emulator checkout (the `web_player` pin must contain `psx-webdisc`, 4d32b426), packs, and has the packer read every file back and compare each sector with the image. `public-only` cannot scan deflated chunks, so it ties the index to a scanned image by game-image hash and sector count and checks the payload sizes; check the web folder together with the download folder. `web-delivery` on its own still writes the raw lazy image.
+
 ## v0.44
 
 - Re-pressed from `release/lineup-v0.44.json` (Public) and `release/lineup-v0.44-private.json` (Private), so every component is the newest library install of 2026-10-16: Celeste Collection 0.2.7 (the brightness stepper, DEFAULT, DARKER n, BRIGHTER n, the palette address fix and the card-save repin; chore/celeste-0.2.7-2026-10-16), NitroXide 0.4.1 (863765d: nine cars, ramp texture fix, SFX pass, SDK pad engine, background settings save), VoXide 0.4.1 (25cb82d: LOAD WORLD title, faster TNT chains, 20 block view), Quake (integ/quake-2026-10-16 e05f786: RAM pass, weapons, monsters and survival fixes). Private adds WipEout with the wall collision option (f08be05c), Hollow Knight (main dd8958f), Counter-Strike (feat/cs-pending 2fb98e8) and Half-Life (integ/hl-focus b5a58b2). Arcade, Cortex (Graybox Reach) and PSXcel keep their previous inputs, byte for byte. The launcher carries the 32-bit song clock (fix/no64-2026-10-16).
