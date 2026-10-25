@@ -1,236 +1,359 @@
-//! Self-contained loading presentation.
+//! The loading presentation: the launch animation's disc, still turning.
 //!
-//! The launcher cannot remain resident while a guest streams into its load
-//! address, so this module redraws the same procedural globe and starfield
-//! from the high-RAM loader. Two VRAM buffers keep the animation tear-free
-//! without re-enabling interrupts or retaining launcher assets.
+//! The launcher's hand-off ends on a disc spinning at the middle of the stage;
+//! this module draws that same disc (the code is shared, see `disc_art`) and
+//! keeps it turning at the same rate while the program streams in, with one
+//! label fading in under it in the Shelf menu's own face. Nothing of the
+//! launcher is resident: the label's glyphs are sprites cut from the menu's
+//! atlas, which the launcher left in VRAM where it put it.
+//!
+//! The animation runs from `tick`, which the transport calls between CD steps
+//! (after every sector, once per spin of a seek wait, every 4 KiB of the
+//! checksum pass). A tick does nothing until a VBlank edge has arrived; then
+//! it flips to the frame drawn since the last edge and draws the next one into
+//! the other buffer, so there are always two buffers and the display only
+//! ever shows a finished one. Only the part of the screen the disc and the
+//! label can change is redrawn (clipped by the draw area), which keeps a
+//! tick's work well under one sector's 13 ms at double speed.
+//!
+//! Interrupts stay off throughout, as in the rest of the blob.
 
-use carousel::{Bead, SPHERE_POINTS, TURN};
-use psx_math::{cos_q12, sin_q12};
-
+use crate::disc_art::{self, Canvas, Rgb};
 use crate::paint;
+use crate::text::Face;
 
-const BACK_BUFFER_Y: i16 = 256;
-const STARS: u32 = 120;
-/// The Shelf menu's ground (4, 8, 12), so the hand-off does not change colour.
-const BACKGROUND: u32 = 0x000C_0804;
-const BAR_W: i16 = 160;
-const BAR_H: i16 = 12;
-const BAR_X: i16 = (320 - BAR_W) / 2;
-const BAR_Y: i16 = 202;
-const BAR_INSET: i16 = 3;
-const BAR_FILL_W: i16 = BAR_W - BAR_INSET * 2;
-const LABEL_SCALE: i16 = 2;
-const LABEL_W: i16 = 7 * 8 * LABEL_SCALE;
-const LABEL_X: i16 = (320 - LABEL_W) / 2;
-const LABEL_Y: i16 = 180;
+/// The two 320x240 buffers: the launcher's own pair, so nothing beyond what
+/// the launcher already used is touched (the menu's palettes sit below row 480).
+const BUFFERS: [i16; 2] = [0, 240];
 
-const MAX_SEGMENTS: usize = 9;
-const MIN_SEGMENTS: usize = 6;
+/// The parts of a buffer a frame can change, in screen pixels (x, y, width,
+/// height): the disc's rings reach 52 pixels from its centre, and the label
+/// sits under it. Repainting only these keeps a frame's GPU work, and so the
+/// CPU time a tick spends waiting on it, down to a few hundred microseconds
+/// to a couple of milliseconds.
+const DISC_BOX: (i16, i16, i16, i16) = (104, 58, 112, 108);
+const LABEL_BOX: (i16, i16, i16, i16) = (112, 176, 96, 28);
+const WHOLE: (i16, i16, i16, i16) = (0, 0, 320, 240);
 
-const GLOSS_TOP: (u8, u8, u8) = (96, 232, 255);
-const GLOSS_BOTTOM: (u8, u8, u8) = (0, 36, 48);
-const GLOSS_EDGE: (u8, u8, u8) = (24, 150, 180);
-const SPECULAR: (u8, u8, u8) = (200, 244, 255);
+/// GP0(E1h): the menu atlas page (x = 832) with additive blending and
+/// dithering, drawing allowed. Opaque primitives ignore the blend bits, so one
+/// state serves every packet the loader sends.
+const DRAW_MODE: u32 = 0xE100_0000 | 13 | (1 << 5) | (1 << 9) | (1 << 10);
+/// The menu atlas's palette row, as a sprite's CLUT word: (256, 480).
+const ATLAS_CLUT: u32 = 16 | (480 << 6);
 
-const fn packed_rgb((r, g, b): (u8, u8, u8)) -> u32 {
-    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
+const LABEL: &str = "LOADING";
+/// The label's capitals are centred on this row, clear of the disc's glow.
+const LABEL_MID: i32 = 190;
+/// Frames the label takes to fade in after the hand-off.
+const LABEL_FADE_FRAMES: u32 = 20;
+/// The menu's muted text colour.
+const LABEL_COLOR: Rgb = (157, 176, 190);
+
+/// The checksum pass ticks once per 4 KiB block; a sector is 2 KiB.
+const SECTORS_PER_TICK: u32 = 2;
+/// Frames the scene takes to dim at the end of the checksum pass. Dimming
+/// redraws the whole screen, so it is kept short: that is CPU time the pass
+/// would otherwise spend hashing.
+const FADE_OUT_FRAMES: u32 = 12;
+/// VBlanks between frames while the checksum pass runs. The pass is the one
+/// stretch of the load that is bound by the CPU and not by the drive, so every
+/// millisecond a frame takes is a millisecond added to the load; half the
+/// frame rate halves that, and the spin keeps its speed (the time advances
+/// by the VBlanks that passed).
+const VERIFY_PERIOD: u32 = 2;
+
+/// How far the checksum pass has got, in its own ticks and in VBlanks.
+#[derive(Clone, Copy)]
+struct Verify {
+    ticks: u32,
+    frames: u32,
+}
+
+/// Which part of the screen a frame repaints.
+#[derive(Clone, Copy)]
+enum Pass {
+    /// All of it, with everything.
+    Whole,
+    /// The disc's square: the disc and what it sits in.
+    Disc,
+    /// The label's strip: what it sits in, and the label.
+    Label,
 }
 
 pub struct LoadingScreen {
-    yaw: i32,
-    pitch: i32,
-    travel: i32,
-    progress: i16,
-    back_y: i16,
-    beads: [Bead; SPHERE_POINTS],
+    /// The launch's frame number, carried on: the frame most recently drawn is
+    /// where the spin-up and the glow have got to.
+    t: i32,
+    /// Frames drawn since the hand-off.
+    frame: u32,
+    /// Index into [`BUFFERS`] of the buffer the display shows.
+    shown: usize,
+    /// A finished frame waiting in the other buffer for the next VBlank.
+    ready: bool,
+    /// VBlanks since the last frame was drawn.
+    edges: u32,
+    /// Sectors in the payload, as the last chunk reported them.
+    sectors: u32,
+    /// Once the payload is in: the checksum pass so far.
+    verifying: Option<Verify>,
 }
 
 impl LoadingScreen {
     pub fn new() -> Self {
         Self {
-            yaw: 0,
-            pitch: TURN / 16,
-            travel: 0,
-            progress: 0,
-            back_y: BACK_BUFFER_Y,
-            beads: [Bead::default(); SPHERE_POINTS],
+            t: disc_art::LAST_SHOWN,
+            frame: 0,
+            shown: 0,
+            ready: false,
+            edges: 0,
+            sectors: 0,
+            verifying: None,
         }
     }
 
-    /// Paint the first complete frame while the display is still off.
+    /// Paint the first complete frame, the launcher's last, and turn the
+    /// display on the moment it is done: the GPU reset that opened the loader
+    /// blanked the screen, and every frame it stays blank is a flicker in what
+    /// should be one shot. The second buffer is painted after, with the next
+    /// frame, so the screen is not kept waiting for it. Both get the whole
+    /// scene once; after that a frame only repaints what changes.
     pub fn begin(&mut self) {
-        paint::set_draw_buffer(0);
-        self.draw_frame();
+        send(&[DRAW_MODE]);
+        self.draw(BUFFERS[0], Pass::Whole, 256);
         paint::draw_sync();
-        paint::present_at_next_vblank(0);
         paint::show();
+        // An edge latched before now is not a frame of this screen.
+        paint::ack_vblank();
+        self.t += 1;
+        self.frame += 1;
+        self.draw(BUFFERS[1], Pass::Whole, 256);
+        self.ready = true;
     }
 
-    /// Advance between CD chunks, while the drive is paused. Rendering or
-    /// waiting for VBlank during an active stream can leave the sector FIFO
-    /// unattended long enough to corrupt the payload on real hardware.
-    pub fn update(&mut self, done: u32, total: u32) {
-        self.progress = ((done * BAR_FILL_W as u32) / total.max(1)).min(BAR_FILL_W as u32) as i16;
-        self.advance();
-        paint::set_draw_buffer(self.back_y);
-        self.draw_frame();
-        paint::draw_sync();
-        paint::present_at_next_vblank(self.back_y);
-        self.back_y = other_buffer(self.back_y);
+    /// A chunk is in; remember how big the payload is.
+    pub fn progress(&mut self, sectors: u32) {
+        self.sectors = sectors;
+        self.tick();
     }
 
-    /// Present a full bar for the final frame before the payload checksum and
-    /// jump. The bounded loader work following it leaves the completed visual
-    /// visible instead of abandoning a nearly full frame.
+    /// Time passes: when a VBlank edge has arrived, show the finished frame
+    /// and start the next.
+    pub fn tick(&mut self) {
+        if let Some(pass) = &mut self.verifying {
+            pass.ticks += 1;
+        }
+        if !paint::take_vblank() {
+            return;
+        }
+        self.edges += 1;
+        if let Some(pass) = &mut self.verifying {
+            pass.frames += 1;
+        }
+        // A frame still drawing is shown at the next edge instead.
+        if self.ready && gpu_idle() {
+            self.shown ^= 1;
+            display(BUFFERS[self.shown]);
+            self.ready = false;
+        }
+        let period = if self.verifying.is_some() && self.level() == 256 {
+            VERIFY_PERIOD
+        } else {
+            1
+        };
+        if !self.ready && self.edges >= period {
+            self.draw_next();
+        }
+    }
+
+    /// The payload is in and the checksum pass is next. The scene dims over
+    /// the last frames of that pass, so the program takes over from a dark
+    /// screen and not from a cut; a payload so small that the whole pass is
+    /// over in a few frames dims for as long as it lasts.
     pub fn finish(&mut self) {
-        self.progress = BAR_FILL_W;
-        self.advance();
-        paint::set_draw_buffer(self.back_y);
-        self.draw_frame();
-        paint::draw_sync();
-        paint::present_at_next_vblank(self.back_y);
+        self.verifying = Some(Verify {
+            ticks: 0,
+            frames: 0,
+        });
     }
 
-    fn advance(&mut self) {
-        // Chunk boundaries are farther apart than launcher frames, so each
-        // safe presentation advances enough to read as deliberate rotation.
-        self.yaw = (self.yaw + 72) & (TURN - 1);
-        self.pitch = (self.pitch + 16) & (TURN - 1);
-        self.travel = self.travel.wrapping_add(56);
+    /// How bright the scene is, 0..=256: full until the checksum pass is
+    /// within [`FADE_OUT_FRAMES`] of its end, then falling to nothing. The
+    /// frames left are estimated from the pass's pace so far.
+    fn level(&self) -> u32 {
+        let Some(pass) = self.verifying else {
+            return 256;
+        };
+        // No pace to go by in the pass's first frames: assume a long pass.
+        if pass.frames < 2 {
+            return 256;
+        }
+        let total = (self.sectors / SECTORS_PER_TICK).max(1);
+        let left = total.saturating_sub(pass.ticks) * pass.frames / pass.ticks.max(1);
+        if left >= FADE_OUT_FRAMES {
+            256
+        } else {
+            256 * left / FADE_OUT_FRAMES
+        }
     }
 
-    fn draw_frame(&mut self) {
-        paint::rect(0, 0, 320, 240, BACKGROUND);
-        draw_starfield(self.travel);
-        draw_sphere(self.yaw, self.pitch, &mut self.beads);
+    fn draw_next(&mut self) {
+        // The spin keeps its speed over any VBlanks that went by.
+        self.t += self.edges as i32;
+        self.edges = 0;
+        self.frame += 1;
+        let level = self.level();
+        let back = BUFFERS[self.shown ^ 1];
+        if level < 256 || disc_art::glow_level(self.t) < 256 {
+            // A dimming scene changes everywhere, glows included.
+            self.draw(back, Pass::Whole, level);
+        } else {
+            self.draw(back, Pass::Disc, level);
+            // Both buffers see the label's last step before it is left alone.
+            if self.frame <= LABEL_FADE_FRAMES + 1 {
+                self.draw(back, Pass::Label, level);
+            }
+        }
+        self.ready = true;
+    }
 
-        paint::text(
-            LABEL_X,
-            LABEL_Y,
-            LABEL_SCALE,
-            "LOADING",
-            packed_rgb(SPECULAR),
-        );
-
-        // The bar borrows the carousel's glossy red lozenge palette. Two
-        // crossed rectangles leave clipped corners without pulling any menu
-        // texture or font state into the high-RAM loader.
-        paint::rect(BAR_X + 2, BAR_Y, BAR_W - 4, BAR_H, packed_rgb(GLOSS_EDGE));
-        paint::rect(BAR_X, BAR_Y + 2, BAR_W, BAR_H - 4, packed_rgb(GLOSS_EDGE));
-        paint::rect(
-            BAR_X + BAR_INSET,
-            BAR_Y + 2,
-            BAR_FILL_W,
-            BAR_H - 4,
-            packed_rgb(GLOSS_BOTTOM),
-        );
-        if self.progress > 0 {
-            paint::rect(
-                BAR_X + BAR_INSET,
-                BAR_Y + 2,
-                self.progress,
-                BAR_H - 4,
-                packed_rgb(GLOSS_EDGE),
+    /// One frame of the scene, or the part of it a pass covers, into the
+    /// buffer at `y`: `level` (0..=256) dims everything, which is how the
+    /// scene fades out.
+    fn draw(&self, y: i16, pass: Pass, level: u32) {
+        let (x0, y0, w, h) = match pass {
+            Pass::Whole => WHOLE,
+            Pass::Disc => DISC_BOX,
+            Pass::Label => LABEL_BOX,
+        };
+        target(y, x0, y0, w, h);
+        paint::rect(x0, y0, w, h, 0);
+        let mut canvas = Gp0;
+        disc_art::disc_glow(&mut canvas, level * disc_art::glow_level(self.t) >> 8);
+        if !matches!(pass, Pass::Label) {
+            disc_art::disc(
+                &mut canvas,
+                disc_art::CX,
+                disc_art::CY,
+                disc_art::R,
+                disc_art::spin(self.t),
+                level,
             );
-            paint::rect(
-                BAR_X + BAR_INSET,
-                BAR_Y + 2,
-                self.progress,
-                3,
-                packed_rgb(GLOSS_TOP),
-            );
+        }
+        disc_art::stage_glow(&mut canvas, level);
+        if !matches!(pass, Pass::Disc) {
+            let fade_in = (self.frame * 256 / LABEL_FADE_FRAMES).min(256);
+            label(fade_in * level >> 8);
         }
     }
 }
 
-fn other_buffer(y: i16) -> i16 {
-    if y == 0 {
-        BACK_BUFFER_Y
-    } else {
-        0
+/// Whether the GPU has finished everything sent so far (GPUSTAT bits 28 and
+/// 26, as `paint::draw_sync` waits for them), without waiting.
+fn gpu_idle() -> bool {
+    psx_io::gpu::try_wait_dma_ready(0) && psx_io::gpu::try_wait_command_ready(0)
+}
+
+/// Show the buffer at VRAM row `y` now.
+fn display(y: i16) {
+    psx_io::gpu::write_display_control(0x0500_0000 | ((y as u32 & 0x1ff) << 10));
+}
+
+/// Aim drawing at buffer row `y`, clipped to the given screen rectangle.
+/// Coordinates sent afterwards stay screen-relative through the draw offset.
+fn target(y: i16, x0: i16, y0: i16, w: i16, h: i16) {
+    let top = (y + y0) as u32 & 0x1ff;
+    let bottom = (y + y0 + h - 1) as u32 & 0x1ff;
+    send(&[
+        0xE300_0000 | (top << 10) | x0 as u32,
+        0xE400_0000 | (bottom << 10) | (x0 + w - 1) as u32,
+        0xE500_0000 | ((y as u32 & 0x7ff) << 11),
+    ]);
+}
+
+/// One GP0 packet: wait once for the GPU to take commands, then every word.
+fn send(words: &[u32]) {
+    // Best effort: a dead GPU must not hang the loader.
+    let _ = psx_io::gpu::try_wait_command_ready(1_000_000);
+    for &word in words {
+        psx_io::gpu::write_command(word);
     }
 }
 
-fn draw_starfield(travel: i32) {
-    for i in 0..STARS {
-        let star = carousel::star(i, travel);
-        if !star.visible {
-            continue;
+fn rgb((r, g, b): Rgb) -> u32 {
+    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
+}
+
+fn vertex((x, y): (i32, i32)) -> u32 {
+    ((y.clamp(-1000, 1000) as u32) << 16) | (x.clamp(-1000, 1000) as u32 & 0xffff)
+}
+
+/// The disc's primitives as raw GP0 packets.
+struct Gp0;
+
+impl Canvas for Gp0 {
+    fn quad_g(&mut self, v: [(i32, i32); 4], c: [Rgb; 4]) {
+        send(&[
+            0x3800_0000 | rgb(c[0]),
+            vertex(v[0]),
+            rgb(c[1]),
+            vertex(v[1]),
+            rgb(c[2]),
+            vertex(v[2]),
+            rgb(c[3]),
+            vertex(v[3]),
+        ]);
+    }
+
+    fn tri_g(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
+        send(&[
+            0x3000_0000 | rgb(c[0]),
+            vertex(v[0]),
+            rgb(c[1]),
+            vertex(v[1]),
+            rgb(c[2]),
+            vertex(v[2]),
+        ]);
+    }
+
+    fn tri_g_add(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
+        send(&[
+            0x3200_0000 | rgb(c[0]),
+            vertex(v[0]),
+            rgb(c[1]),
+            vertex(v[1]),
+            rgb(c[2]),
+            vertex(v[2]),
+        ]);
+    }
+
+    fn line_add(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
+        send(&[0x5200_0000 | rgb(ca), vertex(a), rgb(cb), vertex(b)]);
+    }
+}
+
+/// The label, centred under the disc, at `alpha` (0..=256) of its colour. Its
+/// glyphs are additive sprites out of the menu atlas, as the menu draws text.
+fn label(alpha: u32) {
+    if alpha == 0 {
+        return;
+    }
+    let face: &Face = &crate::ui_atlas::MICH12;
+    let (r, g, b) = disc_art::scale(LABEL_COLOR, alpha);
+    // The atlas is modulated by half the colour: texel 128 is unity.
+    let tint = rgb((r >> 1, g >> 1, b >> 1));
+    let top = LABEL_MID - face.cap_mid();
+    let mut pen = disc_art::CX - face.width(LABEL, 1) / 2;
+    for c in LABEL.bytes() {
+        let glyph = face.glyph(c);
+        if glyph.w > 0 {
+            send(&[
+                0x6600_0000 | tint,
+                vertex((pen + glyph.xoff as i32, top + glyph.yoff as i32)),
+                (ATLAS_CLUT << 16) | ((glyph.v as u32) << 8) | glyph.u as u32,
+                ((glyph.h as u32) << 16) | glyph.w as u32,
+            ]);
         }
-        let b = star.bright;
-        let g = ((b as u16 * 13) / 16) as u8;
-        let blue = ((b as u16 * 11) / 16) as u8;
-        let rgb = b as u32 | ((g as u32) << 8) | ((blue as u32) << 16);
-        paint::rect(star.x, star.y, star.size as i16, star.size as i16, rgb);
+        pen += glyph.adv as i32 + 1;
     }
-}
-
-fn draw_sphere(yaw: i32, pitch: i32, beads: &mut [Bead; SPHERE_POINTS]) {
-    let n = carousel::sphere(yaw, pitch, 0, beads);
-    carousel::sort_by_depth(&mut beads[..n], |bead| bead.z);
-    for bead in &beads[..n] {
-        draw_bead(bead);
-    }
-}
-
-fn draw_bead(bead: &Bead) {
-    if bead.r <= 0 {
-        return;
-    }
-    ellipse(
-        bead.x,
-        bead.y,
-        bead.r,
-        bead.r,
-        scale_rgb(GLOSS_TOP, bead.lit),
-        scale_rgb(GLOSS_BOTTOM, bead.lit),
-    );
-    if bead.r >= 7 {
-        ellipse(
-            bead.x - bead.r / 3,
-            bead.y - bead.r / 3,
-            bead.r / 3,
-            bead.r / 3,
-            scale_rgb(SPECULAR, bead.lit),
-            scale_rgb(GLOSS_TOP, bead.lit),
-        );
-    }
-}
-
-fn segments_for(rx: i16, ry: i16) -> usize {
-    (rx.max(ry) as usize / 2).clamp(MIN_SEGMENTS, MAX_SEGMENTS)
-}
-
-fn ellipse(cx: i16, cy: i16, rx: i16, ry: i16, top: (u8, u8, u8), bottom: (u8, u8, u8)) {
-    if rx <= 0 || ry <= 0 {
-        return;
-    }
-    let segments = segments_for(rx, ry);
-    let centre = mix(top, bottom, 128);
-    let vertex = |segment: usize| -> ((i16, i16), (u8, u8, u8)) {
-        let angle = ((segment as i32 * TURN) / segments as i32) as u16;
-        let x = cx as i32 + ((rx as i32 * sin_q12(angle)) >> 12);
-        let y = cy as i32 - ((ry as i32 * cos_q12(angle)) >> 12);
-        let t = ((4096 - cos_q12(angle)) * 255 / 8192) as u8;
-        ((x as i16, y as i16), mix(top, bottom, t))
-    };
-
-    let (mut previous, mut previous_color) = vertex(0);
-    for segment in 1..=segments {
-        let (point, color) = vertex(segment);
-        paint::tri_gouraud([(cx, cy), previous, point], [centre, previous_color, color]);
-        previous = point;
-        previous_color = color;
-    }
-}
-
-use psx_math::color::lerp_rgb_q8 as mix;
-
-fn scale_rgb((r, g, b): (u8, u8, u8), t: u8) -> (u8, u8, u8) {
-    (
-        ((r as u32 * t as u32) >> 8) as u8,
-        ((g as u32 * t as u32) >> 8) as u8,
-        ((b as u32 * t as u32) >> 8) as u8,
-    )
 }

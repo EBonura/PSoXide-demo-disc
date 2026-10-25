@@ -1,6 +1,8 @@
 //! The hand-off: the chosen case comes to the middle of the stage, its cover
-//! swings open on the left hinge like a real jewel case, the disc lifts out
-//! of the tray and spins up into a flash. 96 frames at 60 Hz.
+//! swings open on the left hinge like a real jewel case, and the disc lifts
+//! out of the tray, flies to the middle and spins up. 72 frames at 60 Hz, and
+//! the last one is not an ending: the chain loader draws the same disc, from
+//! the same shared code, and keeps it turning while the program streams in.
 //!
 //! The cover is a real 3D panel. Its corners and a few points between them
 //! are rotated about the hinge and perspective-projected by the GTE, then
@@ -13,6 +15,7 @@
 
 use crate::common::*;
 use crate::cover::{self, Cover};
+use crate::disc_art;
 use crate::ease;
 use crate::gfx::*;
 use crate::shelf;
@@ -21,7 +24,7 @@ use psx_gte::math::{Mat3I16, Vec3I16, Vec3I32};
 use psx_gte::scene;
 use psx_math::{cos_q12, sin_q12};
 
-pub const FRAMES: i32 = 96;
+pub const FRAMES: i32 = disc_art::HAND_OFF;
 
 /// First and last frame of the cover swinging open.
 const OPEN_FROM: i32 = 10;
@@ -42,55 +45,6 @@ pub struct From {
     pub cx: i32,
     pub bottom: i32,
     pub sc: i32,
-}
-
-fn disc(g: &mut Gfx, cx: i32, cy: i32, r: i32, phase: u16, bright: u32) {
-    const N: u16 = 24;
-    let hole = r * 17 / 100;
-    let label = r * 56 / 100;
-    let pt = |k: u16, rad: i32| {
-        let a = k * (4096 / N);
-        (
-            cx + ((rad * sin_q12(a)) >> 12),
-            cy - ((rad * cos_q12(a)) >> 12),
-        )
-    };
-    let shade = |k: u16| -> Rgb {
-        // Two opposite sheen lobes riding the phase, as light on a CD.
-        let a = (k * (4096 / N)).wrapping_sub(phase) & 4095;
-        let l = ((cos_q12((a * 2) & 4095) + 4096) >> 5) as u32; // 0..=255
-        let l2 = (l * l) >> 8;
-        let base = (20u32, 34u32, 42u32);
-        let add = (l2 * 150) >> 8;
-        scale(
-            (
-                (base.0 + add * 7 / 10).min(255) as u8,
-                (base.1 + add * 9 / 10).min(255) as u8,
-                (base.2 + add).min(255) as u8,
-            ),
-            bright,
-        )
-    };
-    for k in 0..N {
-        let k2 = (k + 1) % N;
-        g.quad_g(
-            [pt(k, r), pt(k2, r), pt(k, hole), pt(k2, hole)],
-            [
-                shade(k),
-                shade(k2),
-                scale(shade(k), 150),
-                scale(shade(k2), 150),
-            ],
-        );
-    }
-    g.ellipse_ring(cx, cy, r, r, scale((60, 130, 148), bright));
-    g.ellipse_ring(cx, cy, label, label, scale((20, 120, 140), bright));
-    g.ellipse_ring(cx, cy, label - 3, label - 3, scale((10, 50, 60), bright));
-    // The hole shows the tray.
-    for k in 0..N {
-        let k2 = (k + 1) % N;
-        g.tri_g([(cx, cy), pt(k, hole), pt(k2, hole)], [(3, 8, 11); 3]);
-    }
 }
 
 /// Project the cover-plane point (`x` from the hinge, `y` from the cover's
@@ -271,15 +225,16 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
         52,
         fly,
     );
-    // Angular speed: a slow turn, then a quadratic ramp, then constant.
-    let ramp = ease::quad_in(ease::span(t, 56, 86));
-    let spin = (t * 16 + ((ramp * t) >> 3)) as u16 & 4095;
+    // Angular speed: a slow turn, then a quadratic ramp, then constant; the
+    // chain loader carries it on from the last frame (see `disc_art`).
+    let spin = disc_art::spin(t);
     if open > 8 {
-        let glow = ease::span(t, 58, 92) as u32;
+        let glow = disc_art::glow_level(t);
         if glow > 0 {
-            g.glow(dcx, dcy, dr + 30, dr + 30, scale((12, 70, 84), glow));
+            let reach = dr + disc_art::DISC_GLOW_REACH;
+            g.glow(dcx, dcy, reach, reach, scale(disc_art::DISC_GLOW, glow));
         }
-        disc(
+        disc_art::disc(
             g,
             dcx,
             dcy,
@@ -288,9 +243,9 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
             120 + (136 * ease::span(t, 14, 60) as u32 >> 8),
         );
         // Two echo rings behind the spin-up, as the shell's tray echoes.
-        if t > 62 {
+        if t > 47 {
             for k in 0..2i32 {
-                let e = ease::span(t - 62 - k * 5, 0, 20);
+                let e = ease::span(t - 47 - k * 4, 0, 20);
                 if e > 0 && e < 256 {
                     let fade = (256 - e) as u32;
                     g.ellipse_ring(
@@ -318,41 +273,5 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
 
     // Stage glow rises under it all, added over the case so a dimmed case
     // never leaves a dark box on the floor.
-    g.glow(160, 150, 150, 26, scale((10, 58, 70), rise));
-
-    // The name and a status line under the disc, as the program loads.
-    let lab = ease::out(ease::span(t, 56, 72)) as u32;
-    if lab > 8 {
-        crate::text::draw_centered(
-            g,
-            &crate::ui_atlas::MICH12,
-            160,
-            184,
-            e.name_str(),
-            scale(TEXT, lab),
-            0,
-        );
-        let msg = if ctx.it { "Caricamento" } else { "Loading" };
-        crate::text::draw_centered(
-            g,
-            &crate::ui_atlas::JOST9,
-            160,
-            202,
-            msg,
-            scale(MUTED, lab),
-            0,
-        );
-    }
-
-    // Flash to the program, then black.
-    let fl = ease::span(t, 78, 92) as u32;
-    if fl > 0 {
-        let c = scale((200, 244, 255), fl);
-        g.quad_g_add([(0, 0), (320, 0), (0, 240), (320, 240)], [c; 4]);
-    }
-    let out = ease::span(t, 90, 96);
-    if out > 0 {
-        let v = (out * 255 / 256) as u8;
-        g.quad_g_sub([(0, 0), (320, 0), (0, 240), (320, 240)], [(v, v, v); 4]);
-    }
+    disc_art::stage_glow(g, rise);
 }

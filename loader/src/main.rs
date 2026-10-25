@@ -4,8 +4,20 @@
 use psx_chainloader::paint;
 use psx_chainloader::runtime::{self, Presentation};
 use psx_chainloader::Span;
+mod disc_art;
 mod loading;
 use loading::LoadingScreen;
+
+// The label is drawn from the menu's atlas, so the launcher's face metrics and
+// baked glyph table are included as they are (`ui_atlas` names them through
+// `text`). Only the label's face is used; the linker drops the rest.
+#[allow(dead_code)]
+#[path = "../../launcher/src/face.rs"]
+mod text;
+#[allow(dead_code)]
+#[path = "../../launcher/assets/ui_atlas.rs"]
+mod ui_atlas;
+
 impl Presentation for LoadingScreen {
     fn setup(&mut self) {
         paint::setup(319, 239);
@@ -13,11 +25,16 @@ impl Presentation for LoadingScreen {
     fn begin(&mut self) {
         LoadingScreen::begin(self);
     }
-    fn update(&mut self, done: u32, total: u32) {
-        LoadingScreen::update(self, done, total);
+    fn update(&mut self, _done: u32, total: u32) {
+        // The disc turns from `tick`; there is no bar. The size is what the
+        // fade after the last chunk is paced by.
+        LoadingScreen::progress(self, total);
     }
     fn finish(&mut self) {
         LoadingScreen::finish(self);
+    }
+    fn tick(&mut self) {
+        LoadingScreen::tick(self);
     }
     fn diagnostic_mode(&mut self) {
         paint::diagnostic_mode();

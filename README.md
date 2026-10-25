@@ -289,12 +289,24 @@ notice in English and Italian and ignores the buttons.
 
 Choosing a program is an event: the case comes to the middle of the stage, its
 cover swings open on the left hinge like a real jewel case, the disc lifts out
-of the tray and spins up into a flash (96 frames, `launcher/src/launch.rs`).
-From the first of those frames the launcher stops the song and sends the drive's
-head to the program's first sector, so the long seek out of the music file
-happens during the animation (`launcher/src/chain.rs`). The loader then keeps a
-standalone copy of the spinning globe and starfield, in the menu's colours,
-visible over the progress bar while the selected program overwrites the launcher.
+of the tray, flies to the middle of the stage and spins up (72 frames,
+`launcher/src/launch.rs`). From the first of those frames the launcher stops the
+song and sends the drive's head to the program's first sector, so the long seek
+out of the music file happens during the animation (`launcher/src/chain.rs`).
+The animation does not end in a flash or a fade: the chain loader that takes
+over draws the same disc (the code is one file, `loader/src/disc_art.rs`, that
+both the launcher and the blob include), carrying its spin-up and glow on from the
+same frame number, so it turns at the same rate from the same
+phase, with "LOADING" fading in under it in the menu's face, and keeps it
+turning while the program streams in. It animates from the transport's `tick`
+(after every sector, once per spin of a seek wait, every 4 KiB of the checksum
+pass; at half the frame rate there, since that stretch is CPU-bound) between two
+buffers, repainting only the parts the disc and label can
+change, and dims the scene over the last 12 frames of the checksum pass so the
+program takes over from a dark screen. The label's glyphs are sprites from the
+menu atlas, which the launcher leaves in VRAM; the loader uses the launcher's
+own two buffers (rows 0 and 240), not the rows below them where the atlas's
+palette sits.
 
 The menu's geometry and easing use no floating point and no 64-bit integers.
 The case's picture, frame, brackets and glare all go through one GTE transform,

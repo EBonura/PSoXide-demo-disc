@@ -17,16 +17,8 @@ name = "loader"
 version = "0.1.0"
 dependencies = [
  "chainload-layout",
- "psx-carousel",
  "psx-chainloader",
  "psx-io",
- "psx-math",
-]
-
-[[package]]
-name = "psx-carousel"
-version = "0.1.0"
-dependencies = [
  "psx-math",
 ]
 

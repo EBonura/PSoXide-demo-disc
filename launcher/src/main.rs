@@ -28,7 +28,12 @@ mod chain;
 mod common;
 mod cover;
 mod credits;
+// The disc the launch ends on, shared with the chain loader (see its header).
+#[path = "../../loader/src/disc_art.rs"]
+#[allow(dead_code)] // the loader uses the rest
+mod disc_art;
 mod ease;
+mod face;
 mod gfx;
 mod launch;
 mod music;
@@ -81,11 +86,12 @@ const SELECT_GAIN: Volume = Volume::linear(1, 3);
 /// The launch swoosh rides under the disc's spin-up, so it carries the moment.
 const LAUNCH_GAIN: Volume = Volume::linear(2, 5);
 /// The swoosh is 0.56 s; pitched to 11/16 of unity it lasts about 0.82 s, which
-/// is the spin-up and the flash.
+/// is the spin-up.
 const LAUNCH_STRETCH_NUM: u32 = 11;
 const LAUNCH_STRETCH_DEN: u32 = 16;
-/// Launch frame the swoosh starts on, so it ends with the flash.
-const SWOOSH_FRAME: i32 = 46;
+/// Launch frame the swoosh starts on, so it ends at the hand-off (the loader
+/// silences the SPU as it takes over).
+const SWOOSH_FRAME: i32 = launch::FRAMES - 49;
 
 /// A blip when the shelf moves and a heavier one when a program is chosen.
 /// Two voices, well clear of the CD input; the swoosh gets its own so the

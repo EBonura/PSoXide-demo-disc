@@ -12,7 +12,6 @@ use psx_gpu::prim::{
 };
 use psx_gpu::Gpu;
 use psx_io::periph::GpuDma;
-use psx_math::{cos_q12, sin_q12};
 use psx_vram::{Clut, TextureDepth, TexturePage, VramRect};
 
 pub type Rgb = (u8, u8, u8);
@@ -329,39 +328,12 @@ impl Gfx {
 
     /// A soft glow: an additive fan from `c` at the centre to black at the rim.
     pub fn glow(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, c: Rgb) {
-        const N: u16 = 16;
-        self.blend(BlendMode::Add);
-        let ring = |k: u16| {
-            let a = k * (4096 / N);
-            (
-                cx + ((rx * sin_q12(a)) >> 12),
-                cy - ((ry * cos_q12(a)) >> 12),
-            )
-        };
-        let mut prev = ring(0);
-        for k in 1..=N {
-            let cur = ring(k % N);
-            self.tri_g_add([(cx, cy), prev, cur], [c, (0, 0, 0), (0, 0, 0)]);
-            prev = cur;
-        }
+        crate::disc_art::glow(self, cx, cy, rx, ry, c);
     }
 
-    /// An ellipse ring (outline) as short additive quads, `t` thick.
+    /// An ellipse ring (outline) as short additive lines.
     pub fn ellipse_ring(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, c: Rgb) {
-        const N: u16 = 24;
-        let pt = |k: u16| {
-            let a = k * (4096 / N);
-            (
-                cx + ((rx * sin_q12(a)) >> 12),
-                cy - ((ry * cos_q12(a)) >> 12),
-            )
-        };
-        let mut prev = pt(0);
-        for k in 1..=N {
-            let cur = pt(k % N);
-            self.line_add(prev, cur, c, c);
-            prev = cur;
-        }
+        crate::disc_art::ellipse_ring(self, cx, cy, rx, ry, c);
     }
 
     pub fn frame(&mut self, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
@@ -575,4 +547,20 @@ fn shot_cell(slot: usize) -> ((u16, u16), i32, i32) {
     let page = SHOT_PAGES[slot / SHOTS_PER_PAGE];
     let at = slot % SHOTS_PER_PAGE;
     (page, (at % 4) as i32, (at / 4) as i32)
+}
+
+/// The disc is drawn through the same four primitives the chain loader uses.
+impl crate::disc_art::Canvas for Gfx {
+    fn quad_g(&mut self, v: [(i32, i32); 4], c: [Rgb; 4]) {
+        Gfx::quad_g(self, v, c);
+    }
+    fn tri_g(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
+        Gfx::tri_g(self, v, c);
+    }
+    fn tri_g_add(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
+        Gfx::tri_g_add(self, v, c);
+    }
+    fn line_add(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
+        Gfx::line_add(self, a, b, ca, cb);
+    }
 }
