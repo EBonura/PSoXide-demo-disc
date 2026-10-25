@@ -251,9 +251,10 @@ fn disc_runtime_crates_do_not_use_quakes_frozen_sdk() {
         assert!(manifest.contains(expected), "{path}");
     }
     // The catalog has one engine owner (the launcher no longer draws a
-    // carousel; the loader's loading screen still does).
+    // carousel, and the loader's loading screen no longer does either: it
+    // draws the launch's disc, not the old globe).
     let manifest = read(root.join("launcher/Cargo.toml"));
-    assert!(read(root.join("loader/Cargo.toml")).contains("package = \"psx-carousel\""));
+    assert!(!read(root.join("loader/Cargo.toml")).contains("psx-carousel"));
     assert!(manifest.contains("package = \"psx-disc-toc\""));
     assert!(!manifest.contains("path = \"../carousel\""));
     assert!(!manifest.contains("path = \"../disc-toc\""));
