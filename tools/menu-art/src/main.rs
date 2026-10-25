@@ -17,6 +17,8 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
+mod attract;
+
 const PAGE: usize = 256;
 
 /// First and last character baked for each face.
@@ -372,9 +374,16 @@ fn emit_face(s: &mut String, f: &Face) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 6 || args[1] != "bake" {
-        eprintln!("usage: menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>");
-        std::process::exit(2);
+    match (args.get(1).map(String::as_str), args.len()) {
+        (Some("backs"), 4) => return attract::bake_backs(Path::new(&args[2]), Path::new(&args[3])),
+        (Some("curve"), 7) => return attract::cut_curve(&args[2..]),
+        (Some("bake"), 6) => {}
+        _ => {
+            eprintln!("usage: menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>");
+            eprintln!("       menu-art backs <shots-dir> <out-dir>");
+            eprintln!("       menu-art curve <menu.spectrum> <song> <start-s> <secs> <out.bin>");
+            std::process::exit(2);
+        }
     }
     let load = |p: &str| {
         Font::from_bytes(

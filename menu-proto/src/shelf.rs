@@ -36,7 +36,7 @@ const VERSION_GAP: i32 = 8;
 /// The title with the version to its right in the small face, both on one
 /// baseline and centred as a group on the screen. `mid` is the row the title's
 /// capitals are centred on.
-fn title_row(g: &mut Gfx, e: &crate::data::Entry, mid: i32, a: u32) {
+pub fn title_row(g: &mut Gfx, e: &crate::data::Entry, mid: i32, a: u32) {
     let tw = MICH12.width(e.name, 0);
     // Versions that are numbers read "v0.2.7"; a build name stands as it is.
     let prefix = e.version.as_bytes().first().is_some_and(u8::is_ascii_digit);
@@ -71,7 +71,7 @@ pub fn sway_yaw(t: u32) -> i32 {
 }
 
 /// Where a case `d` (Q8 slots from the centre) sits: (x offset, scale, dim).
-fn layout(d: i32) -> (i32, i32, i32) {
+pub fn layout(d: i32) -> (i32, i32, i32) {
     let a = d.abs();
     let x = ease::knots(a, &[(0, 0), (256, 98), (512, 158), (768, 215)]);
     let sc = ease::knots(a, &[(0, 256), (256, 168), (512, 128), (768, 100)]);

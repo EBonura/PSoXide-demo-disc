@@ -435,3 +435,71 @@ impl Gfx {
         }
     }
 }
+
+// ---- attract mode primitives ------------------------------------------------
+
+/// Where the back-cover screenshots live: one 8bpp page below the covers
+/// (64x48 texels per shot, four across, five down).
+pub const SHOT_PAGE: (u16, u16) = (320, 256);
+/// One 256-entry CLUT row per program, right of the cover CLUTs and below the
+/// framebuffers.
+pub const SHOT_CLUT_X: u16 = 320;
+pub const SHOT_CLUT_Y: u16 = 480;
+/// Size of one screenshot in texels.
+pub const SHOT_W: i32 = 64;
+pub const SHOT_H: i32 = 48;
+
+impl Gfx {
+    /// One UI-atlas glyph or icon as a quad, so the caller can tilt it with the
+    /// rest of a face it belongs to. `uv` is `(u0, v0, u1, v1)` with the far
+    /// edge half-open, so an unscaled quad lands texel for texel on the screen.
+    pub fn ui_quad(&mut self, v: [(i32, i32); 4], uv: (u8, u8, u8, u8), color: Rgb) {
+        let tint = (color.0 >> 1, color.1 >> 1, color.2 >> 1);
+        let tpage = TexturePage::new(UI_PAGE.0, UI_PAGE.1, TextureDepth::Bit4).uv_word(0);
+        let m = TextureMaterial::blended(UI_CLUT.uv_word(), tpage, tint, BlendMode::Add);
+        let (u0, v0, u1, v1) = uv;
+        self.key = u32::MAX;
+        self.prims += 1;
+        self.gpu.draw(&QuadTexturedMaterial::with_material(
+            v.map(p),
+            [(u0, v0), (u1, v0), (u0, v1), (u1, v1)],
+            m,
+        ));
+    }
+
+    /// Screenshot `shot` (a slot in the back-cover page) of program `prog`,
+    /// laid on a ribbon of quads like [`Gfx::art_ribbon`]. `tops[k]` and
+    /// `bots[k]` are where texture column `k / (len - 1)` lands on screen.
+    ///
+    /// # Panics
+    ///
+    /// If `tops` and `bots` differ in length or hold fewer than two points.
+    pub fn shot_ribbon(
+        &mut self,
+        prog: usize,
+        shot: usize,
+        tops: &[(i32, i32)],
+        bots: &[(i32, i32)],
+        tint: Rgb,
+    ) {
+        assert!(tops.len() == bots.len() && tops.len() >= 2);
+        let n = tops.len() as i32 - 1;
+        let clut = Clut::new(SHOT_CLUT_X, SHOT_CLUT_Y + prog as u16).uv_word();
+        let tp = TexturePage::new(SHOT_PAGE.0, SHOT_PAGE.1, TextureDepth::Bit8).uv_word(0);
+        let m = TextureMaterial::opaque(clut, tp, tint).with_dither(true);
+        let (u0, v0) = ((shot % 4) as i32 * SHOT_W, (shot / 4) as i32 * SHOT_H);
+        self.key = u32::MAX;
+        let (va, vb) = (v0 as u8, (v0 + SHOT_H - 1) as u8);
+        for k in 0..n {
+            let ua = (u0 + (SHOT_W - 1) * k / n) as u8;
+            let ub = (u0 + (SHOT_W - 1) * (k + 1) / n) as u8;
+            let (k, k1) = (k as usize, k as usize + 1);
+            self.prims += 1;
+            self.gpu.draw(&QuadTexturedMaterial::with_material(
+                [tops[k], tops[k1], bots[k], bots[k1]].map(p),
+                [(ua, va), (ub, va), (ua, vb), (ub, vb)],
+                m,
+            ));
+        }
+    }
+}

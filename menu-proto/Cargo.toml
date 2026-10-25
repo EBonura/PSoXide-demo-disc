@@ -24,6 +24,10 @@ lto           = true
 # Press the private edition (the four bring-your-own-assets ports). The real
 # disc fixes the edition at build time; the prototype has no runtime switch.
 private = []
+# Attract mode: start after 12 frames of idle (for captures), and which idea runs.
+quick = []
+only_tour = []
+only_floor = []
 
 [dependencies]
 psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
