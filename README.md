@@ -22,7 +22,7 @@ make check     # host tests, including the Quake pin check
 
 ## Public release
 
-**v0.44** requires an analog DualShock, lets the left stick drive the
+**v0.45** requires an analog DualShock, lets the left stick drive the
 carousel, moves PSXcel to the end of the carousel and carries the newest build of
 every program from its repository's main. See [the changelog](CHANGELOG.md).
 
@@ -32,7 +32,7 @@ disc. Stage them from the same tested image:
 
 ```sh
 disc-tools deploy-public \
-  --cue "/path/to/PSoXide Demo Disc v0.44.cue" --version v0.44 \
+  --cue "/path/to/PSoXide Demo Disc v0.45.cue" --version v0.45 \
   --emulator ../PSoXide-emulator --out /path/to/new-release --publish
 ```
 
@@ -107,13 +107,20 @@ jumps to it.
 That last step needs one trick. Every PSoXide program links to `0x80010000`
 (`sdk/psoxide.ld`), including the launcher, so the launcher cannot load a game
 itself: it would overwrite its own code halfway through the copy. The `loader`
-crate is therefore built separately, linked at `0x801F0000`, and embedded in
-the launcher as raw bytes. The launcher copies it above every game's payload,
-flushes the instruction cache, and jumps. From there nothing below
-`0x801F0000` is live, so the game can land wherever it wants.
+crate is therefore built separately, linked at `0x801C8000`, and embedded in
+the launcher as raw bytes. The launcher copies it there, flushes the
+instruction cache, and jumps. The blob and the stack are the only RAM it keeps;
+the game can land anywhere else, above the blob as well as below it (the
+Half-Life intro loads near the top of RAM, because it has to sit above the
+game it goes on to load).
 
-`mkdisc` refuses to build a disc containing a program whose payload would
-reach `0x801F0000`, so that constraint fails the build rather than the console.
+The addresses live in `chainload-layout/`, the one place the loader's linker
+script, the launcher and `mkdisc` read them from. `mkdisc` refuses to build a
+disc containing a program whose payload, rounded up to whole sectors, would
+overlap the blob or the stack, and prints every program's extent and its
+margin, so that constraint fails the build rather than the console. The loader
+applies the same rule (`psx_chainloader::check_payload`) before it reads a
+sector.
 
 ## Layout
 

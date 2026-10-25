@@ -1,21 +1,21 @@
 /*
- * Linker script for the chain-load blob.
+ * Linker script template for the chain-load blob.
  *
- * The blob lives high in RAM, above every game's loaded payload and below
- * the stack, so it survives while the target EXE is streamed into
- * 0x80010000 (which is where the launcher itself was running).
+ * build.rs fills in the two numbers from the `chainload-layout` crate, which is
+ * where the launcher and mkdisc read them from too, and hands the result to the
+ * linker. Do not link this file directly.
+ *
+ * The blob lives in the gap above the largest bottom-loaded program and below
+ * the Half-Life intro, clear of the stack, so it survives while the target EXE
+ * is streamed into RAM at the address its own header names (see
+ * chainload-layout for the map).
  *
  * Output is a headerless raw binary: the launcher embeds these bytes,
  * copies them to LOADER_BASE, and jumps to offset 0.
- *
- * Region map at load time:
- *   0x80010000 .. t_addr+t_size   target EXE payload (streamed in)
- *   0x801F0000 .. 0x801F8000      this blob (32 KiB budget)
- *   0x801F8000 .. 0x80200000      stack, shared with the launcher
  */
 
-LOADER_BASE = 0x801F0000;
-LOADER_SIZE = 32K;
+LOADER_BASE = @LOADER_BASE@;
+LOADER_SIZE = @LOADER_BUDGET@;
 
 ENTRY(loader_entry)
 

@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "pressing": "v0.48-private",
+  "note": "PSoXide Demo Disc v0.48, private DIAG edition (local, never published or distributed), all XA: no CD-DA track. Quake is the freeze-fix build (main 16ca6ad), Ocarina of Time and Half-Life are DIAG builds on the current mains, WipEout, Hollow Knight and Counter-Strike are their 2026-10-22/23 library builds; every other row is its v0.47 input.",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/arcade/psoxide-arcade.cue",
+      "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
+      "bin_sha256": "34c5538a6627684ba02fe89aab3561007c98dda13715a477807be3b9dd1564fe",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/psoxide-arcade.git",
+        "revision": "2fb9de40bf9d9895a51d0730a2b900903cc68fc5",
+        "ref": "repin/chainloader-quiet-2026-10-19"
+      },
+      "build": "make disc on psoxide-arcade branch repin/chainloader-quiet-2026-10-19 2fb9de4 (main e016f09 plus the pins: editor 9ae15ba7 whose psx-chainloader hands the CD drive over with the last Pause proved, SDK 3cf22179, emulator dddd2814); panic=immediate-abort, Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/arcade/psoxide-arcade.provenance.json"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx main (the pressed 0.2.8 disc: brightness stepper, text palette fix, 32-bit sound and fixed-point maths, SDK b5365b18). The library still holds 0.2.7 (579f14f8).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/celeste/SOURCE.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/nitroxide-diag/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "c4fa779090a017b11be1f28e687f931a1594ee93ebcf4974cdb2cac1674ed5de",
+      "version": "0.4.1 DIAG",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/nitroxide.git",
+        "revision": "64f335761d73e4afa142e722d72d54c145d7d6e4",
+        "ref": "main"
+      },
+      "build": "DIAGNOSTIC sound build: nitroxide main 64f3357 with feature diag-sound (Triangle on the title and then L2/L1/R1/R2 start single goal-sound components and print the SPU voice ENV/END state), to settle the console goal-sound question. Same code otherwise. Not a shipping image."
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "faed048249e473f7d9a95d0eeafed7c3b84cff2501d527b485026e86a421c4cd",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/voxide.git",
+        "revision": "b6d2af3fe066585142d389f31f96c7d974a1a3f1",
+        "ref": "perf/voxide-retune-2026-10-17"
+      },
+      "build": "the library VoXide install of 2026-10-17 (INSTALLED.json): the frame retune on SDK b5365b18 / editor c096eee0, built with make gate-disc; three-vblank frames on the Manny tape 131 -> 38.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/voxide/INSTALLED.json"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/wipeout/WipEout PSoXide.cue",
+      "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
+      "bin_sha256": "9bf1248c527269eff85c05fa15bd2f6dc87ac18c6388b736d201c0cdebcfb2b5",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/wipeout-psx.git",
+        "revision": "0e5a7358d926757110c30092a7f0a658eb478ac2",
+        "ref": "main"
+      },
+      "build": "the library WipEout PSoXide install of 2026-10-23 (provenance json): main 0e5a735, shipping build, US cook, SDK pin 29227c5d, simulation maths off 64-bit integers, PGO layout regenerated, with the six remastered pilot emblems. NTSC US cook from the user's own WipEout (USA).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/wipeout/WipEout PSoXide.provenance.json"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "062f4dddcc06e9d26d1be9ec986410260930b964584ef3182050f4427c3d36d2",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/hk-psx.git",
+        "revision": "eeab081037a4b2070dc91d15fa16f28c9e7efad9",
+        "ref": "main"
+      },
+      "build": "the library Hollow Knight install of 2026-10-22 (provenance json): hk-psx eeab081 = main f9e587e plus the polish pass (original dialogue box, crisper font and Geo coin, exact title-card glyphs), the new game's drop in from King's Pass, and the route-input hold compiled out; SDK 355dc911; XA soundtrack as data-track files, no CD-DA.",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/hk/Hollow Knight (hk-psx).cue",
+      "cue_sha256": "1182082d7a19db0e0825a4758f23d94e7f26dcdcd023805d6d7f8e359f2dbcea",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/hk/Hollow Knight (hk-psx).provenance.json"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/cs/Counter-Strike (cs-psx).cue",
+      "cue_sha256": "a1d71712a10f277fef22813e79b4875c91a6d9f3ebad23df714f4d8979966cdf",
+      "bin_sha256": "c19d5c1b5124a5c183615d2cf7b3173278fb3ecb15e9f11f85335b3cb35a97d8",
+      "version": "0.2.1",
+      "source": {
+        "repository": "EBonura/cs-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/cs-psx.git",
+        "revision": "bc6a93c008a63e6fa00d1bafa75492bf6cbcea2e",
+        "ref": "main"
+      },
+      "build": "the library Counter-Strike install of 2026-10-22 (provenance json): cs-psx bc6a93c on main 2ac55bc (SDK 3cf22179, editor e22f3508), shipping build, profile-guided link, honest recook. Cooked from the user's own Half-Life/CS data.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/cs/Counter-Strike (cs-psx).provenance.json"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/hl/hl-psx.cue",
+      "cue_sha256": "429a96485fcb00fdc4916971fcdc9d4e44ab4e0a2cc18dab033a959377d7693d",
+      "bin_sha256": "63a58192a014b77d630b237778cae83de89260c87a96a190d1a127176ff989cf",
+      "version": "0.2.0 DIAG",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/hl",
+        "revision": "219094669486aaed67e3fec0cafe06eccf8c35ad",
+        "ref": "main"
+      },
+      "build": "DIAGNOSTIC build (demo-v048 lane, 2026-10-23): hl-psx main 2190946 (= library 9730611 game code; main 142f042 differs by the emulator pin only), SDK 3cf22179 / editor 9ae15ba7 (quiet chain-load handoff), plus the console stop-panel (SDK branch diag/console-hl-v047-2026-10-19 d70f408b, console-diag on) and the psx-goldsrc chunk streamer error log (NOENTR/TOOBIG/NOSTRT/RDFAIL/DECOMP with chunk id and sector, halting into the panel), intro disc layout with WORLD.PAK in map-load read order, stack reserve 24576, no I-cache layout (HLPSX_NO_LAYOUT), RAM floor off. The overlay is not in git (reapply.sh in the lane). Not a shipping image."
+    },
+    {
+      "name": "OCARINA OF TIME",
+      "var": "OOTPSX",
+      "version_var": "V_OOTPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/oot-diag/OOT DIAG consolediag b959ecf.cue",
+      "cue_sha256": "d0d7b14ba9e4d5d9c6ddbbe67b35fa4ef6e0f3214d94c189bc472f30c4706a81",
+      "bin_sha256": "796e469ac4425d37c1db107c2b3947312cf3c11c6a6ea187b6c26a78c60358fe",
+      "version": "0.1.0 DIAG",
+      "source": {
+        "repository": "EBonura/oot-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/oot",
+        "revision": "b959ecfe6682fe9f05cdebfea219790afacf4d09",
+        "ref": "lane/demo-v048-oot-2026-10-23"
+      },
+      "build": "DIAGNOSTIC build (demo-v048 lane): oot-psx main 9899fd1 (the library shipping line: DMA-safe veneers, delay-slot fill, profile-guided link) plus the consolediag overlay cherry-picked from fix/oot-console-freeze-2026-10-18 (state overlay rows F G C S X and the CD loader record row R, the exception reporter, the wake-up draw marks), built with tools/qualified/build-disc.sh OOT_FEATURES=consolediag. Not a shipping image."
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "7d62b7ef8a5b9c18d2cfe334a2b90514f7f9b0a121e951ff8f606fca1213e66f",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/quake",
+        "revision": "16ca6add86d1dc05cdf36ebc7f4c8bf737983220",
+        "ref": "main"
+      },
+      "build": "quake-psx main 16ca6ad built in the demo-v048 lane with cargo quake-build disc (SDK 65263055: overlay calls go through jump veneers, the instruction-cache flush waits for every DMA channel; no per-tick flush), shareware 1.06 data, XA music, one data track, no CD-DA. This is the safe-cache-flush freeze fix; main 518d5d8 is the same game code with a newer emulator pin. Not a DIAG: no stop panel exists in Quake builds.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/cortex/Cortex Ignition.cue",
+      "cue_sha256": "3871cb7970444bbda89e0816bf345b26911c9d0bbe709e09abcf27153f1a21ac",
+      "bin_sha256": "f836c1d1519aa9c2c660bad4b42a7c95d4814a9a3514dcdc06b8dd16ee724d72",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-cortex-hl/editor",
+        "revision": "066fe3a2",
+        "ref": "cortex/0.4b-xa-2026-10-19"
+      },
+      "build": "frontend build-project-disc --project editor/projects/default on cortex/0.4b-xa-2026-10-19 (SDK 6518a5eb6, emulator 3f45f0eb): the v0.43 public Cortex line (editor main 309fdf93: the Palermo Comicon update, the approved 09-30 animations, the two-hit R1 combo) with its two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. Poll-bound replay against the plain 309fdf93 CD-DA build: VRAM and display hashes and dump-hw frames byte-identical at five stop polls; same frame count and 30 fps.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/cortex/Cortex Ignition.provenance.json",
+      "library": "Cortex Ignition/Cortex Ignition.cue"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/hwtests/hardware-tests.cue"
+      },
+      "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
+        "ref": "collection/hwt-disc-base (local, not pushed): 48ca026d plus the disc base on the raw CD seeks, kept out of line"
+      },
+      "build": "make hardware-tests-disc at the branch head (SDK 5c3955fd, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
+      "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/psxcel/PSXcel.cue"
+      },
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v048/src/psxcel.git",
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
+      },
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v048/inputs/psxcel/PSXcel.provenance.json"
+    }
+  ]
+}

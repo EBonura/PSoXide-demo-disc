@@ -8,8 +8,8 @@
 //! The chain-load itself cannot happen here: every PSoXide program links to
 //! `0x80010000`, which is where this launcher is running, so streaming a game
 //! in would overwrite the code doing the streaming. Instead the `loader` crate
-//! is built separately at a high base address, embedded below as raw bytes,
-//! copied up, and jumped to. See `loader/loader.ld`.
+//! is built separately at its own base address (`chainload-layout`), embedded below as raw bytes,
+//! copied there, and jumped to. See `loader/loader.ld`.
 
 #![no_std]
 #![no_main]
@@ -36,7 +36,7 @@ use psx_vram::{Clut, TexDepth, Tpage};
 use music::Music;
 use stick_nav::StickNav;
 
-/// The chain-load blob, linked at `LOADER_BASE` by `loader/loader.ld`.
+/// The chain-load blob, linked at `LOADER_BASE` from `loader/loader.ld`.
 const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
 
 /// Which pressing this is: `git describe` at build time, on screen in the
@@ -53,12 +53,12 @@ const DISC_TITLE: &str = match option_env!("DISC_TITLE") {
     None => "DEMO DISC",
 };
 
-/// Where the blob expects to run. Must match `loader.ld`.
-const LOADER_BASE: u32 = 0x801F_0000;
+/// Where the blob runs, from the one place the loader link and mkdisc read too.
+const LOADER_BASE: u32 = chainload_layout::LOADER_BASE;
 
-/// Blob budget, also from `loader.ld`. Overrunning it would walk into the
-/// stack, so check rather than trust.
-const LOADER_LIMIT: usize = 32 * 1024;
+/// Blob budget. Overrunning it would walk into whatever loads above the blob,
+/// so check rather than trust.
+const LOADER_LIMIT: usize = chainload_layout::LOADER_BUDGET as usize;
 
 const FONT_TPAGE: Tpage = Tpage::new(320, 0, TexDepth::Bit4);
 const FONT_CLUT: Clut = Clut::new(320, 256);
@@ -1522,8 +1522,8 @@ fn boot(entry: &Entry, fb: &mut FrameBuffer, music: &mut Music) -> ! {
     gpu::draw_sync();
     music.stop();
 
-    // SAFETY: `LOADER_BASE` is above every game's payload (mkdisc enforces
-    // that) and below the stack, so nothing live is being overwritten. The
+    // SAFETY: `LOADER_BASE` is clear of every program's payload (mkdisc enforces
+    // that) and of the stack, so nothing live is being overwritten. The
     // blob is position-dependent and linked for exactly this address.
     unsafe {
         core::ptr::copy_nonoverlapping(

@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "pressing": "v0.45-private",
+  "note": "PSoXide Demo Disc v0.45, private edition (local, never published or distributed), all XA: no CD-DA track. The public inputs are those of lineup-v0.45.json. WipEout (2026-10-16), Hollow Knight, Counter-Strike and Ocarina of Time (2026-10-17) and Half-Life (2026-10-16) are their library builds. The hardware tests stay in this file but are left out of the pressing (HWT=0). Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0).",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.cue",
+      "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
+      "bin_sha256": "6e7b81c214b49e1d8e924da032ef1318c3add8c68055375903a922cbf71f9cdc",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psoxide-arcade.git",
+        "revision": "e016f097db1ff51cf333b9262c64495207925fa7",
+        "ref": "main"
+      },
+      "build": "make disc on psoxide-arcade main e016f09 (panic=immediate-abort), SDK b5365b18, editor c096eee0, emulator 9e007839; Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Shot cooks and card cooks run as the repo recipe (Pillow scripts).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/arcade/psoxide-arcade.provenance.json"
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx main (the pressed 0.2.8 disc: brightness stepper, text palette fix, 32-bit sound and fixed-point maths, SDK b5365b18). The library still holds 0.2.7 (579f14f8).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/celeste/SOURCE.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "26dbce63e0bf91fd0298c88c834df01874bac86da0577696194112379fe39c26",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/nitroxide.git",
+        "revision": "9b70726c490e611e11e885a682acce633c83c8e6",
+        "ref": "main"
+      },
+      "build": "the library NitroXide install of 2026-10-17 (INSTALLED.json): make compile and make pack on main 9b70726 with the committed XA music; the goal-post glow edge fix over feb0cd9.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/nitroxide/INSTALLED.json"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "faed048249e473f7d9a95d0eeafed7c3b84cff2501d527b485026e86a421c4cd",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/voxide.git",
+        "revision": "b6d2af3fe066585142d389f31f96c7d974a1a3f1",
+        "ref": "perf/voxide-retune-2026-10-17"
+      },
+      "build": "the library VoXide install of 2026-10-17 (INSTALLED.json): the frame retune on SDK b5365b18 / editor c096eee0, built with make gate-disc; three-vblank frames on the Manny tape 131 -> 38.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/voxide/INSTALLED.json"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "library": "WipEout PSoXide.cue",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/wipeout/WipEout PSoXide.cue",
+      "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
+      "bin_sha256": "3b308a704943fd0a68725f6810de06c38015fc8fc4ec7123597671f8d31846d6",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/wipeout-psx.git",
+        "revision": "e6195fc30bba9c7def2c3ab1f2e3e70ab7ca128f",
+        "ref": "main"
+      },
+      "build": "the library WipEout PSoXide install of 2026-10-18 12:48 (WipEout PSoXide.provenance.json): main e6195fc (shipping build, US cook, panic=immediate-abort), SDK 5219afbe, committed PGO layout. NTSC US cook from the user's own WipEout (USA).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/wipeout/WipEout PSoXide.provenance.json"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "library": "hk-psx.cue",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "a00985e78973fb56b880c66860bdc8914f876e1a31a83d1d56c03fbbb923f70c",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hk-psx.git",
+        "revision": "a7b4b156fc95c5ab0b7f601b1d52884a1c6525f9",
+        "ref": "main"
+      },
+      "build": "the library Hollow Knight install of 2026-10-18 19:10 (hk-psx.provenance.json): main a7b4b15 (cbf459a plus the state-driven route runner and the Hornet milestone; Hornet art not in this build); SDK 355dc911, emulator b3848054; XA soundtrack as data-track files, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.provenance.json",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hk/hk-psx.cue",
+      "cue_sha256": "847e6ea3d0762d2163e0616a19c01b3ae85c469748318c588e14656bbc7f98fb"
+    },
+    {
+      "name": "COUNTER-STRIKE",
+      "library": "cs-psx.cue",
+      "var": "CSPSX",
+      "version_var": "V_CSPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/cs/cs-psx.cue",
+      "cue_sha256": "76b0195ef7b405c7ca5311c3a402857c0a766ac00afd800dd9e400fcc7800c5b",
+      "bin_sha256": "966b089684e7e901214c745d63442a7b3a4e9051853c1ccfd5b03a1f99031069",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/cs-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/cs-psx.git",
+        "revision": "d607325c4705f44c5ac9c46214fdd86c84f319cc",
+        "ref": "chore/abort-panics-2026-10-17"
+      },
+      "build": "the library Counter-Strike install of 2026-10-17 17:00 (cs-psx.provenance.json): chore/abort-panics-2026-10-17 d607325 (main cd9fc04 plus panic=immediate-abort); SDK b5365b18, editor c096eee0. Cooked from the user's own Half-Life/CS data.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/cs/cs-psx.provenance.json"
+    },
+    {
+      "name": "HALF-LIFE",
+      "library": "Half-Life (hl-psx).cue",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hl/Half-Life (hl-psx).cue",
+      "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
+      "bin_sha256": "075e1f03d28ec27cc3fd88b26be1167bb20538d2faf9de7268e3a010009991c0",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/hl-psx.git",
+        "revision": "1b4dbd4a6ece24a3beb869ed4ad8e55cfc45cc93",
+        "ref": "fix/hl-intro-chainload-lib-2026-10-18"
+      },
+      "build": "the library Half-Life install of 2026-10-18 (provenance json): fix/hl-intro-chainload-lib-2026-10-18 1b4dbd4 (integ/hl-focus f1ce8a0, pass 4 plus the startup movie, plus the intro chain-load fix a304602); the intro hands HLGAME.EXE the launcher's disc bases; separate boot EXE for the intro, game image HLGAME.EXE.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/hl/Half-Life (hl-psx).provenance.json"
+    },
+    {
+      "name": "OCARINA OF TIME",
+      "library": "Ocarina of Time (oot-psx)/Ocarina of Time (oot-psx).cue",
+      "var": "OOTPSX",
+      "version_var": "V_OOTPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/Ocarina of Time (oot-psx).cue",
+      "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
+      "bin_sha256": "ecd172930636b67c5459fb233e42f8f6c2ebca4492905932778875622c6fd0c1",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/oot-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/oot-psx.git",
+        "revision": "cff5b0df634cea18a24607887b922f3d66a0810e",
+        "ref": "main"
+      },
+      "build": "the library Ocarina of Time install of 2026-10-18 (INSTALLED.json): tools/qualified/build-disc.sh with the shipping features on main cff5b0d (Deku Tree enemies: Deku Baba, Skulltula, Skullwalltula), SDK b5365b18, editor c096eee0. Cooked from the owner's own ROM, Private edition only.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/oot/INSTALLED.json"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.cue",
+      "cue_sha256": "5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c",
+      "bin_sha256": "62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/quake-psx.git",
+        "revision": "c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621",
+        "ref": "main"
+      },
+      "build": "the library Quake install of 2026-10-18 (quake-psx.provenance.json): main c14ec10 (save and load, 6 KB more save buffer), PSoXide c096eee0, SDK b5365b18; shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/quake/quake-psx.provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/cortex/Cortex Graybox Reach XA.cue",
+      "cue_sha256": "6569b490b367f437fc890eb6c2a1c1cd1458aa9b789b7b7dd9a5f0160ae0a15e",
+      "bin_sha256": "0581a485b4cd1647427f221ad469a1ec2290aa75df35646a2d947d509b1ca787",
+      "version": "Graybox Reach",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/PSoXide-editor",
+        "revision": "84e7512d77b64106ff835e97bb04c32407b3f772",
+        "ref": "feat/engine-xa-music-2026-10-15"
+      },
+      "build": "frontend build-project-disc --project editor/projects/graybox-reach on feat/engine-xa-music-2026-10-15 (SDK 36ead4b, emulator 6edde550): the two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. The default (0.4b) project does not link on editor main, so Graybox Reach stands in the Cortex slot.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/cortex-xa/RESULT.md"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/hwtests/hardware-tests.cue"
+      },
+      "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
+        "ref": "collection/hwt-disc-base (local, not pushed): 48ca026d plus the disc base on the raw CD seeks, kept out of line"
+      },
+      "build": "make hardware-tests-disc at the branch head (SDK 5c3955fd, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
+      "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.cue"
+      },
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/psxcel.git",
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
+      },
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-v045/inputs/psxcel/PSXcel.provenance.json"
+    }
+  ]
+}

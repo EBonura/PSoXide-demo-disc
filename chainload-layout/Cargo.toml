@@ -1,0 +1,13 @@
+[package]
+name    = "chainload-layout"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "Where the demo disc's chain-load blob lives in RAM; the one place the launcher, the loader build and mkdisc read it from"
+
+# Standalone: the loader and the launcher are separate guest workspaces and
+# mkdisc is a host tool; each takes this crate by path.
+[workspace]
+
+[lib]
+path = "src/lib.rs"

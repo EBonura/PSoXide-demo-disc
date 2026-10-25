@@ -117,7 +117,7 @@ mod tests {
 
     // sha256 of the cooked shot for every PNG in assets/shots, generated once
     // by the retired cook-shots.py running on Pillow 12.0.0.
-    const GOLDEN: [(&str, &str); 26] = [
+    const GOLDEN: [(&str, &str); 28] = [
         (
             "breakout",
             "d51db0ca89a8fb6c388212e8a850126e7d833ae36a099aabc7e7be8d06619c3d",
@@ -148,7 +148,7 @@ mod tests {
         ),
         (
             "halflife",
-            "b8414fe5f4e55cc922b3cd842f496b8289ceafdbadd28310ba15bf4ac1e25c90",
+            "328b2c0fd17d894f463dddcdc69a787f09a52300c0935e88559218abed10270a",
         ),
         (
             "hollowknight",
@@ -221,6 +221,15 @@ mod tests {
         (
             "wipeout2",
             "8da8e2e2dea214dde35b2650243cb7fdf93896d343481b4f0f31043a4aab0b7f",
+        ),
+        // oot1 and oot2 are goldens of the Rust cook; Pillow was not re-run for them.
+        (
+            "oot1",
+            "e1ebdbe0ac7f13f593b09ebef753053926ec2a3a9e079925782cce627c27d7e5",
+        ),
+        (
+            "oot2",
+            "90bc7b63e130f04d37131b16f12793a85b1e2a79fc3aa0ab1791bd77fb302e71",
         ),
     ];
 

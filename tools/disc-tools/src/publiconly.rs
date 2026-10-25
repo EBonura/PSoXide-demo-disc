@@ -5,7 +5,7 @@
 //!
 //! Every PATH is a staged file or a directory of them (the itch.io download
 //! folder, the HTML5 folder, the Celeste package). The Half-Life, Hollow
-//! Knight, Counter-Strike and WipEout programs exist only on the private
+//! Knight, Counter-Strike, WipEout and Ocarina of Time programs exist only on the private
 //! edition, which stays in the local library; this refuses to bless a package
 //! that carries any trace of them:
 //!
@@ -66,6 +66,8 @@ const FORBIDDEN: &[&str] = &[
     "hkpsx",
     "cspsx",
     "cstrike",
+    "ocarina",
+    "oot-psx",
 ];
 
 /// File names that are receipts of a pressing, which list every program.

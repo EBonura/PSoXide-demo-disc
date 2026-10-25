@@ -4,17 +4,17 @@
     "sdk": {
       "path": "games/PSoXide-sdk",
       "repository": "EBonura/PSoXide",
-      "revision": "e6ec267ebdc7c18e54a0cc8059ae66b5f13db507"
+      "revision": "649c7ed84e335f7fb1ef8d4f122f306738891312"
     },
     "editor": {
       "path": "games/PSoXide-editor",
       "repository": "EBonura/PSoXide-editor",
-      "revision": "9ad78b36884e5bbae3f409b92198f5090a348db8"
+      "revision": "3cb1839a22cc6865ad1760610969754faa17ec52"
     },
     "emulator": {
       "path": "games/PSoXide-emulator",
       "repository": "EBonura/PSoXide-emulator",
-      "revision": "9e007839a3d722e71a80d9b651a51ddd11d0c8bb"
+      "revision": "dddd2814c991b2c3dba1fd60f0fa407186b124b3"
     }
   },
   "web_player": {

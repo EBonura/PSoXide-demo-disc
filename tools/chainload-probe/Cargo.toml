@@ -1,0 +1,27 @@
+# `trim-paths` is a nightly cargo feature; these crates are nightly-pinned
+# anyway (bare-metal MIPS needs build-std), so the gate costs nothing.
+cargo-features = ["trim-paths"]
+
+[package]
+name    = "chainload-probe"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+# Outside any workspace: this links for the PS1 with psoxide.ld.
+[workspace]
+
+[[bin]]
+name = "chainload-probe"
+path = "src/main.rs"
+
+[profile.release]
+trim-paths    = "all"
+panic         = "abort"
+codegen-units = 1
+lto           = true
+
+[dependencies]
+psx-hw  = { path = "../../games/PSoXide-editor/crates/psx-hw" }
+psx-io  = { path = "../../games/PSoXide-editor/sdk/crates/psx-io" }
+psx-rt  = { path = "../../games/PSoXide-editor/sdk/crates/psx-rt" }

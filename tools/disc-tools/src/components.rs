@@ -77,6 +77,13 @@ fn gh_compare(repository: &str, revision: &str) -> Result<String> {
     )
 }
 
+/// True when the tree's `components.lock.json` marks its SDK as vendored.
+fn vendored_sdk(tree: &Path) -> bool {
+    read_json(&tree.join("components.lock.json"))
+        .map(|lock| lock["components"]["sdk"]["vendored"].as_bool() == Some(true))
+        .unwrap_or(false)
+}
+
 /// The component tuple: checkouts at their pins and clean, nested pins agreeing,
 /// then the sub-repositories' own bootstrap run (or, with `check`, verified).
 pub fn run_checks(env: &Env, check: bool, check_main: bool, bootstrap: BootstrapFn) -> Result<()> {
@@ -114,6 +121,11 @@ pub fn run_checks(env: &Env, check: bool, check_main: bool, bootstrap: Bootstrap
     ] {
         let source = env.root.join(field(&specs[owner], "path")?);
         let nested = read_json(&source.join("components.lock.json"))?;
+        // An emulator that vendors its SDK carries the crates in git: it has no
+        // SDK pin to agree with the disc's and nothing to bootstrap.
+        if nested["components"]["sdk"]["vendored"].as_bool() == Some(true) {
+            continue;
+        }
         for name in dependencies {
             let pinned = nested["components"][name]["revision"].as_str();
             ensure!(
@@ -124,6 +136,9 @@ pub fn run_checks(env: &Env, check: bool, check_main: bool, bootstrap: Bootstrap
     }
     for name in ["emulator", "editor"] {
         let source = env.root.join(field(&specs[name], "path")?);
+        if name == "emulator" && vendored_sdk(&source) {
+            continue;
+        }
         let mut flags: Vec<String> = Vec::new();
         if check || check_main {
             flags.push("--check".into());
@@ -598,6 +613,49 @@ mod tests {
                 .contains(&format!("{owner} sdk pin differs")));
             fs::write(&path, original).unwrap();
         }
+    }
+
+    #[test]
+    fn a_vendored_emulator_has_no_sdk_pin_to_agree_or_bootstrap() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let specs = specs();
+        write(
+            &root.join("release-components.json"),
+            &json!({"schema": 1, "components": specs}).to_string(),
+        );
+        write(
+            &root.join("editor").join("components.lock.json"),
+            &json!({"components": {"sdk": specs["sdk"].clone(), "emulator": specs["emulator"].clone()}})
+                .to_string(),
+        );
+        write(
+            &root.join("emulator").join("components.lock.json"),
+            &json!({"components": {"sdk": {"revision": "d".repeat(40), "vendored": true}}})
+                .to_string(),
+        );
+        let revisions = specs.clone();
+        let git_of = move |dir: &Path, args: &[&str]| -> Result<String> {
+            if args[0] == "rev-parse" {
+                let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+                Ok(revisions[&name]["revision"].as_str().unwrap().to_string())
+            } else {
+                Ok(String::new())
+            }
+        };
+        let env = Env {
+            root,
+            git: &git_of,
+        };
+        let ran = RefCell::new(Vec::new());
+        let bootstrap = |tree: &Path, _: &[String]| -> Result<()> {
+            ran.borrow_mut().push(tree.to_path_buf());
+            Ok(())
+        };
+        run_checks(&env, true, false, &bootstrap).unwrap();
+        let ran = ran.borrow();
+        assert_eq!(ran.len(), 1);
+        assert!(ran[0].ends_with("editor"));
     }
 
     #[test]

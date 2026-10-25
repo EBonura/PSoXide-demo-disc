@@ -3,6 +3,7 @@
 #![no_main]
 use psx_chainloader::paint;
 use psx_chainloader::runtime::{self, Presentation};
+use psx_chainloader::Span;
 mod loading;
 use loading::LoadingScreen;
 impl Presentation for LoadingScreen {
@@ -37,13 +38,19 @@ pub unsafe extern "C" fn loader_entry(
     track_base: u32,
     checksum: u32,
 ) -> ! {
+    // The blob and the stack are what a payload must stay clear of; the payload
+    // itself may load above the blob (the Half-Life intro does).
+    const RESERVED: [Span; 2] = {
+        let [blob, stack] = chainload_layout::RESERVED;
+        [Span::new(blob.0, blob.1), Span::new(stack.0, stack.1)]
+    };
     unsafe {
-        runtime::run(
+        runtime::run_reserving(
             exe_lba,
             lba_offset,
             track_base,
             checksum,
-            loader_entry as *const () as u32,
+            &RESERVED,
             LoadingScreen::new(),
         )
     }

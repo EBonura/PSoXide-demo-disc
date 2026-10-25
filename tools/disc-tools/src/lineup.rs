@@ -10,6 +10,8 @@
 //!   prepare  verify every input, derive the few that need it into --out, and
 //!            write --out/lineup.mk, which points the Makefile's program and
 //!            version variables at them
+//!   refresh  take the newest library build of every row that names one,
+//!            copy it into the lineup inputs and rewrite its hashes
 //!   receipt  after mkdisc: prove each pressed entry is its lineup input and
 //!            write the release receipt and the component receipt
 //!
@@ -510,12 +512,149 @@ fn write_components(
     write_receipt(&args.require_path("components-out")?, &document)
 }
 
+/// The commit a library receipt says its build came from, whichever of the
+/// receipt shapes in use (`source.commit`, `source_commit`) it is written in.
+fn receipt_commit(path: &Path) -> Option<String> {
+    let document = crate::util::read_json(path).ok()?;
+    document
+        .pointer("/source/commit")
+        .or_else(|| document.get("source_commit"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+/// Copy `from` over `to` only when the bytes differ; true when it copied.
+fn copy_if_changed(from: &Path, to: &Path) -> Result<bool> {
+    if to.is_file() && sha256_file(from)? == sha256_file(to)? {
+        return Ok(false);
+    }
+    // Remove first so a copy-on-write clone replaces the file, never rewrites it.
+    if to.exists() {
+        fs::remove_file(to)?;
+    }
+    fs::copy(from, to).map_err(|e| Error(format!("{}: {e}", to.display())))?;
+    Ok(true)
+}
+
+/// Take the newest library build of every row that names one (`"library":
+/// "<cue path under the library root>"`), copy it over the lineup's input,
+/// and write its hashes into the lineup file, so the next `prepare` accepts it.
+/// The revision and build text stay human-owned: a moved build whose receipt
+/// names a different commit is reported as needing its text updated.
+fn refresh(args: &Args) -> Result<()> {
+    let lineup_path = args.require_path("lineup")?;
+    let library = resolve(&expand_home(args.require("library")?))?;
+    let mut lineup = load(&lineup_path)?;
+    let only: Vec<&str> = args.all("only");
+    let mut moved = 0;
+    let programs = lineup
+        .get_mut("programs")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| Error("'programs'".into()))?;
+    for row in programs {
+        let Some(relative) = row
+            .get("library")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        let name = text(row, "name")?.to_string();
+        if !only.is_empty() && !only.contains(&name.as_str()) {
+            continue;
+        }
+        let library_cue = resolve(&library.join(&relative))?;
+        let library_bin = cue_bin(&library_cue)?;
+        let input_cue = expand_home(text(row, "cue")?);
+        let dir = input_cue
+            .parent()
+            .ok_or_else(|| Error(format!("{name}: input cue has no directory")))?
+            .to_path_buf();
+        fs::create_dir_all(&dir)?;
+        let input_bin = dir.join(
+            library_bin
+                .file_name()
+                .ok_or_else(|| Error(format!("{name}: library bin has no name")))?,
+        );
+        let old_bin = row
+            .get("bin_sha256")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let new_bin = sha256_file(&library_bin)?;
+        let new_cue = sha256_file(&library_cue)?;
+        let copied_bin = copy_if_changed(&library_bin, &input_bin)?;
+        let copied_cue = copy_if_changed(&library_cue, &input_cue)?;
+        // The build receipt next to the library image, when there is one.
+        let mut library_commit = None;
+        if let Some(receipt) = row.get("receipt").and_then(Value::as_str) {
+            let receipt = expand_home(receipt);
+            if let (Some(file), Some(parent)) = (receipt.file_name(), library_cue.parent()) {
+                let candidate = parent.join(file);
+                if candidate.is_file() {
+                    copy_if_changed(&candidate, &receipt)?;
+                    library_commit = receipt_commit(&candidate);
+                }
+            }
+        }
+        row["bin_sha256"] = json!(new_bin);
+        row["cue_sha256"] = json!(new_cue);
+        if new_bin == old_bin {
+            println!("{name}: unchanged ({})", &new_bin[..8]);
+            continue;
+        }
+        moved += 1;
+        println!(
+            "{name}: {} -> {} (bin {}, cue {})",
+            &old_bin[..old_bin.len().min(8)],
+            &new_bin[..8],
+            if copied_bin {
+                "copied"
+            } else {
+                "already there"
+            },
+            if copied_cue {
+                "copied"
+            } else {
+                "already there"
+            },
+        );
+        let revision = row
+            .pointer("/source/revision")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        match library_commit {
+            Some(commit) if !revision.starts_with(&commit) && !commit.starts_with(revision) => println!(
+                "  UPDATE source.revision and build text: lineup says {}, library receipt says {commit}",
+                &revision[..revision.len().min(8)]
+            ),
+            Some(_) => println!("  receipt commit matches source.revision; check the build text"),
+            None => println!("  no readable receipt commit; check source.revision and build text"),
+        }
+    }
+    if moved != 0 {
+        let mut out = crate::util::dumps(&lineup, 2, false);
+        out.push('\n');
+        crate::util::write_atomic(&lineup_path, &out)?;
+    }
+    println!(
+        "lineup refresh: {moved} input(s) moved{}",
+        if moved != 0 {
+            "; lineup file rewritten"
+        } else {
+            ""
+        }
+    );
+    Ok(())
+}
+
 pub fn run(raw: &[String]) -> Result<i32> {
     let Some((command, rest)) = raw.split_first() else {
-        bail!("usage: lineup prepare|receipt [options]");
+        bail!("usage: lineup prepare|refresh|receipt [options]");
     };
     match command.as_str() {
         "prepare" => prepare(&Args::parse(rest, &["lineup", "out"], &[])?)?,
+        "refresh" => refresh(&Args::parse(rest, &["lineup", "library", "only"], &[])?)?,
         "receipt" => receipt(&Args::parse(
             rest,
             &[
@@ -533,4 +672,63 @@ pub fn run(raw: &[String]) -> Result<i32> {
         other => bail!("unknown lineup command {other:?}"),
     }
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn raw(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn refresh_copies_a_moved_library_build_and_rewrites_its_hashes() {
+        let dir = tempfile::tempdir().unwrap();
+        let library = dir.path().join("library");
+        let inputs = dir.path().join("inputs");
+        fs::create_dir_all(&library).unwrap();
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(library.join("g.bin"), b"new build").unwrap();
+        fs::write(library.join("g.cue"), "FILE \"g.bin\" BINARY\n").unwrap();
+        fs::write(inputs.join("g.bin"), b"old build").unwrap();
+        fs::write(inputs.join("g.cue"), "FILE \"g.bin\" BINARY\n").unwrap();
+        let lineup_path = dir.path().join("lineup.json");
+        let lineup = json!({
+            "schema": 1,
+            "programs": [
+                {
+                    "name": "G", "library": "g.cue",
+                    "cue": inputs.join("g.cue").display().to_string(),
+                    "cue_sha256": "0", "bin_sha256": "old",
+                    "source": {"revision": "abc"}
+                },
+                {"name": "OTHER", "cue": "x.cue", "bin_sha256": "keep"}
+            ]
+        });
+        fs::write(&lineup_path, crate::util::dumps(&lineup, 2, false)).unwrap();
+        let arguments = raw(&[
+            "--lineup",
+            lineup_path.to_str().unwrap(),
+            "--library",
+            library.to_str().unwrap(),
+        ]);
+        refresh(&Args::parse(&arguments, &["lineup", "library", "only"], &[]).unwrap()).unwrap();
+        let after = crate::util::read_json(&lineup_path).unwrap();
+        let rows = after["programs"].as_array().unwrap();
+        assert_eq!(
+            rows[0]["bin_sha256"],
+            json!(sha256_file(&library.join("g.bin")).unwrap())
+        );
+        assert_eq!(
+            rows[0]["cue_sha256"],
+            json!(sha256_file(&library.join("g.cue")).unwrap())
+        );
+        assert_eq!(rows[1]["bin_sha256"], json!("keep"));
+        assert_eq!(fs::read(inputs.join("g.bin")).unwrap(), b"new build");
+        // Run again: nothing moved, the file is left alone.
+        let before = fs::read_to_string(&lineup_path).unwrap();
+        refresh(&Args::parse(&arguments, &["lineup", "library", "only"], &[]).unwrap()).unwrap();
+        assert_eq!(fs::read_to_string(&lineup_path).unwrap(), before);
+    }
 }

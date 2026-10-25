@@ -42,16 +42,19 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use disc_toc::Entry;
+use psx_chainloader::{check_payload, payload_extent, Conflict, Span, MIN_LOAD_ADDR, RAM_END};
 use psx_iso::iso9660::{default_system_cnf, IsoBuilder, SECTOR_SIZE};
 use psx_iso::SECTOR_BYTES;
 
-/// Where the chain-load blob runs (`loader/loader.ld`). A program whose
-/// payload reaches this address would be overwritten by the very code loading
-/// it, so the disc build refuses it.
-const LOADER_BASE: u32 = 0x801F_0000;
-
-/// Lowest legal PSX-EXE load address (`sdk/psoxide.ld`).
-const MIN_LOAD_ADDR: u32 = 0x8001_0000;
+/// The spans of RAM the chain loader occupies while it streams a program in:
+/// its own blob and the stack it runs on (`chainload-layout`, which the loader
+/// link and the launcher read too). A program whose payload would land on one
+/// would be overwritten by the very code loading it, so the disc build refuses
+/// it. The program may sit anywhere else, above the blob as well as below it.
+fn reserved_spans() -> [Span; 2] {
+    let [blob, stack] = chainload_layout::RESERVED;
+    [Span::new(blob.0, blob.1), Span::new(stack.0, stack.1)]
+}
 
 /// A boot EXE must appear near the front of an imported data track. Ordinary
 /// PSoXide images put it at the canonical playtest LBA; collection images may
@@ -133,6 +136,10 @@ struct Args {
     /// Sectors the target blank holds. A layout over it is an error that names
     /// every program's share, rather than a burn that runs off the disc.
     max_sectors: Option<u32>,
+    /// Zero-filled data sectors appended after the last program, so the outermost
+    /// stretch of the pressing (where silicon reads are least reliable) holds nothing
+    /// that matters. They count against `--max-sectors`.
+    tail_filler: u32,
     /// Print the sector budget and stop before writing the image.
     dry_run: bool,
 }
@@ -152,6 +159,7 @@ fn parse_args() -> Result<Args, String> {
     let mut menu_titles: Vec<String> = Vec::new();
     let mut gates: Vec<String> = Vec::new();
     let mut max_sectors = None;
+    let mut tail_filler = 0u32;
     let mut dry_run = false;
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
@@ -257,6 +265,12 @@ fn parse_args() -> Result<Args, String> {
                     format!("--max-sectors wants a sector count, got {value:?}")
                 })?);
             }
+            "--tail-filler" => {
+                let value = it.next().ok_or("--tail-filler takes a sector count")?;
+                tail_filler = value.parse::<u32>().map_err(|_| {
+                    format!("--tail-filler wants a sector count, got {value:?}")
+                })?;
+            }
             "--dry-run" => dry_run = true,
             "--help" | "-h" => {
                 print_usage();
@@ -282,6 +296,7 @@ fn parse_args() -> Result<Args, String> {
         gates,
         shots,
         max_sectors,
+        tail_filler,
         dry_run,
     })
 }
@@ -313,6 +328,7 @@ fn print_usage() {
 }
 
 /// The bits of a PSX-EXE header the disc build cares about.
+#[derive(Clone, Copy)]
 struct ExeHeader {
     load_addr: u32,
     payload_bytes: u32,
@@ -332,31 +348,71 @@ fn parse_exe_header(bytes: &[u8], what: &Path) -> Result<ExeHeader, String> {
     })
 }
 
-/// Reject a program that would be loaded on top of the chain-load blob.
+/// Reject a program whose payload would be loaded on top of the chain loader.
 ///
-/// The blob streams the payload in and then jumps, so only the loaded payload
-/// matters here: `.bss` is zeroed by the target's own `_start`, after the blob
-/// has stopped running.
-fn check_fits_below_loader(header: &ExeHeader, what: &Path) -> Result<(), String> {
-    if header.load_addr < MIN_LOAD_ADDR {
-        return Err(format!(
-            "{}: loads at {:#010X}, below the {:#010X} floor",
-            what.display(),
-            header.load_addr,
-            MIN_LOAD_ADDR
+/// The loader streams the payload in whole sectors and then jumps, so the
+/// extent that matters is the loaded payload rounded up to sectors: `.bss` is
+/// zeroed by the target's own `_start`, after the loader has stopped running.
+/// This is the rule the loader applies on the console (`check_payload`), so the
+/// two cannot disagree.
+fn check_clear_of_loader(header: &ExeHeader, what: &Path) -> Result<(), String> {
+    check_payload(header.load_addr, header.payload_bytes, &reserved_spans()).map_err(|conflict| {
+        let extent = payload_extent(header.load_addr, header.payload_bytes)
+            .map(|span| format!("{:#010X}..{:#010X}", span.start, span.end))
+            .unwrap_or_else(|| String::from("past the address space"));
+        match conflict {
+            Conflict::BelowFloor => format!(
+                "{}: loads at {:#010X}, below the {:#010X} floor",
+                what.display(),
+                header.load_addr,
+                MIN_LOAD_ADDR
+            ),
+            Conflict::PastRam => format!(
+                "{}: payload {extent} runs past the end of RAM ({:#010X})",
+                what.display(),
+                RAM_END
+            ),
+            Conflict::Reserved(span) => format!(
+                "{}: payload {extent} overlaps the chain loader's {:#010X}..{:#010X}. \
+                 Move the loader (chainload-layout) or shrink or relocate the program.",
+                what.display(),
+                span.start,
+                span.end
+            ),
+        }
+    })
+}
+
+/// One line per program for the budget output: where its payload loads and how
+/// much room it leaves around the loader, so a pressing's log shows how close
+/// each program is to the edge before one crosses it.
+fn memory_map(rows: &[(String, ExeHeader)]) -> String {
+    let [blob, _] = reserved_spans();
+    let mut text = format!(
+        "chain-load memory map (loader {:#010X}..{:#010X}, stack {:#010X}..{:#010X})\n",
+        blob.start,
+        blob.end,
+        reserved_spans()[1].start,
+        RAM_END
+    );
+    for (name, header) in rows {
+        let Some(extent) = payload_extent(header.load_addr, header.payload_bytes) else {
+            text.push_str(&format!("  {name:<20} (extent overflows)\n"));
+            continue;
+        };
+        let margin = if extent.end <= blob.start {
+            format!("{} B below the loader", blob.start - extent.end)
+        } else if extent.start >= blob.end {
+            format!("{} B above the loader", extent.start - blob.end)
+        } else {
+            String::from("OVERLAPS THE LOADER")
+        };
+        text.push_str(&format!(
+            "  {name:<20} {:#010X}..{:#010X}  {margin}\n",
+            extent.start, extent.end
         ));
     }
-    let end = header.load_addr.saturating_add(header.payload_bytes);
-    if end > LOADER_BASE {
-        return Err(format!(
-            "{}: payload ends at {:#010X}, past the chain-load blob at {:#010X}. \
-             Shrink the program or move LOADER_BASE (loader/loader.ld, launcher, mkdisc).",
-            what.display(),
-            end,
-            LOADER_BASE
-        ));
-    }
-    Ok(())
+    text
 }
 
 /// Find the first valid chain-loadable PS-X EXE in an imported data track.
@@ -367,6 +423,7 @@ fn check_fits_below_loader(header: &ExeHeader, what: &Path) -> Result<(), String
 /// sectors keeps both layouts relocatable without teaching the outer disc the
 /// inner ISO directory structure.
 fn find_image_boot_exe(data: &[u8], what: &Path) -> Result<(u32, ExeHeader), String> {
+    let mut first_refusal: Option<String> = None;
     for (lba, sector) in data
         .chunks_exact(SECTOR_BYTES)
         .take(IMAGE_BOOT_SCAN_SECTORS)
@@ -379,14 +436,19 @@ fn find_image_boot_exe(data: &[u8], what: &Path) -> Result<(u32, ExeHeader), Str
         let Ok(header) = parse_exe_header(user, what) else {
             continue;
         };
-        if check_fits_below_loader(&header, what).is_ok() {
-            return Ok((lba as u32, header));
+        match check_clear_of_loader(&header, what) {
+            Ok(()) => return Ok((lba as u32, header)),
+            Err(reason) => first_refusal = first_refusal.or(Some(reason)),
         }
     }
-    Err(format!(
-        "{}: no chain-loadable PSX-EXE in the first {IMAGE_BOOT_SCAN_SECTORS} data sectors",
-        what.display()
-    ))
+    // A boot EXE that exists but cannot be loaded is the real failure; say why
+    // instead of claiming there was none.
+    Err(first_refusal.unwrap_or_else(|| {
+        format!(
+            "{}: no chain-loadable PSX-EXE in the first {IMAGE_BOOT_SCAN_SECTORS} data sectors",
+            what.display()
+        )
+    }))
 }
 
 fn sectors_for(bytes: usize) -> u32 {
@@ -902,13 +964,15 @@ fn run() -> Result<(), String> {
     let mut iso_files = Vec::new();
     let mut map = Vec::new();
 
+    let mut loaded: Vec<(String, ExeHeader)> = Vec::new();
     for (index, program) in args.programs.iter().enumerate() {
         let Source::Exe(path) = &program.source else {
             continue;
         };
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let header = parse_exe_header(&bytes, path)?;
-        check_fits_below_loader(&header, path)?;
+        check_clear_of_loader(&header, path)?;
+        loaded.push((program.name.clone(), header));
         let payload_end = 2048usize + header.payload_bytes as usize;
         if bytes.len() < payload_end {
             return Err(format!(
@@ -939,7 +1003,8 @@ fn run() -> Result<(), String> {
         };
         let image = load_image(path)?;
         let (boot_exe_lba, header) = find_image_boot_exe(&image.data, path)?;
-        check_fits_below_loader(&header, path)?;
+        check_clear_of_loader(&header, path)?;
+        loaded.push((program.name.clone(), header));
         // Checksum the payload as the loader will read it: the 2048-byte
         // data windows of the raw sectors after the header sector.
         let mut remaining = header.payload_bytes as usize;
@@ -1005,6 +1070,10 @@ fn run() -> Result<(), String> {
             image.audio.len() as u32,
         ));
     }
+    if args.tail_filler != 0 {
+        budget.push((String::from("tail filler (outer edge)"), args.tail_filler, 0));
+    }
+    print!("{}", memory_map(&loaded));
     print!("{}", budget_table(&budget, args.max_sectors));
     check_budget(&budget, args.max_sectors)?;
     if args.dry_run {
@@ -1138,6 +1207,20 @@ fn run() -> Result<(), String> {
         lba += (image.data.len() / SECTOR_BYTES) as u32;
     }
 
+    // The tail filler: a zero-data Form 1 sector (the ISO's own empty system-area sector 1,
+    // already encoded with its EDC/ECC) repeated, re-addressed like every placed sector.
+    if args.tail_filler != 0 {
+        let template: Vec<u8> = disc[SECTOR_BYTES..2 * SECTOR_BYTES].to_vec();
+        if template[0x18..0x818].iter().any(|b| *b != 0) {
+            return Err("the ISO's system-area sector 1 is not empty: no filler template".to_string());
+        }
+        for _ in 0..args.tail_filler {
+            let at = disc.len();
+            disc.extend_from_slice(&template);
+            rewrite_sector_msf(&mut disc[at..at + SECTOR_BYTES], (at / SECTOR_BYTES) as u32);
+        }
+    }
+
     // All CD-DA follows all data, each game's in program order.
     let mut placed_audio = Vec::new();
     for (_, _, image, _, _) in &images {
@@ -1257,14 +1340,81 @@ mod tests {
     #[test]
     fn accepts_a_program_that_clears_the_blob() {
         let h = header(0x8001_0000, 1_500_000);
-        assert!(check_fits_below_loader(&h, Path::new("cortex")).is_ok());
+        assert!(check_clear_of_loader(&h, Path::new("cortex")).is_ok());
+    }
+
+    #[test]
+    fn accepts_the_half_life_intro_above_the_blob() {
+        // 75,776 bytes at 0x801E0000, ending 0x801F2800: past the old blob
+        // address, which is why it could not be pressed.
+        let h = header(0x801E_0000, 75_776);
+        assert!(check_clear_of_loader(&h, Path::new("half-life")).is_ok());
     }
 
     #[test]
     fn rejects_a_program_that_would_overwrite_the_blob() {
-        let h = header(0x8001_0000, LOADER_BASE - 0x8001_0000 + 1);
-        let err = check_fits_below_loader(&h, Path::new("huge")).unwrap_err();
-        assert!(err.contains("chain-load blob"), "{err}");
+        let blob = chainload_layout::LOADER_BASE;
+        let h = header(0x8001_0000, blob - 0x8001_0000 + 1);
+        let err = check_clear_of_loader(&h, Path::new("huge")).unwrap_err();
+        assert!(err.contains("overlaps the chain loader"), "{err}");
+    }
+
+    #[test]
+    fn rejects_a_program_that_would_reach_the_stack() {
+        let h = header(0x801E_0000, 0x1_9000);
+        let err = check_clear_of_loader(&h, Path::new("tall")).unwrap_err();
+        assert!(err.contains("overlaps the chain loader"), "{err}");
+    }
+
+    #[test]
+    fn the_checked_extent_is_whole_sectors() {
+        let blob = chainload_layout::LOADER_BASE;
+        // One byte over a sector boundary writes the next whole sector.
+        let h = header(blob - 2048, 2049);
+        assert!(check_clear_of_loader(&h, Path::new("edge")).is_err());
+        let h = header(blob - 2048, 2048);
+        assert!(check_clear_of_loader(&h, Path::new("edge")).is_ok());
+    }
+
+    /// The boot EXE of every program on the v0.47 Private pressing plus the
+    /// current Half-Life intro: `(name, load address, payload bytes)`, read from
+    /// the pressed images. A change to `chainload-layout` that would strand any
+    /// of them fails here instead of at the next pressing.
+    const PRESSED_PROGRAMS: [(&str, u32, u32); 12] = [
+        ("PSOXIDE ARCADE", 0x8001_0000, 110_592),
+        ("CELESTE COLLECTION", 0x8001_0000, 587_776),
+        ("NITROXIDE", 0x8001_0000, 1_363_968),
+        ("VOXIDE", 0x8001_0000, 733_184),
+        ("WIPEOUT PSOXIDE", 0x8001_0000, 546_816),
+        ("HOLLOW KNIGHT", 0x8001_0000, 1_024_000),
+        ("COUNTER-STRIKE", 0x8001_0000, 604_160),
+        ("HALF-LIFE", 0x801E_0000, 75_776),
+        ("OCARINA OF TIME", 0x8001_0000, 1_728_512),
+        ("QUAKE SHAREWARE", 0x8001_0000, 559_104),
+        ("CORTEX IGNITION", 0x8001_0000, 1_134_592),
+        ("PSXCEL", 0x8001_0000, 260_096),
+    ];
+
+    #[test]
+    fn every_pressed_program_clears_the_loader_and_the_stack() {
+        for (name, load_addr, payload_bytes) in PRESSED_PROGRAMS {
+            let h = header(load_addr, payload_bytes);
+            check_clear_of_loader(&h, Path::new(name)).unwrap_or_else(|e| panic!("{e}"));
+        }
+    }
+
+    #[test]
+    fn the_memory_map_names_each_program_and_flags_an_overlap() {
+        let rows = vec![
+            (String::from("CORTEX"), header(0x8001_0000, 0x0011_5000)),
+            (String::from("HALF-LIFE"), header(0x801E_0000, 75_776)),
+            (String::from("BAD"), header(0x801C_8000, 2048)),
+        ];
+        let map = memory_map(&rows);
+        assert!(map.contains("CORTEX"), "{map}");
+        assert!(map.contains("B below the loader"), "{map}");
+        assert!(map.contains("B above the loader"), "{map}");
+        assert!(map.contains("OVERLAPS THE LOADER"), "{map}");
     }
 
     #[test]

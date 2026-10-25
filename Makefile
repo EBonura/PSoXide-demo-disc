@@ -8,7 +8,7 @@
 # music live outside Git. Cortex uses an exact PSoXide pin so the active editor
 # project remains reproducible as the engine advances.
 
-.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check clean
+.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check chainload-probe clean
 
 ROOT       := $(CURDIR)
 # All programs use the validated shared renderer and asset runtime.
@@ -102,13 +102,18 @@ HK ?=
 WO ?=
 # The hardware test suite is likewise lineup-only (HWT=1).
 HWT ?=
+# Ocarina of Time rides the lineup pressings only (make lineup-disc ... OOT=1):
+# it is built from the owner's own ROM in its own repository, has no submodule
+# here, and is on the Private edition only.
+OOT ?=
 # HL=0 means off, not "0 is a non-empty string, so on". Same for CS and HK.
 override HL := $(filter-out 0,$(HL))
 override CS := $(filter-out 0,$(CS))
 override HK := $(filter-out 0,$(HK))
 override WO := $(filter-out 0,$(WO))
 override HWT := $(filter-out 0,$(HWT))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT))
+override OOT := $(filter-out 0,$(OOT))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -145,12 +150,12 @@ DISC_MAX_SECTORS ?= 359999
 QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
 QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
 QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= e05f786dcdf51c5e4aad8be0bd4dd917a6813269
-QUAKE_EXPECTED_PSOXIDE_REV ?= fb2a9ab476d19faa0ccfc84b767fbead9a370bb5
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 34589273ad85d8ff65a130de78c75591e8f4a0d6f810fec74ab828f3f1dc79fa
+QUAKE_EXPECTED_REV ?= c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621
+QUAKE_EXPECTED_PSOXIDE_REV ?= c096eee01f4cc0b896461e6f2cdad4e404a32a0a
+QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 223334a7ae4b2c48f1158e07d945b3c9d6062091a62defe11eb59bd29249c250
 QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 6728e703c17c199216c39fdac639c2a02fe363f3aaab60f2d5075bda2e704c8f
-QUAKE_EXPECTED_EXE_SHA256 ?= 2884b76a43a4b1573352edb2d9dcd14ce8d9f078c3e292fe6c95596884d5e416
+QUAKE_EXPECTED_BIN_SHA256 ?= 62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149
+QUAKE_EXPECTED_EXE_SHA256 ?= bd272edab1e2d9435bd4faba7b090937013b30eab0c3d1b96721ff0d7f78c881
 QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 # The emulator package was renamed from `frontend` to `psoxide-emulator` after the
 # component tuple's pin, and the web player runs ahead of the tuple (see
@@ -174,7 +179,7 @@ DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0)
 RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
@@ -230,7 +235,7 @@ help:
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-Tloader.ld -Clink-arg=--oformat=binary" \
+		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
 # Each program's own version, read from the source that declares it rather than
@@ -259,6 +264,7 @@ V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arc
 V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
 V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
 V_HKPSX     := $(call cargo_version,$(HKPSX_SOURCE)/game/Cargo.toml)
+V_OOTPSX    := 0.1.0
 # Build revisions are recorded in the release receipt.
 V_CORTEX_CURRENT := Tech demo
 
@@ -464,6 +470,13 @@ WO_ARGS = --image "WIPEOUT PSOXIDE=$(WIPEOUT)" \
 	--version-of "WIPEOUT PSOXIDE=$(V_WIPEOUT)" \
 	--describe "WIPEOUT PSOXIDE=WipEout (1995) rewritten in Rust for the original PlayStation, cooked from your own copy of the game. Tracks, ships, weapons and two-player split screen.|WipEout (1995) riscritto in Rust per la prima PlayStation, partendo dalla propria copia del gioco. Piste, navi, armi e schermo diviso per due."
 endif
+ifneq ($(OOT),)
+OOT_ARGS = --image "OCARINA OF TIME=$(OOTPSX)" \
+	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot1.shot" \
+	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot2.shot" \
+	--version-of "OCARINA OF TIME=$(V_OOTPSX)" \
+	--describe "OCARINA OF TIME=An early from-scratch PlayStation port of Ocarina of Time, cooked from your own ROM. The opening and Kokiri Forest can be explored. Still in development and slow.|Un primo port di Ocarina of Time per PlayStation, fatto da zero partendo dalla propria ROM. Si esplorano l'inizio e la Foresta Kokiri. In sviluppo e lento."
+endif
 ifneq ($(HK),)
 HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
 	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
@@ -542,6 +555,77 @@ _release-headless-check: $(DISC_TOOLS)
 		$(if $(HL),--target HALF-LIFE) $(if $(CS),--target COUNTER-STRIKE) \
 		$(if $(HK),--target "HOLLOW KNIGHT")
 
+# The Private pressing in one command (never distributed: Half-Life, Hollow
+# Knight, Counter-Strike, Ocarina of Time and WipEout PSoXide ride only here):
+#
+#   make press-private FRONTEND=<psoxide-emulator>
+#
+# 1. lineup refresh: takes the newest library build of the five library-fed
+#    programs (each row's "library" path in the lineup file), copies it into
+#    the lineup inputs and rewrites its hashes. If anything moved the run stops
+#    here: the lineup's revision and build text are a human's to update, and the
+#    launcher version is read from a clean tree, so commit the lineup and run
+#    this again (nothing moves the second time).
+# 2. clean-tree check, then the sector budget (fails, writing no image, when the
+#    layout is over an 80-minute CD-R; prints the spare sectors otherwise).
+# 3. lineup-disc: the pressing and its two receipts, into PRIVATE_DIST.
+# 4. gates on the pressed image: the independent programs boot, and every
+#    chain-load replays twice byte-identical (Cortex, Quake, Half-Life,
+#    Counter-Strike, Hollow Knight, WipEout PSoXide to a race, Ocarina of Time
+#    to Link's house).
+# 5. only with INSTALL=1: copy the image, cue and receipts into the games
+#    library and remove the older Private pressings there.
+#
+# The launcher shows PRIVATE_VERSION, not what `git describe` says, so a commit
+# made after the version tag does not change what the disc says.
+PRIVATE_LINEUP ?= release/lineup-v0.45-private.json
+PRIVATE_VERSION ?= v0.45
+PRIVATE_NAME ?= PSoXide Demo Disc $(PRIVATE_VERSION) Private
+PRIVATE_DIST ?= $(BUILD)/private-press
+PRIVATE_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 HWT=0
+PRIVATE_ARGS = LINEUP=$(PRIVATE_LINEUP) $(PRIVATE_FLAGS) DISC_NAME="$(PRIVATE_NAME)" DISC_VERSION=$(PRIVATE_VERSION) DIST="$(PRIVATE_DIST)" FRONTEND="$(FRONTEND)"
+PRIVATE_EVIDENCE ?= $(PRIVATE_DIST)/evidence
+
+.PHONY: press-private private-refresh private-budget private-gates private-install
+private-refresh: $(DISC_TOOLS)
+	$(DISC_TOOLS) lineup refresh --lineup "$(PRIVATE_LINEUP)" --library "$(PSOXIDE_LIB)"
+
+private-budget:
+	$(MAKE) lineup-budget $(PRIVATE_ARGS)
+
+private-gates: $(DISC_TOOLS)
+	@mkdir -p "$(PRIVATE_EVIDENCE)"
+	$(DISC_TOOLS) programs --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
+		--out "$(PRIVATE_EVIDENCE)/programs" --jobs 2
+	$(DISC_TOOLS) chainloads --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
+		--artifact-dir "$(PRIVATE_EVIDENCE)/chainloads"
+
+private-install:
+	@test -f "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" || { echo "private-install: press first"; exit 1; }
+	for ext in bin cue components.json release-receipt.json; do \
+		cp -c "$(PRIVATE_DIST)/$(PRIVATE_NAME).$$ext" "$(PSOXIDE_LIB)/$(PRIVATE_NAME).$$ext" || exit 1; \
+	done
+	@# one copy per pressing in the library: older Private pressings go
+	for old in "$(PSOXIDE_LIB)"/PSoXide\ Demo\ Disc\ v*\ Private.*; do \
+		case "$$old" in "$(PSOXIDE_LIB)/$(PRIVATE_NAME)."*) ;; *) echo "removing $$old"; rm -f "$$old";; esac; \
+	done
+
+press-private: $(DISC_TOOLS)
+	@test -x "$(FRONTEND)" || { echo "press-private: FRONTEND=$(FRONTEND) is not an executable"; exit 1; }
+	$(MAKE) private-refresh
+	@if [ -n "$$(git -C $(ROOT) status --porcelain --untracked-files=no)" ]; then \
+		echo "press-private: the tree is not clean (the refresh moved an input, or there are edits)."; \
+		echo "  update source.revision and build text in $(PRIVATE_LINEUP), commit, and run again."; \
+		git -C $(ROOT) status --short --untracked-files=no; exit 1; \
+	fi
+	$(MAKE) private-budget
+	rm -rf "$(PRIVATE_DIST)"
+	$(MAKE) lineup-disc $(PRIVATE_ARGS)
+	$(MAKE) private-gates $(PRIVATE_ARGS)
+	@if [ -n "$(INSTALL)" ]; then $(MAKE) private-install $(PRIVATE_ARGS); fi
+	@echo "press-private: $(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+	@shasum -a 256 "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+
 # Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
 # pointer are the whole contract, and they all come out of a built Quake tree:
 #
@@ -587,7 +671,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
-              $(if $(WO),wipeout1 wipeout2) $(if $(HWT),hwtests hwtests2)
+              $(if $(WO),wipeout1 wipeout2) $(if $(OOT),oot1 oot2) $(if $(HWT),hwtests hwtests2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
@@ -608,6 +692,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(HK_ARGS) \
 		$(CS_ARGS) \
 		$(HL_ARGS) \
+		$(OOT_ARGS) \
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(HWT_ARGS) \
@@ -648,6 +733,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
 		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
 		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
+		$(if $(TAIL_FILLER),--tail-filler $(TAIL_FILLER)) \
 		--max-sectors $(DISC_MAX_SECTORS)
 
 ifneq ($(PRIVATE),)
@@ -729,7 +815,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(HWT),,--omit "HARDWARE TESTS") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
@@ -844,6 +930,15 @@ relocation-check: launcher mkdisc
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
 	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."
+
+# The chain loader must hand the CD drive over quiet: a plain Pause leaves its
+# second response (INT2, 1.2 to 3.9 million clocks later on the console) to land
+# in the next program. tools/chainload-probe is the payload that checks for it
+# after the launcher chain-loads it. FRONTEND must carry the emulator's silicon
+# Pause model (PSoXide-emulator dddd281 or later).
+chainload-probe: launcher mkdisc
+	@test -n "$(FRONTEND)" || { echo "chainload-probe: set FRONTEND to a psoxide-emulator with the silicon Pause model"; exit 1; }
+	sh tools/chainload_probe.sh "$(LAUNCHER_EXE)" "$(FRONTEND)"
 
 clean:
 	rm -rf $(BUILD) $(ROOT)/dist
