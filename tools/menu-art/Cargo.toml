@@ -1,0 +1,12 @@
+[package]
+name    = "menu-art"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "Host tool for the demo disc menu prototype: bakes fonts, glyph icons and cover art into PS1 texture blobs."
+
+[workspace]
+
+[dependencies]
+fontdue = "0.9"
+image   = { version = "0.25", default-features = false, features = ["png"] }
