@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.45
+PSoXide Demo Disc v0.49
 =======================
 
 A little of everything. One PlayStation disc.
@@ -6,6 +6,21 @@ A little of everything. One PlayStation disc.
 Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.49
+-------------------
+- A new menu. The programs stand as game cases on a shelf: left and right
+  browse, Cross or Start runs the one in front, Triangle switches between
+  English and Italian, Select opens the credits and links (with the QR code),
+  L1 and R1 skip the music. Choosing a program opens its case like a real one
+  and the disc spins up while the console finds the program on the disc.
+- Leave the disc alone for twenty seconds and the menu starts touring the shelf,
+  turning each case to show its spine and back cover, with the floor lit by the
+  music. Any button brings the menu back.
+- The music credit (Mulula VGM Loops, CC BY 4.0) is on the credits screen and
+  appears at the foot of the screen while the menu tours.
+- The Konami code is gone; every program on the disc is on the shelf.
+- Quake is the latest build. The other programs are as in v0.48.
 
 What's new in v0.45
 -------------------
