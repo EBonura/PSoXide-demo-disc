@@ -6,7 +6,6 @@
 //! the title, description and start button sit under the row. Vertical
 //! positions are fixed rows (see the constants) so nothing drifts.
 
-use crate::attract;
 use crate::common::*;
 use crate::ease;
 use disc_toc::Entry;
@@ -41,7 +40,7 @@ const VERSION_GAP: i32 = 8;
 /// The title with the version to its right in the small face, both on one
 /// baseline and centred as a group on the screen. `mid` is the row the title's
 /// capitals are centred on.
-fn title_row(g: &mut Gfx, e: &Entry, mid: i32, a: u32) {
+pub fn title_row(g: &mut Gfx, e: &Entry, mid: i32, a: u32) {
     let (name, version) = (e.name_str(), e.version_str());
     let tw = MICH12.width(name, 0);
     // Versions that are numbers read "v0.2.7"; a build name stands as it is.
@@ -66,15 +65,14 @@ fn title_row(g: &mut Gfx, e: &Entry, mid: i32, a: u32) {
     }
 }
 
-/// Ease the row toward case `sel`. In the attract state the row creeps a
-/// fifth of a case either way on a slow wave, so the idle shelf drifts.
 /// How much of the focus a case `d` Q8 slots from the middle has (256 = all).
 fn settle_of(d: i32) -> i32 {
     (256 - d.abs() * 3 / 2).max(0)
 }
 
-pub fn update(s: &mut State, sel: i32, t: u32, level: i32) {
-    s.pos = ease::follow(s.pos, sel * 256 + attract::row_creep(t, level), 2);
+/// Ease the row toward case `sel`.
+pub fn update(s: &mut State, sel: i32) {
+    s.pos = ease::follow(s.pos, sel * 256, 2);
 }
 
 /// The focused case's sway at frame `t` (-32..=32), the hinge swing the launch
@@ -84,7 +82,7 @@ pub fn sway_yaw(t: u32) -> i32 {
 }
 
 /// Where a case `d` (Q8 slots from the centre) sits: (x offset, scale, dim).
-fn layout(d: i32) -> (i32, i32, i32) {
+pub fn layout(d: i32) -> (i32, i32, i32) {
     let a = d.abs();
     let x = ease::knots(a, &[(0, 0), (256, 98), (512, 158), (768, 215)]);
     let sc = ease::knots(a, &[(0, 256), (256, 168), (512, 128), (768, 100)]);
@@ -131,14 +129,12 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
         }
         let (dx, sc, dim) = layout(d);
         let settle = settle_of(d);
-        // The idle shelf dims everything but the focused case.
-        let dim = attract::dim(dim, ctx.attract, settle);
         let lift = (3 * settle) >> 8;
         // A neighbour leans toward the focused case; the focused one sways on
         // its hinge. One blend by `settle`, so the lean eases in and out as the
         // row moves instead of jumping.
         let lean = if d < 0 { -150 } else { 150 };
-        let yaw = ((lean * (256 - settle)) >> 8) + ((attract::sway(sway_yaw(ctx.t), ctx.attract) * settle) >> 8);
+        let yaw = ((lean * (256 - settle)) >> 8) + ((sway_yaw(ctx.t) * settle) >> 8);
         // Pool of light under each case, brightest for the focused one.
         let pool = scale((10, 52, 62), (settle as u32 * 3 >> 2) + 20);
         let rx = (66 * sc) >> 8;
@@ -159,10 +155,6 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
         draw_case(g, &cv, &entries[i as usize]);
     }
 
-    if launch < 0 {
-        attract::credit_line(g, ctx);
-    }
-
     // Title, description and the primary action for the selected entry.
     let e = &entries[sel as usize];
     let near = ((256 - (sel * 256 - s.pos).abs() * 2).max(0)) as u32;
@@ -171,7 +163,7 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
     } else {
         256
     };
-    let a = (near * gone >> 8) * ctx.chrome() >> 8;
+    let a = near * gone >> 8;
     if a > 8 {
         let off = ((256 - near as i32) * 6) >> 8;
         title_row(g, e, TITLE_MID + off, a);

@@ -272,9 +272,16 @@ run time.
 
 The credits screen has the music attribution (author, works, licence, link),
 the project links behind their platform marks, and the QR code for the link hub.
-After 20 seconds without a button the text and hints fade out, the shelf drifts
-and the music credit takes the footer's place; any button brings everything back
-at once (`launcher/src/attract.rs` is all of that state).
+After 20 seconds without a button the menu hands over to its attract mode
+(`launcher/src/attract.rs`): the text and hints fade out and the camera tours the
+shelf, lifting each case in turn, turning it to show its spine and then its back
+cover (a blurb and two small screenshots, `launcher/assets/back_*.art`, baked by
+`menu-art backs`), and turning it home; the grid floor lights from the level
+meter (each cell is one band, older rows further away), the light pools swell on
+every beat and the PSoXide logo's X catches a sweep of light. The line at the foot
+of the screen alternates between "press any button" and the music credit. Any
+button ends it at once, on the case it was showing, and is not also taken as a
+menu command.
 
 The disc is meant for a DualShock in analog mode. The launcher locks port 1
 there at boot and asks again every second; until it holds one, the menu shows a

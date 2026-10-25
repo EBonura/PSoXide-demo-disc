@@ -81,9 +81,6 @@ pub struct Ctx<'a> {
     pub music: NowPlaying<'a>,
     /// The disc table's short music credit, shown while the menu idles.
     pub credit: &'a str,
-    /// How far the idle menu has settled into its attract state: 0 is the
-    /// menu as it is used, 256 is text and hints gone.
-    pub attract: i32,
 }
 
 impl Ctx<'_> {
@@ -94,20 +91,15 @@ impl Ctx<'_> {
             e.desc_en_str()
         }
     }
-
-    /// Opacity of the header, footer and text (256 = fully shown).
-    pub fn chrome(&self) -> u32 {
-        (256 - self.attract).max(0) as u32
-    }
 }
 
-pub fn wordmark(g: &mut Gfx, x: i32, cy: i32, a: u32) -> i32 {
+pub fn wordmark(g: &mut Gfx, x: i32, cy: i32) -> i32 {
     let y = cy - MICH12.cap_mid();
-    text::draw(g, &MICH12, x, y, "PSo", scale(TEXT, a), 0);
+    text::draw(g, &MICH12, x, y, "PSo", TEXT, 0);
     let w = MICH12.width("PSo", 0);
-    text::draw(g, &MICH12, x + w, y, "X", scale(ACCENT, a), 0);
+    text::draw(g, &MICH12, x + w, y, "X", ACCENT, 0);
     let w2 = MICH12.width("PSoX", 0);
-    text::draw(g, &MICH12, x + w2, y, "ide", scale(TEXT, a), 0);
+    text::draw(g, &MICH12, x + w2, y, "ide", TEXT, 0);
     x + MICH12.width("PSoXide", 0)
 }
 
@@ -121,45 +113,41 @@ fn icon(g: &mut Gfx, gl: &Glyph, x: i32, cy: i32, c: Rgb) {
 /// meter and the language switch on the right; one rule under it. Everything
 /// is centred on [`HEAD_MID`].
 pub fn header(g: &mut Gfx, ctx: &Ctx) {
-    let a = ctx.chrome();
-    if a == 0 {
-        return;
-    }
     let cy = HEAD_MID;
-    let mut x = wordmark(g, MARGIN, cy, a);
+    let mut x = wordmark(g, MARGIN, cy);
     x += 6;
-    g.rect(x, cy - 4, 1, 9, scale((34, 52, 62), a));
+    g.rect(x, cy - 4, 1, 9, (34, 52, 62));
     x += 1 + 6;
-    text::draw_mid(g, &JOST9, x, cy, ctx.disc_title, scale(DIM, a), 1);
+    text::draw_mid(g, &JOST9, x, cy, ctx.disc_title, DIM, 1);
     x += JOST9.width(ctx.disc_title, 1) + 6;
-    text::draw_mid(g, &JOST9, x, cy, ctx.disc_version, scale(RING, a), 0);
+    text::draw_mid(g, &JOST9, x, cy, ctx.disc_version, RING, 0);
 
     // Language switch: two cells in one frame, the active one lit, flush with
     // the right margin.
     let cell = JOST9.width("EN", 1).max(JOST9.width("IT", 1)) + 8;
     let lx = RIGHT - (2 * cell + 1);
-    g.frame(lx, cy - CHIP_H / 2, 2 * cell + 1, CHIP_H, scale(RING, a));
+    g.frame(lx, cy - CHIP_H / 2, 2 * cell + 1, CHIP_H, RING);
     let lit = if ctx.it { lx + cell + 1 } else { lx + 1 };
-    g.rect(lit, cy - CHIP_H / 2 + 1, cell - 1, CHIP_H - 2, scale((10, 50, 62), a));
-    g.rect(lx + cell, cy - CHIP_H / 2 + 1, 1, CHIP_H - 2, scale(RING, a));
+    g.rect(lit, cy - CHIP_H / 2 + 1, cell - 1, CHIP_H - 2, (10, 50, 62));
+    g.rect(lx + cell, cy - CHIP_H / 2 + 1, 1, CHIP_H - 2, RING);
     let (en, it) = if ctx.it { (DIM, TEXT) } else { (TEXT, DIM) };
-    text::draw_centered_mid(g, &JOST9, lx + cell / 2 + 1, cy, "EN", scale(en, a), 1);
-    text::draw_centered_mid(g, &JOST9, lx + cell + 1 + cell / 2, cy, "IT", scale(it, a), 1);
+    text::draw_centered_mid(g, &JOST9, lx + cell / 2 + 1, cy, "EN", en, 1);
+    text::draw_centered_mid(g, &JOST9, lx + cell + 1 + cell / 2, cy, "IT", it, 1);
 
     // The Language key sits beside its switch, and the level meter beside that.
     let kx = lx - ICON_GAP - ICON_TRIANGLE.w as i32;
-    icon(g, &ICON_TRIANGLE, kx, cy, scale(RING, a));
+    icon(g, &ICON_TRIANGLE, kx, cy, RING);
     if ctx.music.state != Playback::None {
-        meter(g, &ctx.music, ctx.t, kx - HEAD_GAP - METER_W, cy, a);
+        meter(g, &ctx.music, ctx.t, kx - HEAD_GAP - METER_W, cy);
         // The song's name has the row under the header, at the right margin.
         let (label, tint) = match ctx.music.state {
             Playback::Off => ("MUSIC OFF", DIM),
             Playback::Loading => ("LOADING", DIM),
             _ => (ctx.music.title, MUTED),
         };
-        text::draw_right_mid(g, &JOST9, RIGHT, SONG_MID, label, scale(tint, a), 0);
+        text::draw_right_mid(g, &JOST9, RIGHT, SONG_MID, label, tint, 0);
     }
-    g.rect_add(0, HEAD_RULE, 320, 1, scale((16, 26, 30), a));
+    g.rect_add(0, HEAD_RULE, 320, 1, (16, 26, 30));
 }
 
 /// Bars in the header's level meter, their width and pitch, and its width.
@@ -169,7 +157,7 @@ const METER_W: i32 = METER_BARS * 3 - 1;
 /// The level meter: the disc's analysis folded to eight bars (low frequencies
 /// on the left), mirrored about the header's centre line. A song with no
 /// analysis rides a slow wave instead, and a silent or loading menu is flat.
-fn meter(g: &mut Gfx, now: &NowPlaying, t: u32, bx: i32, cy: i32, a: u32) {
+fn meter(g: &mut Gfx, now: &NowPlaying, t: u32, bx: i32, cy: i32) {
     for b in 0..METER_BARS {
         let level = match (now.state, now.levels) {
             (Playback::Playing, Some(levels)) => {
@@ -189,15 +177,15 @@ fn meter(g: &mut Gfx, now: &NowPlaying, t: u32, bx: i32, cy: i32, a: u32) {
         let half = (level * 5 + 127) / 255; // 0..=5
         let h = 1 + 2 * half;
         let c = mix(DIM, ACCENT, (level * 256 / 255) as u32);
-        g.rect(bx + b * 3, cy - half, 2, h, scale(c, a));
+        g.rect(bx + b * 3, cy - half, 2, h, c);
     }
 }
 
 /// A shoulder-button tag: an outlined box with the key name inside.
-fn tag(g: &mut Gfx, x: i32, cy: i32, name: &str, a: u32) -> i32 {
+fn tag(g: &mut Gfx, x: i32, cy: i32, name: &str) -> i32 {
     let w = JOST9.width(name, 0) + 8;
-    g.frame(x, cy - CHIP_H / 2, w, CHIP_H, scale(RING, a));
-    text::draw_centered_mid(g, &JOST9, x + w / 2, cy, name, scale(DIM, a), 0);
+    g.frame(x, cy - CHIP_H / 2, w, CHIP_H, RING);
+    text::draw_centered_mid(g, &JOST9, x + w / 2, cy, name, DIM, 0);
     w
 }
 
@@ -207,63 +195,59 @@ const ICON_GAP: i32 = 4;
 const HINT_GAP: i32 = 10;
 
 /// One footer hint: glyph then label. Returns the x after it.
-fn hint(g: &mut Gfx, x: i32, gl: &Glyph, label: &str, a: u32) -> i32 {
-    icon(g, gl, x, FOOT_MID, scale(RING, a));
+fn hint(g: &mut Gfx, x: i32, gl: &Glyph, label: &str) -> i32 {
+    icon(g, gl, x, FOOT_MID, RING);
     text::draw_mid(
         g,
         &JOST9,
         x + gl.w as i32 + ICON_GAP,
         FOOT_MID,
         label,
-        scale(MUTED, a),
+        MUTED,
         0,
     );
     x + gl.w as i32 + ICON_GAP + JOST9.width(label, 0) + HINT_GAP
 }
 
 /// A hint whose key is a tag box (SELECT, L1, R1) rather than a glyph.
-fn tag_hint(g: &mut Gfx, x: i32, key: &str, label: &str, a: u32) -> i32 {
-    let w = tag(g, x, FOOT_MID, key, a);
-    text::draw_mid(g, &JOST9, x + w + ICON_GAP, FOOT_MID, label, scale(MUTED, a), 0);
+fn tag_hint(g: &mut Gfx, x: i32, key: &str, label: &str) -> i32 {
+    let w = tag(g, x, FOOT_MID, key);
+    text::draw_mid(g, &JOST9, x + w + ICON_GAP, FOOT_MID, label, MUTED, 0);
     x + w + ICON_GAP + JOST9.width(label, 0) + HINT_GAP
 }
 
 /// Footer: the hints for the screen from the left margin, the music keys at
 /// the right one, all centred on [`FOOT_MID`].
 pub fn footer(g: &mut Gfx, ctx: &Ctx) {
-    let a = ctx.chrome();
-    if a == 0 {
-        return;
-    }
     let it = ctx.it;
-    g.rect_add(0, FOOT_RULE, 320, 1, scale((12, 20, 24), a));
+    g.rect_add(0, FOOT_RULE, 320, 1, (12, 20, 24));
     let mut x = MARGIN;
     match ctx.screen {
         Screen::Shelf => {
-            icon(g, &ICON_CHEV_L, x, FOOT_MID, scale(RING, a));
+            icon(g, &ICON_CHEV_L, x, FOOT_MID, RING);
             x += ICON_CHEV_L.w as i32 + 2;
-            icon(g, &ICON_CHEV_R, x, FOOT_MID, scale(RING, a));
+            icon(g, &ICON_CHEV_R, x, FOOT_MID, RING);
             x += ICON_CHEV_R.w as i32 + ICON_GAP;
             let browse = if it { "Sfoglia" } else { "Browse" };
-            text::draw_mid(g, &JOST9, x, FOOT_MID, browse, scale(MUTED, a), 0);
+            text::draw_mid(g, &JOST9, x, FOOT_MID, browse, MUTED, 0);
             x += JOST9.width(browse, 0) + HINT_GAP;
-            x = hint(g, x, &ICON_CROSS, if it { "Avvia" } else { "Start" }, a);
-            let _ = tag_hint(g, x, "SELECT", if it { "Crediti" } else { "Credits" }, a);
+            x = hint(g, x, &ICON_CROSS, if it { "Avvia" } else { "Start" });
+            let _ = tag_hint(g, x, "SELECT", if it { "Crediti" } else { "Credits" });
         }
         Screen::Credits => {
-            x = hint(g, x, &ICON_CIRCLE, if it { "Indietro" } else { "Back" }, a);
-            let _ = hint(g, x, &ICON_TRIANGLE, if it { "Lingua" } else { "Language" }, a);
+            x = hint(g, x, &ICON_CIRCLE, if it { "Indietro" } else { "Back" });
+            let _ = hint(g, x, &ICON_TRIANGLE, if it { "Lingua" } else { "Language" });
         }
     }
     // Music keys, right-aligned.
     if ctx.music.state != Playback::None {
         let label = if it { "Musica" } else { "Music" };
         let lw = JOST9.width(label, 0);
-        text::draw_right_mid(g, &JOST9, RIGHT, FOOT_MID, label, scale(MUTED, a), 0);
+        text::draw_right_mid(g, &JOST9, RIGHT, FOOT_MID, label, MUTED, 0);
         let tw = JOST9.width("R1", 0) + 8;
         let rx = RIGHT - lw - ICON_GAP - tw;
-        tag(g, rx, FOOT_MID, "R1", a);
-        tag(g, rx - 2 - JOST9.width("L1", 0) - 8, FOOT_MID, "L1", a);
+        tag(g, rx, FOOT_MID, "R1");
+        tag(g, rx - 2 - JOST9.width("L1", 0) - 8, FOOT_MID, "L1");
     }
 }
 

@@ -136,9 +136,10 @@ fn main() {
     let mut port = peripherals.controller_port;
     let mut g = Gfx::new(peripherals.gpu_dma);
     g.upload_ui(UI_TEX);
-    for (i, (_, art)) in cover::ARTS.iter().enumerate() {
-        g.upload_art(i, art);
+    for (i, program) in cover::PROGRAMS.iter().enumerate() {
+        g.upload_art(i, &program.art);
     }
+    attract::upload_backs(&mut g);
     g.upload_link_icons(ICONS_TEX, ICONS_CLUT, credits::ICON_COUNT);
 
     // The sound chip comes up before anything is uploaded to it.
@@ -200,7 +201,7 @@ fn main() {
     // Frames since the start press, or -1 while the menu is just a menu.
     let mut launching: i32 = -1;
     let mut seek: Option<chain::Seek> = None;
-    let mut attract = attract::Attract::new();
+    let mut attract: Option<attract::Attract> = None;
     // Frames since the pad last did anything.
     let mut idle: u32 = 0;
     let mut prev_held = ButtonState::default();
@@ -260,16 +261,23 @@ fn main() {
         // Buttons still track while the notice is up, so one held through
         // it does not fire when the pad is accepted.
         let pressed = |b: u16| analog_ok && pad.is_held(b) && !prev_held.is_held(b);
-        // Anything at all brings the menu back from its attract state.
-        let touched = pad.bits() & !prev_held.bits() != 0;
+        // Any button held, or the stick pushed, is activity; any of them also
+        // ends the attract mode at once, on the case it was showing, and is not
+        // taken as a menu command as well.
+        let touched = pad.bits() != 0;
         idle = if touched { 0 } else { idle.saturating_add(1) };
+        let mut woke = false;
+        if let Some(a) = attract.take_if(|_| touched) {
+            sel = a.selection() as i32;
+            shelf.pos = sel * 256;
+            woke = true;
+        }
         let both_shoulders = |s: &ButtonState| s.is_held(button::L2) && s.is_held(button::R2);
         let debug_chord = analog_ok && both_shoulders(&pad) && !both_shoulders(&prev_held);
 
         // The pad goes quiet once a launch is under way: the animation is
         // short, and half a browse queued behind it would land in the game.
-        if launching < 0 {
-            attract.update(idle, screen == Screen::Shelf);
+        if launching < 0 && !woke {
             if pressed(button::TRIANGLE) {
                 italian = !italian;
             }
@@ -321,6 +329,16 @@ fn main() {
                 }
             }
         }
+        // Nothing touched for twenty seconds: the shelf tours itself.
+        if launching < 0
+            && screen == Screen::Shelf
+            && analog_ok
+            && count > 0
+            && attract.is_none()
+            && idle == attract::IDLE_FRAMES
+        {
+            attract = Some(attract::Attract::new(entries, sel as usize));
+        }
         prev_held = pad;
 
         // The playing state for the header.
@@ -348,7 +366,6 @@ fn main() {
                 levels,
             },
             credit: header.as_ref().map_or("", |h| h.credit_str()),
-            attract: attract.level(),
         };
 
         g.begin();
@@ -371,8 +388,11 @@ fn main() {
             draw_controller_notice(&mut g);
         } else if screen == Screen::Credits {
             credits::draw(&mut g, &ctx);
+        } else if let Some(a) = attract.as_mut() {
+            a.update(levels.unwrap_or(&[0; attract::BANDS]));
+            a.draw(&mut g, &ctx, entries);
         } else {
-            shelf::update(&mut shelf, sel, tick, attract.level());
+            shelf::update(&mut shelf, sel);
             // Past frame 30 the veil has taken the menu to black, so it is not
             // drawn at all: the hand-off is cheaper than the menu it replaces.
             if launching < 30 {

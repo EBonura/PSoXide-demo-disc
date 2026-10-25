@@ -34,7 +34,7 @@ impl Face {
         h.yoff as i32 + h.h as i32 - 1
     }
 
-    fn glyph(&self, c: u8) -> &Glyph {
+    pub fn glyph(&self, c: u8) -> &Glyph {
         let i = if (32..=126).contains(&c) {
             c - 32
         } else {

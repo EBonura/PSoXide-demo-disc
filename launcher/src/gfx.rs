@@ -476,3 +476,103 @@ impl Gfx {
         }
     }
 }
+
+// ---- attract mode primitives ------------------------------------------------
+
+/// Where the back-cover screenshots live: two 8bpp pages below the covers'
+/// pages, 64x48 texels per shot, four across and four down (sixteen a page).
+pub const SHOT_PAGES: [(u16, u16); 2] = [(320, 256), (448, 256)];
+/// Shots one page holds.
+pub const SHOTS_PER_PAGE: usize = 16;
+/// One 256-entry CLUT row per program, right of the cover CLUTs and below the
+/// framebuffers.
+pub const SHOT_CLUT_X: u16 = 320;
+pub const SHOT_CLUT_Y: u16 = 480;
+/// Size of one screenshot in texels.
+pub const SHOT_W: i32 = 64;
+pub const SHOT_H: i32 = 48;
+
+impl Gfx {
+    /// One UI-atlas glyph or icon as a quad, so the caller can tilt it with the
+    /// rest of a face it belongs to. `uv` is `(u0, v0, u1, v1)` with the far
+    /// edge half-open, so an unscaled quad lands texel for texel on the screen.
+    pub fn ui_quad(&mut self, v: [(i32, i32); 4], uv: (u8, u8, u8, u8), color: Rgb) {
+        let tint = (color.0 >> 1, color.1 >> 1, color.2 >> 1);
+        let tpage = TexturePage::new(UI_PAGE.0, UI_PAGE.1, TextureDepth::Bit4).uv_word(0);
+        let m = TextureMaterial::blended(UI_CLUT.uv_word(), tpage, tint, BlendMode::Add);
+        let (u0, v0, u1, v1) = uv;
+        self.key = u32::MAX;
+        self.prims += 1;
+        self.gpu.draw(&QuadTexturedMaterial::with_material(
+            v.map(p),
+            [(u0, v0), (u1, v0), (u0, v1), (u1, v1)],
+            m,
+        ));
+    }
+
+    /// Put program `prog`'s back-cover palette and `shots` screenshots (`pixels`
+    /// is their 8bpp texels one after another) into VRAM, the first at `slot`.
+    pub fn upload_back(&mut self, prog: usize, clut: &[u8], pixels: &[u8], slot: usize) {
+        psx_vram::upload_bytes(
+            VramRect::new(SHOT_CLUT_X, SHOT_CLUT_Y + prog as u16, 256, 1),
+            clut,
+        );
+        let bytes = (SHOT_W * SHOT_H) as usize;
+        for (k, shot) in pixels.chunks_exact(bytes).enumerate() {
+            let (page, col, row) = shot_cell(slot + k);
+            psx_vram::upload_bytes(
+                VramRect::new(
+                    page.0 + (col * SHOT_W / 2) as u16,
+                    page.1 + (row * SHOT_H) as u16,
+                    (SHOT_W / 2) as u16,
+                    SHOT_H as u16,
+                ),
+                shot,
+            );
+        }
+    }
+
+    /// Screenshot `shot` (a slot in the back-cover pages) of program `prog`,
+    /// laid on a ribbon of quads like [`Gfx::art_ribbon`]. `tops[k]` and
+    /// `bots[k]` are where texture column `k / (len - 1)` lands on screen.
+    ///
+    /// # Panics
+    ///
+    /// If `tops` and `bots` differ in length or hold fewer than two points.
+    pub fn shot_ribbon(
+        &mut self,
+        prog: usize,
+        shot: usize,
+        tops: &[(i32, i32)],
+        bots: &[(i32, i32)],
+        tint: Rgb,
+    ) {
+        assert!(tops.len() == bots.len() && tops.len() >= 2);
+        let n = tops.len() as i32 - 1;
+        let clut = Clut::new(SHOT_CLUT_X, SHOT_CLUT_Y + prog as u16).uv_word();
+        let (page, col, row) = shot_cell(shot);
+        let tp = TexturePage::new(page.0, page.1, TextureDepth::Bit8).uv_word(0);
+        let m = TextureMaterial::opaque(clut, tp, tint).with_dither(true);
+        let (u0, v0) = (col * SHOT_W, row * SHOT_H);
+        self.key = u32::MAX;
+        let (va, vb) = (v0 as u8, (v0 + SHOT_H - 1) as u8);
+        for k in 0..n {
+            let ua = (u0 + (SHOT_W - 1) * k / n) as u8;
+            let ub = (u0 + (SHOT_W - 1) * (k + 1) / n) as u8;
+            let (k, k1) = (k as usize, k as usize + 1);
+            self.prims += 1;
+            self.gpu.draw(&QuadTexturedMaterial::with_material(
+                [tops[k], tops[k1], bots[k], bots[k1]].map(p),
+                [(ua, va), (ub, va), (ua, vb), (ub, vb)],
+                m,
+            ));
+        }
+    }
+}
+
+/// The page, column and row of back-cover slot `slot`.
+fn shot_cell(slot: usize) -> ((u16, u16), i32, i32) {
+    let page = SHOT_PAGES[slot / SHOTS_PER_PAGE];
+    let at = slot % SHOTS_PER_PAGE;
+    (page, (at % 4) as i32, (at / 4) as i32)
+}

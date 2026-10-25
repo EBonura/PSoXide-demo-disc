@@ -9,13 +9,18 @@
 //!   cut to 256 colours with median cut, as 512 bytes of CLUT followed by the
 //!   8bpp pixels.
 //!
+//! * `back_<name>.art`: the attract mode's back-cover screenshots.
+//!
 //! Usage: `menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>`
+//!        `menu-art backs <shots-dir> <out-dir>`
 
 use fontdue::{Font, FontSettings};
 use image::imageops::FilterType;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
+
+mod attract;
 
 const PAGE: usize = 256;
 
@@ -373,8 +378,12 @@ fn emit_face(s: &mut String, f: &Face) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() == 4 && args[1] == "backs" {
+        return attract::bake_backs(Path::new(&args[2]), Path::new(&args[3]));
+    }
     if args.len() != 6 || args[1] != "bake" {
         eprintln!("usage: menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>");
+        eprintln!("       menu-art backs <shots-dir> <out-dir>");
         std::process::exit(2);
     }
     let load = |p: &str| {
