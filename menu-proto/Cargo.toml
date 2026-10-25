@@ -20,6 +20,11 @@ panic         = "abort"
 codegen-units = 1
 lto           = true
 
+[features]
+# Press the private edition (the four bring-your-own-assets ports). The real
+# disc fixes the edition at build time; the prototype has no runtime switch.
+private = []
+
 [dependencies]
 psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
 psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }

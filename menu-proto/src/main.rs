@@ -1,7 +1,7 @@
 //! Demo disc menu prototype: the Shelf direction on one PS1 guest.
 //!
-//! Prototype only (SQUARE swaps the Public and Private entry sets, TRIANGLE
-//! the language). Nothing here ships; it exists so the menu can be drawn on
+//! Prototype only (TRIANGLE switches the language; the edition is a build-time
+//! feature, `private`). Nothing here ships; it exists so the menu can be drawn on
 //! the real GPU at 320x240 and measured.
 
 #![no_std]
@@ -24,7 +24,7 @@ mod ui_atlas;
 use common::Ctx;
 use gfx::Gfx;
 use psx_pad::{button, ButtonState, PadReader};
-use psx_rt::tty;
+use psx_rt::{tty, Peripherals};
 
 static UI_TEX: &[u8] = include_bytes!("../assets/ui.tex");
 
@@ -34,7 +34,9 @@ const AFTER_LAUNCH: i32 = 24;
 #[no_mangle]
 fn main() {
     tty::println("menu-proto: booted");
-    let mut g = Gfx::new();
+    let peripherals = Peripherals::take().expect("peripherals are taken once");
+    let mut port = peripherals.controller_port;
+    let mut g = Gfx::new(peripherals.gpu_dma);
     g.upload_ui(UI_TEX);
     for (i, art) in data::ARTS.iter().enumerate() {
         g.upload_art(i, art);
@@ -45,8 +47,7 @@ fn main() {
     let mut ctx = Ctx {
         t: 0,
         it: false,
-        entries: &data::PUBLIC,
-        private: false,
+        entries: data::EDITION,
     };
     let mut sel = 0i32;
     let mut shelf = shelf::State { pos: 0 };
@@ -55,7 +56,7 @@ fn main() {
 
     loop {
         ctx.t = ctx.t.wrapping_add(1);
-        let pad = pad_reader.poll();
+        let pad = pad_reader.poll_on(&mut port);
         let now = ButtonState::from_bits(pad.buttons.bits());
         let pressed = |bt: u16| now.is_held(bt) && !prev.is_held(bt);
         let n = ctx.entries.len() as i32;
@@ -68,15 +69,6 @@ fn main() {
             }
             if pressed(button::TRIANGLE) {
                 ctx.it = !ctx.it;
-            }
-            if pressed(button::SQUARE) || pressed(button::SELECT) {
-                ctx.private = !ctx.private;
-                ctx.entries = if ctx.private {
-                    &data::PRIVATE
-                } else {
-                    &data::PUBLIC
-                };
-                sel = sel.min(ctx.entries.len() as i32 - 1);
             }
             if pressed(button::CROSS) && ctx.entries[sel as usize].art.is_some() {
                 launching = 0;

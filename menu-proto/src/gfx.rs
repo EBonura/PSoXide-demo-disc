@@ -5,8 +5,7 @@
 //! so the same calls could be linked into an ordering table without a node
 //! over the 16-word limit.
 
-use psx_gpu::display::{DisplayConfig, Resolution, VideoMode};
-use psx_gpu::framebuf::FrameBuffer;
+use psx_gpu::display::{DisplayConfig, DoubleBuffer, Resolution, VideoMode};
 use psx_gpu::material::{BlendMode, TextureMaterial};
 use psx_gpu::prim::{
     FillRect, LineGouraud, QuadFlat, QuadGouraud, QuadTexturedMaterial, Sprite, TriGouraud,
@@ -14,14 +13,13 @@ use psx_gpu::prim::{
 use psx_gpu::Gpu;
 use psx_io::periph::GpuDma;
 use psx_math::{cos_q12, sin_q12};
-use psx_vram::{Clut, TexDepth, Tpage, VramRect};
+use psx_vram::{Clut, TextureDepth, TexturePage, VramRect};
 
 pub type Rgb = (u8, u8, u8);
 
 // ---- palette (the home shell's tokens, on a 15-bit display) ---------------
 
 pub const TEXT: Rgb = (244, 248, 251);
-pub const TEXT2: Rgb = (196, 211, 222);
 pub const MUTED: Rgb = (157, 176, 190);
 pub const DIM: Rgb = (129, 150, 166);
 pub const RING: Rgb = (108, 127, 143);
@@ -104,7 +102,7 @@ impl Size {
 
 pub struct Gfx {
     gpu: Gpu,
-    pub fb: FrameBuffer,
+    pub fb: DoubleBuffer,
     key: u32,
     /// Primitives drawn this frame, for the cost table.
     pub prims: u32,
@@ -127,16 +125,15 @@ fn p(v: (i32, i32)) -> (i16, i16) {
 }
 
 impl Gfx {
-    pub fn new() -> Self {
-        // SAFETY: the prototype is the only owner of the GPU DMA channel.
-        let dma = unsafe { GpuDma::steal() };
+    /// Take over the GPU through its DMA token.
+    pub fn new(dma: GpuDma) -> Self {
         let gpu = Gpu::new(
             dma,
             DisplayConfig::new(VideoMode::Ntsc, Resolution::R320X240),
         );
         let mut g = Gfx {
             gpu,
-            fb: FrameBuffer::new(320, 240),
+            fb: DoubleBuffer::new(Resolution::R320X240),
             key: u32::MAX,
             prims: 0,
             ui_sub: false,
@@ -214,15 +211,12 @@ impl Gfx {
     pub fn end(&mut self) {
         self.gpu.wait_idle();
         psx_rt::interrupts::wait_vblank();
-        self.fb.swap();
+        self.fb.swap(&mut self.gpu);
     }
 
     pub fn clear(&mut self, c: Rgb) {
-        self.gpu.draw(&FillRect::new(
-            (0, self.fb.buffer_y(self.fb.drawing)),
-            (320, 240),
-            c,
-        ));
+        self.gpu
+            .draw(&FillRect::new(self.fb.draw_origin(), (320, 240), c));
     }
 
     // ---- flat and gouraud ------------------------------------------------
@@ -274,6 +268,17 @@ impl Gfx {
         self.gpu.draw(&TriGouraud::new(v.map(p), c).translucent());
     }
 
+    /// An opaque one-pixel line.
+    pub fn line(&mut self, a: (i32, i32), b: (i32, i32), c: Rgb) {
+        self.line_g(a, b, c, c);
+    }
+
+    /// An opaque one-pixel line shaded from `ca` to `cb`.
+    pub fn line_g(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
+        self.prims += 1;
+        self.gpu.draw(&LineGouraud::new(p(a), ca, p(b), cb));
+    }
+
     pub fn line_add(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
         self.blend(BlendMode::Add);
         self.prims += 1;
@@ -318,20 +323,6 @@ impl Gfx {
         }
     }
 
-    /// Four corner brackets around a rectangle, `len` long and 1 thick,
-    /// plus an optional faint tint inside.
-    pub fn brackets(&mut self, x: i32, y: i32, w: i32, h: i32, len: i32, c: Rgb) {
-        let (x1, y1) = (x + w - 1, y + h - 1);
-        self.rect(x, y, len, 1, c);
-        self.rect(x, y, 1, len, c);
-        self.rect(x1 - len + 1, y, len, 1, c);
-        self.rect(x1, y, 1, len, c);
-        self.rect(x, y1, len, 1, c);
-        self.rect(x, y1 - len + 1, 1, len, c);
-        self.rect(x1 - len + 1, y1, len, 1, c);
-        self.rect(x1, y1 - len + 1, 1, len, c);
-    }
-
     pub fn frame(&mut self, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
         self.rect(x, y, w, 1, c);
         self.rect(x, y + h - 1, w, 1, c);
@@ -343,7 +334,7 @@ impl Gfx {
 
     /// Switch to the UI atlas for a run of sprites.
     pub fn ui_mode(&mut self) {
-        let tp = Tpage::new(UI_PAGE.0, UI_PAGE.1, TexDepth::Bit4).uv_tpage_word(1);
+        let tp = TexturePage::new(UI_PAGE.0, UI_PAGE.1, TextureDepth::Bit4).uv_word(1);
         let blend = if self.ui_sub {
             BlendMode::Subtract
         } else {
@@ -365,7 +356,7 @@ impl Gfx {
         } else {
             BlendMode::Add
         };
-        let m = TextureMaterial::blended(UI_CLUT.uv_clut_word(), 0, tint, blend);
+        let m = TextureMaterial::blended(UI_CLUT.uv_word(), 0, tint, blend);
         self.prims += 1;
         self.gpu.draw(&Sprite::with_material(
             clip(x) as i16,
@@ -379,8 +370,8 @@ impl Gfx {
 
     fn art_material(&self, size: Size, i: usize, tint: Rgb) -> (TextureMaterial, i32, i32) {
         let (px, py, u0, v0) = size.slot(i);
-        let clut = Clut::new(ART_CLUT_X, ART_CLUT_Y + i as u16).uv_clut_word();
-        let tp = Tpage::new(px, py, TexDepth::Bit8).uv_tpage_word(0);
+        let clut = Clut::new(ART_CLUT_X, ART_CLUT_Y + i as u16).uv_word();
+        let tp = TexturePage::new(px, py, TextureDepth::Bit8).uv_word(0);
         (
             TextureMaterial::opaque(clut, tp, tint).with_dither(true),
             u0,
@@ -403,51 +394,6 @@ impl Gfx {
             (u0 as u8, v0 as u8),
             m,
         ));
-    }
-}
-
-impl Gfx {
-    /// Cover `i` on a trapezoid with vertical left and right edges, drawn as
-    /// vertical strips so the GPU's affine texturing stays square on each.
-    /// Left edge spans `lt..lb`, right edge `rt..rb` (screen y).
-    pub fn art_strips(
-        &mut self,
-        size: Size,
-        i: usize,
-        x0: i32,
-        x1: i32,
-        (lt, lb): (i32, i32),
-        (rt, rb): (i32, i32),
-        tint: Rgb,
-    ) {
-        if x1 - x0 < 1 {
-            return;
-        }
-        let (m, u0, v0) = self.art_material(size, i, tint);
-        let (sw, sh) = size.dims();
-        self.key = u32::MAX;
-        let n: i32 = if lt == rt && lb == rb {
-            1
-        } else {
-            ((x1 - x0) / 12).clamp(2, 6)
-        };
-        let (va, vb) = (v0 as u8, (v0 + sh - 1) as u8);
-        for k in 0..n {
-            let xa = x0 + (x1 - x0) * k / n;
-            let xb = x0 + (x1 - x0) * (k + 1) / n;
-            let ta = lt + (rt - lt) * k / n;
-            let tb = lt + (rt - lt) * (k + 1) / n;
-            let ba = lb + (rb - lb) * k / n;
-            let bb = lb + (rb - lb) * (k + 1) / n;
-            let ua = (u0 + (sw - 1) * k / n) as u8;
-            let ub = (u0 + (sw - 1) * (k + 1) / n) as u8;
-            self.prims += 1;
-            self.gpu.draw(&QuadTexturedMaterial::with_material(
-                [(xa, ta), (xb, tb), (xa, ba), (xb, bb)].map(p),
-                [(ua, va), (ub, va), (ua, vb), (ub, vb)],
-                m,
-            ));
-        }
     }
 }
 

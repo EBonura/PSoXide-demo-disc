@@ -2,6 +2,9 @@
 //! descriptions the real disc table carries (Makefile `--describe` strings),
 //! for the Public and the Private pressing.
 
+// The other edition's entries stay in the table, unused by this build.
+#![cfg_attr(not(feature = "private"), allow(dead_code))]
+
 use crate::gfx::CoverArt;
 
 macro_rules! art {
@@ -138,6 +141,7 @@ pub const HALFLIFE: Entry = Entry {
 };
 
 /// The v0.44 public pressing, in carousel order.
+#[cfg_attr(feature = "private", allow(dead_code))]
 pub static PUBLIC: [&Entry; 8] = [
     &ARCADE, &CELESTE, &NITRO, &VOXIDE, &QUAKE, &CORTEX, &PSXCEL, &CREDITS,
 ];
@@ -148,3 +152,10 @@ pub static PRIVATE: [&Entry; 12] = [
     &ARCADE, &CELESTE, &NITRO, &VOXIDE, &WIPEOUT, &HOLLOW, &CSTRIKE, &HALFLIFE, &QUAKE, &CORTEX,
     &PSXCEL, &CREDITS,
 ];
+
+/// The entries this build presses: the edition is fixed at build time.
+#[cfg(feature = "private")]
+pub static EDITION: &[&Entry] = &PRIVATE;
+/// The entries this build presses: the edition is fixed at build time.
+#[cfg(not(feature = "private"))]
+pub static EDITION: &[&Entry] = &PUBLIC;

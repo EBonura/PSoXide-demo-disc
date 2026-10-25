@@ -27,6 +27,13 @@ pub struct Face {
 }
 
 impl Face {
+    /// Rows from a glyph's draw position down to the baseline row (the
+    /// bottom row of `H`), for lining faces of different sizes up on one baseline.
+    pub fn baseline(&self) -> i32 {
+        let h = self.glyph(b'H');
+        h.yoff as i32 + h.h as i32 - 1
+    }
+
     fn glyph(&self, c: u8) -> &Glyph {
         let i = if (32..=126).contains(&c) {
             c - 32

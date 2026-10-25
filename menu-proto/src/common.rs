@@ -15,6 +15,8 @@ use crate::gfx::*;
 use crate::text;
 use crate::text::Glyph;
 use crate::ui_atlas::*;
+use psx_gte::math::{Mat3I16, Vec3I16, Vec3I32};
+use psx_gte::scene;
 use psx_math::{cos_q12, sin_q12};
 
 /// Pixels between the screen edge and the first or last element.
@@ -40,7 +42,6 @@ pub struct Ctx {
     pub t: u32,
     pub it: bool,
     pub entries: &'static [&'static crate::data::Entry],
-    pub private: bool,
 }
 
 impl Ctx {
@@ -74,8 +75,8 @@ fn divider(g: &mut Gfx, x: i32, cy: i32) {
     g.rect(x, cy - 4, 1, 9, (34, 52, 62));
 }
 
-/// Header: wordmark and disc name on the left; music meter, language switch
-/// and edition on the right; one rule under it. Everything is centred on
+/// Header: wordmark and disc name on the left; music meter and language switch
+/// on the right; one rule under it. Everything is centred on
 /// [`HEAD_MID`].
 pub fn header(g: &mut Gfx, ctx: &Ctx, label: &str) {
     let cy = HEAD_MID;
@@ -87,21 +88,10 @@ pub fn header(g: &mut Gfx, ctx: &Ctx, label: &str) {
     x += JOST9.width(label, 1) + 6;
     text::draw_mid(g, &JOST9, x, cy, "v0.5", RING, 0);
 
-    // Edition chip, flush with the right margin. Both names get the width of
-    // the longer one so the chips to its left never shift when it toggles.
-    let (name, ink, edge) = if ctx.private {
-        ("PRIVATE", FOCUS, mix(RING, ACCENT, 150))
-    } else {
-        ("PUBLIC", TEXT2, RING)
-    };
-    let cw = JOST9.width("PRIVATE", 1) + 10;
-    let ex = RIGHT - cw;
-    g.frame(ex, cy - CHIP_H / 2, cw, CHIP_H, edge);
-    text::draw_centered_mid(g, &JOST9, ex + cw / 2, cy, name, ink, 1);
-
-    // Language switch: two cells in one frame, the active one lit.
+    // Language switch: two cells in one frame, the active one lit, flush with
+    // the right margin.
     let cell = JOST9.width("EN", 1).max(JOST9.width("IT", 1)) + 8;
-    let lx = ex - HEAD_GAP - (2 * cell + 1);
+    let lx = RIGHT - (2 * cell + 1);
     g.frame(lx, cy - CHIP_H / 2, 2 * cell + 1, CHIP_H, RING);
     let lit = if ctx.it { lx + cell + 1 } else { lx + 1 };
     g.rect(lit, cy - CHIP_H / 2 + 1, cell - 1, CHIP_H - 2, (10, 50, 62));
@@ -162,17 +152,11 @@ pub fn footer(g: &mut Gfx, ctx: &Ctx) {
     text::draw_mid(g, &JOST9, x, FOOT_MID, browse, MUTED, 0);
     x += JOST9.width(browse, 0) + HINT_GAP;
     x = hint(g, x, &ICON_CROSS, if ctx.it { "Avvia" } else { "Start" });
-    x = hint(
+    let _ = hint(
         g,
         x,
         &ICON_TRIANGLE,
         if ctx.it { "Lingua" } else { "Language" },
-    );
-    let _ = hint(
-        g,
-        x,
-        &ICON_SQUARE,
-        if ctx.it { "Edizione" } else { "Edition" },
     );
     // Music keys, right-aligned: the menu keeps the old L1/R1 skip.
     let label = if ctx.it { "Musica" } else { "Music" };
@@ -275,8 +259,8 @@ pub fn floor_grid(g: &mut Gfx, y0: i32, y1: i32) {
     }
 }
 
-/// Where a case sits on screen at scale `sc` (Q8): the body box and the art
-/// box inside it. The art is inset by `pad`.
+/// Where a case sits on screen at scale `sc` (Q8): the body box, which hugs
+/// the art box with `pad` pixels on every side, and the art box inside it.
 #[derive(Clone, Copy)]
 pub struct CaseGeom {
     pub x0: i32,
@@ -292,8 +276,9 @@ pub struct CaseGeom {
 impl CaseGeom {
     /// A case centred on `cx` whose lower edge is the row `bottom`.
     pub fn new(cx: i32, bottom: i32, sc: i32) -> Self {
-        let (w, h) = ((112 * sc) >> 8, (102 * sc) >> 8);
-        let pad = (4 * sc) >> 8;
+        let (aw, ah) = ((L_W * sc) >> 8, (L_H * sc) >> 8);
+        let pad = ((3 * sc) >> 8).max(2);
+        let (w, h) = (aw + 2 * pad, ah + 2 * pad);
         let (x0, y0) = (cx - w / 2, bottom - h);
         CaseGeom {
             x0,
@@ -302,15 +287,123 @@ impl CaseGeom {
             h,
             ax: x0 + pad,
             ay: y0 + pad,
-            aw: (L_W * sc) >> 8,
-            ah: (L_H * sc) >> 8,
+            aw,
+            ah,
+        }
+    }
+}
+
+/// Turn of a case about its vertical axis, from the shelf's `yaw` units
+/// (-256..=256, positive leans the far edge up on the left) to Q12 turns.
+fn yaw_angle(yaw: i32) -> i32 {
+    -yaw * 2
+}
+
+/// The one transform a case is drawn through: the GTE rotates the case about
+/// its vertical axis and projects it, and the picture, the plastic body, the
+/// frame, the corner brackets and the glare all take their screen points
+/// from [`CaseXform::at`]. They can no longer disagree about the tilt.
+///
+/// Points are given where the case would be drawn if it faced the camera;
+/// `at` returns where the tilted case puts them. A case that faces the camera
+/// (`flat`) maps every point to itself.
+pub struct CaseXform {
+    mx: i32,
+    my: i32,
+    flat: bool,
+}
+
+impl CaseXform {
+    /// Aim the GTE at `geom`'s case turned by `yaw`. The camera sits one and a
+    /// half case widths away, so the near edge of a strongly turned case is
+    /// about a third taller than the far one.
+    ///
+    /// The GTE state is global: use the transform before the next `aim`.
+    pub fn aim(geom: &CaseGeom, yaw: i32) -> Self {
+        let (mx, my) = (geom.x0 + geom.w / 2, geom.y0 + geom.h / 2);
+        let angle = yaw_angle(yaw);
+        let flat = angle == 0;
+        if !flat {
+            let dist = geom.w * 3 / 2;
+            let (s, c) = (sin_q12(angle as u16), cos_q12(angle as u16));
+            // Rotation about the vertical axis; +z points away from the
+            // camera, so a positive angle brings the right edge closer.
+            scene::load_rotation(&Mat3I16 {
+                m: [
+                    [c as i16, 0, s as i16],
+                    [0, 4096, 0],
+                    [-s as i16, 0, c as i16],
+                ],
+            });
+            scene::load_translation(Vec3I32 {
+                x: 0,
+                y: 0,
+                z: dist,
+            });
+            scene::set_projection_plane(dist as u16);
+            scene::set_screen_offset(mx << 16, my << 16);
+        }
+        CaseXform { mx, my, flat }
+    }
+
+    /// Where the flat-case point `(x, y)` lands.
+    pub fn at(&self, x: i32, y: i32) -> (i32, i32) {
+        if self.flat {
+            return (x, y);
+        }
+        let p = scene::project_vertex(Vec3I16 {
+            x: (x - self.mx) as i16,
+            y: (y - self.my) as i16,
+            z: 0,
+        });
+        (p.sx as i32, p.sy as i32)
+    }
+
+    /// The four corners of a flat rectangle, top-left first, in the order a
+    /// quad takes them (top-left, top-right, bottom-left, bottom-right).
+    pub fn quad(&self, x: i32, y: i32, w: i32, h: i32) -> [(i32, i32); 4] {
+        [
+            self.at(x, y),
+            self.at(x + w, y),
+            self.at(x, y + h),
+            self.at(x + w, y + h),
+        ]
+    }
+
+    /// A rectangle's outline (`w` by `h` pixels, last pixel inclusive).
+    pub fn frame(&self, g: &mut Gfx, x: i32, y: i32, w: i32, h: i32, c: Rgb) {
+        let (x1, y1) = (x + w - 1, y + h - 1);
+        let (a, b, d, e) = (
+            self.at(x, y),
+            self.at(x1, y),
+            self.at(x, y1),
+            self.at(x1, y1),
+        );
+        g.line(a, b, c);
+        g.line(d, e, c);
+        g.line(a, d, c);
+        g.line(b, e, c);
+    }
+
+    /// Four corner brackets around a rectangle, `len` long.
+    pub fn brackets(&self, g: &mut Gfx, x: i32, y: i32, w: i32, h: i32, len: i32, c: Rgb) {
+        let (x1, y1) = (x + w - 1, y + h - 1);
+        for (cx, cy, sx, sy) in [
+            (x, y, 1, 1),
+            (x1, y, -1, 1),
+            (x, y1, 1, -1),
+            (x1, y1, -1, -1),
+        ] {
+            let corner = self.at(cx, cy);
+            g.line(corner, self.at(cx + sx * (len - 1), cy), c);
+            g.line(corner, self.at(cx, cy + sy * (len - 1)), c);
         }
     }
 }
 
 /// A case: framed cover with gloss, scaled `sc` (Q8) about its bottom centre.
-/// `yaw` (-256..=256) tilts the far edge; `dim` darkens; `focus` brightens
-/// the outline and brackets.
+/// `yaw` (-256..=256) turns it about its vertical axis; `dim` darkens;
+/// `focus` brightens the outline and brackets.
 pub struct CaseView {
     pub cx: i32,
     pub bottom: i32,
@@ -320,67 +413,24 @@ pub struct CaseView {
     pub yaw: i32,
 }
 
-/// The case's plastic body: base, lit spine, and the version plate at its foot.
-pub fn case_body(g: &mut Gfx, cv: &CaseView, e: &Entry) {
+/// The case's plastic body: a base with a lit spine down the hinge side.
+pub fn case_body(g: &mut Gfx, cv: &CaseView, xf: &CaseXform) {
     let c = CaseGeom::new(cv.cx, cv.bottom, cv.sc);
-    let tilt = (cv.yaw * c.h) >> 11; // edge height change, up to ~h/8
-    let (tl, tr) = (tilt, -tilt);
     let dim = cv.dim as u32;
     let bodyc = scale((9, 20, 27), dim);
-    g.quad_g(
-        [
-            (c.x0, c.y0 - tl),
-            (c.x0 + c.w, c.y0 - tr),
-            (c.x0, c.y0 + c.h + tl),
-            (c.x0 + c.w, c.y0 + c.h + tr),
-        ],
-        [
-            bodyc,
-            bodyc,
-            scale((4, 11, 15), dim),
-            scale((4, 11, 15), dim),
-        ],
+    let foot = scale((4, 11, 15), dim);
+    g.quad_g(xf.quad(c.x0, c.y0, c.w, c.h), [bodyc, bodyc, foot, foot]);
+    g.line_g(
+        xf.at(c.x0 + 1, c.y0 + 1),
+        xf.at(c.x0 + 1, c.y0 + c.h - 2),
+        scale((34, 64, 74), dim),
+        scale((12, 24, 30), dim),
     );
-    // Spine: a lit strip down the hinge side.
-    let sp = ((3 * cv.sc) >> 8).max(1);
-    g.quad_g(
-        [
-            (c.x0 + 1, c.y0 + 1 - tl),
-            (c.x0 + 1 + sp, c.y0 + 1 - tl),
-            (c.x0 + 1, c.y0 + c.h - 1 + tl),
-            (c.x0 + 1 + sp, c.y0 + c.h - 1 + tl),
-        ],
-        [
-            scale((34, 64, 74), dim),
-            scale((18, 36, 44), dim),
-            scale((14, 28, 34), dim),
-            scale((8, 16, 20), dim),
-        ],
-    );
-    // Plate: version at the foot of the case.
-    let py = c.ay + c.ah + (2 * cv.sc >> 8);
-    if cv.sc > 200 {
-        let col = scale(MUTED, dim);
-        icon_at(g, &ICON_DISC, c.ax + 1, py + 1, scale(RING, dim));
-        if !e.version.is_empty() {
-            text::draw(g, &JOST9, c.ax + 19, py + 2, "v", col, 0);
-            text::draw(g, &JOST9, c.ax + 24, py + 2, e.version, col, 0);
-        } else {
-            text::draw(g, &JOST9, c.ax + 19, py + 2, "Info", col, 0);
-        }
-    }
-}
-
-fn icon_at(g: &mut Gfx, gl: &Glyph, x: i32, y: i32, c: Rgb) {
-    g.ui_mode();
-    g.ui_sprite(x, y, gl.w as u16, gl.h as u16, (gl.u, gl.v), c);
 }
 
 /// The case's front: cover art, gloss and outline (the closed case).
-pub fn case_front(g: &mut Gfx, cv: &CaseView, e: &Entry) {
+pub fn case_front(g: &mut Gfx, cv: &CaseView, xf: &CaseXform, e: &Entry) {
     let c = CaseGeom::new(cv.cx, cv.bottom, cv.sc);
-    let tilt = (cv.yaw * c.h) >> 11;
-    let (tl, tr) = (tilt, -tilt);
     let dim = cv.dim as u32;
     let tint = {
         let v = (128 * cv.dim) >> 8;
@@ -393,26 +443,27 @@ pub fn case_front(g: &mut Gfx, cv: &CaseView, e: &Entry) {
     } else {
         Size::S
     };
-    let aq = [
-        (c.ax, c.ay - tl),
-        (c.ax + c.aw, c.ay - tr),
-        (c.ax, c.ay + c.ah + tl),
-        (c.ax + c.aw, c.ay + c.ah + tr),
-    ];
+    let aq = xf.quad(c.ax, c.ay, c.aw, c.ah);
     match e.art {
         Some(i) => {
-            if cv.sc >= 250 && cv.yaw == 0 {
+            if xf.flat && c.aw == L_W {
                 g.art(Size::L, i, c.ax, c.ay, tint);
             } else {
-                g.art_strips(
-                    size,
-                    i,
-                    c.ax,
-                    c.ax + c.aw,
-                    (c.ay - tl, c.ay + c.ah + tl),
-                    (c.ay - tr, c.ay + c.ah + tr),
-                    tint,
-                );
+                // One ribbon of quads whose vertices are projected points, so
+                // the picture takes the same perspective as everything else.
+                let n = if xf.flat {
+                    1
+                } else {
+                    (c.aw / 16).clamp(2, 6) as usize
+                };
+                let mut tops = [(0, 0); 7];
+                let mut bots = [(0, 0); 7];
+                for k in 0..=n {
+                    let x = c.ax + c.aw * k as i32 / n as i32;
+                    tops[k] = xf.at(x, c.ay);
+                    bots[k] = xf.at(x, c.ay + c.ah);
+                }
+                g.art_ribbon(size, i, &tops[..=n], &bots[..=n], tint);
             }
         }
         None => credits_cover(g, aq, dim),
@@ -421,25 +472,42 @@ pub fn case_front(g: &mut Gfx, cv: &CaseView, e: &Entry) {
     let gl = scale((18, 30, 34), dim);
     g.quad_g_add(
         [
-            (c.x0, c.y0 - tl),
-            (c.x0 + c.w * 3 / 5, c.y0 - tl),
-            (c.x0, c.y0 + c.h / 2),
-            (c.x0 + c.w / 4, c.y0 + c.h / 2),
+            xf.at(c.x0, c.y0),
+            xf.at(c.x0 + c.w * 3 / 5, c.y0),
+            xf.at(c.x0, c.y0 + c.h / 2),
+            xf.at(c.x0 + c.w / 4, c.y0 + c.h / 2),
         ],
         [gl, (0, 0, 0), (0, 0, 0), (0, 0, 0)],
     );
-    // Outline.
-    let ring = mix(scale(RING, dim), FOCUS, cv.focus as u32);
-    g.frame(c.x0, c.y0, c.w, c.h, ring);
+    case_outline(g, cv, xf);
+}
+
+/// The frame and, on a focused case, the corner brackets and a faint tint.
+pub fn case_outline(g: &mut Gfx, cv: &CaseView, xf: &CaseXform) {
+    let c = CaseGeom::new(cv.cx, cv.bottom, cv.sc);
+    let dim = cv.dim as u32;
+    let ring = scale(mix(RING, FOCUS, cv.focus as u32), dim);
+    xf.frame(g, c.x0, c.y0, c.w, c.h, ring);
     if cv.focus > 100 {
-        g.brackets(c.x0 - 2, c.y0 - 2, c.w + 4, c.h + 4, 7, FOCUS);
-        g.rect_add(c.x0, c.y0, c.w, c.h, (3, 14, 17));
+        xf.brackets(
+            g,
+            c.x0 - 2,
+            c.y0 - 2,
+            c.w + 4,
+            c.h + 4,
+            7,
+            scale(FOCUS, dim),
+        );
+        let tint = scale((3, 14, 17), dim);
+        g.quad_g_add(xf.quad(c.x0, c.y0, c.w, c.h), [tint; 4]);
     }
 }
 
 pub fn draw_case(g: &mut Gfx, cv: &CaseView, e: &Entry) {
-    case_body(g, cv, e);
-    case_front(g, cv, e);
+    let geom = CaseGeom::new(cv.cx, cv.bottom, cv.sc);
+    let xf = CaseXform::aim(&geom, cv.yaw);
+    case_body(g, cv, &xf);
+    case_front(g, cv, &xf, e);
 }
 
 fn credits_cover(g: &mut Gfx, q: [(i32, i32); 4], dim: u32) {
@@ -450,5 +518,4 @@ fn credits_cover(g: &mut Gfx, q: [(i32, i32); 4], dim: u32) {
     let r = (q[1].0 - q[0].0) / 4;
     g.ellipse_ring(cx, cy, r, r, scale((20, 120, 140), dim));
     g.ellipse_ring(cx, cy, r / 3, r / 3, scale((20, 120, 140), dim));
-    let _ = cos_q12(0);
 }

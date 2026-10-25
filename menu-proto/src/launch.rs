@@ -15,6 +15,7 @@
 use crate::common::*;
 use crate::ease;
 use crate::gfx::*;
+use crate::shelf;
 use psx_gte::math::{Mat3I16, Vec3I16, Vec3I32};
 use psx_gte::scene;
 use psx_math::{cos_q12, sin_q12};
@@ -240,13 +241,19 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &crate::data::Entry, ctx: &Ctx) 
         sc,
         dim,
         focus: 256,
-        yaw: 0,
+        // The menu's sway carries on and settles flat before the cover opens.
+        yaw: (shelf::sway_yaw(ctx.t) * (256 - ease::span(t, 0, OPEN_FROM))) >> 8,
     };
     let geom = CaseGeom::new(cv.cx, cv.bottom, sc);
+    let xf = CaseXform::aim(&geom, cv.yaw);
+    // Until the cover moves the case is closed, drawn as on the shelf.
+    let closed = t < OPEN_FROM;
 
     if dim > 6 {
-        case_body(g, &cv, e);
-        tray(g, &geom, d);
+        case_body(g, &cv, &xf);
+        if !closed {
+            tray(g, &geom, d);
+        }
     }
 
     // One disc for the whole sequence: seated in the tray, lifted out of the
@@ -298,17 +305,13 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &crate::data::Entry, ctx: &Ctx) 
     }
 
     if dim > 6 {
-        g.frame(geom.x0, geom.y0, geom.w, geom.h, scale(FOCUS, d));
-        g.brackets(
-            geom.x0 - 2,
-            geom.y0 - 2,
-            geom.w + 4,
-            geom.h + 4,
-            7,
-            scale(FOCUS, d),
-        );
-        if let Some(art) = e.art {
-            cover(g, &geom, art, (open * COVER_MAX) >> 8, d);
+        if closed {
+            case_front(g, &cv, &xf, e);
+        } else {
+            case_outline(g, &cv, &xf);
+            if let Some(art) = e.art {
+                cover(g, &geom, art, (open * COVER_MAX) >> 8, d);
+            }
         }
     }
 
