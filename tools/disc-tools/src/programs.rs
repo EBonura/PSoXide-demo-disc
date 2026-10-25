@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use crate::args::Args;
-use crate::disc::{self, FLAG_HIDDEN};
+use crate::disc;
 use crate::replay::{
     number, parse_int, pattern, run_merged, shlex_join, shlex_split, toc_rows, Csv, Row,
 };
@@ -70,31 +70,22 @@ pub(crate) fn read_rows(image: &Path) -> Result<Vec<Row>> {
     )?)
 }
 
-/// The presses that bring `target` to the middle of the carousel and launch
-/// it, and the tick of the launching CROSS.
+/// The presses that bring `target` to the middle of the shelf and launch
+/// it, and the tick of the launching CROSS. The launcher shows every entry in
+/// the table, in order, and the shelf does not wrap, so it is RIGHT from the
+/// first case.
 pub(crate) fn menu_presses(entries: &[Row], target: &str) -> Result<(Vec<String>, i64)> {
-    let visible: Vec<&str> = entries
-        .iter()
-        .filter(|e| e.flags & FLAG_HIDDEN == 0)
-        .map(|e| e.name.as_str())
-        .collect();
-    let Some(index) = visible.iter().position(|name| *name == target) else {
-        bail!("{target:?} is not visible: {}", visible.join(", "));
+    let Some(index) = entries.iter().position(|e| e.name == target) else {
+        let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
+        bail!("{target:?} is not on the disc: {}", names.join(", "));
     };
-    let count = visible.len() as i64 + 1; // Credits is the final non-program card.
-    let index = index as i64;
-    let (left, right) = (index, count - index);
-    let (button, moves) = if left <= right {
-        ("left", left)
-    } else {
-        ("right", right)
-    };
+    let moves = index as i64;
     let mut presses: Vec<String> = (0..moves)
-        .map(|step| format!("{}:{button}:8", 400 + step * 200))
+        .map(|step| format!("{}:right:8", 400 + step * 200))
         .collect();
-    // Let the final backdrop decode and carousel movement finish before launch.
-    // Cards reached after several rapid moves can still be selected while X is
-    // temporarily ignored during that visual transition.
+    // Let the final backdrop decode and the shelf movement finish before
+    // launch: a case reached after several rapid moves can still be selected
+    // while X is ignored during the transition.
     let cross = if moves != 0 {
         1_000.max(400 + (moves - 1) * 200 + 600)
     } else {
@@ -190,10 +181,11 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         // These exercise both linked games, not just the collection menu.
         route("celeste-classic", &classic, 1_100_000_000, 1, &[]),
         route("celeste-classic-2", &classic2, 1_100_000_000, 1, &[]),
-        // PSXcel is six carousel moves from the initial card. Give the launcher
-        // enough emulated time to reach the delayed launch press before judging
-        // the guest, rather than stopping while its card is merely selected.
-        route("psxcel", &psxcel, 450_000_000, 1, &[]),
+        // PSXcel is six shelf moves from the first case (the shelf does not
+        // wrap). Give the launcher enough emulated time to reach the delayed
+        // launch press before judging the guest, rather than stopping while
+        // its case is merely selected.
+        route("psxcel", &psxcel, 650_000_000, 1, &[]),
         route("arcade-breakout", &breakout, 700_000_000, 2, &[]),
         route(
             "arcade-invaders",
@@ -448,6 +440,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::disc::FLAG_HIDDEN;
 
     fn table(names: &[&str], hidden_first: bool) -> Vec<u8> {
         let mut toc = vec![0u8; disc::TOC_SECTORS as usize * disc::USER_DATA_BYTES];
@@ -473,14 +466,13 @@ mod tests {
         assert!(entries[0].hidden());
         assert_eq!(entries[2].cdda_track_base, 6);
         let (presses, cross) = menu_presses(&entries, "NITROXIDE").unwrap();
-        assert_eq!(presses, ["400:left:8", "1000:cross:12"]);
-        assert_eq!(cross, 1000);
+        assert_eq!(presses, ["400:right:8", "600:right:8", "1200:cross:12"]);
+        assert_eq!(cross, 1200);
     }
 
     #[test]
-    fn menu_route_rejects_hidden_and_unknown_programs() {
-        let entries = toc_rows(&table(&["CORTEX", "VOXIDE"], true)).unwrap();
-        assert!(menu_presses(&entries, "CORTEX").is_err());
+    fn menu_route_rejects_unknown_programs() {
+        let entries = toc_rows(&table(&["CORTEX", "VOXIDE"], false)).unwrap();
         assert!(menu_presses(&entries, "NOPE").is_err());
         assert!(toc_rows(&[0u8; 8192]).is_err());
     }

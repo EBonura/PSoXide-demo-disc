@@ -43,6 +43,7 @@ pub struct TocEntry {
 }
 
 impl TocEntry {
+    #[cfg(test)]
     pub fn hidden(&self) -> bool {
         self.flags & FLAG_HIDDEN != 0
     }

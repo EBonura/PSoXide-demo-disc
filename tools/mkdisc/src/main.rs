@@ -128,9 +128,6 @@ struct Args {
     /// Per menu song, in the same order: the title the menu shows as
     /// "now playing". Their count is the number of songs.
     menu_titles: Vec<String>,
-    /// Display names pressed onto the disc but held off the carousel until
-    /// the cheat code reveals them.
-    gates: Vec<String>,
     /// `(name, cooked blob)` menu backdrops, in slideshow order per name.
     shots: Vec<(String, PathBuf)>,
     /// Sectors the target blank holds. A layout over it is an error that names
@@ -157,7 +154,6 @@ fn parse_args() -> Result<Args, String> {
     let mut credit = String::new();
     let mut menu_beats: Vec<(u32, u32)> = Vec::new();
     let mut menu_titles: Vec<String> = Vec::new();
-    let mut gates: Vec<String> = Vec::new();
     let mut max_sectors = None;
     let mut tail_filler = 0u32;
     let mut dry_run = false;
@@ -212,7 +208,6 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or_else(|| format!("--version-of wants NAME=VERSION, got {spec:?}"))?;
                 versions.push((name.to_string(), version.trim().to_string()));
             }
-            "--gate" => gates.push(it.next().ok_or("--gate takes a display NAME".to_string())?),
             "--shot" => {
                 let (name, path) = split(&it.next().ok_or("--shot takes NAME=path")?, "--shot")?;
                 shots.push((name, path));
@@ -293,7 +288,6 @@ fn parse_args() -> Result<Args, String> {
         credit,
         menu_beats,
         menu_titles,
-        gates,
         shots,
         max_sectors,
         tail_filler,
@@ -311,7 +305,6 @@ fn print_usage() {
          --share-cdda  points one program at another's CD-DA tracks, so a song\n\
         \x20             two programs both use is only burned once\n\
          --describe    NAME=ENGLISH|ITALIAN, the blurb under the carousel\n\
-         --gate        NAME stays off the carousel until the cheat code\n\
          --shot        NAME=<blob> adds a menu backdrop for the program; repeat\n\
         \x20             for a slideshow (cook the blob with disc-tools cook-shot)\n\
          --menu-xa     an XA song file (psx-audio-cook xa-pack) for the launcher's\n\
@@ -634,19 +627,6 @@ fn apply_versions(
             ));
         }
         entries[at] = entries[at].versioned(version);
-    }
-    Ok(())
-}
-
-/// Mark gated programs hidden. An unknown name fails the build: a gate that
-/// silently does not take would ship the one thing it existed to hold back.
-fn apply_gates(entries: &mut [Entry], names: &[&str], gates: &[String]) -> Result<(), String> {
-    for name in gates {
-        let at = names
-            .iter()
-            .position(|n| n == name)
-            .ok_or_else(|| format!("--gate names {name:?}, which is not on this disc"))?;
-        entries[at] = entries[at].gated();
     }
     Ok(())
 }
@@ -1122,7 +1102,6 @@ fn run() -> Result<(), String> {
     apply_shared_cdda(&mut entries, &names, &args.shared_cdda)?;
     apply_descriptions(&mut entries, &names, &args.descriptions)?;
     apply_versions(&mut entries, &names, &args.versions)?;
-    apply_gates(&mut entries, &names, &args.gates)?;
     apply_shots(&mut entries, &names, &shot_spans)?;
     // The menu draws the credit as one centred line at the 8-pixel font, so a
     // long one runs off both edges. Same silent-clipping trap as the blurbs.

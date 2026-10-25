@@ -12,7 +12,7 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 use crate::args::Args;
-use crate::disc::{self, FLAG_HIDDEN, USER_DATA_BYTES};
+use crate::disc::{self, USER_DATA_BYTES};
 use crate::programs::read_rows;
 use crate::replay::{
     number, parse_int, pattern, run_merged, setloc_lba, stdout_core, Csv, Scratch,
@@ -257,18 +257,12 @@ fn root_file_exe(image: &Path, image_lba: u64, name: &str) -> Result<(u64, u64)>
     bail!("{name} not found in the root of the image at LBA {image_lba}")
 }
 
-/// The visible entries and the carousel's card names (CREDITS last).
+/// The entries and the shelf's case names. The launcher shows every entry the
+/// table lists; the credits are a screen of their own, not a case.
 fn parse_toc(image: &Path) -> Result<(Vec<Entry>, Vec<String>)> {
     let rows = read_rows(image)?;
-    let visible: Vec<_> = rows
-        .iter()
-        .filter(|row| row.flags & FLAG_HIDDEN == 0)
-        .collect();
-    let mut menu: Vec<String> = visible.iter().map(|row| row.name.clone()).collect();
-    if !menu.is_empty() {
-        menu.push("CREDITS".into());
-    }
-    let entries = visible
+    let menu: Vec<String> = rows.iter().map(|row| row.name.clone()).collect();
+    let entries = rows
         .iter()
         .enumerate()
         .map(|(visible_index, row)| Entry {
@@ -328,19 +322,13 @@ fn parse_exe(image: &Path, entry: &Entry) -> Result<Exe> {
     })
 }
 
-/// The presses that bring card `index` of `count` to the middle and the tick
-/// of the launching CROSS.
-fn launcher_route(index: usize, count: usize) -> (Vec<String>, i64) {
-    let (index, count) = (index as i64, count as i64);
-    let left = index;
-    let right = (-index).rem_euclid(count);
-    let (button, presses) = if left <= right {
-        ("left", left)
-    } else {
-        ("right", right)
-    };
+/// The presses that bring case `index` of the shelf to the middle (the shelf
+/// does not wrap, so it is always RIGHT from the first case) and the tick of
+/// the launching CROSS.
+fn launcher_route(index: usize) -> (Vec<String>, i64) {
+    let presses = index as i64;
     let mut events: Vec<String> = (0..presses)
-        .map(|step| format!("{}:{button}:8", 400 + step * 200))
+        .map(|step| format!("{}:right:8", 400 + step * 200))
         .collect();
     let cross_tick = 1_000.max(400 + presses * 200 + 200);
     events.push(format!("{cross_tick}:cross:12"));
@@ -374,8 +362,8 @@ fn shifted(route: &str, by: i64) -> Vec<String> {
         .collect()
 }
 
-fn route_for(target: &str, index: usize, count: usize) -> String {
-    let (mut events, cross_tick) = launcher_route(index, count);
+fn route_for(target: &str, index: usize) -> String {
+    let (mut events, cross_tick) = launcher_route(index);
     if matches!(
         target,
         "CORTEX IGNITION" | "HALF-LIFE" | "COUNTER-STRIKE" | "HOLLOW KNIGHT"
@@ -595,7 +583,6 @@ fn run_once(
     cue: &Path,
     target: &Entry,
     exe: Exe,
-    menu_count: usize,
     steps: u64,
     root: &Path,
     label: &str,
@@ -617,7 +604,7 @@ fn run_once(
         .arg("--steps")
         .arg(steps_for(&target.name, steps).to_string())
         .arg("--press")
-        .arg(route_for(&target.name, target.visible_index, menu_count))
+        .arg(route_for(&target.name, target.visible_index))
         .arg("--route-log")
         .arg(&route_log)
         .arg("--cd-command-log")
@@ -870,7 +857,6 @@ pub fn run(raw: &[String]) -> Result<i32> {
             &cue,
             entry,
             exe,
-            menu.len(),
             steps,
             &root,
             "first",
@@ -880,7 +866,6 @@ pub fn run(raw: &[String]) -> Result<i32> {
             &cue,
             entry,
             exe,
-            menu.len(),
             steps,
             &root,
             "second",
@@ -891,7 +876,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
             "{name}: PASS route={} version={} EXE-LBA={} image-LBA={} payload-FNV={:#010x} \
              PC={:#010x} samples={} CD={commands} runtime-read={} VRAM={} display={} \
              gameplay={}/{} hashes={} geometry-edge={}permille",
-            route_for(name, entry.visible_index, menu.len()),
+            route_for(name, entry.visible_index),
             if entry.version.is_empty() {
                 "-"
             } else {
@@ -957,14 +942,14 @@ mod tests {
     #[test]
     fn cortex_route_enters_internal_menu_after_launcher() {
         assert_eq!(
-            route_for("CORTEX IGNITION", 0, 11),
+            route_for("CORTEX IGNITION", 0),
             "1000:cross:12,1400:cross:12,1800:cross:12,2200:cross:12,\
              2600:cross:12,3000:cross:12,3400:cross:12,3600:cross:150,\
              4000:cross:12,4400:cross:12,4800:cross:12"
         );
         assert_eq!(
-            route_for("HALF-LIFE", 1, 11),
-            "400:left:8,1000:cross:12,1400:cross:12,\
+            route_for("HALF-LIFE", 1),
+            "400:right:8,1000:cross:12,1400:cross:12,\
              1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,\
              3400:cross:12"
         );
@@ -979,24 +964,25 @@ mod tests {
 
     #[test]
     fn wipeout_and_oot_walk_their_own_menus_after_the_launcher() {
-        // Index 4 of 13 is four cards ahead: LEFT x4, CROSS at 1400.
-        let wipeout = route_for("WIPEOUT PSOXIDE", 4, 13);
-        assert!(wipeout
-            .starts_with("400:left:8,600:left:8,800:left:8,1000:left:8,1400:cross:12,1980:cross,"));
+        // Index 4 is four cases along: RIGHT x4, CROSS at 1400.
+        let wipeout = route_for("WIPEOUT PSOXIDE", 4);
+        assert!(wipeout.starts_with(
+            "400:right:8,600:right:8,800:right:8,1000:right:8,1400:cross:12,1980:cross,"
+        ));
         assert!(wipeout.contains(",2679:start,"));
         assert!(wipeout.ends_with(",8583:l2"));
-        // Index 8 of 13 is five cards behind: RIGHT x5, CROSS at 1600.
-        let oot = route_for("OCARINA OF TIME", 8, 13);
+        // Index 8 is eight cases along: RIGHT x8, CROSS at 2200.
+        let oot = route_for("OCARINA OF TIME", 8);
         assert!(oot.starts_with("400:right:8,"));
-        assert!(oot.contains(",1600:cross:12,2600:cross:20,3600:cross:6,3720:cross:6,"));
-        assert!(oot.ends_with(",13560:cross:6"));
+        assert!(oot.contains(",2200:cross:12,3200:cross:20,4200:cross:6,4320:cross:6,"));
+        assert!(oot.ends_with(",14160:cross:6"));
     }
 
     #[test]
-    fn launcher_route_takes_the_short_way_round() {
-        // Index 9 of 11 is two cards behind the start: two RIGHT presses.
+    fn launcher_route_walks_right_from_the_first_case() {
+        // The shelf does not wrap: case 2 is two RIGHT presses along.
         assert_eq!(
-            launcher_route(9, 11),
+            launcher_route(2),
             (
                 vec![
                     "400:right:8".to_string(),

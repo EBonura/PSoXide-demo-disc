@@ -279,7 +279,7 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
-		cargo build $(PSX_FLAGS)
+		cargo build $(PSX_FLAGS) $(if $(PRIVATE),--features private)
 
 # The hardware test suite left the demo disc on 2026-09-25; it has a disc of
 # its own (`make hardware-tests-disc` in PSoXide-editor).
@@ -437,10 +437,10 @@ $(DISC_TOOLS): $(DISC_TOOLS_SRC)
 	cd tools/disc-tools && cargo build --release
 disc-tools: $(DISC_TOOLS)
 
-# Cortex Ignition is on the carousel of both pressings since 2026-09-03 (it
-# used to sit behind the Konami unlock on the standard one). The launcher's
-# unlock sequence still works; nothing is gated by default.
-CORTEX_GATE_ARGS =
+# Which programs a pressing carries is decided here, when the disc is built
+# (the flags below and the lineup file); the launcher shows what the disc's
+# table lists and has no way to reveal anything else. Cortex Ignition has been
+# on both pressings since 2026-09-03.
 
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
@@ -726,7 +726,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--version-of "PSXCEL=$(V_PSXCEL)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
 		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
-		$(CORTEX_GATE_ARGS) \
 		--describe "CORTEX IGNITION=A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Supports 2 players in split screen.|Un clone di Rocket League per la prima PlayStation. Supporta 2 giocatori a schermo diviso." \
