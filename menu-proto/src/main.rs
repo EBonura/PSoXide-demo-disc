@@ -1,8 +1,8 @@
-//! Demo disc menu prototype: three directions on one PS1 guest.
+//! Demo disc menu prototype: the Shelf direction on one PS1 guest.
 //!
-//! Prototype only (L2/R2 switch direction, SQUARE swaps the Public and Private
-//! entry sets). Nothing here ships; it exists so each direction can be drawn
-//! on the real GPU at 320x240 and measured.
+//! Prototype only (SQUARE swaps the Public and Private entry sets, TRIANGLE
+//! the language). Nothing here ships; it exists so the menu can be drawn on
+//! the real GPU at 320x240 and measured.
 
 #![no_std]
 #![no_main]
@@ -12,12 +12,10 @@ extern crate psx_rt;
 
 mod common;
 mod data;
-mod dir_a;
-mod dir_b;
-mod dir_c;
 mod ease;
 mod gfx;
 mod launch;
+mod shelf;
 mod text;
 #[path = "../assets/ui_atlas.rs"]
 #[allow(dead_code)]
@@ -50,19 +48,9 @@ fn main() {
         entries: &data::PUBLIC,
         private: false,
     };
-    let mut dir = 0u8;
     let mut sel = 0i32;
-    let mut a = dir_a::State { pos: 0 };
-    let mut b = dir_b::State {
-        focus: [0; 16],
-        scroll: 0,
-    };
-    let mut c = dir_c::State {
-        bar: 0,
-        scroll: 0,
-        swap: 256,
-        last: 0,
-    };
+    let mut shelf = shelf::State { pos: 0 };
+    // Frames since the start press, or -1.
     let mut launching = -1i32;
 
     loop {
@@ -72,22 +60,11 @@ fn main() {
         let pressed = |bt: u16| now.is_held(bt) && !prev.is_held(bt);
         let n = ctx.entries.len() as i32;
         if launching < 0 {
-            let step_v = match dir {
-                1 => dir_b::COLS,
-                2 => 1,
-                _ => 0,
-            };
             if pressed(button::RIGHT) {
                 sel = (sel + 1).min(n - 1);
             }
             if pressed(button::LEFT) {
                 sel = (sel - 1).max(0);
-            }
-            if pressed(button::DOWN) && step_v != 0 {
-                sel = (sel + step_v).min(n - 1);
-            }
-            if pressed(button::UP) && step_v != 0 {
-                sel = (sel - step_v).max(0);
             }
             if pressed(button::TRIANGLE) {
                 ctx.it = !ctx.it;
@@ -101,68 +78,35 @@ fn main() {
                 };
                 sel = sel.min(ctx.entries.len() as i32 - 1);
             }
-            if pressed(button::R2) {
-                dir = (dir + 1) % 3;
-            }
-            if pressed(button::L2) {
-                dir = (dir + 2) % 3;
-            }
             if pressed(button::CROSS) && ctx.entries[sel as usize].art.is_some() {
                 launching = 0;
             }
-        } else {
-            launching += 1;
-            if launching > launch::FRAMES + AFTER_LAUNCH {
-                launching = -1;
-            }
+        } else if launching > launch::FRAMES + AFTER_LAUNCH {
+            launching = -1;
         }
         prev = now;
 
         g.begin();
         g.clear((4, 8, 12));
-        let hide = launching >= 0;
-        let n = ctx.entries.len() as i32;
-        let from = match dir {
-            0 => {
-                dir_a::update(&mut a, sel);
-                launch::From {
-                    cx: 160,
-                    bottom: dir_a::FLOOR - 3,
-                    sc: 256,
-                }
-            }
-            1 => {
-                dir_b::update(&mut b, sel, n);
-                let (x, y) = dir_b::tile_origin(sel, b.scroll);
-                launch::From {
-                    cx: x + dir_b::TILE_W / 2,
-                    bottom: y + dir_b::TILE_H,
-                    sc: 160,
-                }
-            }
-            _ => {
-                dir_c::update(&mut c, sel, n);
-                launch::From {
-                    cx: 162 + (150 - 104) / 2 - 3 + 52,
-                    bottom: 42 + 98,
-                    sc: 256,
-                }
-            }
-        };
+        shelf::update(&mut shelf, sel);
         // Past frame 30 the veil has taken the menu to black, so it is not drawn
         // at all: the hand-off is cheaper than the menu it replaces.
         if launching < 30 {
-            match dir {
-                0 => dir_a::draw(&mut g, &a, &ctx, sel, hide),
-                1 => dir_b::draw(&mut g, &b, &ctx, sel, hide),
-                _ => dir_c::draw(&mut g, &c, &ctx, sel, hide),
-            }
+            shelf::draw(&mut g, &shelf, &ctx, sel, launching);
         }
-        if launching > 0 && launching <= launch::FRAMES {
+        if (0..=launch::FRAMES).contains(&launching) {
+            let from = launch::From {
+                cx: 160,
+                bottom: shelf::FLOOR - 3,
+                sc: 256,
+            };
             launch::draw(&mut g, launching, from, ctx.entries[sel as usize], &ctx);
         } else if launching > launch::FRAMES {
             g.rect(0, 0, 320, 240, (0, 0, 0));
         }
         g.end();
+        if launching >= 0 {
+            launching += 1;
+        }
     }
 }

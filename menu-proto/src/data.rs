@@ -31,6 +31,7 @@ pub static ARTS: [CoverArt; 11] = [
 
 pub struct Entry {
     pub name: &'static str,
+    #[allow(dead_code)]
     pub short: &'static str,
     pub version: &'static str,
     pub en: &'static str,

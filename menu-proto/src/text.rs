@@ -19,6 +19,7 @@ pub struct Glyph {
 }
 
 /// Printable ASCII, space to tilde.
+#[allow(dead_code)]
 pub struct Face {
     pub ascent: i32,
     pub line: i32,
@@ -127,4 +128,46 @@ pub fn draw_wrapped(
         rest = rest[end..].trim_start();
     }
     lines
+}
+
+impl Face {
+    /// Rows from a glyph's draw position down to the middle row of the capital
+    /// letters (taken from `H`). Aligning on this row, rather than on the
+    /// baseline or the line box, puts faces of different sizes on one centre
+    /// line.
+    pub fn cap_mid(&self) -> i32 {
+        let h = self.glyph(b'H');
+        h.yoff as i32 + (h.h as i32 - 1) / 2
+    }
+}
+
+/// Draw `s` with its capitals centred vertically on pixel row `cy`.
+pub fn draw_mid(g: &mut Gfx, face: &Face, x: i32, cy: i32, s: &str, color: Rgb, track: i32) {
+    draw(g, face, x, cy - face.cap_mid(), s, color, track);
+}
+
+/// As [`draw_mid`], centred horizontally on `cx`.
+pub fn draw_centered_mid(
+    g: &mut Gfx,
+    face: &Face,
+    cx: i32,
+    cy: i32,
+    s: &str,
+    color: Rgb,
+    track: i32,
+) {
+    draw_centered(g, face, cx, cy - face.cap_mid(), s, color, track);
+}
+
+/// As [`draw_mid`], right-aligned to the pixel edge `right`.
+pub fn draw_right_mid(
+    g: &mut Gfx,
+    face: &Face,
+    right: i32,
+    cy: i32,
+    s: &str,
+    color: Rgb,
+    track: i32,
+) {
+    draw_right(g, face, right, cy - face.cap_mid(), s, color, track);
 }

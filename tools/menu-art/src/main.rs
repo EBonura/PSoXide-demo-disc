@@ -185,41 +185,43 @@ fn bake_icons(atlas: &mut Atlas) -> Vec<(&'static str, Glyph)> {
             },
         ));
     };
-    let c = 7.0;
-    add("CROSS", 14, 14, &|x, y| {
-        ring(x, y, c, c, 6.2, 1.3)
-            || seg_dist(x, y, 4.6, 4.6, 9.4, 9.4) <= 0.75
-            || seg_dist(x, y, 9.4, 4.6, 4.6, 9.4) <= 0.75
+    // Odd sizes on purpose: an odd box has a middle pixel row and column, so
+    // the marks sit exactly on the menu's centre lines.
+    let c = 7.5;
+    add("CROSS", 15, 15, &|x, y| {
+        ring(x, y, c, c, 6.7, 1.3)
+            || seg_dist(x, y, 5.0, 5.0, 10.0, 10.0) <= 0.75
+            || seg_dist(x, y, 10.0, 5.0, 5.0, 10.0) <= 0.75
     });
-    add("CIRCLE", 14, 14, &|x, y| {
-        ring(x, y, c, c, 6.2, 1.3) || ring(x, y, c, c, 2.7, 1.3)
+    add("CIRCLE", 15, 15, &|x, y| {
+        ring(x, y, c, c, 6.7, 1.3) || ring(x, y, c, c, 2.9, 1.3)
     });
-    let tri = [(7.0, 3.7), (10.6, 9.6), (3.4, 9.6)];
-    add("TRIANGLE", 14, 14, &move |x, y| {
-        ring(x, y, c, c, 6.2, 1.3) || poly_outline(x, y, &tri, 1.2)
+    let tri = [(7.5, 4.0), (11.4, 10.4), (3.6, 10.4)];
+    add("TRIANGLE", 15, 15, &move |x, y| {
+        ring(x, y, c, c, 6.7, 1.3) || poly_outline(x, y, &tri, 1.2)
     });
-    let sq = [(4.3, 4.3), (9.7, 4.3), (9.7, 9.7), (4.3, 9.7)];
-    add("SQUARE", 14, 14, &move |x, y| {
-        ring(x, y, c, c, 6.2, 1.3) || poly_outline(x, y, &sq, 1.2)
+    let sq = [(4.7, 4.7), (10.3, 4.7), (10.3, 10.3), (4.7, 10.3)];
+    add("SQUARE", 15, 15, &move |x, y| {
+        ring(x, y, c, c, 6.7, 1.3) || poly_outline(x, y, &sq, 1.2)
     });
-    // Disc: outer ring, hub ring and a hub dot, 14 px.
-    add("DISC", 14, 14, &|x, y| {
-        ring(x, y, c, c, 6.2, 1.4)
-            || ring(x, y, c, c, 2.6, 1.2)
+    // Disc: outer ring, hub ring and a hub dot, 15 px.
+    add("DISC", 15, 15, &|x, y| {
+        ring(x, y, c, c, 6.7, 1.4)
+            || ring(x, y, c, c, 2.8, 1.2)
             || ((x - c).powi(2) + (y - c).powi(2)) <= 0.5
     });
     // Chevrons for the carousel hint.
-    add("CHEV_L", 6, 10, &|x, y| {
-        seg_dist(x, y, 4.6, 1.2, 1.4, 5.0) <= 0.7 || seg_dist(x, y, 1.4, 5.0, 4.6, 8.8) <= 0.7
+    add("CHEV_L", 7, 11, &|x, y| {
+        seg_dist(x, y, 5.2, 1.2, 1.6, 5.5) <= 0.7 || seg_dist(x, y, 1.6, 5.5, 5.2, 9.8) <= 0.7
     });
-    add("CHEV_R", 6, 10, &|x, y| {
-        seg_dist(x, y, 1.4, 1.2, 4.6, 5.0) <= 0.7 || seg_dist(x, y, 4.6, 5.0, 1.4, 8.8) <= 0.7
+    add("CHEV_R", 7, 11, &|x, y| {
+        seg_dist(x, y, 1.8, 1.2, 5.4, 5.5) <= 0.7 || seg_dist(x, y, 5.4, 5.5, 1.8, 9.8) <= 0.7
     });
-    add("CHEV_U", 10, 6, &|x, y| {
-        seg_dist(x, y, 1.2, 4.6, 5.0, 1.4) <= 0.7 || seg_dist(x, y, 5.0, 1.4, 8.8, 4.6) <= 0.7
+    add("CHEV_U", 11, 7, &|x, y| {
+        seg_dist(x, y, 1.2, 5.2, 5.5, 1.6) <= 0.7 || seg_dist(x, y, 5.5, 1.6, 9.8, 5.2) <= 0.7
     });
-    add("CHEV_D", 10, 6, &|x, y| {
-        seg_dist(x, y, 1.2, 1.4, 5.0, 4.6) <= 0.7 || seg_dist(x, y, 5.0, 4.6, 8.8, 1.4) <= 0.7
+    add("CHEV_D", 11, 7, &|x, y| {
+        seg_dist(x, y, 1.2, 1.8, 5.5, 5.4) <= 0.7 || seg_dist(x, y, 5.5, 5.4, 9.8, 1.8) <= 0.7
     });
     out
 }
@@ -390,7 +392,7 @@ fn main() {
     let mut atlas = Atlas::new();
     let faces = [
         bake_face(&mut atlas, "mich12", &michroma, 12.0),
-        bake_face(&mut atlas, "mich7", &michroma, 7.0),
+        bake_face(&mut atlas, "mich9", &michroma, 9.0),
         bake_face(&mut atlas, "jost9", &jost, 9.0),
         bake_face(&mut atlas, "jost11", &jost, 11.0),
     ];
@@ -413,9 +415,13 @@ fn main() {
     fs::write(out.join("ui_atlas.rs"), rs).unwrap();
     fs::write(out.join("ui.tex"), atlas.packed()).unwrap();
 
-    for (stem, id) in ARTS {
-        for (tag, blob) in cook_art(&shots.join(format!("{stem}.png")), SIZES) {
-            fs::write(out.join(format!("art_{tag}_{id}.bin")), blob).unwrap();
+    // A shots directory that does not exist means "interface only": the cover
+    // blobs already in the output directory are left as they are.
+    if shots.is_dir() {
+        for (stem, id) in ARTS {
+            for (tag, blob) in cook_art(&shots.join(format!("{stem}.png")), SIZES) {
+                fs::write(out.join(format!("art_{tag}_{id}.bin")), blob).unwrap();
+            }
         }
     }
     println!(

@@ -27,4 +27,5 @@ psx-pad  = { path = "../games/PSoXide-editor/sdk/crates/psx-pad" }
 psx-rt   = { path = "../games/PSoXide-editor/sdk/crates/psx-rt" }
 psx-vram = { path = "../games/PSoXide-editor/sdk/crates/psx-vram" }
 psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
+psx-gte  = { path = "../games/PSoXide-editor/sdk/crates/psx-gte" }
 psx-hw   = { path = "../games/PSoXide-editor/crates/psx-hw" }

@@ -13,6 +13,7 @@ name = "menu-proto"
 version = "0.1.0"
 dependencies = [
  "psx-gpu",
+ "psx-gte",
  "psx-hw",
  "psx-io",
  "psx-math",
@@ -28,6 +29,21 @@ dependencies = [
  "bitflags",
  "psx-hw",
  "psx-io",
+]
+
+[[package]]
+name = "psx-gte"
+version = "0.1.0"
+dependencies = [
+ "psx-gte-core",
+ "psx-hw",
+]
+
+[[package]]
+name = "psx-gte-core"
+version = "0.1.0"
+dependencies = [
+ "psx-math",
 ]
 
 [[package]]

@@ -1,9 +1,10 @@
-//! Direction A, "Shelf": big cases on the shell's floor, one in focus.
+//! The Shelf: big cases on the shell's floor, one in focus.
 //!
 //! The home shell's Home screen at 320x240: the focused case lifts and
 //! brightens inside corner brackets and sways on its hinge, its neighbours
 //! recede in scale and light, a teal pool glows on the floor beneath it, and
-//! the title and description sit under the row.
+//! the title, description and start button sit under the row. Vertical
+//! positions are fixed rows (see the constants) so nothing drifts.
 
 use crate::common::*;
 use crate::ease;
@@ -17,8 +18,17 @@ pub struct State {
     pub pos: i32,
 }
 
-pub const HORIZON: i32 = 136;
-pub const FLOOR: i32 = 129;
+/// Row the focused case's feet stand on (before its lift).
+pub const FLOOR: i32 = 133;
+/// Where the floor grid meets the horizon.
+pub const HORIZON: i32 = FLOOR + 7;
+/// Pixel row the title's capitals are centred on.
+const TITLE_MID: i32 = 141;
+/// Pixel row of the description's first line (capitals centred), and the pitch.
+const DESC_MID: i32 = 155;
+const DESC_PITCH: i32 = 10;
+/// Pixel row the start button is centred on.
+const BUTTON_MID: i32 = 196;
 
 pub fn update(s: &mut State, sel: i32) {
     s.pos = ease::follow(s.pos, sel * 256, 2);
@@ -33,17 +43,19 @@ fn layout(d: i32) -> (i32, i32, i32) {
     (if d < 0 { -x } else { x }, sc, dim)
 }
 
-pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, hide_sel: bool) {
-    ground(g, (4, 9, 13), (3, 6, 9));
+/// Draw the menu. `launch` is the frame count since the start press, or -1;
+/// from frame 0 the selected case belongs to the launch sequence, and the
+/// text and the button fade out under the pressed button's flash.
+pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, launch: i32) {
     g.glow(160, 78, 150, 80, (5, 22, 28));
     g.glow(160, HORIZON + 6, 190, 40, (9, 38, 46));
-    floor_grid(g, HORIZON, 218, ctx.t);
+    floor_grid(g, HORIZON, 212);
     header(g, ctx, "DEMO DISC");
-    footer(g, ctx, Nav::Row, if ctx.it { "Sfoglia" } else { "Browse" });
+    footer(g, ctx);
 
+    let hide_sel = launch >= 0;
     let n = ctx.entries.len() as i32;
     // Far to near so the focused case overlaps its neighbours.
-    let near = (s.pos + 128) >> 8;
     let mut order = [0i32; 16];
     let mut count = 0;
     for i in 0..n {
@@ -58,7 +70,6 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, hide_sel: bool) {
             }
         }
     }
-    let _ = near;
     let sway = sin_q12((ctx.t * 6) as u16 & 4095) >> 4; // -256..=256
     for &i in &order[..count] {
         let d = i * 256 - s.pos;
@@ -92,36 +103,40 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, hide_sel: bool) {
             focus: settle,
             yaw,
         };
-        draw_case(g, &cv, ctx.entries[i as usize], ctx.t);
+        draw_case(g, &cv, ctx.entries[i as usize]);
     }
 
-    if hide_sel {
-        return;
-    }
-    // Title, version, description and the primary action for the selected entry.
+    // Title, description and the primary action for the selected entry.
     let e = ctx.entries[sel as usize];
-    let a = ((256 - (sel * 256 - s.pos).abs() * 2).max(0)) as u32;
+    let near = ((256 - (sel * 256 - s.pos).abs() * 2).max(0)) as u32;
+    let gone = if hide_sel {
+        256 - ease::span(launch, 0, 16) as u32
+    } else {
+        256
+    };
+    let a = near * gone >> 8;
     if a > 8 {
-        let off = ((256 - a as i32) * 6) >> 8;
-        text::draw_centered(g, &MICH12, 160, 142 + off, e.name, scale(TEXT, a), 0);
+        let off = ((256 - near as i32) * 6) >> 8;
+        text::draw_centered_mid(g, &MICH12, 160, TITLE_MID + off, e.name, scale(TEXT, a), 0);
         text::draw_wrapped(
             g,
             &JOST9,
             56,
-            160 + off * 2,
+            DESC_MID - JOST9.cap_mid() + off * 2,
             208,
-            10,
+            DESC_PITCH,
             3,
             ctx.desc(e),
             scale(MUTED, a),
             true,
         );
-        pill(
-            g,
-            160,
-            199,
-            if e.art.is_some() { "START" } else { "OPEN" },
-            a >> 2,
-        );
+        let label = match (e.art.is_some(), ctx.it) {
+            (true, false) => "START",
+            (true, true) => "AVVIA",
+            (false, false) => "OPEN",
+            (false, true) => "APRI",
+        };
+        let press = if hide_sel { Press::Down } else { Press::Idle };
+        start_button(g, 160, BUTTON_MID + off * 2, label, press, ctx.t, a);
     }
 }

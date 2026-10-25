@@ -9,8 +9,7 @@ use psx_gpu::display::{DisplayConfig, Resolution, VideoMode};
 use psx_gpu::framebuf::FrameBuffer;
 use psx_gpu::material::{BlendMode, TextureMaterial};
 use psx_gpu::prim::{
-    FillRect, LineGouraud, QuadFlat, QuadGouraud, QuadTexturedGouraud, QuadTexturedMaterial,
-    Sprite, TriGouraud,
+    FillRect, LineGouraud, QuadFlat, QuadGouraud, QuadTexturedMaterial, Sprite, TriGouraud,
 };
 use psx_gpu::Gpu;
 use psx_io::periph::GpuDma;
@@ -21,7 +20,6 @@ pub type Rgb = (u8, u8, u8);
 
 // ---- palette (the home shell's tokens, on a 15-bit display) ---------------
 
-pub const GROUND: Rgb = (5, 9, 13);
 pub const TEXT: Rgb = (244, 248, 251);
 pub const TEXT2: Rgb = (196, 211, 222);
 pub const MUTED: Rgb = (157, 176, 190);
@@ -29,8 +27,6 @@ pub const DIM: Rgb = (129, 150, 166);
 pub const RING: Rgb = (108, 127, 143);
 pub const ACCENT: Rgb = (34, 200, 229);
 pub const FOCUS: Rgb = (128, 239, 255);
-pub const ON_ACCENT: Rgb = (3, 24, 32);
-pub const OK: Rgb = (82, 208, 138);
 
 pub fn scale(c: Rgb, num: u32) -> Rgb {
     // num: 0..=256
@@ -408,37 +404,6 @@ impl Gfx {
             m,
         ));
     }
-
-    /// Cover `i` at `size` stretched onto a quad (TL, TR, BL, BR).
-    pub fn art_quad(&mut self, size: Size, i: usize, v: [(i32, i32); 4], tint: Rgb) {
-        let (m, u0, v0) = self.art_material(size, i, tint);
-        self.key = u32::MAX;
-        let (w, h) = size.dims();
-        let (ua, ub) = (u0 as u8, (u0 + w - 1) as u8);
-        let (va, vb) = (v0 as u8, (v0 + h - 1) as u8);
-        self.prims += 1;
-        self.gpu.draw(&QuadTexturedMaterial::with_material(
-            v.map(p),
-            [(ua, va), (ub, va), (ua, vb), (ub, vb)],
-            m,
-        ));
-    }
-
-    /// As [`art_quad`] with a colour per corner (for shading and fades).
-    pub fn art_quad_g(&mut self, size: Size, i: usize, v: [(i32, i32); 4], c: [Rgb; 4]) {
-        let (m, u0, v0) = self.art_material(size, i, (128, 128, 128));
-        self.key = u32::MAX;
-        let (w, h) = size.dims();
-        let (ua, ub) = (u0 as u8, (u0 + w - 1) as u8);
-        let (va, vb) = (v0 as u8, (v0 + h - 1) as u8);
-        self.prims += 1;
-        self.gpu.draw(&QuadTexturedGouraud::with_material(
-            v.map(p),
-            [(ua, va), (ub, va), (ua, vb), (ub, vb)],
-            c,
-            m,
-        ));
-    }
 }
 
 impl Gfx {
@@ -479,6 +444,45 @@ impl Gfx {
             self.prims += 1;
             self.gpu.draw(&QuadTexturedMaterial::with_material(
                 [(xa, ta), (xb, tb), (xa, ba), (xb, bb)].map(p),
+                [(ua, va), (ub, va), (ua, vb), (ub, vb)],
+                m,
+            ));
+        }
+    }
+}
+
+impl Gfx {
+    /// Cover `i` on a ribbon of quads: `tops[k]` and `bots[k]` are where the
+    /// vertical line at texture column `k / (len - 1)` lands on screen. The
+    /// caller projects real 3D points, so each vertex is perspective-correct
+    /// and only the span between two neighbours is affine. A ribbon whose
+    /// columns run right to left shows the cover mirrored, as the back of a
+    /// swung-open cover does.
+    ///
+    /// # Panics
+    ///
+    /// If `tops` and `bots` differ in length or hold fewer than two points.
+    pub fn art_ribbon(
+        &mut self,
+        size: Size,
+        i: usize,
+        tops: &[(i32, i32)],
+        bots: &[(i32, i32)],
+        tint: Rgb,
+    ) {
+        assert!(tops.len() == bots.len() && tops.len() >= 2);
+        let n = tops.len() as i32 - 1;
+        let (m, u0, v0) = self.art_material(size, i, tint);
+        let (sw, sh) = size.dims();
+        self.key = u32::MAX;
+        let (va, vb) = (v0 as u8, (v0 + sh - 1) as u8);
+        for k in 0..n {
+            let ua = (u0 + (sw - 1) * k / n) as u8;
+            let ub = (u0 + (sw - 1) * (k + 1) / n) as u8;
+            let (k, k1) = (k as usize, k as usize + 1);
+            self.prims += 1;
+            self.gpu.draw(&QuadTexturedMaterial::with_material(
+                [tops[k], tops[k1], bots[k], bots[k1]].map(p),
                 [(ua, va), (ub, va), (ua, vb), (ub, vb)],
                 m,
             ));
