@@ -18,12 +18,10 @@ version = "0.1.0"
 dependencies = [
  "chainload-layout",
  "playlist",
- "psx-asset",
- "psx-carousel",
  "psx-disc-toc",
  "psx-fmv",
- "psx-font",
  "psx-gpu",
+ "psx-gte",
  "psx-hw",
  "psx-io",
  "psx-math",
@@ -50,13 +48,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psx-carousel"
-version = "0.1.0"
-dependencies = [
- "psx-math",
-]
-
-[[package]]
 name = "psx-disc-toc"
 version = "0.1.0"
 
@@ -70,17 +61,6 @@ dependencies = [
  "psx-pack",
  "psx-rt",
  "psx-spu",
- "psx-vram",
-]
-
-[[package]]
-name = "psx-font"
-version = "0.1.0"
-dependencies = [
- "psx-gpu",
- "psx-hw",
- "psx-io",
- "psx-math",
  "psx-vram",
 ]
 

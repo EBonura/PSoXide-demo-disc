@@ -1,11 +1,11 @@
-//! Bakes the demo disc menu prototype's art into PS1 texture blobs.
+//! Bakes the demo disc launcher's art into PS1 texture blobs.
 //!
 //! * `ui.tex`: one 256x256 4bpp texture page holding three anti-aliased
 //!   faces (Michroma display, Michroma small caps, Jost body) and the button
 //!   glyphs. Texel 0 is transparent, texels 1..=15 are coverage levels, so the
 //!   guest tints it with the palette ramp and blends it additively.
 //! * `ui_atlas.rs`: the glyph tables for that page, as `const` data.
-//! * `art_<size>_<name>.bin`: a cover image resized with a Lanczos filter and
+//! * `art_<size>_<name>.art`: a cover image resized with a Lanczos filter and
 //!   cut to 256 colours with median cut, as 512 bytes of CLUT followed by the
 //!   8bpp pixels.
 //!
@@ -348,6 +348,7 @@ const ARTS: &[(&str, &str)] = &[
     ("hollowknight", "hollow"),
     ("counterstrike", "cstrike"),
     ("halflife", "halflife"),
+    ("oot1", "oot"),
 ];
 
 /// Cover sizes: (tag, width, height). Large is the focused case or the media
@@ -420,7 +421,7 @@ fn main() {
     if shots.is_dir() {
         for (stem, id) in ARTS {
             for (tag, blob) in cook_art(&shots.join(format!("{stem}.png")), SIZES) {
-                fs::write(out.join(format!("art_{tag}_{id}.bin")), blob).unwrap();
+                fs::write(out.join(format!("art_{tag}_{id}.art")), blob).unwrap();
             }
         }
     }

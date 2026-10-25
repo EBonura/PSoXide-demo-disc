@@ -87,6 +87,25 @@ pub fn draw_right(g: &mut Gfx, face: &Face, right: i32, y: i32, s: &str, color: 
     draw(g, face, right - w, y, s, color, track);
 }
 
+/// How many lines [`draw_wrapped`] needs for `s` at `max_w` pixels.
+pub fn wrapped_lines(face: &Face, s: &str, max_w: i32) -> usize {
+    let space = face.glyph(b' ').adv as i32;
+    let (mut lines, mut used) = (0, 0);
+    for word in s.split(' ').filter(|w| !w.is_empty()) {
+        let w = face.width(word, 0);
+        if lines == 0 {
+            lines = 1;
+            used = w;
+        } else if used + space + w > max_w {
+            lines += 1;
+            used = w;
+        } else {
+            used += space + w;
+        }
+    }
+    lines
+}
+
 /// Greedy word wrap of `s` into lines of at most `max_w` pixels; each line is
 /// drawn `line_h` below the last, at most `max_lines` of them. Returns the
 /// number of lines drawn.

@@ -15,7 +15,6 @@ use playlist::{Playlist, Slot, SongClock};
 use psx_fmv::iso;
 use psx_hw::cd::xa::END_GUARD_SECTORS;
 use psx_io::cd::xa::{DriveSpeed, Event, File, Player, Song};
-use psx_io::periph::Cd;
 use psx_io::timers::{counter, Timer};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_rt::tty;
@@ -81,9 +80,9 @@ impl Music {
     /// from `seed`. The disc table's song count is `songs`; a pressing whose
     /// files do not match the table this launcher was built with has no music
     /// rather than the wrong music.
-    pub fn locate(reader: &mut SectorReader, songs: usize) -> Music {
+    pub fn locate(mut reader: SectorReader, songs: usize) -> Music {
         let mut files = [None; pack::XA_FILE_COUNT];
-        let found = locate_files(reader, &mut files);
+        let found = locate_files(&mut reader, &mut files);
         let usable = if found && songs == pack::XA_SONGS.len() {
             songs
         } else {
@@ -97,10 +96,8 @@ impl Music {
         let seed = (counter(Timer::Timer2) as u32) << 16
             ^ counter(Timer::Timer1) as u32
             ^ counter(Timer::Timer0) as u32 * 0x9E37;
-        // SAFETY: the launcher drives the CD controller through its
-        // `SectorReader` only before music starts and not at all while a
-        // song plays, so this player is the one owner while it matters.
-        let mut player = Player::new(unsafe { Cd::steal() });
+        // The reader is done with the drive; the player takes its token.
+        let mut player = Player::new(reader.release());
         // The drive's own mixer has to pass the song to the SPU; 0x80 is unity.
         player.set_volume(0x80, 0x80);
         Music {

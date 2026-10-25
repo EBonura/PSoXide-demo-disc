@@ -1,5 +1,5 @@
-//! Immediate-mode drawing for the menu prototype: gradients, additive glow,
-//! brackets, textured art, and the baked UI atlas.
+//! Immediate-mode drawing for the menu: gradients, additive glow, brackets,
+//! textured art, and the baked UI atlas.
 //!
 //! Every primitive here is at most 12 GP0 words (the textured Gouraud quad),
 //! so the same calls could be linked into an ordering table without a node
@@ -56,6 +56,12 @@ pub const ART_CLUT_X: u16 = 0;
 pub const ART_CLUT_Y: u16 = 480;
 /// The UI atlas ramp.
 pub const UI_CLUT: Clut = Clut::new(256, 480);
+/// The credits screen's platform marks: a 4bpp strip of six 12x12 cells.
+pub const ICON_PAGE: (u16, u16) = (896, 0);
+/// Their palette, a grey ramp the tint colours.
+pub const ICON_CLUT: Clut = Clut::new(288, 480);
+/// Width of one mark's cell in the strip, and the mark's size.
+pub const ICON_CELL: i32 = 12;
 
 pub const L_W: i32 = 104;
 pub const L_H: i32 = 78;
@@ -180,6 +186,41 @@ impl Gfx {
             clut[k as usize * 2..k as usize * 2 + 2].copy_from_slice(&c.to_le_bytes());
         }
         psx_vram::upload_bytes(VramRect::new(UI_CLUT.x(), UI_CLUT.y(), 16, 1), &clut);
+    }
+
+    /// Upload the platform-mark strip (`tex`, 4bpp, `cells` cells of
+    /// [`ICON_CELL`] pixels, one row of marks) and its 16-colour palette.
+    pub fn upload_link_icons(&mut self, tex: &[u8], clut: &[u8], cells: i32) {
+        let halfwords = (cells * ICON_CELL) as u16 / 4;
+        psx_vram::upload_bytes(
+            VramRect::new(ICON_PAGE.0, ICON_PAGE.1, halfwords, ICON_CELL as u16),
+            tex,
+        );
+        psx_vram::upload_bytes(VramRect::new(ICON_CLUT.x(), ICON_CLUT.y(), 16, 1), clut);
+    }
+
+    /// Platform mark `slot` with its top-left at `x, y`, tinted so that full
+    /// coverage is `color`.
+    pub fn link_icon(&mut self, slot: i32, x: i32, y: i32, color: Rgb) {
+        let tp = TexturePage::new(ICON_PAGE.0, ICON_PAGE.1, TextureDepth::Bit4).uv_word(0);
+        let tint = (color.0 >> 1, color.1 >> 1, color.2 >> 1);
+        let m = TextureMaterial::opaque(ICON_CLUT.uv_word(), tp, tint);
+        self.gpu.set_draw_mode(m);
+        self.key = u32::MAX;
+        self.prims += 1;
+        self.gpu.draw(&Sprite::with_material(
+            clip(x) as i16,
+            clip(y) as i16,
+            ICON_CELL as u16,
+            ICON_CELL as u16,
+            ((slot * ICON_CELL) as u8, 0),
+            m,
+        ));
+    }
+
+    /// Wait for the GPU to finish everything queued (before a hand-off).
+    pub fn wait_idle(&mut self) {
+        self.gpu.wait_idle();
     }
 
     pub fn upload_art(&mut self, i: usize, art: &CoverArt) {

@@ -25,22 +25,28 @@ panic         = "abort"
 codegen-units = 1
 lto           = true
 
+[features]
+# The Private edition: the programs that are bring-your-own-assets (WipEout,
+# Hollow Knight, Counter-Strike, Half-Life, Ocarina of Time) have covers in
+# the menu. Off, the binary holds neither their art nor their names, which a
+# Public disc must not carry anywhere (`disc-tools public-only` scans for them).
+# The Makefile turns it on whenever a pressing includes one of them.
+private = []
+
 [dependencies]
 chainload-layout = { path = "../chainload-layout" }
-psx-font = { path = "../games/PSoXide-editor/sdk/crates/psx-font" }
 psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
 psx-pack = { path = "../games/PSoXide-editor/sdk/crates/psx-pack" }
 psx-pad  = { path = "../games/PSoXide-editor/sdk/crates/psx-pad" }
 psx-rt   = { path = "../games/PSoXide-editor/sdk/crates/psx-rt" }
 psx-vram = { path = "../games/PSoXide-editor/sdk/crates/psx-vram" }
 psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
-carousel = { package = "psx-carousel", path = "../games/PSoXide-editor/engine/crates/psx-carousel" }
 psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
 psx-spu  = { path = "../games/PSoXide-editor/sdk/crates/psx-spu" }
 stick-nav = { path = "stick-nav" }
-psx-asset = { path = "../games/PSoXide-editor/sdk/crates/psx-asset" }
 psx-sfx  = { path = "../games/PSoXide-editor/sdk/crates/psx-sfx" }
 disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-editor/engine/crates/psx-disc-toc" }
 playlist = { path = "playlist" }
 psx-fmv  = { path = "../games/PSoXide-editor/sdk/crates/psx-fmv" }
 psx-hw   = { path = "../games/PSoXide-editor/crates/psx-hw" }
+psx-gte  = { path = "../games/PSoXide-editor/sdk/crates/psx-gte" }

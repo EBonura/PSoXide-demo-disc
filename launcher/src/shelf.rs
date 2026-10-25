@@ -6,8 +6,10 @@
 //! the title, description and start button sit under the row. Vertical
 //! positions are fixed rows (see the constants) so nothing drifts.
 
+use crate::attract;
 use crate::common::*;
 use crate::ease;
+use disc_toc::Entry;
 use crate::gfx::*;
 use crate::text;
 use crate::ui_atlas::*;
@@ -27,6 +29,9 @@ const TITLE_MID: i32 = 141;
 /// Pixel row of the description's first line (capitals centred), and the pitch.
 const DESC_MID: i32 = 155;
 const DESC_PITCH: i32 = 10;
+/// Widest a description line runs: the whole of the English and Italian texts
+/// on the discs fit three lines at this width.
+const DESC_W: i32 = 256;
 /// Pixel row the start button is centred on.
 const BUTTON_MID: i32 = 196;
 
@@ -36,19 +41,20 @@ const VERSION_GAP: i32 = 8;
 /// The title with the version to its right in the small face, both on one
 /// baseline and centred as a group on the screen. `mid` is the row the title's
 /// capitals are centred on.
-fn title_row(g: &mut Gfx, e: &crate::data::Entry, mid: i32, a: u32) {
-    let tw = MICH12.width(e.name, 0);
+fn title_row(g: &mut Gfx, e: &Entry, mid: i32, a: u32) {
+    let (name, version) = (e.name_str(), e.version_str());
+    let tw = MICH12.width(name, 0);
     // Versions that are numbers read "v0.2.7"; a build name stands as it is.
-    let prefix = e.version.as_bytes().first().is_some_and(u8::is_ascii_digit);
+    let prefix = version.as_bytes().first().is_some_and(u8::is_ascii_digit);
     let vp = if prefix { JOST9.width("v", 0) } else { 0 };
-    let vw = if e.version.is_empty() {
+    let vw = if version.is_empty() {
         0
     } else {
-        VERSION_GAP + vp + JOST9.width(e.version, 0)
+        VERSION_GAP + vp + JOST9.width(version, 0)
     };
     let x = 160 - (tw + vw) / 2;
     let top = mid - MICH12.cap_mid();
-    text::draw(g, &MICH12, x, top, e.name, scale(TEXT, a), 0);
+    text::draw(g, &MICH12, x, top, name, scale(TEXT, a), 0);
     if vw > 0 {
         let vx = x + tw + VERSION_GAP;
         let vy = top + MICH12.baseline() - JOST9.baseline();
@@ -56,12 +62,19 @@ fn title_row(g: &mut Gfx, e: &crate::data::Entry, mid: i32, a: u32) {
         if prefix {
             text::draw(g, &JOST9, vx, vy, "v", col, 0);
         }
-        text::draw(g, &JOST9, vx + vp, vy, e.version, col, 0);
+        text::draw(g, &JOST9, vx + vp, vy, version, col, 0);
     }
 }
 
-pub fn update(s: &mut State, sel: i32) {
-    s.pos = ease::follow(s.pos, sel * 256, 2);
+/// Ease the row toward case `sel`. In the attract state the row creeps a
+/// fifth of a case either way on a slow wave, so the idle shelf drifts.
+/// How much of the focus a case `d` Q8 slots from the middle has (256 = all).
+fn settle_of(d: i32) -> i32 {
+    (256 - d.abs() * 3 / 2).max(0)
+}
+
+pub fn update(s: &mut State, sel: i32, t: u32, level: i32) {
+    s.pos = ease::follow(s.pos, sel * 256 + attract::row_creep(t, level), 2);
 }
 
 /// The focused case's sway at frame `t` (-32..=32), the hinge swing the launch
@@ -79,18 +92,23 @@ fn layout(d: i32) -> (i32, i32, i32) {
     (if d < 0 { -x } else { x }, sc, dim)
 }
 
-/// Draw the menu. `launch` is the frame count since the start press, or -1;
-/// from frame 0 the selected case belongs to the launch sequence, and the
-/// text and the button fade out under the pressed button's flash.
-pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, launch: i32) {
+/// The stage behind every screen: a soft light up the middle and the floor grid.
+pub fn backdrop(g: &mut Gfx) {
     g.glow(160, 78, 150, 80, (5, 22, 28));
     g.glow(160, HORIZON + 6, 190, 40, (9, 38, 46));
     floor_grid(g, HORIZON, 212);
-    header(g, ctx, "DEMO DISC");
+}
+
+/// Draw the menu. `launch` is the frame count since the start press, or -1;
+/// from frame 0 the selected case belongs to the launch sequence, and the
+/// text and the button fade out under the pressed button's flash.
+pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, launch: i32) {
+    backdrop(g);
+    header(g, ctx);
     footer(g, ctx);
 
     let hide_sel = launch >= 0;
-    let n = ctx.entries.len() as i32;
+    let n = entries.len() as i32;
     // Far to near so the focused case overlaps its neighbours.
     let mut order = [0i32; 16];
     let mut count = 0;
@@ -112,13 +130,15 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, launch: i32) {
             continue;
         }
         let (dx, sc, dim) = layout(d);
-        let settle = (256 - d.abs() * 3 / 2).max(0);
+        let settle = settle_of(d);
+        // The idle shelf dims everything but the focused case.
+        let dim = attract::dim(dim, ctx.attract, settle);
         let lift = (3 * settle) >> 8;
         // A neighbour leans toward the focused case; the focused one sways on
         // its hinge. One blend by `settle`, so the lean eases in and out as the
         // row moves instead of jumping.
         let lean = if d < 0 { -150 } else { 150 };
-        let yaw = ((lean * (256 - settle)) >> 8) + ((sway_yaw(ctx.t) * settle) >> 8);
+        let yaw = ((lean * (256 - settle)) >> 8) + ((attract::sway(sway_yaw(ctx.t), ctx.attract) * settle) >> 8);
         // Pool of light under each case, brightest for the focused one.
         let pool = scale((10, 52, 62), (settle as u32 * 3 >> 2) + 20);
         let rx = (66 * sc) >> 8;
@@ -136,39 +156,41 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, sel: i32, launch: i32) {
             focus: settle,
             yaw,
         };
-        draw_case(g, &cv, ctx.entries[i as usize]);
+        draw_case(g, &cv, &entries[i as usize]);
+    }
+
+    if launch < 0 {
+        attract::credit_line(g, ctx);
     }
 
     // Title, description and the primary action for the selected entry.
-    let e = ctx.entries[sel as usize];
+    let e = &entries[sel as usize];
     let near = ((256 - (sel * 256 - s.pos).abs() * 2).max(0)) as u32;
     let gone = if hide_sel {
         256 - ease::span(launch, 0, 16) as u32
     } else {
         256
     };
-    let a = near * gone >> 8;
+    let a = (near * gone >> 8) * ctx.chrome() >> 8;
     if a > 8 {
         let off = ((256 - near as i32) * 6) >> 8;
         title_row(g, e, TITLE_MID + off, a);
+        // Three lines at the usual pitch; a longer text tightens to four.
+        let desc = ctx.desc(e);
+        let pitch = if text::wrapped_lines(&JOST9, desc, DESC_W) > 3 { 9 } else { DESC_PITCH };
         text::draw_wrapped(
             g,
             &JOST9,
-            56,
+            (320 - DESC_W) / 2,
             DESC_MID - JOST9.cap_mid() + off * 2,
-            208,
-            DESC_PITCH,
-            3,
-            ctx.desc(e),
+            DESC_W,
+            pitch,
+            4,
+            desc,
             scale(MUTED, a),
             true,
         );
-        let label = match (e.art.is_some(), ctx.it) {
-            (true, false) => "START",
-            (true, true) => "AVVIA",
-            (false, false) => "OPEN",
-            (false, true) => "APRI",
-        };
+        let label = if ctx.it { "AVVIA" } else { "START" };
         let press = if hide_sel { Press::Down } else { Press::Idle };
         start_button(g, 160, BUTTON_MID + off * 2, label, press, ctx.t, a);
     }

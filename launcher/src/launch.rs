@@ -8,14 +8,15 @@
 //! camera, passes in front of the case, and carries on to lie open on the
 //! left, showing its back.
 //!
-//! In the real launcher the chain-load can start reading at frame 0 and this
-//! plays while the drive seeks; the flash then ends on the program's own
-//! first frame instead of black.
+//! The launcher points the drive at the program on frame 0 (see `chain`), so
+//! the seek happens while this plays.
 
 use crate::common::*;
+use crate::cover::{self, Cover};
 use crate::ease;
 use crate::gfx::*;
 use crate::shelf;
+use disc_toc::Entry;
 use psx_gte::math::{Mat3I16, Vec3I16, Vec3I32};
 use psx_gte::scene;
 use psx_math::{cos_q12, sin_q12};
@@ -214,7 +215,7 @@ fn tray(g: &mut Gfx, geom: &CaseGeom, dim: u32) {
 
 /// `t` counts frames from the press. Draws over whatever the menu drew (which
 /// left the selected case to this).
-pub fn draw(g: &mut Gfx, t: i32, from: From, e: &crate::data::Entry, ctx: &Ctx) {
+pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
     // Veil the menu: subtract toward the dark stage (the menu stops being
     // drawn once the veil has taken it to black).
     let veil = ease::out(ease::span(t, 0, 28)) * 230 / 256;
@@ -309,7 +310,7 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &crate::data::Entry, ctx: &Ctx) 
             case_front(g, &cv, &xf, e);
         } else {
             case_outline(g, &cv, &xf);
-            if let Some(art) = e.art {
+            if let Cover::Art(art) = cover::of(e.name_str()) {
                 cover(g, &geom, art, (open * COVER_MAX) >> 8, d);
             }
         }
@@ -327,7 +328,7 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &crate::data::Entry, ctx: &Ctx) 
             &crate::ui_atlas::MICH12,
             160,
             184,
-            e.name,
+            e.name_str(),
             scale(TEXT, lab),
             0,
         );

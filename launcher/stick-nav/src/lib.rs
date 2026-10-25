@@ -3,7 +3,7 @@
 //! [`StickNav::update`] turns each poll's stick bytes into a button mask in the
 //! same bit layout as [`psx_pad::button`], so the launcher ORs it into the
 //! d-pad's own bits and everything downstream (press edges, the browse chirp,
-//! the idle timer, the unlock code) treats the stick as the d-pad. The d-pad
+//! the idle timer) treats the stick as the d-pad. The d-pad
 //! has no auto-repeat in the launcher, so neither does this: a push is one
 //! press, and the stick has to come back near centre before it can press again.
 //!

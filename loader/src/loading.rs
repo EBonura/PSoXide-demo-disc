@@ -12,7 +12,8 @@ use crate::paint;
 
 const BACK_BUFFER_Y: i16 = 256;
 const STARS: u32 = 120;
-const BACKGROUND: u32 = 0x0004_001A;
+/// The Shelf menu's ground (4, 8, 12), so the hand-off does not change colour.
+const BACKGROUND: u32 = 0x000C_0804;
 const BAR_W: i16 = 160;
 const BAR_H: i16 = 12;
 const BAR_X: i16 = (320 - BAR_W) / 2;
@@ -27,10 +28,10 @@ const LABEL_Y: i16 = 180;
 const MAX_SEGMENTS: usize = 9;
 const MIN_SEGMENTS: usize = 6;
 
-const GLOSS_TOP: (u8, u8, u8) = (255, 66, 44);
-const GLOSS_BOTTOM: (u8, u8, u8) = (58, 0, 2);
-const GLOSS_EDGE: (u8, u8, u8) = (178, 10, 12);
-const SPECULAR: (u8, u8, u8) = (255, 196, 170);
+const GLOSS_TOP: (u8, u8, u8) = (96, 232, 255);
+const GLOSS_BOTTOM: (u8, u8, u8) = (0, 36, 48);
+const GLOSS_EDGE: (u8, u8, u8) = (24, 150, 180);
+const SPECULAR: (u8, u8, u8) = (200, 244, 255);
 
 const fn packed_rgb((r, g, b): (u8, u8, u8)) -> u32 {
     r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
