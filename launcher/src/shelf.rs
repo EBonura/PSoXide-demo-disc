@@ -45,23 +45,23 @@ pub fn title_row(g: &mut Gfx, e: &Entry, mid: i32, a: u32) {
     let tw = MICH12.width(name, 0);
     // Versions that are numbers read "v0.2.7"; a build name stands as it is.
     let prefix = version.as_bytes().first().is_some_and(u8::is_ascii_digit);
-    let vp = if prefix { JOST9.width("v", 0) } else { 0 };
+    let vp = if prefix { SMALL8.width("v", 0) } else { 0 };
     let vw = if version.is_empty() {
         0
     } else {
-        VERSION_GAP + vp + JOST9.width(version, 0)
+        VERSION_GAP + vp + SMALL8.width(version, 0)
     };
     let x = 160 - (tw + vw) / 2;
     let top = mid - MICH12.cap_mid();
     text::draw(g, &MICH12, x, top, name, scale(TEXT, a), 0);
     if vw > 0 {
         let vx = x + tw + VERSION_GAP;
-        let vy = top + MICH12.baseline() - JOST9.baseline();
+        let vy = top + MICH12.baseline() - SMALL8.baseline();
         let col = scale(MUTED, a);
         if prefix {
-            text::draw(g, &JOST9, vx, vy, "v", col, 0);
+            text::draw(g, &SMALL8, vx, vy, "v", col, 0);
         }
-        text::draw(g, &JOST9, vx + vp, vy, version, col, 0);
+        text::draw(g, &SMALL8, vx + vp, vy, version, col, 0);
     }
 }
 
@@ -169,12 +169,12 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
         title_row(g, e, TITLE_MID + off, a);
         // Three lines at the usual pitch; a longer text tightens to four.
         let desc = ctx.desc(e);
-        let pitch = if text::wrapped_lines(&JOST9, desc, DESC_W) > 3 { 9 } else { DESC_PITCH };
+        let pitch = if text::wrapped_lines(&SMALL8, desc, DESC_W) > 3 { 9 } else { DESC_PITCH };
         text::draw_wrapped(
             g,
-            &JOST9,
+            &SMALL8,
             (320 - DESC_W) / 2,
-            DESC_MID - JOST9.cap_mid() + off * 2,
+            DESC_MID - SMALL8.cap_mid() + off * 2,
             DESC_W,
             pitch,
             4,

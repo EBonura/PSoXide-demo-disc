@@ -463,7 +463,7 @@ impl Attract {
             let phase = (self.t % 360) as i32;
             let fade = (ease::span(phase, 0, 30) * (256 - ease::span(phase, 330, 360)) >> 8) as u32;
             if (self.t / 360) % 2 == 1 && !ctx.credit.is_empty() {
-                text::draw_centered_mid(g, &JOST9, 160, 228, ctx.credit, scale(MUTED, fade), 0);
+                text::draw_centered_mid(g, &SMALL8, 160, 228, ctx.credit, scale(MUTED, fade), 0);
             } else {
                 let hint = if ctx.it {
                     "PREMI UN TASTO"
@@ -472,7 +472,7 @@ impl Attract {
                 };
                 let breath = (sin_q12((self.t * 24) as u16 & 4095) + 4096) as u32 >> 6; // 0..=127
                 let c = scale(DIM, (90 + breath) * fade >> 8);
-                text::draw_centered_mid(g, &JOST9, 160, 228, hint, c, 1);
+                text::draw_centered_mid(g, &SMALL8, 160, 228, hint, c, 1);
             }
         }
     }
@@ -964,7 +964,7 @@ fn draw_back(
     } else {
         PROGRAMS[prog].blurb.0
     };
-    let face = &JOST9;
+    let face = &SMALL8;
     let mut lines = [""; 5];
     let n = wrap(face, blurb, inner, &mut lines);
     let ty = sy + dh + 7;

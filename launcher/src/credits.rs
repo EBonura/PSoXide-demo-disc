@@ -110,7 +110,7 @@ pub fn draw(g: &mut Gfx, ctx: &Ctx) {
     for (row, (slot, handle)) in LINKS.iter().enumerate() {
         let y = LINKS_TOP + row as i32 * LINK_PITCH;
         g.link_icon(*slot, TEXT_X, y - 1, MUTED);
-        text::draw_mid(g, &JOST9, TEXT_X + ICON_CELL + 6, y + 5, handle, TEXT, 0);
+        text::draw_mid(g, &SMALL8, TEXT_X + ICON_CELL + 6, y + 5, handle, TEXT, 0);
     }
     // The music credit under them.
     let credit_top = LINKS_TOP + LINKS.len() as i32 * LINK_PITCH + 10;
@@ -119,7 +119,7 @@ pub fn draw(g: &mut Gfx, ctx: &Ctx) {
         let tint = if row == 0 { ACCENT } else { MUTED };
         text::draw_mid(
             g,
-            &JOST9,
+            &SMALL8,
             TEXT_X,
             credit_top + 4 + row as i32 * CREDIT_PITCH,
             line,
@@ -153,5 +153,5 @@ pub fn draw(g: &mut Gfx, ctx: &Ctx) {
         }
     }
     let caption = if ctx.it { "Inquadra per tutti i link" } else { "Scan for every link" };
-    text::draw_centered_mid(g, &JOST9, qx + QR_SIZE / 2, qy + QR_SIZE + 10, caption, MUTED, 0);
+    text::draw_centered_mid(g, &SMALL8, qx + QR_SIZE / 2, qy + QR_SIZE + 10, caption, MUTED, 0);
 }

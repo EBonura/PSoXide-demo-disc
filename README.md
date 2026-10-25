@@ -308,6 +308,14 @@ menu atlas, which the launcher leaves in VRAM; the loader uses the launcher's
 own two buffers (rows 0 and 240), not the rows below them where the atlas's
 palette sits.
 
+The menu's type is baked by `tools/menu-art` into one 4bpp atlas: the titles
+and button labels are anti-aliased Michroma (12 and 9 px); everything small
+(descriptions, footer hints, header, version labels, credits, back covers) is
+Tiny5 at its own 8 px size, kept as whole pixels (1-bit), so it stays crisp when
+a player scales the 320x240 picture up (a phone, a browser tab) and does not
+smear the way the anti-aliased 9 px face it replaced did. Michroma and Tiny5
+are SIL OFL; both sit in the editor's `psx-font/vendor/google-fonts`.
+
 The menu's geometry and easing use no floating point and no 64-bit integers.
 The case's picture, frame, brackets and glare all go through one GTE transform,
 so a tilted case stays one object.

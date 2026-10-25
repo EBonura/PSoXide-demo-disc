@@ -1,7 +1,8 @@
 //! Bakes the demo disc launcher's art into PS1 texture blobs.
 //!
-//! * `ui.tex`: one 256x256 4bpp texture page holding three anti-aliased
-//!   faces (Michroma display, Michroma small caps, Jost body) and the button
+//! * `ui.tex`: one 256x256 4bpp texture page holding two anti-aliased
+//!   faces (Michroma display, Michroma small caps), one pixel-hinted face for
+//!   small text (Tiny5, 1-bit) and the button
 //!   glyphs. Texel 0 is transparent, texels 1..=15 are coverage levels, so the
 //!   guest tints it with the palette ramp and blends it additively.
 //! * `ui_atlas.rs`: the glyph tables for that page, as `const` data.
@@ -11,8 +12,13 @@
 //!
 //! * `back_<name>.art`: the attract mode's back-cover screenshots.
 //!
-//! Usage: `menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>`
+//! Usage: `menu-art bake <michroma.ttf> <tiny5.ttf> <shots-dir> <out-dir>`
 //!        `menu-art backs <shots-dir> <out-dir>`
+//!
+//! Both fonts are SIL OFL and sit in the editor's `psx-font/vendor/google-fonts`.
+//! Tiny5 is drawn on a pixel grid, so at its own size (8 px) it rasterises to
+//! whole pixels and the baked face keeps them whole: small text stays crisp when
+//! the player scales the picture up, which the anti-aliased Jost it replaced did not.
 
 use fontdue::{Font, FontSettings};
 use image::imageops::FilterType;
@@ -97,7 +103,9 @@ struct Face {
     line: i32,
 }
 
-fn bake_face(atlas: &mut Atlas, name: &'static str, font: &Font, px: f32) -> Face {
+/// `snap`: keep only whole pixels (coverage of at least one half), for a face
+/// drawn on a pixel grid; otherwise keep the anti-aliased coverage.
+fn bake_face(atlas: &mut Atlas, name: &'static str, font: &Font, px: f32, snap: bool) -> Face {
     let lm = font
         .horizontal_line_metrics(px)
         .expect("font has line metrics");
@@ -106,7 +114,10 @@ fn bake_face(atlas: &mut Atlas, name: &'static str, font: &Font, px: f32) -> Fac
     let mut glyphs = Vec::new();
     for c in FIRST..=LAST {
         let (m, cov) = font.rasterize(c as char, px);
-        let levels: Vec<u8> = cov.iter().map(|&b| level(b as f32 / 255.0)).collect();
+        let levels: Vec<u8> = cov
+            .iter()
+            .map(|&b| if snap { u8::from(b >= 128) * 15 } else { level(b as f32 / 255.0) })
+            .collect();
         let mut g = Glyph {
             adv: m.advance_width.round() as u8,
             ..Glyph::default()
@@ -382,7 +393,7 @@ fn main() {
         return attract::bake_backs(Path::new(&args[2]), Path::new(&args[3]));
     }
     if args.len() != 6 || args[1] != "bake" {
-        eprintln!("usage: menu-art bake <michroma.ttf> <jost.ttf> <shots-dir> <out-dir>");
+        eprintln!("usage: menu-art bake <michroma.ttf> <tiny5.ttf> <shots-dir> <out-dir>");
         eprintln!("       menu-art backs <shots-dir> <out-dir>");
         std::process::exit(2);
     }
@@ -394,17 +405,16 @@ fn main() {
         .expect("font parses")
     };
     let michroma = load(&args[2]);
-    let jost = load(&args[3]);
+    let tiny5 = load(&args[3]);
     let shots = Path::new(&args[4]);
     let out = Path::new(&args[5]);
     fs::create_dir_all(out).unwrap();
 
     let mut atlas = Atlas::new();
     let faces = [
-        bake_face(&mut atlas, "mich12", &michroma, 12.0),
-        bake_face(&mut atlas, "mich9", &michroma, 9.0),
-        bake_face(&mut atlas, "jost9", &jost, 9.0),
-        bake_face(&mut atlas, "jost11", &jost, 11.0),
+        bake_face(&mut atlas, "mich12", &michroma, 12.0, false),
+        bake_face(&mut atlas, "mich9", &michroma, 9.0, false),
+        bake_face(&mut atlas, "small8", &tiny5, 8.0, true),
     ];
     let icons = bake_icons(&mut atlas);
 

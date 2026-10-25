@@ -381,7 +381,7 @@ fn main() {
             common::header(&mut g, &ctx);
             text::draw_centered_mid(
                 &mut g,
-                &ui_atlas::JOST9,
+                &ui_atlas::SMALL8,
                 160,
                 118,
                 "DISC TABLE OF CONTENTS UNREADABLE",
@@ -466,7 +466,7 @@ fn draw_controller_notice(g: &mut Gfx) {
         let tint = if row < 2 { gfx::TEXT } else { gfx::MUTED };
         text::draw_centered_mid(
             g,
-            &ui_atlas::JOST9,
+            &ui_atlas::SMALL8,
             160,
             y + 14 + row as i32 * 12,
             line,
@@ -534,7 +534,7 @@ fn draw_music_debug(
     let emit = |g: &mut Gfx, y: &mut i32, buf: &[u8], n: usize| {
         // SAFETY: every byte written above is ASCII.
         let line = unsafe { core::str::from_utf8_unchecked(&buf[..n]) };
-        text::draw(g, &ui_atlas::JOST9, x, *y - 4, line, gfx::TEXT, 0);
+        text::draw(g, &ui_atlas::SMALL8, x, *y - 4, line, gfx::TEXT, 0);
         *y += 11;
     };
 
