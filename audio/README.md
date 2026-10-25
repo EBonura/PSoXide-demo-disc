@@ -17,7 +17,7 @@ The launcher plays six pieces made by chaining loops from those three packs
 
 The pieces were loudness-matched (-15 LUFS integrated) before encoding. The
 license (CC BY 4.0) asks for the author, the work, the license and a link; the
-launcher's Credits and Links card carries them, and so do the repository
+launcher's credits screen (Select) carries them, and so do the repository
 README, the CHANGELOG and the release notes. Keep those in step.
 
 ## What is in `launcher/`

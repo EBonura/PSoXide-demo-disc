@@ -183,8 +183,8 @@ larger streaming games.
 `editor/projects/default` project (formerly `cortex-ignition-tech-demo-0.4b`,
 renamed when it became the editor's New Project template) at the exact editor
 revision recorded in `release-components.json` and the Makefile. Both editions
-expose this early tech demo directly in the carousel. `QUAKE SHAREWARE` is the last program before
-CREDITS, and a default program rather than a variant. Quake streams `WORLD.PAK`,
+expose this early tech demo directly on the shelf. `QUAKE SHAREWARE` is a
+default program rather than a variant. Quake streams `WORLD.PAK`,
 so a bare executable is not sufficient; the entry uses the same caller-provided
 LBA offset that relocates
 Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
@@ -192,7 +192,8 @@ revision and by four artifact hashes, and `disc-only` refuses to lay out a
 sector until they check. See [the Quake runbook](docs/quake-shareware.md).
 
 The standard order is PSoXide Arcade, Celeste Collection, NitroXide,
-Voxide, Quake Shareware, Cortex Ignition, PSXcel, then Credits. PSoXide
+Voxide, Quake Shareware, Cortex Ignition, then PSXcel; the credits are a
+screen of their own, opened with Select. PSoXide
 Arcade opens a dedicated cabinet selector for Breakout, Space Invaders and
 Magikarp Pong. The optional programs sit between Voxide and Quake Shareware in
 HK, CS, HL order.
@@ -206,8 +207,7 @@ programs in another order.
 Music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and Ambient Jungle D&B
 Vol 3, CC BY 4.0, <https://mululavgmloops.itch.io/>. The loops are chained
 into six pieces (JUNGLE 1 A and B, JUNGLE 2 A and B, JUNGLE DNB A and B). The
-credit is on the launcher's Credits and Links card (it turns between the music
-credit and the links), in `audio/README.md`, the CHANGELOG and the release notes.
+credit is on the launcher's credits screen (Select), in `audio/README.md`, the CHANGELOG and the release notes.
 
 The pieces are packed with the SDK's `psx-audio-cook xa-pack` (37.8 kHz stereo,
 two files, 35,100 sectors) and ride in the launcher's ISO. The launcher finds
@@ -233,61 +233,65 @@ and find fewer than five CD-DA tracks, which they treat as no music.
 
 ## The menu
 
-A carousel of glossy blue pills under a turning ball of balls, over a
-starfield: the PlayStation demo discs, as closely as flat and gouraud
-triangles get you. Left and right (the d-pad or the left stick) spin the ring, X runs the pill at the front, up or down swaps
-the description between English and Italian under a drawn flag, and L1 or R1
-skips the music. Titles too long for a pill break across two lines.
+The Shelf: the programs as jewel cases standing on a floor, one in focus, in
+the look of the PSoXide home shell at 320x240 (near-black blue-grey, a soft
+teal glow, white type, one cyan accent). The focused case lifts, brightens
+inside corner brackets and sways on its hinge; its neighbours recede in scale
+and light and lean toward it. Under the row sit the program's name with its
+own version beside it, its description in English or Italian, and the start
+button. The cover on each case is a picture baked into the launcher by
+`tools/menu-art` from `assets/shots` (a program the launcher has no picture
+for gets a plain cover and still starts).
 
-Top left is a music panel: what is playing, a sixteen-band level meter, and the L1/R1
-label. The six songs play as a shuffled playlist, none twice until all have
-played; L1 and R1 walk the shuffle and then a MUSIC OFF slot. The meter is not
-keeping time, it is listening: `mkdisc analyse` runs an FFT over each song
-when the music is authored and the result ships in a `SPECTRUM.BIN`
-region the launcher reads at boot, indexed by song time from the XA player. Bands are normalised per band rather than
-globally, because a drum and bass track has so much more energy at 60 Hz than
-at 12 kHz that a single scale leaves the top half of the meter permanently
-flat. Only that control is labelled on screen. The rest a PlayStation owner
-tries without being told; nothing about the screen suggests the shoulder
-buttons do anything at all.
+| Control | Does |
+|---|---|
+| Left, right (d-pad or left stick) | browse the shelf |
+| Cross or Start | start the program |
+| Triangle | switch the descriptions and hints between English and Italian |
+| Select | open the credits screen (Circle or Select to leave) |
+| L1, R1 | skip through the six songs and the MUSIC OFF slot |
+| L2 + R2 | the CD debug overlay (song state, drive head, refusals), for console photos |
 
-Track titles come off the disc like everything else the menu shows, so the
-launcher still knows nothing about what it is playing until it reads the
-table. That table now spans two sectors, since the titles and two
-descriptions per program stopped fitting in one.
+The header carries the wordmark, the disc's name and version (the build's
+`DISC_VERSION`), the Language key beside the EN/IT switch, and a level meter;
+the song's name sits under it at the right. The six songs play as a shuffled
+playlist, none twice until all have played. The meter is not keeping time, it
+is listening: `mkdisc analyse` runs an FFT over each song when the music is
+authored and the result ships in a `SPECTRUM.BIN` region the launcher reads at
+boot, indexed by song time from the XA player (eight bars, each the mean of two
+of the sixteen analysed bands).
 
-The whole scene answers the music. With a measured tempo, `disc-tools
-beatgrid` fits a tempo and phase to a song's onset envelope offline and the
-numbers ship in the disc table, so the grid stays in step for the length of a
-song rather than drifting out of it. The current six songs ship without a grid
-(they chain loops of different tempos, so there is no single tempo to fit) and
-the scene follows the level meter alone. With a grid: the ball blows outward on every beat and snaps back, harder
-on the downbeat; the pills flash on the downbeat only; the starfield twinkles
-on the offbeat, in the gaps the other two leave; and the ball's idle spin rides
-the bar, quickest just after the downbeat.
+Everything the menu shows about a program (name, version, descriptions, its
+order) and about the music (titles, the credit line, the analysis) comes off the
+disc's table, so one launcher serves every pressing. The only build-time choice
+inside the launcher is the `private` cargo feature, which compiles in the covers
+and names of the bring-your-own-assets programs; the Makefile turns it on for any
+pressing that carries one, and a Public launcher holds neither. Which programs a
+pressing has is decided when the disc is built, and nothing can be revealed at
+run time.
 
-It answers the pad too. Browsing shoves the ball's spin, which coasts back down
-over the next second, and the same shove blows the beads apart and lets them
-re-form. The starfield drifts with it, brighter stars faster.
+The credits screen has the music attribution (author, works, licence, link),
+the project links behind their platform marks, and the QR code for the link hub.
+After 20 seconds without a button the text and hints fade out, the shelf drifts
+and the music credit takes the footer's place; any button brings everything back
+at once (`launcher/src/attract.rs` is all of that state).
 
-A shaft of light crosses the frame behind everything, drawn additively so it
-brightens what it passes rather than covering it, and the carousel is mirrored
-in the floor below it.
+The disc is meant for a DualShock in analog mode. The launcher locks port 1
+there at boot and asks again every second; until it holds one, the menu shows a
+notice in English and Italian and ignores the buttons.
 
-Choosing a program is an event rather than a cut: the camera accelerates into
-the starfield until the stars streak into lines, the ball blows itself apart
-past the edges of the screen, and only then does the fade hand over to the
-chain-load. The high-RAM loader then keeps a standalone copy of the spinning
-globe and starfield visible over the progress bar while the selected program
-overwrites the launcher. A tail brighter than its head marks a star that
-wrapped back to the far plane between two frames, which is what keeps a streak
-from crossing the whole sky.
+Choosing a program is an event: the case comes to the middle of the stage, its
+cover swings open on the left hinge like a real jewel case, the disc lifts out
+of the tray and spins up into a flash (96 frames, `launcher/src/launch.rs`).
+From the first of those frames the launcher stops the song and sends the drive's
+head to the program's first sector, so the long seek out of the music file
+happens during the animation (`launcher/src/chain.rs`). The loader then keeps a
+standalone copy of the spinning globe and starfield, in the menu's colours,
+visible over the progress bar while the selected program overwrites the launcher.
 
-The menu's procedural geometry uses no floating point. Its screenshot cards
-and branding are cooked textures. Ellipses are triangle fans whose segment
-count follows their size: at a flat twelve the ball alone put the frame over
-2000 triangles and the menu stopped holding 60 Hz, which stretched every
-time-driven effect with it.
+The menu's geometry and easing use no floating point and no 64-bit integers.
+The case's picture, frame, brackets and glare all go through one GTE transform,
+so a tilted case stays one object.
 
 ## Status
 
@@ -297,8 +301,7 @@ boot is HLE, while the launcher still reads the pressed table and chain-loads
 the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
-- the standard carousel contains eight visible entries including Cortex
-  Ignition and Credits
+- the standard shelf holds seven programs including Cortex Ignition
 - `hello-pack` streams its pack and reports ALL PASS with its image relocated
   220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
