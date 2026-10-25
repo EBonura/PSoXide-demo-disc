@@ -401,8 +401,13 @@ fn route_for(target: &str, index: usize) -> String {
 }
 
 /// The intro and panels push Cortex's gameplay past the default budget.
-fn steps_for(target: &str, steps: u64) -> u64 {
-    match target {
+///
+/// A case further along the shelf is launched later (one RIGHT press every 200
+/// route ticks), so the budget grows by the ticks the walk adds, at about
+/// 250,000 steps a tick.
+fn steps_for(target: &str, steps: u64, index: usize) -> u64 {
+    let walk = (launcher_route(index).1 - 1_000).max(0) as u64 * 250_000;
+    walk + match target {
         "CORTEX IGNITION" => steps.max(CORTEX_STEPS),
         "HALF-LIFE" => steps.max(HL_STEPS),
         "WIPEOUT PSOXIDE" => steps.max(WIPEOUT_STEPS),
@@ -602,7 +607,7 @@ fn run_once(
         .args(["launch", "--embedded-playtest", "--path"])
         .arg(cue)
         .arg("--steps")
-        .arg(steps_for(&target.name, steps).to_string())
+        .arg(steps_for(&target.name, steps, target.visible_index).to_string())
         .arg("--press")
         .arg(route_for(&target.name, target.visible_index))
         .arg("--route-log")
@@ -957,9 +962,9 @@ mod tests {
 
     #[test]
     fn half_life_gets_enough_steps_to_leave_its_loading_screens() {
-        assert_eq!(steps_for("HALF-LIFE", DEFAULT_STEPS), HL_STEPS);
-        assert_eq!(steps_for("HALF-LIFE", 2 * HL_STEPS), 2 * HL_STEPS);
-        assert_eq!(steps_for("QUAKE SHAREWARE", DEFAULT_STEPS), DEFAULT_STEPS);
+        assert_eq!(steps_for("HALF-LIFE", DEFAULT_STEPS, 0), HL_STEPS);
+        assert_eq!(steps_for("HALF-LIFE", 2 * HL_STEPS, 0), 2 * HL_STEPS);
+        assert_eq!(steps_for("QUAKE SHAREWARE", DEFAULT_STEPS, 0), DEFAULT_STEPS);
     }
 
     #[test]
@@ -992,8 +997,8 @@ mod tests {
                 1000
             )
         );
-        assert_eq!(steps_for("CORTEX IGNITION", 1), CORTEX_STEPS);
-        assert_eq!(steps_for("QUAKE SHAREWARE", 1), 1);
+        assert_eq!(steps_for("CORTEX IGNITION", 1, 0), CORTEX_STEPS);
+        assert_eq!(steps_for("QUAKE SHAREWARE", 1, 0), 1);
     }
 
     #[test]

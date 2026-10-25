@@ -104,7 +104,7 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
     let (voxide, _) = outer("VOXIDE")?;
     let (nitroxide, _) = outer("NITROXIDE")?;
     let (celeste, celeste_cross) = outer("CELESTE COLLECTION")?;
-    let (psxcel, _) = outer("PSXCEL")?;
+    let (psxcel, psxcel_cross) = outer("PSXCEL")?;
     let (arcade, arcade_cross) = outer("PSOXIDE ARCADE")?;
     let inner_ready = arcade_cross + 600;
     let at = |tick: i64, button: &str, hold: u32| format!("{tick}:{button}:{hold}");
@@ -181,11 +181,18 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         // These exercise both linked games, not just the collection menu.
         route("celeste-classic", &classic, 1_100_000_000, 1, &[]),
         route("celeste-classic-2", &classic2, 1_100_000_000, 1, &[]),
-        // PSXcel is six shelf moves from the first case (the shelf does not
-        // wrap). Give the launcher enough emulated time to reach the delayed
-        // launch press before judging the guest, rather than stopping while
-        // its case is merely selected.
-        route("psxcel", &psxcel, 650_000_000, 1, &[]),
+        // PSXcel is the last case, so the walk to it is the longest on the
+        // shelf (the shelf does not wrap). Give the launcher enough emulated
+        // time (about 250,000 steps a route tick) to reach the delayed launch
+        // press before judging the guest, rather than stopping while its case
+        // is merely selected.
+        route(
+            "psxcel",
+            &psxcel,
+            150_000_000 + psxcel_cross as u64 * 250_000,
+            1,
+            &[],
+        ),
         route("arcade-breakout", &breakout, 700_000_000, 2, &[]),
         route(
             "arcade-invaders",
