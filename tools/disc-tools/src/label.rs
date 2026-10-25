@@ -29,16 +29,18 @@ use regex::Regex;
 use crate::args::Args;
 use crate::util::{Error, Result};
 
+/// The public pressing in menu order: the three arcade games of PSoXide
+/// Arcade, then every other program.
 const GAMES: [&str; 9] = [
-    "CORTEX IGNITION",
-    "QUAKE SHAREWARE",
-    "VOXIDE",
-    "NITROXIDE",
-    "CELESTE COLLECTION",
-    "PSXCEL",
     "BREAKOUT",
     "SPACE INVADERS",
     "MAGIKAAAAARP PONG",
+    "CELESTE COLLECTION",
+    "NITROXIDE",
+    "VOXIDE",
+    "QUAKE SHAREWARE",
+    "CORTEX IGNITION",
+    "PSXCEL",
 ];
 
 const CX: f64 = 60.0;
@@ -578,11 +580,11 @@ fn qr(url: &str, cx: f64, cy: f64, size: f64, caption: &str) -> Result<String> {
 }
 
 fn build(hl: bool, links: &[(String, String)], logo: &str) -> Result<String> {
-    let mut games: Vec<&str> = vec![GAMES[0]];
+    let mut games: Vec<&str> = GAMES.to_vec();
     if hl {
-        games.push("HALF-LIFE");
+        let at = games.iter().position(|g| *g == "QUAKE SHAREWARE").unwrap_or(games.len());
+        games.insert(at, "HALF-LIFE");
     }
-    games.extend(&GAMES[1..]);
     let rim = games.join("  ·  ");
     let (defs, mark) = wordmark(logo)?;
     // QRs flank the hub, clear of both the stacking ring and the title block.
@@ -859,22 +861,22 @@ mod tests {
         let plain = build(false, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(plain.as_bytes()),
-            "6106c057976f118c86c3d1b22e7d6d93004fe5920c20ec07ffd3e43f503f5288"
+            "91bd70918a4ebedfdf62f6dfc16ef4df73e4029d4a991859fd828c9429853357"
         );
         let hl = build(true, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(hl.as_bytes()),
-            "bad5f1b5fd12d194ae061a2b7d5ba44b6acadeb3770254cb3d1416cd3ff00893"
+            "e92c87e4b95f8566c8cd1b91f9d9cf1a227a271add40fff40a74b8c81a7b2f65"
         );
         let linked = build(false, &links(), &logo).unwrap();
         assert_eq!(
             sha256_bytes(linked.as_bytes()),
-            "e5f1b7889fd8a665a914996c0fd0d436bf852949c35211def03b545e11f61cd8"
+            "6af9fbb71ac45b7465531ee7f3d106439de160aa5554733957ee2024c753c2f7"
         );
         let one = build(true, &links()[..1], &logo).unwrap();
         assert_eq!(
             sha256_bytes(one.as_bytes()),
-            "507935d63cc12dee1f2d393b8f76e5ab68a12bc5834947003f97982b3dcfa730"
+            "f69ed97ac6cd5229de87a5de90510a6f849dcb14fc7d2e890be5959354ca9268"
         );
     }
 

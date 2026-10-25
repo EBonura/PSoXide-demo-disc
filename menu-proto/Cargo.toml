@@ -1,0 +1,36 @@
+# Prototype guest for the demo disc menu redesign (drafts, not shipped).
+# Outside any workspace: this links for the PS1 with psoxide.ld.
+cargo-features = ["trim-paths"]
+
+[package]
+name    = "menu-proto"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[workspace]
+
+[[bin]]
+name = "menu-proto"
+path = "src/main.rs"
+
+[profile.release]
+trim-paths    = "all"
+panic         = "abort"
+codegen-units = 1
+lto           = true
+
+[features]
+# Press the private edition (the four bring-your-own-assets ports). The real
+# disc fixes the edition at build time; the prototype has no runtime switch.
+private = []
+
+[dependencies]
+psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
+psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
+psx-pad  = { path = "../games/PSoXide-editor/sdk/crates/psx-pad" }
+psx-rt   = { path = "../games/PSoXide-editor/sdk/crates/psx-rt" }
+psx-vram = { path = "../games/PSoXide-editor/sdk/crates/psx-vram" }
+psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
+psx-gte  = { path = "../games/PSoXide-editor/sdk/crates/psx-gte" }
+psx-hw   = { path = "../games/PSoXide-editor/crates/psx-hw" }
