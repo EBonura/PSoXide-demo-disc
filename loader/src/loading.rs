@@ -101,10 +101,17 @@ pub struct LoadingScreen {
 
 impl LoadingScreen {
     pub fn new() -> Self {
+        // SAFETY: the launcher wrote this word before it jumped here (see
+        // `chainload_layout::SHOWN_BUFFER_MAILBOX`); it is plain RAM inside the
+        // blob's reservation. Anything but the second buffer's row means the
+        // first.
+        let shown_row = unsafe {
+            core::ptr::read_volatile(chainload_layout::SHOWN_BUFFER_MAILBOX as *const u32)
+        };
         Self {
             t: disc_art::LAST_SHOWN,
             frame: 0,
-            shown: 0,
+            shown: usize::from(shown_row == BUFFERS[1] as u32),
             ready: false,
             edges: 0,
             sectors: 0,
@@ -112,22 +119,42 @@ impl LoadingScreen {
         }
     }
 
-    /// Paint the first complete frame, the launcher's last, and turn the
-    /// display on the moment it is done: the GPU reset that opened the loader
-    /// blanked the screen, and every frame it stays blank is a flicker in what
-    /// should be one shot. The second buffer is painted after, with the next
-    /// frame, so the screen is not kept waiting for it. Both get the whole
-    /// scene once; after that a frame only repaints what changes.
+    /// Program the display after the GPU reset, as `paint::setup` does, but
+    /// with its start on the buffer the launcher was showing: the screen
+    /// (and anything that looks at VRAM while the display is off) keeps the
+    /// launcher's last picture, whole, until the first frame is ready.
+    pub fn setup(&mut self) {
+        let start = 0x0500_0000 | ((BUFFERS[self.shown] as u32 & 0x1ff) << 10);
+        for word in [
+            0x0300_0001,                                     // display off while painting
+            0x0800_0001,                                     // 320x240, NTSC
+            0x0600_0000 | 0x260 | ((0x260 + 320 * 8) << 12), // the centred picture
+            0x0700_0000 | 0x10 | ((0x10 + 240) << 10),
+            start,
+        ] {
+            psx_io::gpu::write_display_control(word);
+        }
+    }
+
+    /// Paint the first frame into the buffer the launcher was not showing,
+    /// then show it and turn the display on: nothing partial is ever on the
+    /// screen. The frame is the one after the launch's last. The buffer the
+    /// launcher was showing is painted next, with the frame after that, so the
+    /// screen is not kept waiting for it. Both get the whole scene once; after
+    /// that a frame only repaints what changes.
     pub fn begin(&mut self) {
         send(&[DRAW_MODE]);
-        self.draw(BUFFERS[0], Pass::Whole, 256);
+        self.t += 1;
+        self.draw(BUFFERS[self.shown ^ 1], Pass::Whole, 256);
         paint::draw_sync();
+        self.shown ^= 1;
+        display(BUFFERS[self.shown]);
         paint::show();
         // An edge latched before now is not a frame of this screen.
         paint::ack_vblank();
         self.t += 1;
         self.frame += 1;
-        self.draw(BUFFERS[1], Pass::Whole, 256);
+        self.draw(BUFFERS[self.shown ^ 1], Pass::Whole, 256);
         self.ready = true;
     }
 

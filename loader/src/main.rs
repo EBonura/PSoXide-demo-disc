@@ -20,7 +20,7 @@ mod ui_atlas;
 
 impl Presentation for LoadingScreen {
     fn setup(&mut self) {
-        paint::setup(319, 239);
+        LoadingScreen::setup(self);
     }
     fn begin(&mut self) {
         LoadingScreen::begin(self);

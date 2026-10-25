@@ -47,6 +47,10 @@ SECTIONS {
        stack-only and let the link fail if that ever stops being true. */
     ASSERT(__bss_end == __bss_start, "loader blob must have no .bss")
 
+    /* The last word of the reservation is the launcher's mailbox
+       (chainload-layout::SHOWN_BUFFER_MAILBOX); the blob must stop short. */
+    ASSERT(SIZEOF(.text) + 4 <= LOADER_SIZE, "loader blob overruns the mailbox word")
+
     /DISCARD/ : {
         *(.MIPS.abiflags)
         *(.reginfo)

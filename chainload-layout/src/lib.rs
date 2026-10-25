@@ -33,6 +33,14 @@ pub const LOADER_BUDGET: u32 = 32 * 1024;
 /// Lowest address of the stack the launcher hands the blob.
 pub const STACK_BASE: u32 = 0x801F_8000;
 
+/// The word the launcher leaves for the blob: the VRAM row of the buffer the
+/// display was showing when it handed over (0 or 240). It is the last word of
+/// the blob's reservation, past the end of the blob (the link asserts the blob
+/// stops short of it), so copying the blob does not touch it. The loader paints
+/// its first frame into the other buffer and flips to it, so the launcher's
+/// last picture stays up, whole, until the loader's first one is ready.
+pub const SHOWN_BUFFER_MAILBOX: u32 = LOADER_BASE + LOADER_BUDGET - 4;
+
 /// Top of RAM.
 pub const RAM_END: u32 = 0x8020_0000;
 
@@ -53,6 +61,7 @@ mod tests {
         assert!(LOADER_BASE >= 0x8001_0000);
         let [blob, stack] = RESERVED;
         assert!(blob.0 < blob.1 && blob.1 <= stack.0 && stack.0 < stack.1);
+        assert!(SHOWN_BUFFER_MAILBOX >= blob.0 && SHOWN_BUFFER_MAILBOX + 4 == blob.1);
         assert_eq!(stack.1, RAM_END);
     }
 }

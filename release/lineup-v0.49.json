@@ -62,18 +62,18 @@
       "var": "VOXIDE",
       "version_var": "V_VOXIDE",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-ship/inputs/voxide/VoXide.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/disc-loader/inputs/voxide/VoXide.cue",
       "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
-      "bin_sha256": "a2d9086235265cb373b958cb6dc03f417a2e462dcbebb4913bebcac1fc068e39",
+      "bin_sha256": "82461d86219d9ac514faef8c22c3c4695827580246633b694b3a32c4fb478086",
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/voxide",
-        "local": "~/Desktop/repos/campaign-2026-10-15/web-player/vox",
-        "revision": "aaf89592e6d6bc37b291a740cbf14c74cacec430",
-        "ref": "fix/public-splash-2026-10-23"
+        "local": "~/Desktop/repos/campaign-2026-10-15/voxide-loading/voxide",
+        "revision": "12895132b5e49a888c4d712fa4a7af9a4940eaab",
+        "ref": "main"
       },
-      "build": "make gate-disc on voxide aaf8959 (b6d2af3, the v0.47 VoXide, plus the one-line splash fix; same SDK b5365b18 / editor c096eee0 pins, committed PGO profile). 76 bytes differ from the v0.47 input, all in the sector that holds the splash text.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-ship/inputs/voxide/INSTALLED.json"
+      "build": "voxide main 12895132 (44dc725 plus the Minecraft-style loading screen of 97e6017: dirt backdrop, turning grass block, stage line, bar, fade-in), the library VoXide of 2026-10-25, built with make gate-disc on the same SDK b5365b18 / editor c096eee0 pins with the committed PGO profile. Its splash line already reads ALSO TRY CELESTE!, so one build serves both editions.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/disc-loader/inputs/voxide/INSTALLED.json"
     },
     {
       "name": "QUAKE SHAREWARE",

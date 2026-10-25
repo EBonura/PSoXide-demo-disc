@@ -24,9 +24,9 @@ const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
 /// Where the blob runs, from the one place the loader link and mkdisc read too.
 const LOADER_BASE: u32 = chainload_layout::LOADER_BASE;
 
-/// Blob budget. Overrunning it would walk into whatever loads above the blob,
-/// so check rather than trust.
-const LOADER_LIMIT: usize = chainload_layout::LOADER_BUDGET as usize;
+/// Blob budget, less the mailbox word at its end. Overrunning it would walk
+/// into whatever loads above the blob, so check rather than trust.
+const LOADER_LIMIT: usize = chainload_layout::LOADER_BUDGET as usize - 4;
 
 /// Polls a single command may wait for its first answer. The commands answer
 /// in about a millisecond; this only bounds a dead drive.
@@ -127,6 +127,15 @@ pub fn boot(entry: &Entry, g: &mut Gfx, seek: &mut Seek) -> ! {
             LOADER_BLOB.as_ptr(),
             LOADER_BASE as *mut u8,
             LOADER_BLOB.len(),
+        );
+        // Which buffer the display shows, for the loader to leave up until its
+        // first frame is painted (see `chainload_layout::SHOWN_BUFFER_MAILBOX`).
+        // The swap that follows a frame only takes hold at the next VBlank, and
+        // the loader resets the GPU before that, so the picture on the screen is
+        // the one in the buffer the next frame would have been drawn into.
+        core::ptr::write_volatile(
+            chainload_layout::SHOWN_BUFFER_MAILBOX as *mut u32,
+            g.fb.draw_origin().1 as u32,
         );
         psx_rt::cache::flush_instruction_cache();
         let blob: unsafe extern "C" fn(u32, u32, u32, u32) -> ! =

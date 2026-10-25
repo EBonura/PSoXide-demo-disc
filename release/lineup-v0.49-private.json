@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.49-private",
-  "note": "PSoXide Demo Disc v0.49, private edition (local, never published or distributed), all XA: no CD-DA track. The programs both editions share are the Public v0.49 inputs (Quake and the five bring-your-own-assets ports are their library builds of 2026-10-25, WipEout 2026-10-22); VoXide is the original build with its WipEout splash line. Hardware tests stay on their own disc.",
+  "note": "PSoXide Demo Disc v0.49, private edition (local, never published or distributed), all XA: no CD-DA track. The programs both editions share are the Public v0.49 inputs (Quake and the five bring-your-own-assets ports are their library builds of 2026-10-25, WipEout 2026-10-22); VoXide is voxide main 12895132 (library build of 2026-10-25, with its loading screen). Hardware tests stay on their own disc.",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -62,18 +62,18 @@
       "var": "VOXIDE",
       "version_var": "V_VOXIDE",
       "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/demo-ship/inputs/voxide-private/VoXide.cue",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/disc-loader/inputs/voxide/VoXide.cue",
       "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
-      "bin_sha256": "faed048249e473f7d9a95d0eeafed7c3b84cff2501d527b485026e86a421c4cd",
+      "bin_sha256": "82461d86219d9ac514faef8c22c3c4695827580246633b694b3a32c4fb478086",
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/voxide",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v045/src/voxide.git",
-        "revision": "b6d2af3fe066585142d389f31f96c7d974a1a3f1",
-        "ref": "perf/voxide-retune-2026-10-17"
+        "local": "~/Desktop/repos/campaign-2026-10-15/voxide-loading/voxide",
+        "revision": "12895132b5e49a888c4d712fa4a7af9a4940eaab",
+        "ref": "main"
       },
-      "build": "the library VoXide install of 2026-10-17 (INSTALLED.json): the frame retune on SDK b5365b18 / editor c096eee0, built with make gate-disc; three-vblank frames on the Manny tape 131 -> 38.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/demo-ship/inputs/voxide-private/INSTALLED.json"
+      "build": "voxide main 12895132 (44dc725 plus the Minecraft-style loading screen of 97e6017: dirt backdrop, turning grass block, stage line, bar, fade-in), the library VoXide of 2026-10-25, built with make gate-disc on the same SDK b5365b18 / editor c096eee0 pins with the committed PGO profile. Its splash line already reads ALSO TRY CELESTE!, so one build serves both editions.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/disc-loader/inputs/voxide/INSTALLED.json"
     },
     {
       "name": "WIPEOUT PSOXIDE",
