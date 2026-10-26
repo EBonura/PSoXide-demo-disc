@@ -114,25 +114,6 @@
       "cue_sha256": "1182082d7a19db0e0825a4758f23d94e7f26dcdcd023805d6d7f8e359f2dbcea"
     },
     {
-      "name": "COUNTER-STRIKE",
-      "library": "Counter-Strike (cs-psx).cue",
-      "var": "CSPSX",
-      "version_var": "V_CSPSX",
-      "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/cs/Counter-Strike (cs-psx).cue",
-      "cue_sha256": "a1d71712a10f277fef22813e79b4875c91a6d9f3ebad23df714f4d8979966cdf",
-      "bin_sha256": "ac48e03f6c140ad11740f01429e7028cd0cd9629c971a448d68c71463a5b8de3",
-      "version": "0.2.0",
-      "source": {
-        "repository": "EBonura/cs-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-ship/src/cs-psx.git",
-        "revision": "4613a46df3d63b336a35d0b6381a511b9ee75139",
-        "ref": "main"
-      },
-      "build": "library install of 2026-10-25 09:45 (Counter-Strike (cs-psx).provenance.json): cs-psx main 4613a46.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/cs/Counter-Strike (cs-psx).provenance.json"
-    },
-    {
       "name": "HALF-LIFE",
       "library": "Half-Life (hl-psx).cue",
       "var": "HLPSX",
