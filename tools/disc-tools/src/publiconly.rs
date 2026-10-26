@@ -34,6 +34,8 @@
 //! `--allow TEXT` excuses a search hit whose surrounding 48 bytes contain TEXT
 //! (case-insensitive), and each excused hit is printed. It exists for text that
 //! belongs to a public program (a splash tagline), not for the programs.
+//! `PUBLIC_TEXT_ALLOW` is the one built-in excuse: the browser build's welcome
+//! sentence that points at the ports a visitor builds from their own game copy.
 //! Exit 0 when clean, 1 when anything fails.
 
 use std::fs::{self, File};
@@ -80,6 +82,16 @@ const RECEIPT_MARKERS: &[&str] = &[
 ];
 
 const CONTEXT: usize = 48;
+
+/// Reviewed text of the emulator's welcome page that names Half-Life on
+/// purpose: it points a visitor at the bigger ports they build themselves from
+/// their own copy of the original game (Manny, 2026-10-26). A staged file
+/// (the browser build) may carry exactly this sentence; the hit is excused the
+/// way `--allow` excuses one (the 48 bytes around it contain the text) and is
+/// still printed. It is not applied to disc images, receipts, file names or
+/// the table of contents, and any other mention of the program still fails.
+const PUBLIC_TEXT_ALLOW: &[&str] =
+    &["bigger PlayStation ports, like Half-Life, that you build yourself"];
 
 /// What a compact web index says about the image it was packed from (see
 /// psx-webdisc's index header: magic, version, chunk sectors, sector count,
@@ -590,6 +602,11 @@ fn check_file(
     }
     let mut data = fs::read(file)?;
     let mut what = file.display().to_string();
+    let allow: Vec<String> = allow
+        .iter()
+        .cloned()
+        .chain(PUBLIC_TEXT_ALLOW.iter().map(|text| text.to_string()))
+        .collect();
     if lower.ends_with(".gz") {
         let mut inflated = Vec::new();
         if flate2::read::GzDecoder::new(&data[..])
@@ -600,7 +617,7 @@ fn check_file(
             what = format!("{what} (decompressed)");
         }
     }
-    judge_hits(report, &what, scan_bytes(&data), allow);
+    judge_hits(report, &what, scan_bytes(&data), &allow);
     Ok(())
 }
 
@@ -736,6 +753,31 @@ mod tests {
         assert_eq!(report.failures, 0);
         judge_hits(&mut report, "tagline", hits, &[]);
         assert_eq!(report.failures, 1);
+    }
+
+    #[test]
+    fn the_welcome_page_sentence_passes_and_other_mentions_fail() {
+        let dir = tempfile::tempdir().unwrap();
+        let sentence = "The PSoXide project also has bigger PlayStation ports, like Half-Life, \
+                        that you build yourself from your own Steam copy of the original game.";
+        let mut report = Report { lines: Vec::new(), failures: 0 };
+        let mut compact = Vec::new();
+        let only = dir.path().join("welcome.js");
+        fs::write(&only, sentence).unwrap();
+        check_file(&mut report, &mut compact, &only, &[]).unwrap();
+        assert_eq!(report.failures, 0, "{:?}", report.lines);
+        assert!(report.lines.iter().any(|l| l.starts_with("note") && l.contains("excused 'half-life'")));
+        // The same file also names the program somewhere else: that hit fails.
+        let both = dir.path().join("both.js");
+        let filler = "x".repeat(200);
+        fs::write(&both, format!("{sentence}{filler}see Half-Life here{filler}")).unwrap();
+        check_file(&mut report, &mut compact, &both, &[]).unwrap();
+        assert_eq!(report.failures, 1, "{:?}", report.lines);
+        // A near miss of the sentence is not excused.
+        let near = dir.path().join("near.js");
+        fs::write(&near, "bigger PlayStation ports, like Half-Life, that you buy").unwrap();
+        check_file(&mut report, &mut compact, &near, &[]).unwrap();
+        assert_eq!(report.failures, 2, "{:?}", report.lines);
     }
 
     #[test]
