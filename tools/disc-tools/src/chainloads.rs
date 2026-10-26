@@ -104,6 +104,9 @@ const HL_GAMEPLAY_MIN_HASHES: usize = 8;
 // at tick ~3400 on the loading screens (0 frames); 1.5 billion steps reach
 // tick ~7300 with 200+ qualifying frames and keep the thresholds unchanged.
 const HL_STEPS: u64 = 1_500_000_000;
+// hk-psx: launch, boot, the intro and its skip, then the title (about 4,900 route ticks per
+// billion steps; the last pair of presses falls 2,860 ticks after the launch press).
+const HK_STEPS: u64 = 1_500_000_000;
 // WipEout: the race starts near route tick 4300 and the route throttles to ~7500
 // (about 300M steps per 1000 ticks). OoT: the walk to Link's house ends near
 // route tick 15000 (about 250M steps per 1000 ticks).
@@ -366,7 +369,7 @@ fn route_for(target: &str, index: usize) -> String {
     let (mut events, cross_tick) = launcher_route(index);
     if matches!(
         target,
-        "CORTEX IGNITION" | "HALF-LIFE" | "COUNTER-STRIKE" | "HOLLOW KNIGHT"
+        "CORTEX IGNITION" | "HALF-LIFE" | "COUNTER-STRIKE"
     ) {
         // These programs have their own menu after the demo-disc carousel.
         // Sparse presses remain deterministic across scene and data loads and
@@ -375,6 +378,16 @@ fn route_for(target: &str, index: usize) -> String {
             [400, 800, 1200, 1600, 2000, 2400]
                 .map(|offset| format!("{}:cross:12", cross_tick + offset)),
         );
+    }
+    if target == "HOLLOW KNIGHT" {
+        // hk-psx opens with its own intro (a poem, then two movies) before the title. Its skip
+        // takes two presses less than 2 s apart: the first only shows "Press any button to
+        // skip", the second, while that prompt is up, ends the whole sequence. Pairs of presses
+        // 60 ticks apart, repeated, skip it however long the boot takes; the same presses then
+        // carry on into the title like the sparse ones of the other programs.
+        events.extend([400, 1_200, 2_000, 2_800].into_iter().flat_map(|offset| {
+            [offset, offset + 60].map(|at| format!("{}:cross:12", cross_tick + at))
+        }));
     }
     if target == "WIPEOUT PSOXIDE" {
         events.extend(shifted(
@@ -410,6 +423,7 @@ fn steps_for(target: &str, steps: u64, index: usize) -> u64 {
     walk + match target {
         "CORTEX IGNITION" => steps.max(CORTEX_STEPS),
         "HALF-LIFE" => steps.max(HL_STEPS),
+        "HOLLOW KNIGHT" => steps.max(HK_STEPS),
         "WIPEOUT PSOXIDE" => steps.max(WIPEOUT_STEPS),
         "OCARINA OF TIME" => steps.max(OOT_STEPS),
         _ => steps,
