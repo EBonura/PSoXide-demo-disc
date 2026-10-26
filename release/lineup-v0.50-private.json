@@ -86,7 +86,7 @@
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/private-rebuild/src/hk-psx.git",
+        "local": "~/Desktop/repos/campaign-2026-10-15/nx-release/src/hk-psx.git",
         "revision": "9a0bca6c475bbc214e4a60f2db63361ef6a8fafe",
         "ref": "main"
       },
