@@ -678,13 +678,35 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
 	@mkdir -p "$(SHOTS_OUT)"
 	$(DISC_TOOLS) cook-shot "$<" "$@"
 
+# A lineup pressing can leave a program out: LEAVE_OUT="ARCADE PSXCEL" drops those
+# entries with their shots, version and description (the lineup file must not carry them).
+LEAVE_OUT ?=
+ifeq ($(filter ARCADE,$(LEAVE_OUT)),)
+ARCADE_ARGS = --image "PSOXIDE ARCADE=$(ARCADE)" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout.shot" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout2.shot" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders.shot" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
+	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
+	--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
+	--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio."
+endif
+ifeq ($(filter PSXCEL,$(LEAVE_OUT)),)
+PSXCEL_ARGS = --game "PSXCEL=$(PSXCEL)" \
+	--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
+	--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
+	--version-of "PSXCEL=$(V_PSXCEL)" \
+	--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card."
+endif
+
 # Just the layout, for when nothing but the text or the audio changed. Also
 # the one place the mkdisc invocation lives, so it cannot drift from what
 # `make disc` builds. The program order here is the carousel order: the
 # reverse of v0.39 (Manny, 2026-09-26), with PSXcel moved from first to last,
 # just before CREDITS (Manny, 2026-10-05).
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
-		--image "PSOXIDE ARCADE=$(ARCADE)" \
+		$(ARCADE_ARGS) \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
 		--image "VOXIDE=$(VOXIDE)" \
@@ -696,7 +718,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(HWT_ARGS) \
-		--game "PSXCEL=$(PSXCEL)" \
+		$(PSXCEL_ARGS) \
 		$(foreach t,$(MENU_XA),--menu-xa "$(t)") \
 		--menu-spectrum "$(MENU_SPECTRUM)" \
 		--menu-title "JUNGLE 1 A" --menu-title "JUNGLE 1 B" \
@@ -712,26 +734,14 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-goal.shot" \
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste.shot" \
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste2.shot" \
-		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
-		--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout2.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
-		--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
 		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
-		--version-of "PSXCEL=$(V_PSXCEL)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
-		--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
 		--describe "CORTEX IGNITION=A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo." \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Supports 2 players in split screen.|Un clone di Rocket League per la prima PlayStation. Supporta 2 giocatori a schermo diviso." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
-		--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card." \
-		--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio." \
 		$(if $(TAIL_FILLER),--tail-filler $(TAIL_FILLER)) \
 		--max-sectors $(DISC_MAX_SECTORS)
 

@@ -104,35 +104,15 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
     let (voxide, _) = outer("VOXIDE")?;
     let (nitroxide, _) = outer("NITROXIDE")?;
     let (celeste, celeste_cross) = outer("CELESTE COLLECTION")?;
-    let (psxcel, psxcel_cross) = outer("PSXCEL")?;
-    let (arcade, arcade_cross) = outer("PSOXIDE ARCADE")?;
-    let inner_ready = arcade_cross + 600;
+    // A lineup pressing may leave PSXcel and the Arcade out (LEAVE_OUT in the Makefile); their
+    // routes exist only when the table lists them.
+    let present = |name: &str| entries.iter().any(|row| row.name == name);
+    let psxcel = present("PSXCEL").then(|| outer("PSXCEL")).transpose()?;
+    let arcade = present("PSOXIDE ARCADE")
+        .then(|| outer("PSOXIDE ARCADE"))
+        .transpose()?;
     let at = |tick: i64, button: &str, hold: u32| format!("{tick}:{button}:{hold}");
 
-    let breakout = extended(
-        &arcade,
-        &[
-            at(inner_ready, "cross", 12),
-            at(inner_ready + 500, "cross", 12),
-        ],
-    );
-    let invaders = extended(
-        &arcade,
-        &[
-            at(inner_ready, "right", 8),
-            at(inner_ready + 200, "cross", 12),
-            at(inner_ready + 700, "cross", 12),
-        ],
-    );
-    let magikarp = extended(
-        &arcade,
-        &[
-            at(inner_ready, "right", 8),
-            at(inner_ready + 200, "right", 8),
-            at(inner_ready + 400, "cross", 12),
-            at(inner_ready + 900, "cross", 12),
-        ],
-    );
     let classic = extended(
         &celeste,
         &[
@@ -159,7 +139,7 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         markers: markers.to_vec(),
         xa_music: false,
     };
-    Ok(vec![
+    let mut routes = vec![
         // VoXide 0.4.0 opens on a splash that fades through black, so a stop at
         // 450M steps can land on a black frame (it did on the 11-card private
         // pressing); 1.2G steps is the title menu on every pressing.
@@ -186,22 +166,55 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         // time (about 250,000 steps a route tick) to reach the delayed launch
         // press before judging the guest, rather than stopping while its case
         // is merely selected.
-        route(
+    ];
+    // PSXcel is the last case, so the walk to it is the longest on the shelf (the shelf does
+    // not wrap). Give the launcher enough emulated time (about 250,000 steps a route tick) to
+    // reach the delayed launch press before judging the guest, rather than stopping while its
+    // case is merely selected.
+    if let Some((psxcel, psxcel_cross)) = &psxcel {
+        routes.push(route(
             "psxcel",
-            &psxcel,
-            150_000_000 + psxcel_cross as u64 * 250_000,
+            psxcel,
+            150_000_000 + *psxcel_cross as u64 * 250_000,
             1,
             &[],
-        ),
-        route("arcade-breakout", &breakout, 700_000_000, 2, &[]),
-        route(
+        ));
+    }
+    if let Some((arcade, arcade_cross)) = &arcade {
+        let inner_ready = arcade_cross + 600;
+        let breakout = extended(
+            arcade,
+            &[
+                at(inner_ready, "cross", 12),
+                at(inner_ready + 500, "cross", 12),
+            ],
+        );
+        let invaders = extended(
+            arcade,
+            &[
+                at(inner_ready, "right", 8),
+                at(inner_ready + 200, "cross", 12),
+                at(inner_ready + 700, "cross", 12),
+            ],
+        );
+        let magikarp = extended(
+            arcade,
+            &[
+                at(inner_ready, "right", 8),
+                at(inner_ready + 200, "right", 8),
+                at(inner_ready + 400, "cross", 12),
+                at(inner_ready + 900, "cross", 12),
+            ],
+        );
+        routes.push(route("arcade-breakout", &breakout, 700_000_000, 2, &[]));
+        routes.push(route(
             "arcade-invaders",
             &invaders,
             700_000_000,
             2,
             &["invaders: init ok"],
-        ),
-        Route {
+        ));
+        routes.push(Route {
             xa_music: true,
             ..route(
                 "arcade-magikarp",
@@ -210,8 +223,9 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
                 2,
                 &["magikarp: xa ok"],
             )
-        },
-    ])
+        });
+    }
+    Ok(routes)
 }
 
 /// The last frame has to show something: a few colours, some bright pixels,
@@ -573,5 +587,12 @@ mod tests {
         // A table missing a program cannot produce a route at all.
         let short = toc_rows(&table(&["VOXIDE"], false)).unwrap();
         assert!(routes(&short).is_err());
+        // PSXcel and the Arcade may be left out of a pressing; the other routes remain.
+        let lean_names = ["CORTEX", "VOXIDE", "NITROXIDE", "CELESTE COLLECTION"];
+        let lean = routes(&toc_rows(&table(&lean_names, true)).unwrap()).unwrap();
+        assert_eq!(lean.len(), 5);
+        assert!(lean
+            .iter()
+            .all(|route| route.name != "psxcel" && !route.name.starts_with("arcade")));
     }
 }
