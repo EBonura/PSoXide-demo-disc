@@ -306,7 +306,7 @@ fn headless_path_requires_the_program_revision_stamp() {
     let links = Links::new();
     let headless = links.dry_run("quake-headless-check", &[]);
     let stamp_at = index_of(&headless, "programs.psoxide-revision");
-    let replay_at = index_of(&headless, "tools/check_release_chainloads.py");
+    let replay_at = index_of(&headless, "disc-tools chainloads");
     assert!(headless.contains("--target \"QUAKE SHAREWARE\""));
     assert!(stamp_at < replay_at);
 }
@@ -429,8 +429,8 @@ fn distribution_targets_publish_only_the_standard_pressing() {
     for target in ["release-web: $(DISC_TOOLS)", "itch:"] {
         assert!(makefile.contains(&format!("\n{target}\n")), "{target}");
     }
-    // The pressing flags grew WO and HWT since the Python test was written.
-    assert!(makefile.contains("\nPRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT))\n"));
+    // The pressing flags grew WO, HWT and OOT since the Python test was written.
+    assert!(makefile.contains("\nPRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT))\n"));
     assert!(makefile.contains(
         "release-web: $(DISC_TOOLS)\n\t@test -z \"$(PRIVATE)\" || { echo \
          \"release-web: the HL, CS and HK pressings are never distributed\""
