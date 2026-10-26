@@ -823,7 +823,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(MKDISC) $(MKDISC_ARGS)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
-		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)" \
+		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)$(if $(LEAVE_OUT), LEAVE_OUT='$(LEAVE_OUT)')" \
 		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
