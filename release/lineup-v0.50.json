@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.50",
-  "note": "PSoXide Demo Disc v0.50, public pressing, all XA: no CD-DA track. The v0.49 public programs with NitroXide 0.5.0 (main ba05a79) in place of 0.4.1. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). Hashes gate every input; disc-tools lineup refuses a file that changed.",
+  "note": "PSoXide Demo Disc v0.50, public pressing, all XA: no CD-DA track. The v0.49 public programs with NitroXide 0.5.0 (main 88b2baf) in place of 0.4.1. Launcher menu music is XA (Mulula VGM Loops, CC BY 4.0). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only). Hashes gate every input; disc-tools lineup refuses a file that changed.",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -47,15 +47,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.50/nitroxide/NitroXide.cue",
       "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
-      "bin_sha256": "042b37eeca04c2c2268f5b231b0f2aa5770d5524db5a197a54e36f3e7c924703",
+      "bin_sha256": "1fb95699e1977133301aa40d2e8f30449707846bd65638cbfe9ee282c88c3c73",
       "version": "0.5.0",
       "source": {
         "repository": "EBonura/nitroxide",
         "local": "~/Desktop/repos/campaign-2026-10-15/nx-release/nx",
-        "revision": "ba05a794603a973fc245c3e641a742f6a0bec6f1",
+        "revision": "88b2baf23d3a7305181e0756f4782b86e9a8a0e0",
         "ref": "main"
       },
-      "build": "nitroxide main ba05a79 (release 0.5.0) shipping build (make disc, committed XA music, release/README.txt v0.5.0): Rocket League air control, nine cars, golden-goal overtime, kickoff fly-over and 3-2-1-GO, moving menus, rebuilt pause menu, in-match feedback, boost-bar loading screen, stereo sound effects. Built in the nx-release lane; the same image is staged as the itch package and installed as the library NitroXide."
+      "build": "nitroxide main 88b2baf (release 0.5.0) shipping build (make disc, committed XA music, release/README.txt v0.5.0): Rocket League air control, nine cars, golden-goal overtime, kickoff fly-over and 3-2-1-GO, moving menus, rebuilt pause menu, in-match feedback, boost-bar loading screen, stereo sound effects. Built in the nx-release lane; the same image is staged as the itch package and installed as the library NitroXide."
     },
     {
       "name": "VOXIDE",
