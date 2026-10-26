@@ -1,26 +1,8 @@
 {
   "schema": 1,
   "pressing": "v0.49-private",
-  "note": "PSoXide Demo Disc v0.49, private edition (local, never published or distributed), all XA: no CD-DA track. Rebuilt 2026-10-26 from the games library and lane builds at the current mains: Half-Life b1ff13f, Hollow Knight 9c48f99, Cortex Ignition (editor main 01acd106), Arcade 2bb95ad, Ocarina of Time f56d9af; Counter-Strike 4613a46, Quake c6412e2, WipEout 0e5a735, VoXide 12895132, PSXcel ba0a00d and NitroXide 64f3357 and Celeste 0.2.8 (a061d2c) are unchanged inputs (their mains moved only by SDK renames and rustfmt). Every input is a copy under release-inputs/v0.49-private/<game>/ in the campaign folder. Hardware tests stay on their own disc.",
+  "note": "PSoXide Demo Disc v0.49, private edition (local, never published or distributed), all XA: no CD-DA track. Rebuilt 2026-10-26 from the games library and lane builds at the current mains: Half-Life b1ff13f, Hollow Knight 9c48f99, Cortex Ignition (editor main 01acd106), Ocarina of Time f56d9af; Quake c6412e2, WipEout 0e5a735, VoXide 12895132, NitroXide 64f3357 and Celeste 0.2.8 (a061d2c) are unchanged inputs (their mains moved only by SDK renames and rustfmt). Left out by Manny (2026-10-26) to fit the blank: Counter-Strike, PSOXIDE ARCADE and PSXCEL (press with LEAVE_OUT=\"ARCADE PSXCEL\" CS=0). Every input is a copy under release-inputs/v0.49-private/<game>/ in the campaign folder. Hardware tests stay on their own disc.",
   "programs": [
-    {
-      "name": "PSOXIDE ARCADE",
-      "var": "ARCADE",
-      "version_var": "V_ARCADE",
-      "kind": "image",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/arcade/psoxide-arcade.cue",
-      "cue_sha256": "827afd8fef5ce0cf1d149e2b4b82a3e2e136db034bd8690458a13677cc50e7f7",
-      "bin_sha256": "92a1f962194fd6aa99818dde6a995e15839ed935a65ce167e54d3c7c0fb3f47b",
-      "version": "0.1.1",
-      "source": {
-        "repository": "EBonura/psoxide-arcade",
-        "local": "~/Desktop/repos/campaign-2026-10-15/private-rebuild/src/psoxide-arcade.git",
-        "revision": "2bb95ad2490b14cafa4e424673761bb7699cc83d",
-        "ref": "repin/disc-pins-2026-10-26"
-      },
-      "build": "make disc on psoxide-arcade branch repin/disc-pins-2026-10-26 2bb95ad (main 3e858f4, the credits Instagram link bonnie_studios_, plus the pins: SDK 649c7ed8, editor 3cb1839a, emulator dddd2814, the demo disc's own); panic=immediate-abort, Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Same image as the v0.49 Public pressing.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/arcade/psoxide-arcade.provenance.json"
-    },
     {
       "name": "CELESTE COLLECTION",
       "var": "CELESTE",
@@ -206,25 +188,6 @@
       },
       "build": "make hardware-tests-disc at the branch head (SDK 5c3955fd, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
       "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
-    },
-    {
-      "name": "PSXCEL",
-      "var": "PSXCEL",
-      "version_var": "V_PSXCEL",
-      "kind": "game",
-      "derive": {
-        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/psxcel/PSXcel.cue"
-      },
-      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
-      "version": "0.2.0",
-      "source": {
-        "repository": "EBonura/psxcel",
-        "local": "~/Desktop/repos/campaign-2026-10-15/demo-v047/src/psxcel.git",
-        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
-        "ref": "main (chore/abort-panics-2026-10-17)"
-      },
-      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.49-private/psxcel/PSXcel.provenance.json"
     }
   ]
 }
