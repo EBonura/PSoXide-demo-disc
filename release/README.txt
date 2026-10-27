@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.51
+PSoXide Demo Disc v0.52
 =======================
 
 A little of everything. One PlayStation disc.
@@ -6,6 +6,16 @@ A little of everything. One PlayStation disc.
 Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.52
+-------------------
+- NitroXide 0.6.0. A goal now has a replay, shot like a television one:
+  full screen, mostly in slow motion, from a low angle beside the scorer and
+  then at the goal. Hold X for a second to skip it, or the fly-over before a
+  kickoff. The end of a match is a scene: the winning car turns on the centre
+  spot under a trophy and confetti, with the score, a table of goals, shots,
+  saves, boost and top speed, and a choice of REMATCH or QUIT TO MENU.
+- The other programs are as in v0.51.
 
 What's new in v0.51
 -------------------

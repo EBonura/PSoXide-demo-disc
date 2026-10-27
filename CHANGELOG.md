@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.52
+
+- Re-pressed from `release/lineup-v0.52.json` (Public) and `release/lineup-v0.52-private.json` (Private). NitroXide is 0.6.0 (main cb51cd7, tag v0.6.0) on both: a television-style goal replay in slow motion, a results scene with the winning car and a trophy and a REMATCH choice, and hold-to-skip for the replay and the kickoff fly-over (see its `CHANGELOG.md`). Hollow Knight on the Private pressing stays at the library build e15a09ee (hk-psx main 9a0bca6), still the newest. Every other program is the v0.51 input byte for byte. The `games/nitroxide` gitlink moves to cb51cd7. The inputs are hash-gated copies under `release-inputs/v0.52/` and `release-inputs/v0.52-private/`, the sources mirrors under `release-inputs/src/`.
+- The browser player pin moves to the touch-fix build (emulator 117f12e): shoulder buttons clear of the top bar's restore tab.
+
 ## v0.51
 
 - Re-pressed from `release/lineup-v0.51.json` (Public) and `release/lineup-v0.51-private.json` (Private). NitroXide is 0.5.1 (main 9e20819, tag v0.5.1) on both: the boost flame and smoke in the car's colour, pad pickups that burst in the arena, a calmer kickoff fly-over that starts with the tile sweep, split screen drawn at single-player detail, HUD numbers centred in their panels (see its `CHANGELOG.md`). Hollow Knight on the Private pressing stays at the library build e15a09ee (hk-psx main 9a0bca6), still the newest. Every other program is the v0.50 input byte for byte. The `games/nitroxide` gitlink moves to 9e20819.
