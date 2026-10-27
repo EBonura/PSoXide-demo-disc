@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.51
+
+- Re-pressed from `release/lineup-v0.51.json` (Public) and `release/lineup-v0.51-private.json` (Private). NitroXide is 0.5.1 (main 9e20819, tag v0.5.1) on both: the boost flame and smoke in the car's colour, pad pickups that burst in the arena, a calmer kickoff fly-over that starts with the tile sweep, split screen drawn at single-player detail, HUD numbers centred in their panels (see its `CHANGELOG.md`). Hollow Knight on the Private pressing stays at the library build e15a09ee (hk-psx main 9a0bca6), still the newest. Every other program is the v0.50 input byte for byte. The `games/nitroxide` gitlink moves to 9e20819.
+- Every input of both lineups is a hash-gated copy under `release-inputs/v0.51/<game>/` (Public) and `release-inputs/v0.51-private/<game>/` (Private) in the campaign folder, and every source repository a bare mirror under `release-inputs/src/`, so a lineup no longer points into a lane folder that a cleanup can remove.
+- The browser player pin moves to the scrolling home grid (wheel, trackpad and finger), the swipeable welcome pages and the dense phone debug panel (emulator 4ebdf4bc).
+
 ## v0.50
 
 - The loader never shows a partial or blank frame at the hand-off. Its display setup keeps the display start on the buffer the launcher was showing (the launcher leaves that buffer's row in a mailbox word at the end of the blob's reservation, `chainload-layout::SHOWN_BUFFER_MAILBOX`; the link asserts the blob stops short of it), paints its first frame into the other buffer, and only then flips to it and enables the display. The first loader frame is the launch's next step, not a copy.

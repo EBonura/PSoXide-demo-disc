@@ -1,4 +1,4 @@
-PSoXide Demo Disc v0.50
+PSoXide Demo Disc v0.51
 =======================
 
 A little of everything. One PlayStation disc.
@@ -6,6 +6,18 @@ A little of everything. One PlayStation disc.
 Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
 VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
 contains Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.51
+-------------------
+- NitroXide 0.5.1. The boost looks and feels faster: a layered, flickering
+  exhaust flame and soft smoke in your car's colour, pad pickups that burst in
+  the arena, and a view that opens up as you gain speed. The kickoff fly-over is
+  a calm, high swing that keeps the ball in the middle of the screen and starts
+  while the menu tiles are still sweeping away. Two-player split screen draws
+  the pitch with the same detail as a single player's view, and the numbers in
+  the boost counter, scoreboard, clock and pause menu are centred in their
+  panels.
+- The other programs are as in v0.50.
 
 What's new in v0.50
 -------------------

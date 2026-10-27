@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "pressing": "v0.51-private",
+  "note": "PSoXide Demo Disc v0.51, private edition (local, never published or distributed), all XA: no CD-DA track. The v0.50 Private lineup with NitroXide 0.5.1 (main 9e20819) in place of 0.5.0; Hollow Knight stays at the library build e15a09ee (hk-psx main 9a0bca6), still the newest. Half-Life b1ff13f, Ocarina of Time f56d9af, Quake c6412e2, WipEout 0e5a735, VoXide 12895132, Celeste 0.2.8 (a061d2c) and Cortex Ignition (editor main 01acd106) are the v0.50 Private inputs byte for byte. Left out to fit the blank (Manny, 2026-10-26): Counter-Strike, PSOXIDE ARCADE and PSXCEL (press with LEAVE_OUT=\"ARCADE PSXCEL\" CS=0). Every input is a copy under release-inputs/v0.51-private/<game>/ and every source a mirror under release-inputs/src, in the campaign folder. Hardware tests stay on their own disc.",
+  "programs": [
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx main (the pressed 0.2.8 disc: brightness stepper, text palette fix, 32-bit sound and fixed-point maths, SDK b5365b18). The library still holds 0.2.7 (579f14f8).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/celeste/SOURCE.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "ef0c137117975a0a98d9589999d789b8b728bf969213056bf2d1136db3ba1b00",
+      "version": "0.5.1",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/nitroxide.git",
+        "revision": "9e20819bdf9d30c30268829afee17434071fdd91",
+        "ref": "main"
+      },
+      "build": "nitroxide main 9e20819 (release 0.5.1, tag v0.5.1) itch package build (make disc, committed XA music, release/README.txt v0.5.1), as staged in nitroxide-polish/nx7/build/itch: the boost flame and smoke in the car's colour, boost pad bursts, a calmer kickoff fly-over that starts with the tile sweep, split screen pitch at single-player detail, HUD numbers centred."
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "82461d86219d9ac514faef8c22c3c4695827580246633b694b3a32c4fb478086",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/voxide.git",
+        "revision": "12895132b5e49a888c4d712fa4a7af9a4940eaab",
+        "ref": "main"
+      },
+      "build": "voxide main 12895132 (44dc725 plus the Minecraft-style loading screen of 97e6017: dirt backdrop, turning grass block, stage line, bar, fade-in), the library VoXide of 2026-10-25, built with make gate-disc on the same SDK b5365b18 / editor c096eee0 pins with the committed PGO profile. Its splash line already reads ALSO TRY CELESTE!, so one build serves both editions.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/voxide/INSTALLED.json"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "library": "WipEout PSoXide.cue",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/wipeout/WipEout PSoXide.cue",
+      "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
+      "bin_sha256": "9bf1248c527269eff85c05fa15bd2f6dc87ac18c6388b736d201c0cdebcfb2b5",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/wipeout-psx.git",
+        "revision": "0e5a7358d926757110c30092a7f0a658eb478ac2",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-22 (WipEout PSoXide.provenance.json): wipeout-psx main 0e5a735.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/wipeout/WipEout PSoXide.provenance.json"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "library": "Hollow Knight (hk-psx).cue",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "e15a09ee9d7c4a16bc820eb2c2fb3be5c3f071a65a86f30fb7ec6e82f05d8f40",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hk-psx.git",
+        "revision": "9a0bca6c475bbc214e4a60f2db63361ef6a8fafe",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-26 18:49 (Hollow Knight (hk-psx).provenance.json): hk-psx main 9a0bca6 (docs/BUDGET.md only over the build tree 22f02664), guest and disc built from 22f02664, SDK 355dc911, emulator 0e87b3a, xa encoder 5c3955fd.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/hk/Hollow Knight (hk-psx).provenance.json",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/hk/Hollow Knight (hk-psx).cue",
+      "cue_sha256": "1182082d7a19db0e0825a4758f23d94e7f26dcdcd023805d6d7f8e359f2dbcea"
+    },
+    {
+      "name": "HALF-LIFE",
+      "library": "Half-Life (hl-psx).cue",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/hl/Half-Life (hl-psx).cue",
+      "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
+      "bin_sha256": "b6b911e81b1015534ba23b6e05269422e56ce9b2261ab1a30b4120a2ddacc44c",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hl-psx.git",
+        "revision": "b1ff13f8b8ef1a2eadb495c6f88fe19b3168ad59",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-25 22:00 (Half-Life (hl-psx).provenance.json): intro disc packed from the sources of hl-psx main b1ff13f (hl-weapons3: cached weapon swap, banked weapon sounds, Tau Cannon hum, soft muzzle glow; PGO rung 175), the shipping build, not a DIAG overlay.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/hl/Half-Life (hl-psx).provenance.json"
+    },
+    {
+      "name": "OCARINA OF TIME",
+      "library": "Ocarina of Time (oot-psx)/Ocarina of Time (oot-psx).cue",
+      "var": "OOTPSX",
+      "version_var": "V_OOTPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/oot/Ocarina of Time (oot-psx).cue",
+      "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
+      "bin_sha256": "5589ad41e901e0e3443844f22ca0ae16acd9e344b99f0a614e4f0d55d17ff727",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/oot-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/oot-psx.git",
+        "revision": "f56d9af02070db89f4d274eee52695c45fcc0a2c",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-25 14:08 (INSTALLED.json): oot-psx main f56d9af, tools/qualified/build-disc.sh shipping features, profile-guided link, a fresh clone of landed main; data from a clean make extract.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/oot/INSTALLED.json"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/quake/Quake (quake-psx).cue",
+      "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
+      "bin_sha256": "366d5f4ef09b71a2ab4b83bcd5166b7f4155673f3075058f9e14b7ff672699ec",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
+        "revision": "c6412e29cbf5342fd995fc95d37a6394e05e4f56",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-25 10:51 (Quake (quake-psx).provenance.json): quake-psx main c6412e2, shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/quake/Quake (quake-psx).provenance.json",
+      "library": "Quake (quake-psx).cue"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/cortex/Cortex Ignition.cue",
+      "cue_sha256": "3871cb7970444bbda89e0816bf345b26911c9d0bbe709e09abcf27153f1a21ac",
+      "bin_sha256": "a27cd01664316fc86aca7fead7626e3e8d93962947ab249b69cc1891d536cb75",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/PSoXide-editor.git",
+        "revision": "01acd1063082a1397f4050c976f4e48f6e08b6f0",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-26 09:01 (Cortex Ignition.provenance.json): PSoXide-editor main 01acd106, frontend build-project-disc, project editor/projects/zz-far-s10 (the Citadel on the grid mainline: far panels, stance HUD, smooth swap), release, no panel cache; far-panel bake eyes in a fixed sector order so two cooks give byte-identical discs.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.51-private/cortex/Cortex Ignition.provenance.json"
+    },
+    {
+      "name": "HARDWARE TESTS",
+      "var": "HWTESTS",
+      "version_var": "V_HWTESTS",
+      "kind": "image",
+      "derive": {
+        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/hwtests/hardware-tests.cue"
+      },
+      "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
+      "version": "1.27",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
+        "ref": "collection/hwt-disc-base (local, not pushed): 48ca026d plus the disc base on the raw CD seeks, kept out of line"
+      },
+      "build": "make hardware-tests-disc at the branch head (SDK 5c3955fd, MOVIE.STR and HWSONGS.XA reused from the v1.27 build because psxavenc is not installed), data track only",
+      "receipt": "make hardware-tests-disc and make hwtest-verify-code (drift=0) in src/editor-hwt, 2026-10-04"
+    }
+  ]
+}
