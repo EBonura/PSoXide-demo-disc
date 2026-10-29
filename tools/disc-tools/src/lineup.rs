@@ -14,6 +14,10 @@
 //!            copy it into the lineup inputs and rewrite its hashes
 //!   receipt  after mkdisc: prove each pressed entry is its lineup input and
 //!            write the release receipt and the component receipt
+//!   check    prove a lineup is self-contained: every file it presses from, and
+//!            every source mirror, lives under one inputs root, and every input
+//!            is hash-gated. A cleanup of a lane directory can then never break
+//!            a re-press.
 //!
 //! Derivations, all byte-for-byte slices of a hashed input:
 //!   data_track_of  the image's data track alone (its CD-DA is borrowed)
@@ -273,6 +277,163 @@ fn prepare_row(row: &Value, out: &Path) -> Result<PathBuf> {
     Ok(target)
 }
 
+/// The paths a row presses from or points at, with what each one is.
+fn row_paths(row: &Value) -> Vec<(&'static str, String)> {
+    let mut found = Vec::new();
+    let mut add = |what: &'static str, value: Option<&Value>| {
+        if let Some(text) = value.and_then(Value::as_str) {
+            found.push((what, text.to_string()));
+        }
+    };
+    add("cue", row.get("cue"));
+    if let Some(derive) = row.get("derive") {
+        for key in ["data_track_of", "boot_exe_of", "from_disc"] {
+            add(
+                match key {
+                    "data_track_of" => "derive.data_track_of",
+                    "boot_exe_of" => "derive.boot_exe_of",
+                    _ => "derive.from_disc",
+                },
+                derive.get(key),
+            );
+        }
+    }
+    if let Some(source) = row.get("source") {
+        add("source.local", source.get("local"));
+    }
+    // A receipt is a path or a sentence about how the input was made; only a
+    // path has to be kept.
+    if let Some(receipt) = row.get("receipt").and_then(Value::as_str) {
+        if receipt.starts_with('~') || receipt.starts_with('/') {
+            found.push(("receipt", receipt.to_string()));
+        }
+    }
+    found
+}
+
+/// Lexical containment: `path` is under `root` and never climbs out of it.
+fn is_under(path: &Path, root: &Path) -> bool {
+    path.starts_with(root)
+        && !path
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+}
+
+/// Every problem that stops a lineup being re-pressed from `root` alone.
+fn contained_problems(lineup: &Value, root: &Path) -> Result<Vec<String>> {
+    let mut problems = Vec::new();
+    for row in programs_of(lineup)? {
+        let name = text(row, "name")?;
+        for (what, value) in row_paths(row) {
+            let path = expand_home(&value);
+            if !is_under(&path, root) {
+                problems.push(format!(
+                    "{name}: {what} {value} is outside {}",
+                    root.display()
+                ));
+            }
+        }
+        let digest = |key: &str| row.get(key).and_then(Value::as_str);
+        if !digest("bin_sha256").is_some_and(crate::util::is_digest) {
+            problems.push(format!("{name}: bin_sha256 is missing or not a sha256"));
+        }
+        if row.get("cue").and_then(Value::as_str).is_some()
+            && !digest("cue_sha256").is_some_and(crate::util::is_digest)
+        {
+            problems.push(format!("{name}: cue_sha256 is missing or not a sha256"));
+        }
+        if row.get("source").and_then(|s| s.get("local")).is_none() {
+            problems.push(format!("{name}: no source.local mirror"));
+        }
+    }
+    Ok(problems)
+}
+
+/// Refuse a lineup that leans on anything outside `root`.
+fn check_contained(lineup: &Value, root: &Path) -> Result<()> {
+    let problems = contained_problems(lineup, root)?;
+    ensure!(
+        problems.is_empty(),
+        "lineup is not self-contained:\n  {}",
+        problems.join("\n  ")
+    );
+    Ok(())
+}
+
+/// With `--exists`: every file and mirror the lineup names is really there,
+/// including the BIN each cue names (the images are what a cleanup deletes).
+fn missing_files(lineup: &Value) -> Result<Vec<String>> {
+    let mut missing = Vec::new();
+    for row in programs_of(lineup)? {
+        let name = text(row, "name")?;
+        for (what, value) in row_paths(row) {
+            let path = expand_home(&value);
+            if !path.exists() {
+                missing.push(format!("{name}: {what} {} does not exist", path.display()));
+            } else if what.starts_with("derive.") || what == "cue" {
+                if path.extension().is_some_and(|e| e == "cue") {
+                    if let Err(error) = cue_bin(&path) {
+                        missing.push(format!("{name}: {error}"));
+                    }
+                }
+            }
+        }
+    }
+    Ok(missing)
+}
+
+/// With `--hashes`: every image and cue still hashes to what the lineup says.
+fn verify_hashes(lineup: &Value) -> Result<()> {
+    for row in programs_of(lineup)? {
+        let name = text(row, "name")?;
+        let hash = |key: &str| row.get(key).and_then(Value::as_str);
+        let derive = row.get("derive");
+        let source = |key: &str| {
+            derive
+                .and_then(|d| d.get(key))
+                .and_then(Value::as_str)
+                .map(expand_home)
+        };
+        if let Some(cue) = row.get("cue").and_then(Value::as_str) {
+            let cue = expand_home(cue);
+            check_hash(&cue, hash("cue_sha256"), name)?;
+            check_hash(&cue_bin(&cue)?, hash("bin_sha256"), name)?;
+        } else if let Some(cue) = source("data_track_of").or_else(|| source("boot_exe_of")) {
+            check_hash(&cue_bin(&cue)?, hash("bin_sha256"), name)?;
+        } else if let Some(disc) = source("from_disc") {
+            let expected = derive
+                .and_then(|d| d.get("disc_sha256"))
+                .and_then(Value::as_str);
+            check_hash(&disc, expected, name)?;
+        }
+    }
+    Ok(())
+}
+
+fn check(args: &Args) -> Result<()> {
+    let lineup_path = args.require_path("lineup")?;
+    let root = expand_home(args.require("inputs-root")?);
+    let lineup = load(&lineup_path)?;
+    check_contained(&lineup, &root)?;
+    if args.has("exists") {
+        let missing = missing_files(&lineup)?;
+        ensure!(
+            missing.is_empty(),
+            "lineup inputs are missing:\n  {}",
+            missing.join("\n  ")
+        );
+    }
+    if args.has("hashes") {
+        verify_hashes(&lineup)?;
+    }
+    println!(
+        "{}: every input and source mirror is under {} and hash-gated",
+        lineup_path.display(),
+        root.display()
+    );
+    Ok(())
+}
+
 fn programs_of(lineup: &Value) -> Result<&Vec<Value>> {
     lineup
         .get("programs")
@@ -283,6 +444,9 @@ fn programs_of(lineup: &Value) -> Result<&Vec<Value>> {
 fn prepare(args: &Args) -> Result<()> {
     let lineup_path = args.require_path("lineup")?;
     let lineup = load(&lineup_path)?;
+    if let Some(root) = args.get("inputs-root") {
+        check_contained(&lineup, &expand_home(root))?;
+    }
     let out = crate::util::resolve_lenient(&args.require_path("out")?);
     fs::create_dir_all(&out)?;
     let lineup_name = lineup_path
@@ -650,10 +814,15 @@ fn refresh(args: &Args) -> Result<()> {
 
 pub fn run(raw: &[String]) -> Result<i32> {
     let Some((command, rest)) = raw.split_first() else {
-        bail!("usage: lineup prepare|refresh|receipt [options]");
+        bail!("usage: lineup prepare|check|refresh|receipt [options]");
     };
     match command.as_str() {
-        "prepare" => prepare(&Args::parse(rest, &["lineup", "out"], &[])?)?,
+        "prepare" => prepare(&Args::parse(rest, &["lineup", "out", "inputs-root"], &[])?)?,
+        "check" => check(&Args::parse(
+            rest,
+            &["lineup", "inputs-root"],
+            &["exists", "hashes"],
+        )?)?,
         "refresh" => refresh(&Args::parse(rest, &["lineup", "library", "only"], &[])?)?,
         "receipt" => receipt(&Args::parse(
             rest,
@@ -680,6 +849,66 @@ mod tests {
 
     fn raw(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn row(extra: Value) -> Value {
+        let mut base = json!({
+            "name": "G",
+            "cue": "/inputs/g/g.cue",
+            "cue_sha256": "a".repeat(64),
+            "bin_sha256": "b".repeat(64),
+            "source": {"local": "/inputs/src/g.git", "revision": "abc"},
+            "receipt": "/inputs/g/g.provenance.json"
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            base[key] = value.clone();
+        }
+        json!({"programs": [base]})
+    }
+
+    #[test]
+    fn a_lineup_under_one_root_with_hashes_is_self_contained() {
+        let lineup = row(json!({}));
+        assert!(contained_problems(&lineup, Path::new("/inputs"))
+            .unwrap()
+            .is_empty());
+        // A receipt written as a sentence is not a path.
+        let lineup = row(json!({"receipt": "make disc in the lane, 2026-10-04"}));
+        assert!(contained_problems(&lineup, Path::new("/inputs"))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn a_lineup_reaching_outside_its_root_or_missing_a_hash_is_refused() {
+        let outside = row(json!({
+            "cue": "/lane/g.cue",
+            "source": {"local": "/inputs/../lane/g.git", "revision": "abc"}
+        }));
+        let problems = contained_problems(&outside, Path::new("/inputs")).unwrap();
+        assert!(
+            problems.iter().any(|p| p.contains("cue /lane/g.cue")),
+            "{problems:?}"
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("source.local")),
+            "{problems:?}"
+        );
+        let derived = row(json!({
+            "cue": null,
+            "derive": {"data_track_of": "/library/hw.cue"},
+            "bin_sha256": "short"
+        }));
+        let problems = contained_problems(&derived, Path::new("/inputs")).unwrap();
+        assert!(
+            problems.iter().any(|p| p.contains("derive.data_track_of")),
+            "{problems:?}"
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("bin_sha256")),
+            "{problems:?}"
+        );
+        assert!(check_contained(&derived, Path::new("/inputs")).is_err());
     }
 
     #[test]

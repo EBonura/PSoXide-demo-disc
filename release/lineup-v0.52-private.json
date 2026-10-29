@@ -176,13 +176,13 @@
       "version_var": "V_HWTESTS",
       "kind": "image",
       "derive": {
-        "data_track_of": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/inputs/hwtests/hardware-tests.cue"
+        "data_track_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.52-private/hwtests/hardware-tests.cue"
       },
       "bin_sha256": "5be1c26cde12ab29c46b1125c4f55aee7580971a166ce71cab0837184830c5c0",
       "version": "1.27",
       "source": {
         "repository": "EBonura/PSoXide-editor",
-        "local": "~/Library/Application Support/PSoXide-perf/work/single-disc-2026-10-04/collection/src/editor-hwt",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/editor-hwt.git",
         "revision": "a1e955a3cd36c327a6efbc91e4b7da41689126ac",
         "ref": "collection/hwt-disc-base (local, not pushed): 48ca026d plus the disc base on the raw CD seeks, kept out of line"
       },

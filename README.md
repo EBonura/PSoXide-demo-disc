@@ -97,6 +97,29 @@ a release. `--emulator-source` clones the emulator from another URL or path. `bu
 must be installed and logged in. The private editions are never released this way:
 `public-only` fails on them.
 
+## Release inputs
+
+A lineup (`release/lineup-<version>.json`, one Public and one Private per pressing)
+names every program as a cue plus BIN with a sha256, and the git mirror of the source
+it was built from. All of those live under one folder outside the repository,
+`RELEASE_INPUTS` (default `~/Desktop/repos/campaign-2026-10-15/release-inputs`):
+`<version>/<program>/` for the images and receipts, `src/<repo>.git` for the mirrors.
+Nothing a lineup presses from may sit in a lane directory, the games library or an
+app-support folder, because cleaning those must never break a re-press.
+
+`make lineup-check LINEUP=release/lineup-v0.52.json` proves it without pressing: every
+path is under `RELEASE_INPUTS`, every file and mirror exists, every image still hashes
+to the lineup, and every input is hash-gated. `lineup-prepare` (the first step of every
+pressing) refuses a lineup that reaches outside `RELEASE_INPUTS` (`SELF_CONTAINED=0`
+lifts that for a lineup older than v0.52), and the host tests run the check on the
+newest Public and Private lineups. Large images are copied with `cp -c` (APFS clone,
+no extra disk).
+
+The pressed bytes depend on the checkout path: cargo mixes the absolute path of a path
+dependency into the crate metadata hash, which changes the code the loader and the
+launcher compile to (`trim-paths` only removes the strings). To re-press a released
+disc byte for byte, press from the checkout path the release was made in.
+
 ## How it boots
 
 The BIOS reads `SYSTEM.CNF`, loads `PSX.EXE` (the launcher), and runs it. The

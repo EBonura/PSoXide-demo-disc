@@ -803,6 +803,12 @@ endif
 # arguments are the same ones `make disc` uses. The receipts it writes beside
 # the image prove every pressed entry is its lineup input.
 LINEUP_OUT := $(BUILD)/lineup
+# Every input of a release lineup is copied under RELEASE_INPUTS/<version>[-private]
+# (and its source mirror under RELEASE_INPUTS/src), so cleaning a lane directory
+# cannot break a re-press. `lineup-prepare` refuses a lineup that reaches outside
+# it; SELF_CONTAINED=0 lifts that for an old lineup (v0.51 and earlier).
+RELEASE_INPUTS ?= $(HOME)/Desktop/repos/campaign-2026-10-15/release-inputs
+SELF_CONTAINED ?= 1
 ifneq ($(LINEUP),)
 -include $(LINEUP_OUT)/lineup.mk
 endif
@@ -810,7 +816,14 @@ endif
 .PHONY: lineup-prepare lineup-disc _lineup-lay lineup-budget
 lineup-prepare: $(DISC_TOOLS)
 	@test -n "$(LINEUP)" || { echo "lineup: set LINEUP=release/lineup-<version>.json"; exit 1; }
-	$(DISC_TOOLS) lineup prepare --lineup "$(LINEUP)" --out "$(LINEUP_OUT)"
+	$(DISC_TOOLS) lineup prepare --lineup "$(LINEUP)" --out "$(LINEUP_OUT)" $(if $(filter 0,$(SELF_CONTAINED)),,--inputs-root "$(RELEASE_INPUTS)")
+
+# Prove a lineup can be re-pressed from the inputs root alone: every input and
+# source mirror under RELEASE_INPUTS, present, and hash-gated. Presses nothing.
+.PHONY: lineup-check
+lineup-check: $(DISC_TOOLS)
+	@test -n "$(LINEUP)" || { echo "lineup: set LINEUP=release/lineup-<version>.json"; exit 1; }
+	$(DISC_TOOLS) lineup check --exists --lineup "$(LINEUP)" --inputs-root "$(RELEASE_INPUTS)"
 
 lineup-disc: launcher mkdisc lineup-prepare
 	$(MAKE) _lineup-lay
