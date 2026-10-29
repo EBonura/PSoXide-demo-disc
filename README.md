@@ -115,10 +115,12 @@ lifts that for a lineup older than v0.52), and the host tests run the check on t
 newest Public and Private lineups. Large images are copied with `cp -c` (APFS clone,
 no extra disk).
 
-The pressed bytes depend on the checkout path: cargo mixes the absolute path of a path
-dependency into the crate metadata hash, which changes the code the loader and the
-launcher compile to (`trim-paths` only removes the strings). To re-press a released
-disc byte for byte, press from the checkout path the release was made in.
+The pressed bytes depend on the checkout path (seen on 2026-10-29: the v0.52 discs
+pressed from a second clone differ from the library's in the loader and launcher code,
+not in any input; pressed in the original path they are byte for byte the same). The
+likely cause is cargo mixing the absolute path of a path dependency into its crate
+metadata, which `trim-paths` does not touch. To re-press a released disc exactly, press
+from the checkout path the release was made in.
 
 ## How it boots
 

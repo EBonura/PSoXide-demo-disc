@@ -2,7 +2,7 @@
 //!
 //!     disc-tools release --version vX.Y (--cue <cue> | --lineup <json> --frontend <frontend>)
 //!         [--work <empty dir>] [--emulator-source <url or path>] [--chrome <path>]
-//!         [--dry-run]
+//!         [--shards <n>] [--smoke] [--dry-run]
 //!
 //! In order: the disc repository must be clean, on `main` and level with
 //! `origin/main`; a fresh clone of the emulator is checked out at the
@@ -13,6 +13,12 @@
 //! pinned emulator runs against the web folder. Then the summary is printed, the
 //! operator types the version to confirm, and `butler push` runs for both
 //! channels with `--userversion`, followed by `butler status` for both.
+//!
+//! The journey suite is the slow step (about 50 minutes in one Chrome), so it is
+//! split over `--shards` Chromes started together (3 by default), each running
+//! the journeys that hash to its shard; the reports are merged into one
+//! `journeys.md`. `--smoke` runs one journey of each kind instead, as a
+//! rehearsal, and is refused on a real publish.
 //!
 //! `--dry-run` does everything except the pushes and the status calls: it
 //! prints the exact commands instead, and reports repository-state problems as
@@ -58,6 +64,8 @@ struct Settings {
     work: PathBuf,
     emulator_source: Option<String>,
     chrome: Option<PathBuf>,
+    shards: u32,
+    smoke: bool,
     mode: Mode,
 }
 
@@ -228,6 +236,126 @@ fn megabytes(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
 
+/// Chromes the journey suite is split over unless `--shards` says otherwise.
+const DEFAULT_SHARDS: u32 = 3;
+/// The first port of shard 0; shard k uses this plus 10 k (and the player
+/// server's neighbour, and the DevTools port 20000 away), clear of the
+/// suite's own pid-keyed default.
+const SHARD_PORT_BASE: u32 = 21_000;
+
+/// The suite's arguments for one shard (`None` is the whole suite in one run).
+fn journey_command(
+    suite: &Path,
+    web: &Path,
+    report: &Path,
+    chrome: Option<&Path>,
+    shard: Option<(u32, u32)>,
+    smoke: bool,
+) -> Command {
+    let mut node = Command::new("node");
+    node.arg(suite)
+        .arg("--site")
+        .arg(web)
+        .arg("--report")
+        .arg(report);
+    if let Some(chrome) = chrome {
+        node.arg("--chrome").arg(chrome);
+    }
+    if let Some((index, count)) = shard {
+        node.arg("--shard")
+            .arg(format!("{index}/{count}"))
+            .arg("--port")
+            .arg((SHARD_PORT_BASE + 10 * index).to_string());
+    }
+    if smoke {
+        node.arg("--smoke");
+    }
+    node
+}
+
+/// The rows of several shard reports under one header.
+fn merge_reports(reports: &[String]) -> String {
+    let mut merged = String::new();
+    for (index, report) in reports.iter().enumerate() {
+        for (number, line) in report.lines().enumerate() {
+            if index == 0 || number >= 2 {
+                merged.push_str(line);
+                merged.push('\n');
+            }
+        }
+    }
+    merged
+}
+
+/// Run the browser journey suite, in one Chrome or split over `shards` that
+/// run together. Every shard must pass; the reports are merged into `report`.
+fn run_journeys(
+    suite: &Path,
+    web: &Path,
+    report: &Path,
+    chrome: Option<&Path>,
+    shards: u32,
+    smoke: bool,
+) -> Result<()> {
+    if shards == 1 {
+        return run_program(&mut journey_command(
+            suite, web, report, chrome, None, smoke,
+        ));
+    }
+    let directory = report.parent().unwrap_or_else(|| Path::new("."));
+    let mut running = Vec::new();
+    for index in 0..shards {
+        let log = directory.join(format!("journeys-shard-{index}.log"));
+        let part = directory.join(format!("journeys-shard-{index}.md"));
+        let mut command = journey_command(suite, web, &part, chrome, Some((index, shards)), smoke);
+        command
+            .stdin(std::process::Stdio::null())
+            .stdout(fs::File::create(&log)?)
+            .stderr(fs::File::create(
+                directory.join(format!("journeys-shard-{index}.err")),
+            )?);
+        println!(
+            "journeys: shard {index}/{shards} started, log {}",
+            log.display()
+        );
+        running.push((index, log, part, command.spawn()?));
+    }
+    let mut failed = Vec::new();
+    let mut parts = Vec::new();
+    for (index, log, part, mut child) in running {
+        let status = child.wait()?;
+        let text = fs::read_to_string(&log).unwrap_or_default();
+        let counted = text
+            .lines()
+            .rev()
+            .find(|l| l.contains(" passed"))
+            .unwrap_or("no result line");
+        println!(
+            "journeys: shard {index}/{shards} {} ({counted})",
+            if status.success() { "passed" } else { "FAILED" }
+        );
+        for line in text.lines().filter(|l| l.starts_with("FAIL")) {
+            println!("  {line}");
+        }
+        if !status.success() {
+            failed.push(index);
+        }
+        parts.push(fs::read_to_string(&part).unwrap_or_default());
+    }
+    write_merged(report, &parts)?;
+    ensure!(
+        failed.is_empty(),
+        "journey shard(s) {failed:?} failed; see journeys-shard-<n>.log beside {}",
+        report.display()
+    );
+    Ok(())
+}
+
+fn write_merged(report: &Path, parts: &[String]) -> Result<()> {
+    fs::write(report, merge_reports(parts))?;
+    Ok(())
+}
+
 fn parse(args: &[String]) -> Result<Settings> {
     let args = Args::parse(
         args,
@@ -239,8 +367,9 @@ fn parse(args: &[String]) -> Result<Settings> {
             "work",
             "emulator-source",
             "chrome",
+            "shards",
         ],
-        &["dry-run"],
+        &["dry-run", "smoke"],
     )?;
     ensure!(
         args.positional.is_empty(),
@@ -265,10 +394,21 @@ fn parse(args: &[String]) -> Result<Settings> {
             .map_or_else(|_| PathBuf::from("."), |r| r.join("build"))
             .join(format!("release-{version}"))
     });
+    let shards = match args.int("shards")? {
+        Some(n) if (1..=8).contains(&n) => n as u32,
+        Some(_) => bail!("--shards is 1 to 8"),
+        None => DEFAULT_SHARDS,
+    };
+    ensure!(
+        !args.has("smoke") || args.has("dry-run"),
+        "--smoke is a rehearsal: the smoke set is not the release gate, so it only runs with --dry-run"
+    );
     Ok(Settings {
         version,
         disc,
         work,
+        shards,
+        smoke: args.has("smoke"),
         emulator_source: args.get("emulator-source").map(str::to_string),
         chrome: args.path("chrome"),
         mode: if args.has("dry-run") {
@@ -381,19 +521,28 @@ pub fn run(args: &[String]) -> Result<i32> {
         "the pinned emulator has no tools/web-journeys/run.mjs; pin a newer web_player"
     );
     let report = out.join("journeys.md");
-    let mut node = Command::new("node");
-    node.arg(&suite)
-        .arg("--site")
-        .arg(&web)
-        .arg("--report")
-        .arg(&report);
-    if let Some(chrome) = &settings.chrome {
-        node.arg("--chrome").arg(chrome);
-    }
-    run_program(&mut node)?;
+    let started = std::time::Instant::now();
+    run_journeys(
+        &suite,
+        &web,
+        &report,
+        settings.chrome.as_deref(),
+        settings.shards,
+        settings.smoke,
+    )?;
     summary.row(
         "journeys",
-        format!("all passed, report {}", report.display()),
+        format!(
+            "{}all passed in {} s over {} Chrome(s), report {}",
+            if settings.smoke {
+                "SMOKE SET ONLY, "
+            } else {
+                ""
+            },
+            started.elapsed().as_secs(),
+            settings.shards,
+            report.display()
+        ),
     );
 
     let (digest_web, digest_download) = (tree_digest(&web)?, tree_digest(&download)?);
@@ -506,6 +655,60 @@ mod tests {
         assert!(parse(&raw(&["--version", "v0.48", "--lineup", "b"])).is_err());
         let ok = parse(&raw(&["--version", "v0.48", "--cue", "a.cue", "--dry-run"])).unwrap();
         assert!(ok.mode == Mode::DryRun);
+        assert_eq!(ok.shards, DEFAULT_SHARDS);
+        assert!(!ok.smoke);
+    }
+
+    #[test]
+    fn the_smoke_set_and_odd_shard_counts_are_refused_where_they_would_matter() {
+        let raw = |items: &[&str]| items.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let base = ["--version", "v0.48", "--cue", "a.cue"];
+        let with = |extra: &[&str]| raw(&[&base[..], extra].concat());
+        // A real publish never runs on the smoke set.
+        assert!(parse(&with(&["--smoke"])).is_err());
+        let rehearsal = parse(&with(&["--smoke", "--dry-run", "--shards", "2"])).unwrap();
+        assert!(rehearsal.smoke && rehearsal.shards == 2);
+        assert!(parse(&with(&["--shards", "0", "--dry-run"])).is_err());
+        assert!(parse(&with(&["--shards", "9", "--dry-run"])).is_err());
+    }
+
+    #[test]
+    fn a_shard_gets_its_own_ports_and_the_smoke_flag() {
+        let command = journey_command(
+            Path::new("run.mjs"),
+            Path::new("web"),
+            Path::new("r.md"),
+            None,
+            Some((2, 3)),
+            true,
+        );
+        let args: Vec<String> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        let joined = args.join(" ");
+        assert!(joined.contains("--shard 2/3"), "{joined}");
+        assert!(joined.contains("--port 21020"), "{joined}");
+        assert!(joined.ends_with("--smoke"), "{joined}");
+        let whole = journey_command(
+            Path::new("run.mjs"),
+            Path::new("web"),
+            Path::new("r.md"),
+            None,
+            None,
+            false,
+        );
+        assert!(!whole.get_args().any(|a| a == "--shard"));
+    }
+
+    #[test]
+    fn shard_reports_merge_under_one_header() {
+        let one = "| Journey | Step | Result |\n|---|---|---|\n| a | x | pass |\n".to_string();
+        let two = "| Journey | Step | Result |\n|---|---|---|\n| b | y | pass |\n".to_string();
+        assert_eq!(
+            merge_reports(&[one, two]),
+            "| Journey | Step | Result |\n|---|---|---|\n| a | x | pass |\n| b | y | pass |\n"
+        );
     }
 
     fn git_in(dir: &Path, args: &[&str]) {
