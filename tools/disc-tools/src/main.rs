@@ -18,11 +18,11 @@ mod chainloads;
 mod components;
 mod deploy;
 mod icons;
+mod install;
 mod label;
 mod lineup;
 mod programs;
 mod publiconly;
-mod quake;
 mod receipt;
 mod release;
 mod replay;
@@ -52,9 +52,9 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "prepare and receipt a pressing from a lineup file",
     ),
     (
-        "quake",
-        quake::run,
-        "verify, receipt or repin the Quake payload; headless chain-load check",
+        "install",
+        install::run,
+        "copy a pressing into the games library, verified, with its provenance file",
     ),
     (
         "chainloads",

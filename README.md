@@ -16,8 +16,9 @@ the PSoXide programs burned alongside it.
 | [![Current Cortex Ignition gameplay](assets/readme/cortex-current.png)](assets/readme/cortex-current.png) |
 
 ```bash
-make disc      # -> "PSoXide Demo Disc.{bin,cue}" in the PSoXide game library
-make check     # host tests, including the Quake pin check
+make press-public  VERSION=v0.52   # the Public disc (itch), into build/press/v0.52/public
+make press-private VERSION=v0.52   # the Private disc (the one that is burned), into .../private
+make check                         # host tests
 ```
 
 ## Public release
@@ -45,9 +46,8 @@ rebuilt on read; `deploy-public` builds the packer (`webdisc`, crate `psx-webdis
 at the `web_player` pin and the packer reads its files back and compares every sector with the image.
 A payload that reaches itch.io's 200 MB file limit is split into `demo-disc.pxw.001`, `.002`, ... (the 0.48
 disc packs to 178 MiB, one file). The pin in `release-components.json` must be an emulator that has `psx-webdisc`.
-Omit `--publish` to prepare packages for review. `make itch` only updates the
-download; the older `make release-web` only stages GitHub delivery assets.
-Neither is a complete deployment on its own.
+Omit `--publish` to prepare packages for review. `make release-public` runs the
+whole sequence below, both itch channels.
 
 After upload, check both live pages: launch Cortex from the browser carousel,
 check music and input, and confirm the downloadable version. Keep the existing
@@ -71,11 +71,11 @@ build (`bonnie-studios/psoxide:html5`) and the download
 (`bonnie-studios/psoxide-demo-disc:psx`):
 
 ```sh
-./release-public.sh --version v0.48 \
-  --cue "$HOME/Downloads/ps1 games/PSoXide Demo Disc v0.48.cue" --dry-run
+make release-public-dry-run VERSION=v0.48
 ```
 
-Drop `--dry-run` for the real thing. It runs `disc-tools release`, which, in order:
+`make release-public VERSION=...` is the real thing (it asks for the version before it
+pushes). Both run `disc-tools release`, which, in order:
 
 1. refuses unless this repository is clean, on `main` and level with `origin/main`;
 2. clones the emulator fresh and checks out the `web_player` pin of
@@ -210,9 +210,9 @@ expose this early tech demo directly on the shelf. `QUAKE SHAREWARE` is a
 default program rather than a variant. Quake streams `WORLD.PAK`,
 so a bare executable is not sufficient; the entry uses the same caller-provided
 LBA offset that relocates
-Voxide, NitroXide, and the other streaming programs. Its payload is pinned by
-revision and by four artifact hashes, and `disc-only` refuses to lay out a
-sector until they check. See [the Quake runbook](docs/quake-shareware.md).
+Voxide, NitroXide, and the other streaming programs. Its image is a
+lineup input like every other program: hash-gated, with the source revision it
+was built from. See [the Quake notes](docs/quake-shareware.md).
 
 The standard order is PSoXide Arcade, Celeste Collection, NitroXide,
 Voxide, Quake Shareware, Cortex Ignition, then PSXcel; the credits are a
@@ -385,12 +385,10 @@ its QR codes) are one Rust crate, `tools/disc-tools`. `make disc-tools` builds
 it; the examples in this file call the binary as `disc-tools`, which is
 `tools/disc-tools/target/release/disc-tools`, and `disc-tools help` lists its
 subcommands. `make check` runs its tests.
-Before `make disc`, provide the validated Quake source/artifacts described
-below and the authorized audio inputs in [audio/README.md](audio/README.md).
-The HL edition additionally needs a local Half-Life installation, found by
-its builder or supplied through `HL_DIR`. `CS=1` needs the Windows Steam
-Half-Life folder holding `valve/` and `cstrike/` (`CS_HALF_LIFE`, CrossOver's
-Steam by default) and `HK=1` the Windows Hollow Knight install (`HK_GAME_DIR`).
+Pressing needs the lineup's inputs under `RELEASE_INPUTS` (see "Release inputs"
+below) and the authorized audio inputs in [audio/README.md](audio/README.md).
+Nothing is rebuilt from the game submodules: a lineup takes each program as it
+was already built and played.
 
 `release-components.json` locks the SDK, editor/engine/Cortex and standalone
 emulator separately. Their source receipts are checked before building.
@@ -409,56 +407,46 @@ The existing Quake and HL release receipts remain additional verification.
 See [the repository map](docs/repositories.md) for ownership and dependencies.
 
 
-`make disc` writes into PSoXide's game library, so the disc shows up in the
-emulator next to everything else. The release files are flat in that directory:
+## Release channels
 
+One release is one `VERSION` (`v0.NN`) and a lineup pair,
+`release/lineup-<VERSION>.json` (Public, for itch) and
+`release/lineup-<VERSION>-private.json` (Private, the disc that is burned; Half-Life,
+Hollow Knight, WipEout and Ocarina of Time ride only here, and the Public edition is
+never burned). One Make target per step replaces the old wrapper scripts:
+
+```sh
+make release-inputs-check VERSION=v0.53   # inputs under RELEASE_INPUTS, present, hashes verified
+make press-public  VERSION=v0.53          # -> build/press/v0.53/public
+make press-private VERSION=v0.53          # -> build/press/v0.53/private
+make gates-public  VERSION=v0.53          # preburn check, program boots, chain-loads, Celeste navigation
+make gates-private VERSION=v0.53          # preburn check, program boots, chain-loads
+make install-public  VERSION=v0.53        # into the games library: temp name, sha256 verify, rename, provenance
+make install-private VERSION=v0.53
+make release-public-dry-run VERSION=v0.53 # stage and test both itch packages from the library Public disc
+make release-public VERSION=v0.53         # the same, then asks for the version and runs butler
 ```
-~/Downloads/ps1 games/PSoXide Demo Disc.{bin,cue}
-```
 
-Override with `DIST=...` for somewhere else, or `PSOXIDE_LIB=...` for a
-different library. `PROGRAMS_PSOXIDE=/absolute/path/to/PSoXide-editor` selects the
-checkout used for every ordinary rebuilt program. `PSOXIDE` remains the exact
-checkout named by Quake's artifact provenance, so advancing the shared runtime
-cannot silently change the SDK contract of the pinned Quake image. The Cortex
-project is staged from `games/PSoXide-editor` under `build/`, keeping
-generated output outside the pinned PSoXide worktree. `games/psoxide-arcade`
-is the private collection repository
-and the canonical owner of the Goncharov song (`goncharov.cdda` in history) by
-[magikAAAAArp](https://www.youtube.com/@magikAAAAArp/videos), used with the
-band's permission.
+The release targets use the PGO emulator (`RELEASE_FRONTEND`, the one emulator
+checkout's `target/pgo/release/psoxide-emulator`) and write the image, the release
+and component receipts and the gate evidence beside each pressing. `PSOXIDE_LIB`
+selects another library, `PRESS_ROOT` another output folder. The Private edition is
+pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
+the last program; `mkdisc` fails with each program's share when a layout is over
+`DISC_MAX_SECTORS`, and `make lineup-budget LINEUP=...` prints that table without
+writing an image.
 
-Two pressings exist. `make disc` builds the default one; `make disc HL=1`
-builds the same disc plus Half-Life, for local hardware verification only,
-under a different name so the two bins cannot be confused. That edition is
-never distributed. Both carry Quake shareware. The
-private submodules require repository access: a recursive clone fetches all
-submodules, including HL-PSX, even when the standard edition is selected.
-`HL=1` also requires the separately supplied original game data. Public
-release targets reject that edition.
-
-`CS=1` (Counter-Strike 1.6, from `games/cs-psx`) and `HK=1` (Hollow Knight,
-from `games/hk-psx`) are opt-in the same way, independent of `HL=1` and of each
-other. Each adds its carousel entry and its whole image; the disc name gains a
-tag per flag (`PSoXide Demo Disc HL CS`, for example), the release receipt and
-`make release-headless-check` cover exactly the programs pressed, and the
-public release targets reject every such pressing. Only cooked outputs are
-laid out; no game content enters this repository. mkdisc adds up every sector
-before writing and fails with each program's share when a combination is
-over `DISC_MAX_SECTORS` (an 80-minute CD-R by default). `make disc-budget`
-prints that table for already built inputs without writing an image.
-
-`make disc` needs the pinned Quake tree beside this one (`QUAKE_SRC`, the
-sibling `quake-psx-pinned` checkout by default) and will not build without
-it. `make quake-headless-check` is the gate to run before a burn: it chain-
-loads Quake off the built disc twice and requires the two replays to agree.
+The optional programs of a lineup are chosen with flags (`HL=1 CS=1 HK=1 WO=1 OOT=1
+HWT=1`, each independent); any flag makes the pressing Private. The disc name
+gains `HL` when it carries Half-Life. `LEAVE_OUT="ARCADE PSXCEL"` drops those
+entries with their shots, version and description.
 
 ## Pressing from a lineup
 
-`make disc` rebuilds every program from the submodule pins. The v0.40 Half-Life
-pressing instead takes each program exactly as it was built and played for the
-PS1 games library, listed in `release/lineup-v0.40.json` with its sha256,
-source revision and build receipt:
+A lineup pressing takes each program exactly as it was built and played for the
+PS1 games library, listed in `release/lineup-<version>.json` with its sha256,
+source revision and build receipt. (Rebuilding every program from the submodule pins,
+the old `make disc`, was retired on 2026-10-29.) Below the release channels:
 
 ```sh
 make lineup-disc LINEUP=release/lineup-v0.40.json HL=1 CS=1 HK=1 \
@@ -511,58 +499,6 @@ When a game gets a new build, the re-run is:
    bare games) hashes every program track in the pressing against the cues
    they came from. The order of the programs' tracks
    is read from the disc table, so a reordered carousel needs no edit.
-
-`disc-tools quake headless` still holds frame pins keyed by carousel size,
-but its route (two RIGHT presses) assumes Quake sits just before CREDITS, which
-has not been true since Quake moved to card two; no Makefile target runs it.
-
-## Repinning Quake
-
-Six values in the Makefile and one submodule pointer are the whole Quake
-contract. They all come out of a built Quake tree, and `make quake-repin`
-measures them:
-
-```bash
-make quake-repin                          # from the default QUAKE_SRC
-make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
-```
-
-It prints, and writes nothing:
-
-```
-QUAKE_EXPECTED_REV ?= <the Quake tree's HEAD>
-QUAKE_EXPECTED_PSOXIDE_REV ?= <the PSOXIDE_REV that tree declares>
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= <dist/quake-psx.provenance.json>
-QUAKE_EXPECTED_CUE_SHA256 ?= <dist/quake-psx.cue>
-QUAKE_EXPECTED_BIN_SHA256 ?= <dist/quake-psx.bin>
-QUAKE_EXPECTED_EXE_SHA256 ?= <dist/quake-psx.exe>
-```
-
-Paste those six lines over the ones near the top of the `Makefile`, then:
-
-1. `git -C games/PSoXide-editor checkout <QUAKE_EXPECTED_PSOXIDE_REV> && git add
-   games/PSoXide-editor` -- the Quake tree names the editor/engine revision it was built against, and
-   the disc has to be on that same revision or `quake-verify` refuses.
-2. Update `games/PSoXide-editor` and `PROGRAMS_EXPECTED_PSOXIDE_REV` together
-   when the ordinary programs advance. The verifier requires that clean exact
-   checkout and its build stamp. Keep `release-components.json` and all game
-   component locks on the same SDK/emulator/editor tuple.
-3. `make disc` -- rebuilds every ordinary program against the shared runtime,
-   re-verifies the component inputs and the Quake image, and writes the provenance
-   receipt beside the image.
-4. `make quake-headless-check` -- the shared release checker locates Quake
-   by name in the pressed carousel, verifies its executable checksum and
-   runtime reads, and requires two identical successful chain-load replays.
-   It does not require hand-updating a screenshot hash when the layout changes.
-
-Nothing rewrites a pin on your behalf. A repin that edited its own contract
-would be a verifier that agrees with whatever it is handed, and the diff is
-what tells a reviewer which contract moved.
-
-The Quake input also requires its schema-1 shipping sidecar, which binds the
-clean Quake and PSoXide revisions, canonical shareware PAK, guest recipe and
-toolchain, and actual cue/bin/EXE bytes. See
-[the Quake runbook](docs/quake-shareware.md).
 
 ## Recent changes
 

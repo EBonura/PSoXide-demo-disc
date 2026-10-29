@@ -1,30 +1,27 @@
 # PSoXide demo disc.
 #
-# `make disc` builds the chain-load blob, the launcher, every program, and lays
-# them out into the PSoXide game library as one disc. `make check` runs the
-# host tests.
+# Every pressing is a lineup pressing: `make lineup-disc LINEUP=release/lineup-<version>.json`
+# takes each program as it was already built and played (a cue and BIN named in the
+# lineup with their sha256, source revision and build receipt), refuses any input
+# whose hash moved, and lays them out behind the launcher this repository builds.
+# Nothing is rebuilt from the game submodules. The release channels below
+# (`press-public`, `press-private`, gates, install, release) wrap it for one VERSION.
+# `make check` runs the host tests.
 #
-# Half-Life cannot be rebuilt from a fresh clone because its cooked assets and
-# music live outside Git. Cortex uses an exact PSoXide pin so the active editor
-# project remains reproducible as the engine advances.
+# The non-lineup `make disc` path (rebuild every program from the submodule pins)
+# was retired on 2026-10-29: lineups have been the only real path since v0.45, and
+# the old path carried stale pins nobody could press from.
 
-.PHONY: help disc disc-tools disc-only disc-budget cs-program hk-program quake-verify quake-repin quake-headless-check _quake-headless-check program-headless-check release-frontend release-headless-check _release-headless-check quake-programs quake-programs-verify programs loader launcher mkdisc check relocation-check chainload-probe clean
+.PHONY: help disc-tools disc-budget program-headless-check celeste-navigation-check loader launcher mkdisc check relocation-check chainload-probe clean
 
 ROOT       := $(CURDIR)
-# All programs use the validated shared renderer and asset runtime.
-PSOXIDE    ?= $(ROOT)/games/PSoXide-editor
-SDK ?= $(ROOT)/games/PSoXide-sdk
-EMULATOR ?= $(ROOT)/games/PSoXide-emulator
-PROGRAMS_PSOXIDE ?= $(ROOT)/games/PSoXide-editor
-PROGRAMS_EXPECTED_PSOXIDE_REV ?= 9ad78b36884e5bbae3f409b92198f5090a348db8
-CORTEX_CURRENT_PSOXIDE ?= $(PROGRAMS_PSOXIDE)
-CORTEX_CURRENT_EXPECTED_PSOXIDE_REV ?= 9ad78b36884e5bbae3f409b92198f5090a348db8
-CORTEX_CURRENT_GUEST_STAGE_ROOT ?= /tmp/psoxide-psx-guest-v1-cortex-current
-CORTEX_GUEST_CARGO_HOME ?= /tmp/psoxide-psx-guest-v1/cargo-home
+# The launcher and the loader are built from the pinned editor tree.
+EDITOR     ?= $(ROOT)/games/PSoXide-editor
+SDK        ?= $(ROOT)/games/PSoXide-sdk
+EMULATOR   ?= $(ROOT)/games/PSoXide-emulator
 BUILD      := $(ROOT)/build
-QUAKE_PROGRAMS_STAMP := $(BUILD)/programs.psoxide-revision
 OUT        := $(BUILD)/mipsel-sony-psx/release
-EXAMPLES   := $(PROGRAMS_PSOXIDE)/build/examples/mipsel-sony-psx/release
+EXAMPLES   := $(EDITOR)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 DISC_TOOLS := $(ROOT)/tools/disc-tools/target/release/disc-tools
 
@@ -70,30 +67,13 @@ music: mkdisc
 music-check: music
 	@git diff --exit-code -- "$(MENU_XA_DIR)" && echo "music-check: the cook is byte-identical to the committed music"
 
-# One public pressing and private ones. The menu music permission is scoped to
-# the disc without Half-Life, and hl-psx is private until its own release, so HL
-# is opt-in, and so are the two other bring-your-own-assets ports:
-#   make disc        -> "PSoXide Demo Disc"     (the default pressing)
-#   make disc HL=1   -> "PSoXide Demo Disc HL"  (the same disc plus Half-Life)
-#   make disc CS=1   -> "PSoXide Demo Disc CS"  (plus Counter-Strike 1.6)
-#   make disc HK=1   -> "PSoXide Demo Disc HK"  (plus Hollow Knight)
-# The three flags are independent and combine: HL=1 HK=1 presses
-# "PSoXide Demo Disc HL HK". The names differ so no two bins can be mistaken
-# for each other. Every pressing carries Quake shareware; each flag adds to the
-# default disc, it does not replace anything. Any flag makes the pressing
-# private: the release receipt covers it and the public upload paths refuse it.
-#
-# Adding Quake to the Half-Life pressing was the size question. Measured
-# 2026-08-11 from one tree with one set of inputs, in 2352-byte sectors:
-#
-#   default, no Quake   86928   19:19:03   195.0 MiB
-#   default             96404   21:25:29   216.2 MiB
-#   HL, no Quake       291416   64:45:41   653.7 MiB
-#   HL                 300892   66:51:67   674.9 MiB
-#
-# Quake costs 9476 sectors either way. The HL pressing lands at 83.6% of an
-# 80-minute CD-R (359999 sectors), 59107 spare, and still fits a 74-minute
-# blank with 32108 to spare. Nothing had to be dropped to make room.
+
+# Which optional programs a pressing keeps. A lineup lists every program its
+# edition can carry; the flags choose among the optional ones. Half-Life,
+# Hollow Knight, Counter-Strike, WipEout, Ocarina of Time and the hardware tests
+# are never on the Public edition: any flag makes the pressing Private (the
+# launcher is built with its `private` feature, and the public upload paths
+# refuse it). The release channels below set them per edition.
 HL ?=
 CS ?=
 HK ?=
@@ -118,155 +98,56 @@ PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT))
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
 # the layout is over this. 359999 is an 80-minute CD-R; a 74-minute blank is
-# 333000. `make disc-budget` prints the same table for already built inputs.
-#
-# Measured 2026-09-23 with `make disc-budget` from one tree (tuple SDK
-# c7016844, hl-psx 66009d2, cs-psx b567316), in 2352-byte sectors, against an
-# 80-minute blank. Half-Life is 204888 of them, Counter-Strike 9014:
-#
-#   default            103288   22:57:13   28.7%
-#   CS                 112308   24:57:33   31.2%
-#   HL                 308182   68:29:07   85.6%
-#   HL CS              317202   70:29:27   88.1%
-#
-# The v0.40 lineup (make lineup-budget, 2026-09-25: library builds, HL CS HK,
-# no hardware tests) is 359238 sectors, 79:49:63, 761 spare of 359999. Most
-# 80-minute blanks put the lead-out at 79:59:74, which leaves 359849 sectors of
-# program area, so about 611 spare there: check the blank with drutil status.
+# 333000. `make lineup-budget` prints the table without writing an image. The
+# Private release channel presses for a real 80-minute blank (359844 sectors).
 DISC_MAX_SECTORS ?= 359999
 
-# Quake 1.06 shareware Episode 1 is on every pressing. The source revision,
-# shipping provenance, and all artifact hashes are checked before layout, and
-# the combined image gets a machine-readable provenance receipt beside it, so
-# a disc that carries Quake cannot stop saying exactly which Quake it carries.
-#
-# The owner approved public non-commercial distribution of the canonical
-# Quake 1.06 shareware payload on 2026-08-25. The public upload paths still
-# refuse the Half-Life pressing; only the standard disc may be published.
-#
-# The default paths name the canonical checkout. The expected revision,
-# sidecar and hashes still gate use; current main may require a deliberate
-# repin. The verifier fails closed if any one differs.
-QUAKE_SRC ?= $(abspath $(ROOT)/../quake-psx)
-QUAKE_CUE ?= $(QUAKE_SRC)/dist/quake-psx.cue
-QUAKE_PROVENANCE ?= $(patsubst %.cue,%.provenance.json,$(QUAKE_CUE))
-QUAKE_EXPECTED_REV ?= c14ec1020dbf1e7ecb6ad7fb4413cd18e9f02621
-QUAKE_EXPECTED_PSOXIDE_REV ?= c096eee01f4cc0b896461e6f2cdad4e404a32a0a
-QUAKE_EXPECTED_PROVENANCE_SHA256 ?= 223334a7ae4b2c48f1158e07d945b3c9d6062091a62defe11eb59bd29249c250
-QUAKE_EXPECTED_CUE_SHA256 ?= 5fa78b12b506d4190246e230183e1eebd677f201ff982a584bff10d88ee2594c
-QUAKE_EXPECTED_BIN_SHA256 ?= 62df9cb04e22eb5177cc5d1b0033ff6f0e3a571d4628078b7fc2e021cde0f149
-QUAKE_EXPECTED_EXE_SHA256 ?= bd272edab1e2d9435bd4faba7b090937013b30eab0c3d1b96721ff0d7f78c881
-QUAKE_VERSION := q$(shell printf '%.7s' '$(QUAKE_EXPECTED_REV)')
 # The emulator package was renamed from `frontend` to `psoxide-emulator` after the
-# component tuple's pin, and the web player runs ahead of the tuple (see
-# `web_player` in release-components.json). Name the package and its binary from
-# whichever emulator is checked out.
+# component tuple's pin. Name the package and its binary from whichever emulator
+# is checked out. Releases use the PGO build of the one emulator checkout instead
+# (RELEASE_FRONTEND below).
 EMULATOR_PACKAGE ?= $(or $(shell sed -n 's/^name *= *"\(.*\)"/\1/p' $(EMULATOR)/emu/crates/frontend/Cargo.toml 2>/dev/null | head -1),frontend)
 FRONTEND ?= $(EMULATOR)/target/release/$(EMULATOR_PACKAGE)
-HLPSX_SOURCE ?= $(GAMES)/hl-psx
 
-# The disc lands directly in PSoXide's game library as <library>/<Name>.{bin,cue},
-# no per-disc subfolder (Manny, 2026-09-03). The name carries one tag per
-# optional program, in HL CS HK order.
-# A lineup pressing (see lineup-disc below) is named for the disc it replaces
-# in the library: "HL" when it carries Half-Life (whatever else it carries),
-# then the pressing version. Without HL=1 it is the public pressing, and the
-# lineup's optional programs whose flags are off are left out of its receipt.
+
+# A pressing lands in DIST as <DISC_NAME>.{bin,cue,...}, by default the PSoXide
+# games library. A lineup pressing is named for the disc it replaces: "HL" when it
+# carries Half-Life, then the pressing version. The release channels press into
+# build/press/<version>/<edition> instead and install into the library only on
+# request (`install-public`, `install-private`).
 ifneq ($(LINEUP),)
 DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(DISC_VERSION))
 endif
-DISC_NAME ?= $(strip PSoXide Demo Disc $(if $(HL),HL) $(if $(CS),CS) $(if $(HK),HK))
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
 PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0)
-RELEASE_BUILD_COMMAND ?= make disc $(PRESSING_FLAGS) DIST=$(DIST)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
 LOADER_EXE  := $(OUT)/loader.exe
 LAUNCHER_EXE := $(OUT)/launcher.exe
 
-# Sibling game repos, as submodules.
-GAMES    := $(ROOT)/games
-VOXIDE   := $(GAMES)/voxide/dist/voxide.cue
-PSXCEL   := $(GAMES)/psxcel/game/target/$(PSX_TARGET)/release/psxcel.exe
-CELESTE  := $(GAMES)/pico8-psx/games/celeste-collection/target/$(PSX_TARGET)/release/celeste-collection.exe
-ARCADE   := $(GAMES)/psoxide-arcade/dist/psoxide-arcade.cue
-HLPSX    := $(GAMES)/hl-psx/dist/hl-psx.cue
-CSPSX_SOURCE ?= $(GAMES)/cs-psx
-CSPSX    := $(CSPSX_SOURCE)/dist/cs-psx.cue
-HKPSX_SOURCE ?= $(GAMES)/hk-psx
-# hk-psx's builder writes its disc only to ~/Downloads/ps1 games, so it runs
-# with HOME pointed at a directory under build/ and the image is taken from
-# there. Nothing reaches the real game library.
-HK_HOME  := $(BUILD)/hk-home
-HKPSX    := $(HK_HOME)/Downloads/ps1 games/hk-psx.cue
-# Both ports cook from the owner's own Windows Steam install in CrossOver:
-# Counter-Strike from the Half-Life folder that holds valve/ and cstrike/ (the
-# macOS Steam Half-Life has no cstrike), Hollow Knight from its install folder.
-STEAM_WINDOWS ?= $(HOME)/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common
-CS_HALF_LIFE ?= $(STEAM_WINDOWS)/Half-Life
-HK_GAME_DIR ?= $(STEAM_WINDOWS)/Hollow Knight
-CORTEX_CURRENT_SOURCE := $(CORTEX_CURRENT_PSOXIDE)/editor/projects/default
-CORTEX_CURRENT_PROJECT := $(BUILD)/cortex-current-04b
-CORTEX_CURRENT := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.cue
-CORTEX_CURRENT_MAP := $(CORTEX_CURRENT_PROJECT)/baked/cortex_ignition_tech_demo_0_4b.map
-CORTEX_CURRENT_REV_STAMP := $(CORTEX_CURRENT_PROJECT)/baked/.psoxide-revision
-
-NITROXIDE_SRC ?= $(GAMES)/nitroxide
-NITROXIDE_BUILD := $(BUILD)/nitroxide
-NITROXIDE       := $(NITROXIDE_BUILD)/NitroXide/NitroXide.cue
-
 help:
-	@echo "make disc             - build everything into \"$(DIST)\" (the default pressing, Quake shareware included)"
-	@echo "make disc HL=1        - the same disc plus Half-Life, for the Palermo Comicon"
-	@echo "make disc CS=1 HK=1   - plus Counter-Strike and/or Hollow Knight; flags combine with HL=1"
-	@echo "make disc-budget      - print the sector budget for the selected flags from built inputs"
-	@echo "make disc-only        - relay out the disc without rebuilding the programs"
-	@echo "make check            - host tests (disc-toc, mkdisc) and the Quake pin check"
-	@echo "make quake-verify     - check the pinned Quake input on its own"
-	@echo "make quake-repin      - print the pin values a built Quake tree implies"
-	@echo "make quake-headless-check - prove the default disc chain-loads Quake twice without images"
-	@echo "make program-headless-check - boot the independent games and all three Arcade guests"
-	@echo "make release-headless-check - build the private pressing (HL, or the given HL/CS/HK flags) and chain-load its release-critical entries"
-	@echo "make relocation-check - disc that proves a relocated game still finds its data"
-	@echo "make clean            - drop build/ (the disc in the library is left alone)"
+	@echo "Release channels (VERSION=v0.NN names release/lineup-<VERSION>.json and -private.json):"
+	@echo "  make release-inputs-check VERSION=v0.52   every input under RELEASE_INPUTS, present, hashes verified"
+	@echo "  make press-public  VERSION=v0.52          the Public disc into build/press/<VERSION>/public"
+	@echo "  make press-private VERSION=v0.52          the Private disc (the one that is burned) into .../private"
+	@echo "  make gates-public / gates-private         preburn check, program boots, chain-loads (and Celeste navigation)"
+	@echo "  make install-public / install-private     copy the pressing into the games library (temp name, verify, rename)"
+	@echo "  make release-public-dry-run VERSION=...   stage and test the itch packages from the library Public disc; pushes nothing"
+	@echo "  make release-public VERSION=...           the same, then asks for the version and runs butler for both itch channels"
+	@echo "Lower level:"
+	@echo "  make lineup-disc LINEUP=release/lineup-<version>.json   press one lineup"
+	@echo "  make lineup-check LINEUP=...              prove a lineup is self-contained"
+	@echo "  make lineup-budget LINEUP=...             print the sector budget"
+	@echo "  make check                                host tests"
+	@echo "  make clean                                drop build/"
 
 loader:
 	cd loader && CARGO_TARGET_DIR=$(BUILD) \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
-
-# Each program's own version, read from the source that declares it rather than
-# restated here. The disc could always say which pressing it was, but not which
-# build of anything it carried: the programs come from several repositories at
-# different moments, so the header's tag answered a question nobody was asking
-# when one game looked wrong.
-#
-# The manifest is the source, which took a correction to be true. VoXide's tag
-# and its on-screen string both said 0.1.9 while its Cargo.toml still carried
-# the 0.1.0 it was created with, and the Celeste collection had shipped 0.1.1
-# without the manifest hearing about it -- so the first disc to print versions
-# announced both games as older than they were. Both manifests are right now
-# and VoXide's on-screen string derives from its own, so they cannot drift
-# again.
-#
-# A game genuinely at 0.1.0 is one that has never been released, which is an
-# honest thing for the carousel to say. Bumping is a one-line change in the
-# game's own manifest and the disc follows.
-cargo_version = $(shell awk -F'"' '/^version/{print $$2; exit}' $(1) 2>/dev/null)
-V_VOXIDE    := $(call cargo_version,$(GAMES)/voxide/game/Cargo.toml)
-V_NITROXIDE := $(call cargo_version,$(NITROXIDE_SRC)/game/Cargo.toml)
-V_PSXCEL    := $(call cargo_version,$(GAMES)/psxcel/game/Cargo.toml)
-V_CELESTE   := $(call cargo_version,$(GAMES)/pico8-psx/games/celeste-collection/Cargo.toml)
-V_ARCADE    := $(shell awk '/^VERSION :=/{print $$3; exit}' $(GAMES)/psoxide-arcade/Makefile 2>/dev/null)
-V_HLPSX     := $(call cargo_version,$(GAMES)/hl-psx/game/Cargo.toml)
-V_CSPSX     := $(call cargo_version,$(CSPSX_SOURCE)/game/Cargo.toml)
-V_HKPSX     := $(call cargo_version,$(HKPSX_SOURCE)/game/Cargo.toml)
-V_OOTPSX    := 0.1.0
-# Build revisions are recorded in the release receipt.
-V_CORTEX_CURRENT := Tech demo
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
@@ -281,151 +162,6 @@ launcher: loader
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS) $(if $(PRIVATE),--features private)
 
-# The hardware test suite left the demo disc on 2026-09-25; it has a disc of
-# its own (`make hardware-tests-disc` in PSoXide-editor).
-
-# PSXcel and the Celeste collection never read the disc after boot, so they
-# ride as bare EXEs and do not care which SDK they were built against.
-# NitroXide streams its arena atlas and voxide streams its sfx bank from
-# WORLD.PAK at boot, so both ship whole images and ride the same disc_base
-# relocation as hello-pack.
-# PSOXIDE_FROM on every game that carries its own pin. Each of them records a
-# rev for its standalone build, and those revs drift -- three of them sat eight
-# commits behind a measured SPU fix and nothing said so. A disc built from
-# whatever each game happened to pin would press several different SDKs, so the
-# pin is overridden here and all ordinary non-Cortex programs come off the
-# shared submodule.
-# hl-psx's --psoxide below is the same idea under an older spelling.
-programs:
-	$(MAKE) -C $(GAMES)/voxide disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
-		DIST=$(GAMES)/voxide/dist GAMES_DIR=$(BUILD)/game-library
-	$(MAKE) -C $(NITROXIDE_SRC) disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) GAMES_DIR=$(NITROXIDE_BUILD)
-	$(MAKE) -C $(GAMES)/psxcel build PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
-	$(MAKE) -C $(GAMES)/pico8-psx collection PSOXIDE_FROM=$(PROGRAMS_PSOXIDE)
-	$(MAKE) -C $(GAMES)/psoxide-arcade disc PSOXIDE_FROM=$(PROGRAMS_PSOXIDE) \
-		DIST=$(GAMES)/psoxide-arcade/dist
-	@$(MAKE) cortex-if-stale
-ifneq ($(HL),)
-	cd $(GAMES)/hl-psx && cargo run --release -- assets --psoxide $(PROGRAMS_PSOXIDE)
-	cd $(GAMES)/hl-psx && cargo run --release -- pack --psoxide $(PROGRAMS_PSOXIDE)
-endif
-ifneq ($(CS),)
-	$(MAKE) cs-program
-endif
-ifneq ($(HK),)
-	$(MAKE) hk-program
-endif
-
-# Counter-Strike is a Half-Life mod, and cs-psx's cookers take one game
-# directory, so its builder first hard-links valve/ then cstrike/ into
-# .hlpsx/gamedir and cooks from that union. It hydrates the same shared
-# PSoXide as hl-psx, through the same --psoxide.
-cs-program:
-	cd $(CSPSX_SOURCE) && cargo cs-build overlay --half-life "$(CS_HALF_LIFE)"
-	cd $(CSPSX_SOURCE) && cargo cs-build assets --half-life "$(CSPSX_SOURCE)/.hlpsx/gamedir" --psoxide $(PROGRAMS_PSOXIDE)
-	cd $(CSPSX_SOURCE) && cargo cs-build pack --psoxide $(PROGRAMS_PSOXIDE)
-
-# hk-psx imports only the SDK, pinned by its own sdk.lock.json, which must
-# name the tuple's SDK (sdk-coherence checks). --no-validate skips its route
-# replays; the demo disc's own chain-load check replays it from the pressing.
-# HOME is swapped for the disc destination only, so cargo, rustup and pyenv are
-# pointed back at the real ones.
-hk-program:
-	@mkdir -p "$(HK_HOME)/Downloads/ps1 games"
-	cd $(HKPSX_SOURCE) && env HOME="$(HK_HOME)" \
-		CARGO_HOME="$${CARGO_HOME:-$(HOME)/.cargo}" RUSTUP_HOME="$${RUSTUP_HOME:-$(HOME)/.rustup}" \
-		PYENV_ROOT="$${PYENV_ROOT:-$(HOME)/.pyenv}" \
-		cargo run --release -- build --no-validate --sdk-source $(SDK) --hollow-knight "$(HK_GAME_DIR)"
-
-# Every disc build must establish that its ordinary demo-disc programs were
-# rebuilt from their own exact clean shared-runtime revision. Quake's separate
-# artifact pin is verified independently below.
-# Remove the prior stamp before rebuilding, check the hydration markers after
-# every program recipe finishes, then write the exact clean checkout revision.
-#
-# The name is historical: this was the Quake lane's extra step back when Quake
-# was opt-in. Quake ships on every pressing now, so it is simply how the disc's
-# programs get built, and the stamp is what binds them to one clean SDK.
-quake-programs:
-	@rm -f "$(QUAKE_PROGRAMS_STAMP)"
-	$(MAKE) programs
-	$(MAKE) sdk-coherence
-	@revision=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	dirty=$$(git -C "$(PROGRAMS_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
-	if [ -n "$$dirty" ]; then \
-		echo "quake-programs: PSoXide checkout is dirty; refusing SDK stamp"; \
-		exit 1; \
-	fi; \
-	mkdir -p "$(BUILD)" || exit 1; \
-	temporary="$(QUAKE_PROGRAMS_STAMP).tmp"; \
-	printf '%s\n' "$$revision" > "$$temporary" || exit 1; \
-	mv "$$temporary" "$(QUAKE_PROGRAMS_STAMP)"
-
-# disc-only deliberately reuses binaries. That is permitted only after
-# quake-programs recorded this checkout's full revision. This also makes
-# quake-headless-check fail closed instead of replaying stale ordinary games.
-quake-programs-verify:
-	@if [ ! -f "$(QUAKE_PROGRAMS_STAMP)" ]; then \
-		echo "quake-programs: missing $(QUAKE_PROGRAMS_STAMP); run 'make disc'"; \
-		exit 1; \
-	fi; \
-	lines=$$(wc -l < "$(QUAKE_PROGRAMS_STAMP)" | tr -d '[:space:]'); \
-	stamped=$$(sed -n '1p' "$(QUAKE_PROGRAMS_STAMP)"); \
-	if [ "$$lines" != 1 ] || ! printf '%s\n' "$$stamped" | grep -Eq '^[0-9a-f]{40}$$'; then \
-		echo "quake-programs: malformed SDK revision stamp $(QUAKE_PROGRAMS_STAMP)"; \
-		exit 1; \
-	fi; \
-	current=$$(git -C "$(PROGRAMS_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	if [ "$$stamped" != "$$current" ]; then \
-		echo "quake-programs: SDK revision stamp is $$stamped, but PSoXide is $$current; run 'make disc'"; \
-		exit 1; \
-	fi
-
-# Bake Cortex only when its tracked project or exact engine pin changed. The
-# project is copied under build/ before cooking, so generated packs and baked
-# images never dirty the PSoXide submodule. The complete
-# image is what mkdisc consumes: UI pack, world pack, CDDA and scene-residency
-# layout all remain exactly as build-project-disc authored them.
-CORTEX_FORCE   ?=
-
-.PHONY: cortex-if-stale cortex-current-if-stale cortex-symbol-check
-cortex-if-stale: cortex-current-if-stale
-
-# Replacing the project deletes its linker map. Invalidate the staged guest
-# executable too, so Cargo relinks and emits a matching map for the symbol gate.
-cortex-current-if-stale:
-	@current_rev=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" rev-parse --verify 'HEAD^{commit}') || exit 1; \
-	dirty=$$(git -C "$(CORTEX_CURRENT_PSOXIDE)" status --porcelain=v1 --untracked-files=normal) || exit 1; \
-	if [ "$$current_rev" != "$(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)" ]; then \
-		echo "cortex-current: PSoXide pin is $$current_rev, expected $(CORTEX_CURRENT_EXPECTED_PSOXIDE_REV)"; \
-		exit 1; \
-	fi; \
-	if [ -n "$$dirty" ]; then \
-		echo "cortex-current: pinned PSoXide checkout is dirty"; \
-		exit 1; \
-	fi; \
-	stamped_rev=$$(sed -n '1p' "$(CORTEX_CURRENT_REV_STAMP)" 2>/dev/null || true); \
-	if [ -n "$(CORTEX_FORCE)" ] || [ ! -f "$(CORTEX_CURRENT)" ] || [ ! -s "$(CORTEX_CURRENT_MAP)" ] || [ "$$stamped_rev" != "$$current_rev" ] || [ -n "$$(find "$(CORTEX_CURRENT_SOURCE)/" -type f -newer "$(CORTEX_CURRENT)" -print -quit 2>/dev/null)" ]; then \
-		echo "cortex-current: project or PSoXide revision changed (or forced) -- baking"; \
-		case "$(BUILD)" in ""|"/") echo "cortex-current: unsafe build root $(BUILD)"; exit 1 ;; esac; \
-		case "$(CORTEX_CURRENT_PROJECT)" in "$(BUILD)"/*) ;; *) echo "cortex-current: unsafe staging path $(CORTEX_CURRENT_PROJECT)"; exit 1 ;; esac; \
-		rm -rf "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
-		mkdir -p "$(CORTEX_CURRENT_PROJECT)" || exit 1; \
-		cp -R "$(CORTEX_CURRENT_SOURCE)/." "$(CORTEX_CURRENT_PROJECT)/" || exit 1; \
-		if [ -f "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/engine/examples/editor-playtest/Cargo.toml" ]; then \
-			CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" cargo clean --offline --release --target mipsel-sony-psx -Zjson-target-spec --package editor-playtest --manifest-path "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/engine/examples/editor-playtest/Cargo.toml" --target-dir "$(CORTEX_CURRENT_GUEST_STAGE_ROOT)/stage/build/examples" || exit 1; \
-		fi; \
-		(cd "$(CORTEX_CURRENT_PSOXIDE)/emu" && PSOXIDE_GUEST_STAGE_ROOT="$(CORTEX_CURRENT_GUEST_STAGE_ROOT)" PSOXIDE_GUEST_CARGO_HOME="$(CORTEX_GUEST_CARGO_HOME)" PSOXIDE_GUEST_LINK_MAP="$(CORTEX_CURRENT_MAP)" cargo run -p frontend --release -- build-project-disc --project "$(CORTEX_CURRENT_PROJECT)") || exit 1; \
-		printf '%s\n' "$$current_rev" > "$(CORTEX_CURRENT_REV_STAMP)" || exit 1; \
-	else \
-		echo "cortex-current: project unchanged -- reusing $(CORTEX_CURRENT)"; \
-	fi
-	$(MAKE) cortex-symbol-check
-
-cortex-symbol-check:
-	@test -s "$(CORTEX_CURRENT_MAP)" || { echo "cortex-current: missing or empty guest linker map: $(CORTEX_CURRENT_MAP)" >&2; exit 1; }
-	sh "$(CORTEX_CURRENT_PSOXIDE)/tools/guest_symbol_gate.sh" "$(CORTEX_CURRENT_MAP)"
-
 mkdisc:
 	cd tools/mkdisc && cargo build --release
 
@@ -436,6 +172,7 @@ DISC_TOOLS_SRC := $(wildcard $(ROOT)/tools/disc-tools/src/*.rs) $(ROOT)/tools/di
 $(DISC_TOOLS): $(DISC_TOOLS_SRC)
 	cd tools/disc-tools && cargo build --release
 disc-tools: $(DISC_TOOLS)
+
 
 # Which programs a pressing carries is decided here, when the disc is built
 # (the flags below and the lineup file); the launcher shows what the disc's
@@ -493,14 +230,6 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-gameplay.shot" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
-QUAKE_PREREQS = quake-programs-verify quake-verify
-
-disc: launcher quake-programs mkdisc
-	$(MAKE) disc-only
-
-quake-headless-check:
-	$(MAKE) disc-only
-	$(MAKE) _quake-headless-check
 
 # Smoke-test every independently maintained program outside the three large
 # ports. The script reads the pressed table and navigates by name, so adding or
@@ -523,141 +252,103 @@ celeste-navigation-check: $(DISC_TOOLS)
 		--frontend "$(FRONTEND)" --cue "$(CELESTE_NAV_CUE)" \
 		--out "$(CELESTE_NAV_OUT)"
 
-_quake-headless-check: $(DISC_TOOLS)
-	$(DISC_TOOLS) chainloads \
-		--frontend "$(FRONTEND)" \
-		--cue "$(DIST)/$(DISC_NAME).cue" \
-		--target "QUAKE SHAREWARE"
 
-# Burn gate for the one-disc private pressing.  Rebuild first: a release gate
-# that accepted `disc-only` could prove a perfectly deterministic stale guest.
-# Run both recursive makes with HL=1 so DISC_NAME/DIST and the carousel layout
-# are computed in the same variant that verifies them.  The checker launches
-# each release-critical entry twice and requires byte-identical route/CD/GPU/PC
-# logs as well as a final PC and sampled execution inside that entry's
-# checksummed PS-X EXE.
-release-frontend:
-	cd $(EMULATOR) && cargo build --locked --release -p $(EMULATOR_PACKAGE)
-
-# With no flags this is the HL pressing, as it always was; with any of HL, CS
-# or HK it is exactly that combination, and the replay covers what it carries.
-RELEASE_FLAGS = $(if $(PRIVATE),$(PRESSING_FLAGS),HL=1 CS=0 HK=0)
-release-headless-check: release-frontend
-	$(MAKE) disc $(RELEASE_FLAGS)
-	$(MAKE) _release-headless-check $(RELEASE_FLAGS)
-
-_release-headless-check: $(DISC_TOOLS)
-	$(DISC_TOOLS) release-receipt verify --receipt "$(RELEASE_RECEIPT)"
-	$(DISC_TOOLS) chainloads \
-		--frontend "$(FRONTEND)" \
-		--cue "$(DIST)/$(DISC_NAME).cue" \
-		--target "CORTEX IGNITION" --target "QUAKE SHAREWARE" \
-		$(if $(HL),--target HALF-LIFE) $(if $(CS),--target COUNTER-STRIKE) \
-		$(if $(HK),--target "HOLLOW KNIGHT")
-
-# The Private pressing in one command (never distributed: Half-Life, Hollow
-# Knight, Counter-Strike, Ocarina of Time and WipEout PSoXide ride only here):
+# ---------------------------------------------------------------------------
+# Release channels. A release is one VERSION (v0.NN) and its lineup pair:
+# release/lineup-$(VERSION).json (Public, for itch) and
+# release/lineup-$(VERSION)-private.json (Private, the disc that is burned).
+# These replace the release-public.sh wrapper and the per-lane press, gate,
+# install and web scripts. Nothing here publishes by itself: `release-public`
+# is the only target that can, and it stops to ask for the version first.
 #
-#   make press-private FRONTEND=<psoxide-emulator>
+#   make release-inputs-check VERSION=v0.53
+#   make press-public  VERSION=v0.53
+#   make press-private VERSION=v0.53
+#   make gates-public  VERSION=v0.53       (and gates-private)
+#   make install-public VERSION=v0.53      (and install-private)
+#   make release-public-dry-run VERSION=v0.53
 #
-# 1. lineup refresh: takes the newest library build of the five library-fed
-#    programs (each row's "library" path in the lineup file), copies it into
-#    the lineup inputs and rewrites its hashes. If anything moved the run stops
-#    here: the lineup's revision and build text are a human's to update, and the
-#    launcher version is read from a clean tree, so commit the lineup and run
-#    this again (nothing moves the second time).
-# 2. clean-tree check, then the sector budget (fails, writing no image, when the
-#    layout is over an 80-minute CD-R; prints the spare sectors otherwise).
-# 3. lineup-disc: the pressing and its two receipts, into PRIVATE_DIST.
-# 4. gates on the pressed image: the independent programs boot, and every
-#    chain-load replays twice byte-identical (Cortex, Quake, Half-Life,
-#    Counter-Strike, Hollow Knight, WipEout PSoXide to a race, Ocarina of Time
-#    to Link's house).
-# 5. only with INSTALL=1: copy the image, cue and receipts into the games
-#    library and remove the older Private pressings there.
-#
-# The launcher shows PRIVATE_VERSION, not what `git describe` says, so a commit
-# made after the version tag does not change what the disc says.
-PRIVATE_LINEUP ?= release/lineup-v0.45-private.json
-PRIVATE_VERSION ?= v0.45
-PRIVATE_NAME ?= PSoXide Demo Disc $(PRIVATE_VERSION) Private
-PRIVATE_DIST ?= $(BUILD)/private-press
-PRIVATE_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 HWT=0
-PRIVATE_ARGS = LINEUP=$(PRIVATE_LINEUP) $(PRIVATE_FLAGS) DISC_NAME="$(PRIVATE_NAME)" DISC_VERSION=$(PRIVATE_VERSION) DIST="$(PRIVATE_DIST)" FRONTEND="$(FRONTEND)"
-PRIVATE_EVIDENCE ?= $(PRIVATE_DIST)/evidence
+# The Private pressing is the one console burns use; the Public edition is never
+# burned. Each pressing writes its image and receipts to build/press/<VERSION>/<edition>.
+# ---------------------------------------------------------------------------
+VERSION ?=
+RELEASE_FRONTEND ?= $(HOME)/Desktop/repos/PSoXide-emulator/target/pgo/release/psoxide-emulator
+PRESS_ROOT ?= $(BUILD)/press
+PUBLIC_NAME  = PSoXide Demo Disc $(VERSION)
+PRIVATE_NAME = PSoXide Demo Disc $(VERSION) Private
+PUBLIC_LINEUP  ?= release/lineup-$(VERSION).json
+PRIVATE_LINEUP ?= release/lineup-$(VERSION)-private.json
+PUBLIC_DIST  = $(PRESS_ROOT)/$(VERSION)/public
+PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
+# What the Private disc carries since v0.52: Half-Life, Hollow Knight, WipEout and
+# Ocarina of Time on top of the shared programs, no Arcade or PSXcel, no Counter-Strike
+# and no hardware tests. It is pressed for an 80-minute blank (359844 sectors) with a
+# 4500 sector zero filler after the last program, so all game data ends well inside
+# the radius the console reads cleanly.
+PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+RELEASE_ARGS ?=
 
-.PHONY: press-private private-refresh private-budget private-gates private-install
-private-refresh: $(DISC_TOOLS)
-	$(DISC_TOOLS) lineup refresh --lineup "$(PRIVATE_LINEUP)" --library "$(PSOXIDE_LIB)"
+.PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
+need-version:
+	@test -n "$(VERSION)" || { echo "set VERSION=v0.NN (release/lineup-<VERSION>.json must exist)"; exit 1; }
 
-private-budget:
-	$(MAKE) lineup-budget $(PRIVATE_ARGS)
+release-inputs-check: need-version
+	$(MAKE) lineup-check LINEUP=$(PUBLIC_LINEUP)
+	$(MAKE) lineup-check LINEUP=$(PRIVATE_LINEUP)
 
-private-gates: $(DISC_TOOLS)
-	@mkdir -p "$(PRIVATE_EVIDENCE)"
-	$(DISC_TOOLS) programs --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
-		--out "$(PRIVATE_EVIDENCE)/programs" --jobs 2
-	$(DISC_TOOLS) chainloads --frontend "$(FRONTEND)" --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" \
-		--artifact-dir "$(PRIVATE_EVIDENCE)/chainloads"
+press-public: need-version
+	rm -rf "$(PUBLIC_DIST)"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 $(MAKE) lineup-disc LINEUP=$(PUBLIC_LINEUP) DISC_NAME="$(PUBLIC_NAME)" DISC_VERSION=$(VERSION) \
+		DIST="$(PUBLIC_DIST)" FRONTEND="$(RELEASE_FRONTEND)"
+	@shasum -a 256 "$(PUBLIC_DIST)/$(PUBLIC_NAME).bin" "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue"
 
-private-install:
-	@test -f "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" || { echo "private-install: press first"; exit 1; }
-	for ext in bin cue components.json release-receipt.json; do \
-		cp -c "$(PRIVATE_DIST)/$(PRIVATE_NAME).$$ext" "$(PSOXIDE_LIB)/$(PRIVATE_NAME).$$ext" || exit 1; \
-	done
-	@# one copy per pressing in the library: older Private pressings go
-	for old in "$(PSOXIDE_LIB)"/PSoXide\ Demo\ Disc\ v*\ Private.*; do \
-		case "$$old" in "$(PSOXIDE_LIB)/$(PRIVATE_NAME)."*) ;; *) echo "removing $$old"; rm -f "$$old";; esac; \
-	done
-
-press-private: $(DISC_TOOLS)
-	@test -x "$(FRONTEND)" || { echo "press-private: FRONTEND=$(FRONTEND) is not an executable"; exit 1; }
-	$(MAKE) private-refresh
-	@if [ -n "$$(git -C $(ROOT) status --porcelain --untracked-files=no)" ]; then \
-		echo "press-private: the tree is not clean (the refresh moved an input, or there are edits)."; \
-		echo "  update source.revision and build text in $(PRIVATE_LINEUP), commit, and run again."; \
-		git -C $(ROOT) status --short --untracked-files=no; exit 1; \
-	fi
-	$(MAKE) private-budget
+press-private: need-version
 	rm -rf "$(PRIVATE_DIST)"
-	$(MAKE) lineup-disc $(PRIVATE_ARGS)
-	$(MAKE) private-gates $(PRIVATE_ARGS)
-	@if [ -n "$(INSTALL)" ]; then $(MAKE) private-install $(PRIVATE_ARGS); fi
-	@echo "press-private: $(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 $(MAKE) lineup-disc LINEUP=$(PRIVATE_LINEUP) $(PRIVATE_PRESS_FLAGS) DISC_NAME="$(PRIVATE_NAME)" \
+		DISC_VERSION=$(VERSION) DIST="$(PRIVATE_DIST)" FRONTEND="$(RELEASE_FRONTEND)"
 	@shasum -a 256 "$(PRIVATE_DIST)/$(PRIVATE_NAME).bin" "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
 
-# Repin. The six QUAKE_EXPECTED_* values above and the PSoXide submodule
-# pointer are the whole contract, and they all come out of a built Quake tree:
-#
-#   make quake-repin                          # from the default QUAKE_SRC
-#   make quake-repin QUAKE_SRC=/path/to/tree  # from somewhere else
-#
-# It prints the six lines to paste over the ones above, plus the commands that
-# follow them, and writes nothing. Editing by hand is the point: the diff then
-# shows exactly which contract moved, and a repin that rewrote the pins itself
-# would be a verifier agreeing with whatever it was handed. README.md has the
-# full procedure. The chain-load gate resolves Quake by its pressed name.
-quake-repin: $(DISC_TOOLS)
-	@$(DISC_TOOLS) quake repin \
-		--source "$(QUAKE_SRC)" \
-		--cue "$(QUAKE_CUE)" \
-		--provenance "$(QUAKE_PROVENANCE)"
+# Gates on a pressed image: the console pre-burn check, every independent program
+# boots, every chain-load replays twice byte-identical, and (Public) the Celeste
+# collection's return paths. Evidence lands beside the pressing.
+GATE_JOBS ?= 2
+gates-public: need-version $(DISC_TOOLS)
+	@mkdir -p "$(PUBLIC_DIST)/evidence"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 "$(RELEASE_FRONTEND)" preburn-check --cue "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) programs --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue" --out "$(PUBLIC_DIST)/evidence/programs" --jobs $(GATE_JOBS)
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) chainloads --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue" --artifact-dir "$(PUBLIC_DIST)/evidence/chainloads"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) celeste-nav --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue" --out "$(PUBLIC_DIST)/evidence/celeste-nav"
 
-quake-verify: $(DISC_TOOLS)
-	$(DISC_TOOLS) quake verify \
-		--source "$(QUAKE_SRC)" \
-		--psoxide "$(PSOXIDE)" \
-		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
-		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
-		--cue "$(QUAKE_CUE)" \
-		--provenance "$(QUAKE_PROVENANCE)" \
-		--expected-revision "$(QUAKE_EXPECTED_REV)" \
-		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
-		--expected-programs-psoxide-revision "$(PROGRAMS_EXPECTED_PSOXIDE_REV)" \
-		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
-		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
-		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
-		--expected-exe-sha256 "$(QUAKE_EXPECTED_EXE_SHA256)"
+gates-private: need-version $(DISC_TOOLS)
+	@mkdir -p "$(PRIVATE_DIST)/evidence"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 "$(RELEASE_FRONTEND)" preburn-check --cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) programs --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" --out "$(PRIVATE_DIST)/evidence/programs" --jobs $(GATE_JOBS)
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) chainloads --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(PRIVATE_DIST)/$(PRIVATE_NAME).cue" --artifact-dir "$(PRIVATE_DIST)/evidence/chainloads"
+
+# Copy a pressing into the games library: each file under a temporary name, its
+# sha256 checked against the pressing, then renamed over the old one, plus the
+# provenance file. Older pressings are reported, never removed.
+install-public: need-version $(DISC_TOOLS)
+	$(DISC_TOOLS) install --dist "$(PUBLIC_DIST)" --name "$(PUBLIC_NAME)" --library "$(PSOXIDE_LIB)" --lineup "$(PUBLIC_LINEUP)" --edition Public
+
+install-private: need-version $(DISC_TOOLS)
+	$(DISC_TOOLS) install --dist "$(PRIVATE_DIST)" --name "$(PRIVATE_NAME)" --library "$(PSOXIDE_LIB)" --lineup "$(PRIVATE_LINEUP)" --edition Private
+
+# The two itch.io pages from the library's Public disc (README, "Releasing to itch"):
+# the dry run stages and tests the browser and download packages and prints the exact
+# butler commands. `release-public` runs the same checks, then waits for the version to
+# be typed and pushes both channels. RELEASE_ARGS go to `disc-tools release` (for
+# example --work <dir>, --chrome <path>, --jobs <n>, --smoke). Node 22 and Chrome are needed.
+release-public-dry-run: need-version $(DISC_TOOLS)
+	$(DISC_TOOLS) release --version $(VERSION) --cue "$(PSOXIDE_LIB)/$(PUBLIC_NAME).cue" --dry-run $(RELEASE_ARGS)
+
+release-public: need-version $(DISC_TOOLS)
+	$(DISC_TOOLS) release --version $(VERSION) --cue "$(PSOXIDE_LIB)/$(PUBLIC_NAME).cue" $(RELEASE_ARGS)
 
 # Menu backdrops: the same in-game captures the itch pages use, cooked from
 # assets/shots into the 8bpp CLUT blobs the launcher uploads to VRAM.
@@ -745,47 +436,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(if $(TAIL_FILLER),--tail-filler $(TAIL_FILLER)) \
 		--max-sectors $(DISC_MAX_SECTORS)
 
-ifneq ($(PRIVATE),)
-disc-only: release-frontend
-endif
-disc-only: mkdisc $(DISC_TOOLS) $(SHOT_FILES) $(QUAKE_PREREQS)
-	@mkdir -p "$(DIST)"
-	$(MKDISC) $(MKDISC_ARGS)
-
-	$(DISC_TOOLS) quake receipt \
-		--source "$(QUAKE_SRC)" \
-		--psoxide "$(PSOXIDE)" \
-		--programs-psoxide "$(PROGRAMS_PSOXIDE)" \
-		--programs-psoxide-stamp "$(QUAKE_PROGRAMS_STAMP)" \
-		--cue "$(QUAKE_CUE)" \
-		--provenance "$(QUAKE_PROVENANCE)" \
-		--expected-revision "$(QUAKE_EXPECTED_REV)" \
-		--expected-psoxide-revision "$(QUAKE_EXPECTED_PSOXIDE_REV)" \
-		--expected-programs-psoxide-revision "$(PROGRAMS_EXPECTED_PSOXIDE_REV)" \
-		--expected-provenance-sha256 "$(QUAKE_EXPECTED_PROVENANCE_SHA256)" \
-		--expected-cue-sha256 "$(QUAKE_EXPECTED_CUE_SHA256)" \
-		--expected-bin-sha256 "$(QUAKE_EXPECTED_BIN_SHA256)" \
-		--expected-exe-sha256 "$(QUAKE_EXPECTED_EXE_SHA256)" \
-		--demo-cue "$(DIST)/$(DISC_NAME).cue" \
-		--demo-bin "$(DIST)/$(DISC_NAME).bin" \
-		--out "$(DIST)/$(DISC_NAME).quake-provenance.json"
-
-ifneq ($(PRIVATE),)
-	$(DISC_TOOLS) release-receipt create \
-		--combined-cue "$(DIST)/$(DISC_NAME).cue" \
-		--frontend "$(FRONTEND)" \
-		--build-command "$(RELEASE_BUILD_COMMAND)" \
-		--program "CORTEX IGNITION=$(CORTEX_CURRENT)" \
-		--source "CORTEX IGNITION=$(CORTEX_CURRENT_PSOXIDE)" \
-		$(if $(HL),--program "HALF-LIFE=$(HLPSX)" --source "HALF-LIFE=$(HLPSX_SOURCE)") \
-		$(if $(CS),--program "COUNTER-STRIKE=$(CSPSX)" --source "COUNTER-STRIKE=$(CSPSX_SOURCE)") \
-		$(if $(HK),--program "HOLLOW KNIGHT=$(HKPSX)" --source "HOLLOW KNIGHT=$(HKPSX_SOURCE)") \
-		--program "QUAKE SHAREWARE=$(QUAKE_CUE)" \
-		--source "QUAKE SHAREWARE=$(QUAKE_SRC)" \
-		--out "$(RELEASE_RECEIPT)"
-endif
-	$(DISC_TOOLS) components --check --receipt "$(DIST)/$(DISC_NAME).components.json" --cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)"
-
 
 # A lineup pressing takes every program as it was already built and played,
 # instead of rebuilding it from the submodules: the Half-Life, Hollow Knight
@@ -846,95 +496,22 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 disc-budget: mkdisc $(SHOT_FILES)
 	$(MKDISC) $(MKDISC_ARGS) --dry-run
 
-# The standard pressing may be published. Both upload recipes fail closed when
-# HL, CS or HK is set so no private pressing can reach either public path.
-
-# Keep the browser emulator's copy current. PSoXide's Pages deploy stages
-# these files from the rolling `web-disc` release next to the wasm, and the
-# frontend streams them on demand; the cue's FILE line is rewritten to the
-# stable asset name. Run after pressing a public disc worth shipping -- the
-# next PSoXide deploy picks it up.
-#
-# The release lives on the PSoXide repo, not this one: this repo is private,
-# and the Pages workflow's own token can only read releases on the repo it
-# runs in.
-WEB_DISC_REPO := EBonura/PSoXide
-.PHONY: release-web
-release-web: $(DISC_TOOLS)
-	@test -z "$(PRIVATE)" || { echo "release-web: the HL, CS and HK pressings are never distributed"; exit 1; }
-	$(MAKE) disc
-	@rm -rf "$(BUILD)/web" && mkdir -p "$(BUILD)/web"
-	sed 's/^FILE .*/FILE "demo-disc.bin" BINARY/' "$(DIST)/$(DISC_NAME).cue" > "$(BUILD)/web/demo-disc.cue"
-	$(DISC_TOOLS) web-delivery "$(BUILD)/web/demo-disc.cue" "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web"
-	@# A CD-DA pressing keeps its raw image as a release asset too. A pressing whose
-	@# audio is XA is delivered as that image already (or as numbered parts).
-	@[ -e "$(BUILD)/web/demo-disc.bin" ] || [ -e "$(BUILD)/web/demo-disc.bin.001" ] || cp "$(DIST)/$(DISC_NAME).bin" "$(BUILD)/web/demo-disc.bin"
-	gh release view web-disc --repo $(WEB_DISC_REPO) >/dev/null 2>&1 || gh release create web-disc \
-		--repo $(WEB_DISC_REPO) \
-		--title "PSoXide Demo Disc (disc image)" \
-		--notes "The public pressing as a raw disc image plus the browser emulator's split delivery."
-	@# Everything in the staging directory is the delivery: the split pieces and
-	@# manifest, or the lazy image, its parts and its header sidecar.
-	find "$(BUILD)/web" -maxdepth 1 -type f -print0 | xargs -0 gh release upload web-disc --repo $(WEB_DISC_REPO) --clobber
-
-# Push the public pressing to itch.io from this machine: the ~200 MB bin is
-# too big for GitHub, so CI cannot carry it. Needs butler on PATH and a
-# one-time `butler login`. The HL pressing is never distributed -- the music
-# permission is scoped to the disc without it.
-.PHONY: itch
-itch:
-	@test -z "$(PRIVATE)" || { echo "itch: the HL, CS and HK pressings are never distributed"; exit 1; }
-	@command -v butler >/dev/null || { echo "itch: install butler and run 'butler login' first"; exit 1; }
-	$(MAKE) disc
-	@rm -rf "$(BUILD)/itch" && mkdir -p "$(BUILD)/itch"
-	cp "$(DIST)/$(DISC_NAME).bin" "$(DIST)/$(DISC_NAME).cue" release/README.txt "$(BUILD)/itch/"
-	butler push --userversion "$(DISC_VERSION)" "$(BUILD)/itch" bonnie-studios/psoxide-demo-disc:psx
-
-# The Quake pin check is part of the ordinary check, not a lane of its own: a
-# tree whose pinned Quake payload is missing, stale, dirty, or built against a
-# different PSoXide cannot press a disc, so it should not pass its tests either.
-# The chain-load half of the proof needs a built disc and lives in
-# `make quake-headless-check`.
-check: sdk-on-main sdk-coherence check-locks quake-verify
-	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-carousel
-	cargo test --manifest-path games/PSoXide-editor/engine/Cargo.toml -p psx-disc-toc
+# The host tests: the carousel and the disc table crates, the chain-load blob's
+# layout, mkdisc and disc-tools (which includes the check that the newest
+# lineups are self-contained).
+check:
+	cargo test --manifest-path $(EDITOR)/engine/Cargo.toml -p psx-carousel
+	cargo test --manifest-path $(EDITOR)/engine/Cargo.toml -p psx-disc-toc
 	cd tools/mkdisc && cargo test
 	cd tools/disc-tools && cargo test
 
-# Every program on this disc has to be built against one SDK.
-#
-# It was not always so. The games carrying their own pin drifted, and on
-# 2026-08-03 three of them were eight commits behind a measured SPU fix with
-# nothing to say so -- the disc pressed several SDKs and looked fine. `programs`
-# passes PSOXIDE_FROM to stop that; this checks it actually took, by reading the
-# marker psoxide-link leaves in each hydrated tree.
-#
-# Only games that have been hydrated are checked: a tree nobody has built yet
-# has no marker, and demanding one would fail a fresh clone for no reason.
-# Every tracked lock resolves, and every PSoXide pin names the revision its
-# lockfile actually resolved.
-#
-# sdk-coherence answers a different question: it proves the HYDRATED trees agree
-# after `make programs`. A 2026-08-03 audit found 21 of 56 tracked locks stale
-# while sdk-coherence was green, because a fresh clone of one game honouring its
-# own manifest is not something a marker in .psoxide can speak to.
-.PHONY: check-locks
-check-locks:
-	@./tools/check-locks.sh
-
-# The ordinary-program SDK and Quake's declared PSoXide
-# revision must both be on PSoXide main. Quake's SDK work once lived on a side
-# branch that this disc pinned as the SDK while main moved on; the split cost a
-# reconciliation merge. GitHub's compare API answers "identical" or "ahead"
-# when main contains the revision. DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 skips the
-# check for a deliberate side-branch pressing and says so.
+# The disc's SDK, editor and emulator pins must be on their repositories' main.
+# GitHub's compare API answers "identical" or "ahead" when main contains the
+# revision. DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 skips the check for a deliberate
+# side-branch pressing and says so.
 .PHONY: sdk-on-main
 sdk-on-main: components
 	@$(DISC_TOOLS) components --check-main
-
-.PHONY: sdk-coherence
-sdk-coherence:
-	$(DISC_TOOLS) components --check --games $(if $(HL),--hl) $(if $(CS),--cs) $(if $(HK),--hk)
 
 # hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
 # list, which makes it the end-to-end test for the relocation machinery: its
@@ -942,13 +519,13 @@ sdk-coherence:
 # much, and psx_io::disc_base has to make up the difference. Run the result
 # with the emulator and read the banner.
 relocation-check: launcher mkdisc
-	$(MAKE) -C $(PROGRAMS_PSOXIDE) hello-tri hello-pack-disc
+	$(MAKE) -C $(EDITOR) hello-tri hello-pack-disc
 	@mkdir -p $(ROOT)/dist
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
 		--game "HELLO TRI=$(EXAMPLES)/hello-tri.exe" \
 		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
 	@echo
-	@echo "Now: cd $(PROGRAMS_PSOXIDE)/emu && cargo run -p frontend --release -- launch \\"
+	@echo "Now: cd $(EDITOR)/emu && cargo run -p frontend --release -- launch \\"
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
 	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."
@@ -972,4 +549,4 @@ components: $(DISC_TOOLS)
 	$(DISC_TOOLS) components
 verify-components: $(DISC_TOOLS)
 	$(DISC_TOOLS) components --check
-loader programs mkdisc release-frontend cortex-current-if-stale sdk-coherence: components
+loader mkdisc: components

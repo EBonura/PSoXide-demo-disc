@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
-use crate::util::{fnv1a32, resolve, Error, Result};
+use crate::util::{resolve, Error, Result};
 
 pub const SECTOR_BYTES: u64 = 2352;
 pub const USER_DATA_AT: u64 = 24;
@@ -188,10 +188,6 @@ pub fn find_boot_exe(image: &Path) -> Result<Exe> {
         "no boot PS-X EXE in first {BOOT_SCAN_SECTORS} sectors: {}",
         image.display()
     )
-}
-
-pub fn exe_fnv(exe: &Exe) -> u32 {
-    fnv1a32(&exe.payload)
 }
 
 fn file_line() -> Regex {
