@@ -86,7 +86,12 @@ pushes). Both run `disc-tools release`, which, in order:
 5. runs `public-only` on the web and download folders together, then `webdisc verify`
    of the compact payload against the download BIN;
 6. runs the browser journey suite of the pinned emulator (`tools/web-journeys/run.mjs`,
-   Node and Chrome) against the web folder (`--chrome` names another Chrome);
+   Node and Chrome) against the web folder (`--chrome` names another Chrome). The suite
+   is split over `--shards` Chromes started together (3 by default; a stable hash of the
+   journey name picks the shard) and the reports are merged into `journeys.md`: 1135 steps
+   took 18.5 minutes that way against about 50 in one Chrome. `--smoke` (dry run only)
+   runs one journey of each kind, 185 steps in about 9 minutes, as a rehearsal;
+   it is not the release gate;
 7. prints a summary, then waits for you to type the version. Anything else cancels.
    It re-hashes both folders so nothing changed since the checks, runs `butler push
    ... --userversion <version>` for both channels and `butler status` for both.

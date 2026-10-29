@@ -297,6 +297,13 @@ fn run_journeys(
     shards: u32,
     smoke: bool,
 ) -> Result<()> {
+    // A pinned suite that predates --shard/--smoke would ignore them and run
+    // the whole suite in every Chrome, so refuse it instead.
+    let source = fs::read_to_string(suite)?;
+    ensure!(
+        (shards == 1 && !smoke) || (source.contains("args.shard") && source.contains("args.smoke")),
+        "the pinned emulator's run.mjs has no --shard/--smoke; pin a newer web_player or use --shards 1"
+    );
     if shards == 1 {
         return run_program(&mut journey_command(
             suite, web, report, chrome, None, smoke,

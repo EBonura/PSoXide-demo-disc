@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The release journey suite runs over `--shards` Chromes (3 by default) and merges their reports: the v0.52 package's 1135 steps passed in 18.5 minutes instead of about 50. `--smoke` runs a 185 step rehearsal set (dry run only). The browser player pin moves to emulator 410182ab, which adds `--shard`, `--smoke` and per-journey times to `tools/web-journeys/run.mjs` and nothing else.
 - The non-lineup `make disc` path is retired (lineups have been the only real path since v0.45): `disc`, `disc-only`, `programs`, the Quake and Cortex pin gates and `disc-tools quake` are gone with their tests, including the stale `cortex_bakes_only_the_current_project`.
 - One Make target per release channel replaces `release-public.sh` and the per-lane press, gate and install scripts: `release-inputs-check`, `press-public`, `press-private`, `gates-public`, `gates-private`, `install-public`, `install-private`, `release-public-dry-run`, `release-public` (all take `VERSION=v0.NN`). `disc-tools install` copies a pressing into the library, verified, with its provenance file.
 - Lineups must be self-contained: `disc-tools lineup check` (and `make lineup-check`) requires every input and source mirror under `RELEASE_INPUTS`, present and hash-gated; `lineup-prepare` refuses anything else. The v0.52 hardware-test inputs and mirror moved under `release-inputs`.
