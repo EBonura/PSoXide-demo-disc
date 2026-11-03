@@ -196,7 +196,8 @@ struct Entry {
 struct Exe {
     load: u64,
     payload_bytes: u64,
-    /// The EXE the boot program chains into (load address, payload bytes).
+    /// A second code range outside the boot payload (start, bytes): the EXE the
+    /// boot program chains into, or the pool its room modules run from.
     game: Option<(u64, u64)>,
 }
 
@@ -215,6 +216,16 @@ impl Exe {
 fn chained_exe_name(target: &str) -> Option<&'static str> {
     match target {
         "HALF-LIFE" => Some("HLGAME.EXE"),
+        _ => None,
+    }
+}
+
+/// Programs that run code from a module pool above the boot payload, from their
+/// linker script (Hollow Knight: POOL_BASE = STACK_INIT - STACK_RESERVE - POOL_BYTES).
+/// A pool that moves fails this gate until the range here follows it.
+fn module_pool(target: &str) -> Option<(u64, u64)> {
+    match target {
+        "HOLLOW KNIGHT" => Some((0x801d_9700, 0x1_a800)),
         _ => None,
     }
 }
@@ -316,7 +327,7 @@ fn parse_exe(image: &Path, entry: &Entry) -> Result<Exe> {
     );
     let game = match chained_exe_name(&entry.name) {
         Some(name) => Some(root_file_exe(image, entry.image_lba, name)?),
-        None => None,
+        None => module_pool(&entry.name),
     };
     Ok(Exe {
         load,
@@ -956,6 +967,19 @@ mod tests {
             Ok(_) => panic!("expected an error"),
             Err(error) => error.0,
         }
+    }
+
+    #[test]
+    fn hollow_knight_code_may_run_from_its_module_pool() {
+        let pool = module_pool("HOLLOW KNIGHT");
+        let exe = Exe {
+            load: 0x8001_0000,
+            payload_bytes: 0x10_0000,
+            game: pool,
+        };
+        assert!(exe.contains(0x801e_2450));
+        assert!(!exe.contains(0x801f_3f00));
+        assert!(module_pool("QUAKE SHAREWARE").is_none());
     }
 
     #[test]

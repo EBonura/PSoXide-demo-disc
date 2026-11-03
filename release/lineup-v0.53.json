@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "pressing": "v0.53",
+  "note": "PSoXide Demo Disc v0.53, public pressing, all XA: no CD-DA track. The v0.52 public programs with Quake at the library build c6412e2, the same one as Private. Arcade and Cortex Ignition are lifted byte for byte out of the v0.52 pressing (from_disc), since their inputs were cleaned up. Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only).",
+  "programs": [
+    {
+      "name": "PSOXIDE ARCADE",
+      "var": "ARCADE",
+      "version_var": "V_ARCADE",
+      "kind": "image",
+      "bin_sha256": "fcf15245d3aa7eac2eb5ccd8cd24e1881996c674ac3173643c011f01eca62eca",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/psoxide-arcade",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/psoxide-arcade.git",
+        "revision": "2bb95ad2490b14cafa4e424673761bb7699cc83d",
+        "ref": "repin/disc-pins-2026-10-26"
+      },
+      "build": "make disc on psoxide-arcade branch repin/disc-pins-2026-10-26 2bb95ad (main 3e858f4, the credits Instagram link bonnie_studios_, plus the pins: SDK 649c7ed8, editor 3cb1839a, emulator dddd2814, the demo disc's own); panic=immediate-abort, Goncharov as MUSIC1.XA inside the image, one data track, no CD-DA. Lifted out of the v0.52 pressing: the same image (92a1f962194f) with that disc's sector addresses.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/from-v0.52/PSoXide Demo Disc v0.52.release-receipt.json",
+      "derive": {
+        "from_disc": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/from-v0.52/PSoXide Demo Disc v0.52.bin",
+        "disc_sha256": "2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86",
+        "image_lba": 36166,
+        "sectors": 18097
+      }
+    },
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx main (the pressed 0.2.8 disc: brightness stepper, text palette fix, 32-bit sound and fixed-point maths, SDK b5365b18). The library still holds 0.2.7 (579f14f8).",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/celeste/SOURCE.json"
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "5af2a43bb3bc2d71e5846069d9ccf82c6479cc25b67f252cac4f6ea8e15190a1",
+      "version": "0.6.0",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/nitroxide.git",
+        "revision": "cb51cd716cf28636d96c5b9aa7c17916c2b7f376",
+        "ref": "main"
+      },
+      "build": "nitroxide main cb51cd7 (release 0.6.0, tag v0.6.0) itch package build (make disc, committed XA music, release/README.txt v0.6.0), as staged in nitroxide-polish/nx7/build/itch-0.6.0: a television-style goal replay in slow motion, a results scene with the winner's car and trophy, a REMATCH choice, and hold-to-skip for the replay and the kickoff fly-over.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/nitroxide/INSTALLED.json"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "82461d86219d9ac514faef8c22c3c4695827580246633b694b3a32c4fb478086",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/voxide.git",
+        "revision": "12895132b5e49a888c4d712fa4a7af9a4940eaab",
+        "ref": "main"
+      },
+      "build": "voxide main 12895132 (44dc725 plus the Minecraft-style loading screen of 97e6017: dirt backdrop, turning grass block, stage line, bar, fade-in), the library VoXide of 2026-10-25, built with make gate-disc on the same SDK b5365b18 / editor c096eee0 pins with the committed PGO profile. Its splash line already reads ALSO TRY CELESTE!, so one build serves both editions.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/voxide/INSTALLED.json"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/quake/Quake (quake-psx).cue",
+      "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
+      "bin_sha256": "366d5f4ef09b71a2ab4b83bcd5166b7f4155673f3075058f9e14b7ff672699ec",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
+        "revision": "c6412e29cbf5342fd995fc95d37a6394e05e4f56",
+        "ref": "main"
+      },
+      "build": "library install of 2026-10-25 10:51 (Quake (quake-psx).provenance.json): quake-psx main c6412e2, shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/quake/Quake (quake-psx).provenance.json",
+      "library": "Quake (quake-psx).cue"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "bin_sha256": "18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/PSoXide-editor.git",
+        "revision": "066fe3a2",
+        "ref": "cortex/0.4b-xa-2026-10-19"
+      },
+      "build": "frontend build-project-disc --project editor/projects/default on cortex/0.4b-xa-2026-10-19 (SDK 6518a5eb6, emulator 3f45f0eb): the v0.43 public Cortex line (editor main 309fdf93: the Palermo Comicon update, the approved 09-30 animations, the two-hit R1 combo) with its two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. Poll-bound replay against the plain 309fdf93 CD-DA build: VRAM and display hashes and dump-hw frames byte-identical at five stop polls; same frame count and 30 fps. Lifted out of the v0.52 pressing: the same image (f836c1d1519a) with that disc's sector addresses.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/from-v0.52/PSoXide Demo Disc v0.52.release-receipt.json",
+      "derive": {
+        "from_disc": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/from-v0.52/PSoXide Demo Disc v0.52.bin",
+        "disc_sha256": "2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86",
+        "image_lba": 134965,
+        "sectors": 7076
+      }
+    },
+    {
+      "name": "PSXCEL",
+      "var": "PSXCEL",
+      "version_var": "V_PSXCEL",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/psxcel/PSXcel.cue"
+      },
+      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/psxcel",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/psxcel.git",
+        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
+        "ref": "main (chore/abort-panics-2026-10-17)"
+      },
+      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53/psxcel/PSXcel.provenance.json"
+    }
+  ]
+}
