@@ -42,8 +42,10 @@ pub fn mix(a: Rgb, b: Rgb, t: u32) -> Rgb {
 
 // ---- VRAM layout (halfword coordinates) -----------------------------------
 
-/// Large cover pages: 104x78, 6 per page (2 across, 3 down).
-pub const L_PAGES: [(u16, u16); 2] = [(320, 0), (448, 0)];
+/// Large cover pages: 104x78, 6 per page (2 across, 3 down). The third sits
+/// below the UI atlas's columns, right of the back-cover shots and clear of the
+/// CLUT rows at y 480 (x 576..704, y 256..512).
+pub const L_PAGES: [(u16, u16); 3] = [(320, 0), (448, 0), (576, 256)];
 /// Medium covers: 68x51, 15 per page (3 across, 5 down).
 pub const M_PAGE: (u16, u16) = (576, 0);
 /// Small covers: 52x39, 24 per page (4 across, 6 down).

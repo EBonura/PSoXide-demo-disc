@@ -117,7 +117,7 @@ mod tests {
 
     // sha256 of the cooked shot for every PNG in assets/shots, generated once
     // by the retired cook-shots.py running on Pillow 12.0.0.
-    const GOLDEN: [(&str, &str); 28] = [
+    const GOLDEN: [(&str, &str); 30] = [
         (
             "breakout",
             "d51db0ca89a8fb6c388212e8a850126e7d833ae36a099aabc7e7be8d06619c3d",
@@ -230,6 +230,16 @@ mod tests {
         (
             "oot2",
             "90bc7b63e130f04d37131b16f12793a85b1e2a79fc3aa0ab1791bd77fb302e71",
+        ),
+        // The two Cortex Citadel frames postdate the Pillow cook: their hashes
+        // are `disc-tools cook-shot` output (2026-11-03).
+        (
+            "cortex-citadel1",
+            "3a420dee099449a1e139171eeab2033cfdf132d660b00313399ed0ad643da27d",
+        ),
+        (
+            "cortex-citadel2",
+            "04f2dc2682ff55fa6fcfff3b108590ef257236f61ded3cff6688c30518d80df8",
         ),
     ];
 

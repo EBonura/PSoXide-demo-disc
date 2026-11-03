@@ -82,6 +82,10 @@ HK ?=
 WO ?=
 # The hardware test suite is likewise lineup-only (HWT=1).
 HWT ?=
+# Cortex Citadel, the new-engine Cortex test, rides the lineup pressings only
+# (make lineup-disc ... CITADEL=1) and is on the Private edition only. Cortex Ignition
+# 0.4b, the old engine, is on both editions.
+CITADEL ?=
 # Ocarina of Time rides the lineup pressings only (make lineup-disc ... OOT=1):
 # it is built from the owner's own ROM in its own repository, has no submodule
 # here, and is on the Private edition only.
@@ -93,7 +97,8 @@ override HK := $(filter-out 0,$(HK))
 override WO := $(filter-out 0,$(WO))
 override HWT := $(filter-out 0,$(HWT))
 override OOT := $(filter-out 0,$(OOT))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT))
+override CITADEL := $(filter-out 0,$(CITADEL))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -121,7 +126,7 @@ endif
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0) CITADEL=$(if $(CITADEL),1,0)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
@@ -176,8 +181,9 @@ disc-tools: $(DISC_TOOLS)
 
 # Which programs a pressing carries is decided here, when the disc is built
 # (the flags below and the lineup file); the launcher shows what the disc's
-# table lists and has no way to reveal anything else. Cortex Ignition has been
-# on both pressings since 2026-09-03.
+# table lists and has no way to reveal anything else. Cortex Ignition (the old
+# engine, 0.4b) has been on both pressings since 2026-09-03; Cortex Citadel (the new
+# engine test) is Private only.
 
 # The three HALF-LIFE arguments travel together: an image without its version
 # and description would press, but announce itself wrong.
@@ -221,6 +227,14 @@ HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
 	--describe "HOLLOW KNIGHT=An early from-scratch PlayStation port of Hollow Knight, cooked from your own copy. King's Pass, Dirtmouth and the Forgotten Crossroads can be explored, with enemies, benches and saves.|Un primo port di Hollow Knight per PlayStation, fatto da zero partendo dalla propria copia. Si esplorano King's Pass, Dirtmouth e il Crocevia Dimenticato, con nemici, panchine e salvataggi."
 endif
 
+ifneq ($(CITADEL),)
+CITADEL_ARGS = --image "CORTEX CITADEL=$(CORTEX_CITADEL)" \
+	--shot "CORTEX CITADEL=$(SHOTS_OUT)/cortex-citadel1.shot" \
+	--shot "CORTEX CITADEL=$(SHOTS_OUT)/cortex-citadel2.shot" \
+	--version-of "CORTEX CITADEL=$(V_CORTEX_CITADEL)" \
+	--describe "CORTEX CITADEL=The new Cortex engine, tested on a small Citadel level. This is an engine test, not a game demo; Cortex Ignition is the old-engine demo.|Il nuovo motore di Cortex, provato su un piccolo livello della Cittadella. E un test del motore, non una demo; Cortex Ignition e la demo del vecchio motore."
+endif
+
 # The QUAKE SHAREWARE arguments travel together for the same reason the
 # HALF-LIFE ones do, and they are not conditional: there is no pressing without
 # Quake on it. QUAKE_PREREQS is what stops a disc being laid out around an
@@ -230,6 +244,12 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-gameplay.shot" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
+
+# Cortex Ignition's blurb, as in the launcher's cover table: the Public edition has one
+# Cortex and says what it is; the Private edition carries the new-engine test too and
+# says which engine this one is.
+CORTEX_ONLY_DESC = A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo.
+CORTEX_OLD_DESC = The demo of the old Cortex engine, 0.4b: a Souls-like built from the ground up for the original PlayStation. Early tech demo.|La demo del vecchio motore di Cortex, 0.4b: un souls-like sviluppato da zero per la prima PlayStation. Primo tech demo.
 
 # Smoke-test every independently maintained program outside the three large
 # ports. The script reads the pressed table and navigates by name, so adding or
@@ -281,20 +301,24 @@ PRIVATE_LINEUP ?= release/lineup-$(VERSION)-private.json
 PUBLIC_DIST  = $(PRESS_ROOT)/$(VERSION)/public
 PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # What the Private disc carries since v0.52: Half-Life, Hollow Knight, WipEout and
-# Ocarina of Time on top of the shared programs, no Arcade or PSXcel, no Counter-Strike
+# Ocarina of Time on top of the shared programs (and from v0.54 both Cortex engines:
+# CITADEL=1 adds the new-engine test beside Cortex Ignition 0.4b), no Arcade or PSXcel, no Counter-Strike
 # and no hardware tests. It is pressed for an 80-minute blank (359844 sectors) with a
 # 4500 sector zero filler after the last program, so all game data ends well inside
 # the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
 need-version:
-	@test -n "$(VERSION)" || { echo "set VERSION=v0.NN (release/lineup-<VERSION>.json must exist)"; exit 1; }
+	@test -n "$(VERSION)" || { echo "set VERSION=v0.NN (release/lineup-<VERSION>.json or -private.json must exist)"; exit 1; }
 
+# Checks each edition's lineup that exists: a version may be pressed Private alone
+# (v0.54 is, for the SuperStation event), and then has no Public lineup to check.
 release-inputs-check: need-version
-	$(MAKE) lineup-check LINEUP=$(PUBLIC_LINEUP)
-	$(MAKE) lineup-check LINEUP=$(PRIVATE_LINEUP)
+	@test -f "$(PUBLIC_LINEUP)" -o -f "$(PRIVATE_LINEUP)" || { echo "neither $(PUBLIC_LINEUP) nor $(PRIVATE_LINEUP) exists"; exit 1; }
+	$(if $(wildcard $(PUBLIC_LINEUP)),$(MAKE) lineup-check LINEUP=$(PUBLIC_LINEUP),@echo "no Public lineup for $(VERSION); checking Private only")
+	$(if $(wildcard $(PRIVATE_LINEUP)),$(MAKE) lineup-check LINEUP=$(PRIVATE_LINEUP),@echo "no Private lineup for $(VERSION)")
 
 press-public: need-version
 	rm -rf "$(PUBLIC_DIST)"
@@ -362,7 +386,7 @@ SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
               psxcel-editing breakout breakout2 invaders \
               invaders2 pong pong2 halflife quake-menu \
               quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
-              $(if $(WO),wipeout1 wipeout2) $(if $(OOT),oot1 oot2) $(if $(HWT),hwtests hwtests2)
+              $(if $(WO),wipeout1 wipeout2) $(if $(OOT),oot1 oot2) $(if $(CITADEL),cortex-citadel1 cortex-citadel2) $(if $(HWT),hwtests hwtests2)
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
@@ -408,6 +432,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(OOT_ARGS) \
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		$(CITADEL_ARGS) \
 		$(HWT_ARGS) \
 		$(PSXCEL_ARGS) \
 		$(foreach t,$(MENU_XA),--menu-xa "$(t)") \
@@ -429,7 +454,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
-		--describe "CORTEX IGNITION=A Souls-like built from the ground up for the original PlayStation. This is an early tech demo.|Un souls-like sviluppato da zero per la prima PlayStation. Questo e un primo tech demo." \
+		--describe "CORTEX IGNITION=$(if $(PRIVATE),$(CORTEX_OLD_DESC),$(CORTEX_ONLY_DESC))" \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Supports 2 players in split screen.|Un clone di Rocket League per la prima PlayStation. Supporta 2 giocatori a schermo diviso." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
@@ -487,7 +512,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)$(if $(LEAVE_OUT), LEAVE_OUT='$(LEAVE_OUT)')" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(HWT),,--omit "HARDWARE TESTS") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 

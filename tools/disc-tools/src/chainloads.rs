@@ -21,15 +21,17 @@ use crate::util::{fnv1a32, resolve, sha256_file, Error, Result};
 
 const DEFAULT_STEPS: u64 = 700_000_000;
 /// Every pressing carries the core entries; the Private flags add the others.
+/// Cortex Ignition (the old engine, 0.4b) is on both editions.
 const CORE_TARGETS: [&str; 2] = ["CORTEX IGNITION", "QUAKE SHAREWARE"];
-const OPTIONAL_TARGETS: [&str; 5] = [
+const OPTIONAL_TARGETS: [&str; 6] = [
     "HALF-LIFE",
     "COUNTER-STRIKE",
     "HOLLOW KNIGHT",
     "WIPEOUT PSOXIDE",
     "OCARINA OF TIME",
+    "CORTEX CITADEL",
 ];
-const TARGETS: [&str; 7] = [
+const TARGETS: [&str; 8] = [
     "CORTEX IGNITION",
     "QUAKE SHAREWARE",
     "HALF-LIFE",
@@ -37,7 +39,19 @@ const TARGETS: [&str; 7] = [
     "HOLLOW KNIGHT",
     "WIPEOUT PSOXIDE",
     "OCARINA OF TIME",
+    "CORTEX CITADEL",
 ];
+
+/// The two Cortex engines, each its own disc entry: the old one (Cortex
+/// Ignition 0.4b, both editions) and the new-engine Citadel test (Private only).
+/// They share one gameplay oracle: the launcher route reaches the program's
+/// own menu, CROSS skips its intro and welcome panels, and textured world
+/// geometry is drawn for a sustained run of changing frames.
+const CORTEX_TARGETS: [&str; 2] = ["CORTEX IGNITION", "CORTEX CITADEL"];
+
+fn is_cortex(target: &str) -> bool {
+    CORTEX_TARGETS.contains(&target)
+}
 
 /// Markers the target must print exactly once after the launcher's own two.
 fn target_markers(target: &str) -> &'static [&'static str] {
@@ -72,7 +86,7 @@ fn target_failures(target: &str) -> &'static [&'static str] {
 }
 
 /// Every target must be seen reading from the disc after the loader finished.
-const REQUIRE_RUNTIME_READ: [&str; 7] = TARGETS;
+const REQUIRE_RUNTIME_READ: [&str; 8] = TARGETS;
 
 // These are deliberately below the accepted Cortex 0.4 gameplay load
 // (259-294 textured triangles and 115 quads in the integration replay), but
@@ -171,9 +185,10 @@ fn threshold_gameplay(target: &str) -> Option<Threshold> {
 // high-frequency detail in the upper playfield as a visual-semantic oracle.
 // The ROI excludes the HUD and player silhouette. The broken exterior-facing
 // capture measured 92 permille; the foggier 0.4 authored view measures 135.
-// The Graybox Reach project that holds the Cortex slot while the 0.4b project
-// has no XA build measures 105 (2026-10-15, a textured level with the player
-// in view), so the floor sits at 100, above the broken capture.
+// The Graybox Reach project that once held the Cortex slot measured 105
+// (2026-10-15, a textured level with the player in view), so the floor sits at
+// 100, above the broken capture. Both engines clear it: Cortex Ignition 0.4b
+// and the Citadel test (128 permille in the v0.53 Private gates).
 const CORTEX_GEOMETRY_EDGE_DELTA: u32 = 24;
 const CORTEX_GEOMETRY_MIN_EDGE_PERMILLE: u64 = 100;
 
@@ -378,10 +393,7 @@ fn shifted(route: &str, by: i64) -> Vec<String> {
 
 fn route_for(target: &str, index: usize) -> String {
     let (mut events, cross_tick) = launcher_route(index);
-    if matches!(
-        target,
-        "CORTEX IGNITION" | "HALF-LIFE" | "COUNTER-STRIKE"
-    ) {
+    if is_cortex(target) || matches!(target, "HALF-LIFE" | "COUNTER-STRIKE") {
         // These programs have their own menu after the demo-disc carousel.
         // Sparse presses remain deterministic across scene and data loads and
         // enter gameplay without depending on a single timing edge.
@@ -415,7 +427,7 @@ fn route_for(target: &str, index: usize) -> String {
                 .map(|offset| format!("{}:cross:6", cross_tick + offset)),
         );
     }
-    if target == "CORTEX IGNITION" {
+    if is_cortex(target) {
         // Cortex 0.4b (Comicon) opens New Game with an intro that only a held
         // CROSS skips, then three welcome panels that CROSS dismisses.
         events.push(format!("{}:cross:150", cross_tick + 2600));
@@ -432,7 +444,7 @@ fn route_for(target: &str, index: usize) -> String {
 fn steps_for(target: &str, steps: u64, index: usize) -> u64 {
     let walk = (launcher_route(index).1 - 1_000).max(0) as u64 * 250_000;
     walk + match target {
-        "CORTEX IGNITION" => steps.max(CORTEX_STEPS),
+        _ if is_cortex(target) => steps.max(CORTEX_STEPS),
         "HALF-LIFE" => steps.max(HL_STEPS),
         "HOLLOW KNIGHT" => steps.max(HK_STEPS),
         "WIPEOUT PSOXIDE" => steps.max(WIPEOUT_STEPS),
@@ -697,14 +709,14 @@ fn run_once(
         samples != 0,
         "{name}: PC sampler never observed payload code"
     );
-    let gameplay = if name == "CORTEX IGNITION" {
+    let gameplay = if is_cortex(name) {
         cortex_gameplay_evidence(&gpu)?
     } else if threshold_gameplay(name).is_some() {
         threshold_gameplay_evidence(&gpu, name)?
     } else {
         Gameplay::default()
     };
-    let geometry_edge_permille = if name == "CORTEX IGNITION" {
+    let geometry_edge_permille = if is_cortex(name) {
         cortex_geometry_evidence(&display_ppm)?
     } else {
         0
@@ -996,6 +1008,42 @@ mod tests {
              1800:cross:12,2200:cross:12,2600:cross:12,3000:cross:12,\
              3400:cross:12"
         );
+    }
+
+    #[test]
+    fn both_cortex_engines_are_gated_through_the_same_route() {
+        // Index 9 is nine cases along (the Private shelf puts Cortex Citadel
+        // after Cortex Ignition): RIGHT x9, CROSS at 2400, then the same intro
+        // hold and welcome panels the old engine needs.
+        for target in CORTEX_TARGETS {
+            let route = route_for(target, 9);
+            assert!(route.starts_with("400:right:8,"), "{target}: {route}");
+            assert!(
+                route.contains(",2400:cross:12,2800:cross:12,"),
+                "{target}: {route}"
+            );
+            assert!(route.contains(",5000:cross:150,"), "{target}: {route}");
+            assert!(is_cortex(target));
+            // The steps budget grows by the walk along the shelf.
+            let walk = (launcher_route(9).1 - 1_000) as u64 * 250_000;
+            assert_eq!(steps_for(target, 1, 9), walk + CORTEX_STEPS);
+        }
+        assert!(!is_cortex("QUAKE SHAREWARE"));
+    }
+
+    #[test]
+    fn every_gated_target_is_named_once_and_the_new_cortex_is_optional() {
+        for target in CORE_TARGETS.iter().chain(OPTIONAL_TARGETS.iter()) {
+            assert_eq!(TARGETS.iter().filter(|t| *t == target).count(), 1, "{target}");
+        }
+        assert_eq!(TARGETS.len(), CORE_TARGETS.len() + OPTIONAL_TARGETS.len());
+        // The old engine rides every pressing; the Citadel test is Private only.
+        assert!(CORE_TARGETS.contains(&"CORTEX IGNITION"));
+        assert!(OPTIONAL_TARGETS.contains(&"CORTEX CITADEL"));
+        assert!(!CORE_TARGETS.contains(&"CORTEX CITADEL"));
+        for target in CORTEX_TARGETS {
+            assert!(REQUIRE_RUNTIME_READ.contains(&target));
+        }
     }
 
     #[test]

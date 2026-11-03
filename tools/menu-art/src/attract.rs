@@ -30,6 +30,7 @@ const BACKS: &[(&str, &[&str])] = &[
     ("cstrike", &["counterstrike"]),
     ("halflife", &["halflife"]),
     ("oot", &["oot1", "oot2"]),
+    ("citadel", &["cortex-citadel1", "cortex-citadel2"]),
 ];
 
 pub fn bake_backs(shots: &Path, out: &Path) {

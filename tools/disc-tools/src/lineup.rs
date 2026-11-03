@@ -410,10 +410,90 @@ fn verify_hashes(lineup: &Value) -> Result<()> {
     Ok(())
 }
 
+/// The Cortex Ignition 0.4b images (old engine) a Public lineup may carry,
+/// by the sha256 of the image the row presses. Cortex Citadel and every other
+/// new-engine build stay out of the Public edition and the browser player
+/// (Manny, 2026-11-03).
+const PUBLIC_CORTEX_IMAGES: [&str; 4] = [
+    // v0.40 and v0.41: editor 1eab4c90.
+    "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
+    // v0.43: editor 309fdf93.
+    "1d3333b26748f2e90d98b1240789709d738fa85c1005562102e8247157fe960a",
+    // v0.47 to v0.52: cortex/0.4b-xa-2026-10-19, editor 066fe3a2.
+    "f836c1d1519aa9c2c660bad4b42a7c95d4814a9a3514dcdc06b8dd16ee724d72",
+    // v0.53: the same build lifted out of the v0.52 pressing (from_disc).
+    "18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df",
+];
+/// The v0.52 pressing the lifted 0.4b image sits in, and where: a `from_disc`
+/// Cortex row on a Public lineup must name exactly this slice, since only the
+/// disc is hashed when it is derived.
+const PUBLIC_CORTEX_LIFT: (&str, u64, u64) = (
+    "2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86",
+    134_965,
+    7_076,
+);
+
+/// Whether a lineup is for the Public edition: its pressing name does not say
+/// private.
+fn is_public(lineup: &Value) -> bool {
+    !lineup
+        .get("pressing")
+        .and_then(Value::as_str)
+        .is_some_and(|name| name.contains("private"))
+}
+
+/// A Public lineup carries Cortex only as the old-engine Cortex Ignition 0.4b,
+/// by hash: any other row whose name says Cortex (Cortex Citadel included), or a
+/// Cortex Ignition row that is not one of the 0.4b images, is refused. A Private
+/// lineup is not constrained here.
+fn check_public_cortex(lineup: &Value) -> Result<()> {
+    if !is_public(lineup) {
+        return Ok(());
+    }
+    for row in programs_of(lineup)? {
+        let name = text(row, "name")?;
+        if !name.to_ascii_uppercase().contains("CORTEX") {
+            continue;
+        }
+        ensure!(
+            name == "CORTEX IGNITION",
+            "{name}: a Public lineup carries Cortex Ignition 0.4b only, not {name}"
+        );
+        let sha = row.get("bin_sha256").and_then(Value::as_str).unwrap_or("");
+        ensure!(
+            PUBLIC_CORTEX_IMAGES.contains(&sha),
+            "{name}: bin_sha256 {sha:?} is not a Cortex Ignition 0.4b image; \
+             a Public lineup may not carry a new-engine Cortex"
+        );
+        ensure!(
+            row.get("version").and_then(Value::as_str) == Some("0.4b"),
+            "{name}: a Public lineup's Cortex must be version 0.4b"
+        );
+        if row.get("derive").and_then(|d| d.get("from_disc")).is_some() {
+            let derive = &row["derive"];
+            let found = (
+                derive.get("disc_sha256").and_then(Value::as_str).unwrap_or(""),
+                derive.get("image_lba").and_then(Value::as_u64).unwrap_or(0),
+                derive.get("sectors").and_then(Value::as_u64).unwrap_or(0),
+            );
+            ensure!(
+                found == PUBLIC_CORTEX_LIFT,
+                "{name}: a lifted Public Cortex must be the 0.4b slice of the v0.52 pressing \
+                 (disc {}, LBA {}, {} sectors), not {found:?}",
+                PUBLIC_CORTEX_LIFT.0,
+                PUBLIC_CORTEX_LIFT.1,
+                PUBLIC_CORTEX_LIFT.2
+            );
+        }
+    }
+    Ok(())
+}
+
 fn check(args: &Args) -> Result<()> {
     let lineup_path = args.require_path("lineup")?;
     let root = expand_home(args.require("inputs-root")?);
     let lineup = load(&lineup_path)?;
+    check_public_cortex(&lineup)?;
     check_contained(&lineup, &root)?;
     if args.has("exists") {
         let missing = missing_files(&lineup)?;
@@ -444,6 +524,7 @@ fn programs_of(lineup: &Value) -> Result<&Vec<Value>> {
 fn prepare(args: &Args) -> Result<()> {
     let lineup_path = args.require_path("lineup")?;
     let lineup = load(&lineup_path)?;
+    check_public_cortex(&lineup)?;
     if let Some(root) = args.get("inputs-root") {
         check_contained(&lineup, &expand_home(root))?;
     }
@@ -877,6 +958,85 @@ mod tests {
         assert!(contained_problems(&lineup, Path::new("/inputs"))
             .unwrap()
             .is_empty());
+    }
+
+    fn cortex_lineup(pressing: &str, rows: Value) -> Value {
+        json!({"pressing": pressing, "programs": rows})
+    }
+
+    fn old_cortex() -> Value {
+        json!({
+            "name": "CORTEX IGNITION", "version": "0.4b",
+            "bin_sha256": PUBLIC_CORTEX_IMAGES[3],
+            "derive": {
+                "from_disc": "/inputs/v0.52.bin",
+                "disc_sha256": PUBLIC_CORTEX_LIFT.0,
+                "image_lba": PUBLIC_CORTEX_LIFT.1,
+                "sectors": PUBLIC_CORTEX_LIFT.2
+            }
+        })
+    }
+
+    fn new_cortex() -> Value {
+        json!({
+            "name": "CORTEX CITADEL", "version": "0.1",
+            "bin_sha256": "a27cd01664316fc86aca7fead7626e3e8d93962947ab249b69cc1891d536cb75"
+        })
+    }
+
+    #[test]
+    fn a_public_lineup_may_carry_the_old_cortex_only() {
+        // The old engine, lifted or pressed from its own image: accepted.
+        let lineup = cortex_lineup("v0.54", json!([old_cortex()]));
+        check_public_cortex(&lineup).unwrap();
+        let mut direct = old_cortex();
+        direct["derive"] = Value::Null;
+        direct["bin_sha256"] = json!(PUBLIC_CORTEX_IMAGES[2]);
+        check_public_cortex(&cortex_lineup("v0.54", json!([direct]))).unwrap();
+        // No Cortex at all is the lineup's own business.
+        check_public_cortex(&cortex_lineup("v0.54", json!([{"name": "QUAKE SHAREWARE"}]))).unwrap();
+
+        // The new engine, under its own name or under the old one: refused.
+        let citadel = cortex_lineup("v0.54", json!([old_cortex(), new_cortex()]));
+        let error = check_public_cortex(&citadel).unwrap_err().0;
+        assert!(error.contains("CORTEX CITADEL"), "{error}");
+        let mut renamed = new_cortex();
+        renamed["name"] = json!("CORTEX IGNITION");
+        renamed["version"] = json!("0.4b");
+        let error = check_public_cortex(&cortex_lineup("v0.54", json!([renamed.clone()])))
+            .unwrap_err()
+            .0;
+        assert!(error.contains("not a Cortex Ignition 0.4b image"), "{error}");
+        // A new-engine hash in the old row's lift, or a lift of another slice.
+        let mut moved = old_cortex();
+        moved["derive"]["image_lba"] = json!(1);
+        let error = check_public_cortex(&cortex_lineup("v0.54", json!([moved])))
+            .unwrap_err()
+            .0;
+        assert!(error.contains("0.4b slice"), "{error}");
+        let mut wrong_version = old_cortex();
+        wrong_version["version"] = json!("0.1");
+        assert!(check_public_cortex(&cortex_lineup("v0.54", json!([wrong_version]))).is_err());
+    }
+
+    #[test]
+    fn a_private_lineup_may_carry_both_engines() {
+        let lineup = cortex_lineup("v0.54-private", json!([old_cortex(), new_cortex()]));
+        check_public_cortex(&lineup).unwrap();
+        let mut as_ignition = new_cortex();
+        as_ignition["name"] = json!("CORTEX IGNITION");
+        check_public_cortex(&cortex_lineup("v0.54-private", json!([as_ignition]))).unwrap();
+    }
+
+    #[test]
+    fn the_newest_public_lineup_passes_the_cortex_gate() {
+        // The newest Public lineup passes the gate on its real file.
+        let release = repo_root().unwrap().join("release");
+        let lineup = load(&release.join("lineup-v0.53.json")).unwrap();
+        assert!(is_public(&lineup));
+        check_public_cortex(&lineup).unwrap();
+        let private = load(&release.join("lineup-v0.53-private.json")).unwrap();
+        assert!(!is_public(&private));
     }
 
     #[test]

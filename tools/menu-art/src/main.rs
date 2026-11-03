@@ -365,6 +365,7 @@ const ARTS: &[(&str, &str)] = &[
     ("counterstrike", "cstrike"),
     ("halflife", "halflife"),
     ("oot1", "oot"),
+    ("cortex-citadel1", "citadel"),
 ];
 
 /// Cover sizes: (tag, width, height). Large is the focused case or the media

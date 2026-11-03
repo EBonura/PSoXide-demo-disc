@@ -50,7 +50,7 @@ pub enum Cover {
     Plain,
 }
 
-/// Every program in this build. The index is the cover's slot in VRAM (twelve
+/// Every program in this build. The index is the cover's slot in VRAM (thirteen
 /// fit).
 pub static PROGRAMS: &[Program] = &[
     program!(
@@ -88,12 +88,23 @@ pub static PROGRAMS: &[Program] = &[
         "Quake 1.06 shareware for PS1: all nine maps, the full arsenal and Chthon.",
         "Quake 1.06 shareware per PS1: nove mappe, arsenale completo e Chthon."
     ),
+    // The Public edition has one Cortex, so its case says what it is. The Private
+    // edition carries both engines and says which one this is.
+    #[cfg(not(feature = "private"))]
     program!(
         "CORTEX IGNITION",
         "cortex",
         "CORTEX",
         "A Souls-like built from scratch for the original PlayStation. Early tech demo.",
         "Un souls-like sviluppato da zero per PlayStation. Primo tech demo."
+    ),
+    #[cfg(feature = "private")]
+    program!(
+        "CORTEX IGNITION",
+        "cortex",
+        "CORTEX",
+        "The old Cortex engine demo, 0.4b: a Souls-like built from scratch for PlayStation.",
+        "La demo del vecchio motore di Cortex, 0.4b: un souls-like sviluppato da zero."
     ),
     program!(
         "PSXCEL",
@@ -141,6 +152,14 @@ pub static PROGRAMS: &[Program] = &[
         "OCARINA OF TIME",
         "An early port of Ocarina of Time, cooked from your own ROM: the opening and Kokiri Forest.",
         "Un primo port di Ocarina of Time, dalla propria ROM: l'apertura e la Foresta Kokiri."
+    ),
+    #[cfg(feature = "private")]
+    program!(
+        "CORTEX CITADEL",
+        "citadel",
+        "CITADEL",
+        "The new Cortex engine, tested on a small Citadel level. An engine test, not a game demo.",
+        "Il nuovo motore di Cortex, provato su un piccolo livello della Cittadella. Solo un test."
     ),
 ];
 

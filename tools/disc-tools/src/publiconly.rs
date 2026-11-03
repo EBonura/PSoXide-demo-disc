@@ -5,7 +5,8 @@
 //!
 //! Every PATH is a staged file or a directory of them (the itch.io download
 //! folder, the HTML5 folder, the Celeste package). The Half-Life, Hollow
-//! Knight, Counter-Strike, WipEout and Ocarina of Time programs exist only on the private
+//! Knight, Counter-Strike, WipEout and Ocarina of Time programs, and the Cortex Citadel
+//! new-engine test, exist only on the private
 //! edition, which stays in the local library; this refuses to bless a package
 //! that carries any trace of them:
 //!
@@ -70,6 +71,11 @@ const FORBIDDEN: &[&str] = &[
     "cstrike",
     "ocarina",
     "oot-psx",
+    // The new-engine Cortex test is Private only (Manny, 2026-11-03): the
+    // Public edition and the browser player carry Cortex Ignition 0.4b alone.
+    "cortex citadel",
+    "cortex-citadel",
+    "cortexcitadel",
 ];
 
 /// File names that are receipts of a pressing, which list every program.
@@ -783,6 +789,31 @@ mod tests {
     #[test]
     fn clean_bytes_pass() {
         assert!(scan_bytes(b"Celeste Quake VoXide NitroXide PSXcel Cortex Arcade").is_empty());
+        // The old engine stays public: only the new-engine test is refused.
+        assert!(scan_bytes(b"CORTEX IGNITION 0.4b").is_empty());
+    }
+
+    #[test]
+    fn the_new_engine_cortex_test_is_refused_in_any_spelling() {
+        for text in [
+            &b"xx CORTEX CITADEL xx"[..],
+            b"cortex citadel",
+            b"Cortex-Citadel",
+            b"CortexCitadel",
+        ] {
+            assert_eq!(scan_bytes(text).len(), 1, "{}", String::from_utf8_lossy(text));
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let mut report = Report { lines: Vec::new(), failures: 0 };
+        let mut compact = Vec::new();
+        let clean = dir.path().join("menu.txt");
+        fs::write(&clean, "CORTEX IGNITION 0.4b").unwrap();
+        check_file(&mut report, &mut compact, &clean, &[]).unwrap();
+        assert_eq!(report.failures, 0, "{:?}", report.lines);
+        let dirty = dir.path().join("menu2.txt");
+        fs::write(&dirty, "CORTEX CITADEL 0.1").unwrap();
+        check_file(&mut report, &mut compact, &dirty, &[]).unwrap();
+        assert_eq!(report.failures, 1, "{:?}", report.lines);
     }
 
     fn index_header(sectors: u32, hash: u64, part: u64, payload: u64) -> Vec<u8> {

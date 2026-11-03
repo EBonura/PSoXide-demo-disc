@@ -101,6 +101,55 @@ fn the_standard_order_is_the_documented_one() {
     );
 }
 
+/// Both Cortex engines are on the Private shelf, the old one first: Cortex
+/// Ignition 0.4b (both editions), then the Cortex Citadel new-engine test.
+#[test]
+fn cortex_citadel_follows_cortex_ignition() {
+    let order = pressed_order();
+    let at = |name: &str| order.iter().position(|n| n == name);
+    let ignition = at("CORTEX IGNITION").expect("Cortex Ignition is pressed");
+    assert_eq!(at("CORTEX CITADEL"), Some(ignition + 1), "{order:?}");
+}
+
+/// The Citadel test is Private only: its Makefile block is chosen by a flag
+/// that the Private channel sets and the Public channel does not.
+#[test]
+fn cortex_citadel_is_pressed_by_the_private_channel_only() {
+    let makefile = read(repo_root().join("Makefile"));
+    let flags = makefile
+        .lines()
+        .find(|l| l.starts_with("PRIVATE_PRESS_FLAGS"))
+        .expect("the Private channel's flags");
+    assert!(flags.split_whitespace().any(|f| f == "CITADEL=1"), "{flags}");
+    let public: Vec<&str> = makefile
+        .lines()
+        .skip_while(|l| !l.starts_with("press-public:"))
+        .take_while(|l| !l.starts_with("press-private:"))
+        .collect();
+    assert!(!public.is_empty() && !public.iter().any(|l| l.contains("CITADEL")), "{public:?}");
+    // A flagged pressing is Private (the launcher gets its `private` feature).
+    assert!(
+        makefile.contains("PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL))"),
+        "CITADEL must make a pressing Private"
+    );
+}
+
+/// No Public lineup file names the new engine, and each Public lineup's Cortex
+/// row is a Cortex Ignition 0.4b image (the gate itself is `lineup check`).
+#[test]
+fn no_public_lineup_names_cortex_citadel() {
+    let release = repo_root().join("release");
+    for entry in fs::read_dir(&release).expect("release/ exists") {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !(name.starts_with("lineup-") && name.ends_with(".json")) || name.contains("private") {
+            continue;
+        }
+        let text = read(path);
+        assert!(!text.to_uppercase().contains("CITADEL"), "{name} names the new engine");
+    }
+}
+
 /// Every private lineup lists its programs in the order they are pressed, so
 /// the file reads like the carousel it produces.
 #[test]
