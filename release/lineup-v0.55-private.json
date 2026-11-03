@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "pressing": "v0.55-private",
+  "note": "PSoXide Demo Disc v0.55, private edition (local, never published or distributed), all XA: no CD-DA track. The v0.54 Private lineup with the lost-GP0(1Fh) fix (the draw-done request the GPU must see closed, for FPGA PSX cores such as the SuperStation One) in the rows that carry it: Hollow Knight, Quake, WipEout, NitroXide, Half-Life, Cortex Ignition 0.4b and Cortex Citadel. The launcher is unchanged (editor 3cb1839a, SDK 649c7ed). Left out: Arcade, PSXcel, Counter-Strike and the hardware tests.",
+  "programs": [
+    {
+      "name": "CELESTE COLLECTION",
+      "var": "CELESTE",
+      "version_var": "V_CELESTE",
+      "kind": "game",
+      "derive": {
+        "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/celeste/Celeste Classic Collection.cue"
+      },
+      "bin_sha256": "56ce5abb68143e1f8fe823e23702a7dcd6527dada668c6e022190c2e2f61af7a",
+      "version": "0.2.8",
+      "source": {
+        "repository": "EBonura/celeste-collection-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/celeste-collection-psx.git",
+        "revision": "a061d2c5b02fe342e7e610e244bac9d46e952e20",
+        "ref": "main"
+      },
+      "build": "release/celeste-collection.bin on celeste-collection-psx a061d2c (0.2.8), unchanged since v0.52.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/celeste/SOURCE.json",
+      "cue": null
+    },
+    {
+      "name": "NITROXIDE",
+      "var": "NITROXIDE",
+      "version_var": "V_NITROXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/nitroxide/NitroXide.cue",
+      "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
+      "bin_sha256": "45f7d27778a149b1336f7163b20fab1f9a65a5588cf0024730d469ed06c66a35",
+      "version": "0.6.0",
+      "source": {
+        "repository": "EBonura/nitroxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/nitroxide.git",
+        "revision": "a02762cdb448957e06af65143fe954d8f5f84cc6",
+        "ref": "fpga-fix-nitroxide-a02762c"
+      },
+      "build": "fpga-games-a nitroxide/build/gate: nitroxide lane/fpga-fix-nitroxide a02762c (release 0.6.0 content of cb51cd7, make gate-disc, SDK pin repinned to the draw-done fix backport 5a2f02daf; committed XA music). Replaces 5af2a43b. Mirror ref fpga-fix-nitroxide-a02762c.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/nitroxide/NitroXide.fpga-fix.json"
+    },
+    {
+      "name": "VOXIDE",
+      "var": "VOXIDE",
+      "version_var": "V_VOXIDE",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/voxide/VoXide.cue",
+      "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
+      "bin_sha256": "82461d86219d9ac514faef8c22c3c4695827580246633b694b3a32c4fb478086",
+      "version": "0.4.1",
+      "source": {
+        "repository": "EBonura/voxide",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/voxide.git",
+        "revision": "12895132b5e49a888c4d712fa4a7af9a4940eaab",
+        "ref": "main"
+      },
+      "build": "voxide main 12895132 (44dc725 plus the Minecraft-style loading screen of 97e6017: dirt backdrop, turning grass block, stage line, bar, fade-in), the library VoXide of 2026-10-25, built with make gate-disc on the same SDK b5365b18 / editor c096eee0 pins with the committed PGO profile. Its splash line already reads ALSO TRY CELESTE!, so one build serves both editions.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/voxide/INSTALLED.json"
+    },
+    {
+      "name": "WIPEOUT PSOXIDE",
+      "var": "WIPEOUT",
+      "version_var": "V_WIPEOUT",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/wipeout/WipEout PSoXide.cue",
+      "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
+      "bin_sha256": "eddd209af4b85cfaaf659e3a25ae26a48891b29c9f97c09b4725ec29ec64777f",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/wipeout-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/wipeout-psx.git",
+        "revision": "b507678b324d7d9b5fad0e72eb40cf9f17ea2976",
+        "ref": "fpga-fix-wipeout-b507678"
+      },
+      "build": "fpga-games-a wipeout/build: wipeout-psx lane/fpga-fix-wipeout b507678 (SDK pin 82c47353, the draw-done fix backported to 29227c5d), shipping build from the US disc with the private texture pack. Replaces eab1a22 (e97b0439). Mirror ref fpga-fix-wipeout-b507678.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/wipeout/WipEout PSoXide.fpga-fix.json"
+    },
+    {
+      "name": "HOLLOW KNIGHT",
+      "library": "Hollow Knight (hk-psx).cue",
+      "var": "HKPSX",
+      "version_var": "V_HKPSX",
+      "kind": "image",
+      "bin_sha256": "04a8c9122d22c56c7869a96d1ddee83bd569bd92cd1515e81ea3b2285c97dbf0",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/hk-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hk-psx.git",
+        "revision": "1954aa73980d7a8abd2cf6efb04873e6e2d60d96",
+        "ref": "fpga-irq-hk-1954aa7"
+      },
+      "build": "fpga-irq lane lib5 (Hollow Knight (hk-psx).provenance.json): hk-psx lane/fpga-irq-hk 1954aa7 on main e0ef654, clean tree, SDK pin d362fc81 (the draw-done fix backported to HK pin 355dc911: the closing GP0(1Fh) request reaches FPGA PSX cores), emulator 358eae9a, XA encoder 5c3955fd. Not on hk-psx main (push refused by the permission check); mirror ref fpga-irq-hk-1954aa7.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/hk/Hollow Knight (hk-psx).provenance.json",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/hk/Hollow Knight (hk-psx).cue",
+      "cue_sha256": "1182082d7a19db0e0825a4758f23d94e7f26dcdcd023805d6d7f8e359f2dbcea"
+    },
+    {
+      "name": "HALF-LIFE",
+      "var": "HLPSX",
+      "version_var": "V_HLPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/hl/Half-Life (hl-psx).cue",
+      "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
+      "bin_sha256": "9b67af26f0805619503955f0c96b3765a86e8a36150295ce59f1a630ff135a47",
+      "version": "0.2.0",
+      "source": {
+        "repository": "EBonura/hl-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hl-psx.git",
+        "revision": "1a95521c87b7246e0d2af9db4f7222e82b130127",
+        "ref": "fpga-fix-hl-1a95521"
+      },
+      "build": "fpga-games-b out/hl: hl-psx lane/fpga-fix-hl 1a95521 (game code of 7e09034 with the SDK repinned to the draw-done fix backport dfa3e691a; the fix moves .data and .bss by 208 bytes). Replaces ab665fa4. Mirror ref fpga-fix-hl-1a95521.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/hl/Half-Life (hl-psx).fpga-fix.json"
+    },
+    {
+      "name": "OCARINA OF TIME",
+      "library": "Ocarina of Time (oot-psx)/Ocarina of Time (oot-psx).cue",
+      "var": "OOTPSX",
+      "version_var": "V_OOTPSX",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/oot/Ocarina of Time (oot-psx).cue",
+      "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
+      "bin_sha256": "32e4924f84ffe1851a07b7d48c2faba0b213ba89ee99a50d87e84f7e72d00791",
+      "version": "0.1.0",
+      "source": {
+        "repository": "EBonura/oot-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/oot-psx.git",
+        "revision": "213a28b7f4528f35013324ca542ee70b4d349efc",
+        "ref": "main"
+      },
+      "build": "library install of 2026-11-03: oot-psx main 213a28b, tools/qualified/build-disc.sh shipping features, profile-guided link; gate g1 26 PASS 0 FAIL.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/oot/INSTALLED.json"
+    },
+    {
+      "name": "QUAKE SHAREWARE",
+      "var": "QUAKE_CUE",
+      "version_var": "QUAKE_VERSION",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/quake/Quake (quake-psx).cue",
+      "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
+      "bin_sha256": "ffeb40b7d816a46782d5211898e61da5567321a4a3541f520933924742671216",
+      "version": "0.1.1",
+      "source": {
+        "repository": "EBonura/quake-psx",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
+        "revision": "54128e0deb3d3230fba021b7bbc740f96ade4bb0",
+        "ref": "fpga-fix-quake-54128e0"
+      },
+      "build": "fpga-games-a quake/dist (quake-psx.provenance.json): quake-psx lane/fpga-fix-quake 54128e0 on c6412e2 (SDK pin 18ccdc34: b04008f62 plus the draw-done fix; the scratch block moved to the unused rows below the framebuffers), shareware 1.06 data, XA music, one data track. Version 0.1.1 as before. Mirror ref fpga-fix-quake-54128e0.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/quake/Quake (quake-psx).provenance.json"
+    },
+    {
+      "name": "CORTEX IGNITION",
+      "var": "CORTEX_CURRENT",
+      "version_var": "V_CORTEX_CURRENT",
+      "kind": "image",
+      "bin_sha256": "07510c838ce783f7c98e2d3fc96c85dea3dbf4945f633edf4ba165961ed04188",
+      "version": "0.4b",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/PSoXide-editor.git",
+        "revision": "efc3aff37eff82d56ae02c1d46b056ac0c989eca",
+        "ref": "fpga-fix-cortex-ignition-04b-efc3aff"
+      },
+      "build": "fpga-games-b out/cortex-ignition-04b: PSoXide-editor lane/fpga-fix-cortex-ignition-04b efc3aff37 (cortex/0.4b-xa-2026-10-19 066fe3a2 with the SDK repinned to the draw-done fix, PSoXide lane/fpga-fix-sdk-6518a5eb6 4abbbdebe), the same 0.4b game, 7076 sectors, one data track, XA music, no CD-DA. Replaces the v0.52 lift (18827169) in this Private lineup only; the Public lineup keeps the original 0.4b images. Mirror ref fpga-fix-cortex-ignition-04b-efc3aff.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/cortex-ignition/Cortex Ignition 0.4b.fpga-fix.json",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/cortex-ignition/Cortex Ignition 0.4b.cue",
+      "cue_sha256": "f1a995efcfedc9936ede9d3d7bfa2b25fd40f46dc803d6e2b37ac98fc299fb07"
+    },
+    {
+      "name": "CORTEX CITADEL",
+      "var": "CORTEX_CITADEL",
+      "version_var": "V_CORTEX_CITADEL",
+      "kind": "image",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/cortex/Cortex Ignition.cue",
+      "cue_sha256": "3871cb7970444bbda89e0816bf345b26911c9d0bbe709e09abcf27153f1a21ac",
+      "bin_sha256": "523a51a261c0add3d647cc7134f01c953911d617efcf7f0d8b1bdaecee1c7306",
+      "version": "test aba43fa3",
+      "source": {
+        "repository": "EBonura/PSoXide-editor",
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/PSoXide-editor.git",
+        "revision": "aba43fa3d8e86b748c75ca350997e96338978bfc",
+        "ref": "fpga-fix-cortex-citadel-aba43fa"
+      },
+      "build": "fpga-games-b out/cortex-citadel: PSoXide-editor lane/fpga-fix-cortex-citadel aba43fa3d (the 01acd106 Citadel with the SDK repinned to the draw-done fix, PSoXide lane/fpga-fix-sdk-b04008f 4d9f1d26d), project editor/projects/zz-far-s10, release. Replaces a27cd016. Mirror ref fpga-fix-cortex-citadel-aba43fa.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.55-private/cortex/Cortex Ignition.fpga-fix.json"
+    }
+  ]
+}
