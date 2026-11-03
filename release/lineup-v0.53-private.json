@@ -123,15 +123,15 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53-private/oot/Ocarina of Time (oot-psx).cue",
       "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
-      "bin_sha256": "0ce9eb6de184a2a6721c87595cf8760fff8ecab25a5dbd78d7a79f41e7bcf72b",
+      "bin_sha256": "32e4924f84ffe1851a07b7d48c2faba0b213ba89ee99a50d87e84f7e72d00791",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/oot-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/oot-psx.git",
-        "revision": "f99e77155512e41f0a5385923dc71ed5fe57b5f3",
+        "revision": "213a28b7f4528f35013324ca542ee70b4d349efc",
         "ref": "main"
       },
-      "build": "library install of 2026-11-03: oot-psx main f99e771, tools/qualified/build-disc.sh shipping features, profile-guided link; gate f1 green.",
+      "build": "library install of 2026-11-03: oot-psx main 213a28b, tools/qualified/build-disc.sh shipping features, profile-guided link; gate g1 26 PASS 0 FAIL.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.53-private/oot/INSTALLED.json"
     },
     {
