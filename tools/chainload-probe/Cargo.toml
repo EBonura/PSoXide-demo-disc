@@ -24,4 +24,4 @@ lto           = true
 [dependencies]
 psx-hw  = { path = "../../games/PSoXide-editor/crates/psx-hw" }
 psx-io  = { path = "../../games/PSoXide-editor/sdk/crates/psx-io" }
-psx-rt  = { path = "../../games/PSoXide-editor/sdk/crates/psx-rt" }
+psx-rt  = { path = "../../games/PSoXide-editor/sdk/crates/psx-rt", features = ["host-tty"] }

@@ -137,6 +137,8 @@ static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
 #[no_mangle]
 fn main() {
     tty::println("launcher: booted");
+    // The SDK caps presentation at 30 fps by default; the launcher keeps flipping every VBlank.
+    psx_rt::interrupts::set_min_flip_vblanks(1);
 
     let peripherals = Peripherals::take().expect("peripherals are taken once");
     let mut port = peripherals.controller_port;
