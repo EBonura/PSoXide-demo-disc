@@ -17,15 +17,14 @@
 #
 # Run as: sh tools/chainload_probe.sh <launcher.exe> <frontend> [workdir]
 # `make chainload-probe` builds the launcher and runs it. To see it fail, build the
-# launcher over a games/PSoXide-editor whose engine/crates/psx-chainloader is
-# from before the quiet handoff (editor e22f3508).
+# launcher over a games/PSoXide-sdk whose engine/crates/psx-chainloader is
+# from before the quiet handoff (editor e22f3508, before the engine moved to the SDK).
 set -eu
 LAUNCHER="${1:?usage: chainload_probe.sh <launcher.exe> <frontend> [workdir]}"
 FRONTEND="${2:?missing frontend}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="${3:-$ROOT/build/chainload-probe}"
 SDK="${SDK:-$ROOT/games/PSoXide-sdk}"
-EDITOR="${EDITOR_TREE:-$ROOT/games/PSoXide-editor}"
 MKDISC="$ROOT/tools/mkdisc/target/release/mkdisc"
 mkdir -p "$WORK"
 
@@ -35,11 +34,11 @@ mkdir -p "$WORK"
 PROBE="$WORK/target/mipsel-sony-psx/release/chainload-probe.exe"
 
 # The probe reads its own image through the disc base, so it rides as an image.
-# MKISOPSX names a built mkisopsx to use; otherwise it is built from the editor tree.
+# MKISOPSX names a built mkisopsx to use; otherwise it is built from the SDK tree.
 if [ -n "${MKISOPSX:-}" ]; then
     "$MKISOPSX" --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null
 else
-    (cd "$EDITOR" && CARGO_TARGET_DIR="$WORK/host" cargo run -q --release -p mkisopsx -- \
+    (cd "$SDK" && CARGO_TARGET_DIR="$WORK/host" cargo run -q --release -p mkisopsx -- \
         --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null)
 fi
 

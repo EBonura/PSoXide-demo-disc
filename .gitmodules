@@ -16,9 +16,6 @@
 [submodule "games/psoxide-arcade"]
 	path = games/psoxide-arcade
 	url = https://github.com/EBonura/psoxide-arcade.git
-[submodule "games/PSoXide-editor"]
-	path = games/PSoXide-editor
-	url = https://github.com/EBonura/PSoXide-editor.git
 [submodule "games/PSoXide-emulator"]
 	path = games/PSoXide-emulator
 	url = https://github.com/EBonura/PSoXide-emulator.git

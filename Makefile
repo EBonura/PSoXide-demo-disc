@@ -15,13 +15,16 @@
 .PHONY: help disc-tools disc-budget program-headless-check celeste-navigation-check loader launcher mkdisc check relocation-check chainload-probe clean
 
 ROOT       := $(CURDIR)
-# The launcher and the loader are built from the pinned editor tree.
-EDITOR     ?= $(ROOT)/games/PSoXide-editor
+# The launcher, the loader and the host tools read the SDK and the engine (both live in
+# the SDK repository since 2026-11-08) straight from the pinned SDK submodule. The editor
+# repository is not a dependency of the disc; only `relocation-check` uses an editor
+# checkout, through EDITOR_TREE (it builds the editor's hello-pack disc).
+EDITOR_TREE ?=
 SDK        ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR   ?= $(ROOT)/games/PSoXide-emulator
 BUILD      := $(ROOT)/build
 OUT        := $(BUILD)/mipsel-sony-psx/release
-EXAMPLES   := $(EDITOR)/build/examples/mipsel-sony-psx/release
+EXAMPLES   := $(EDITOR_TREE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 DISC_TOOLS := $(ROOT)/tools/disc-tools/target/release/disc-tools
 
@@ -51,9 +54,7 @@ MENU_CREDIT   := Music: Mulula VGM Loops, CC BY 4.0
 # XA files, write the song table the launcher compiles in, and analyse the
 # level meter. The WAVs are not in the repository (115 MB); the XA files and
 # the analysis are, as the .cdda files were. XA_COOK is a psx-audio-cook
-# that has `xa-pack` (on the SDK's main since 2026-10-16, and in the editor
-# workspace's `psx-audio-cook`; build the one `tools/audio-cook` of NitroXide
-# wraps if the pinned SDK predates it).
+# that has `xa-pack` (the SDK's `crates/psx-audio-cook`, on its main since 2026-10-16).
 #   make music MUSIC_WAVS="a.wav b.wav ..." XA_COOK=/path/to/psx-audio-cook
 #   make music-check <same arguments>   cook again, fail if any committed byte changes
 .PHONY: music
@@ -525,12 +526,12 @@ disc-budget: mkdisc $(SHOT_FILES)
 # layout, mkdisc and disc-tools (which includes the check that the newest
 # lineups are self-contained).
 check:
-	cargo test --manifest-path $(EDITOR)/engine/Cargo.toml -p psx-carousel
-	cargo test --manifest-path $(EDITOR)/engine/Cargo.toml -p psx-disc-toc
+	cargo test --manifest-path $(SDK)/engine/Cargo.toml -p psx-carousel
+	cargo test --manifest-path $(SDK)/engine/Cargo.toml -p psx-disc-toc
 	cd tools/mkdisc && cargo test
 	cd tools/disc-tools && cargo test
 
-# The disc's SDK, editor and emulator pins must be on their repositories' main.
+# The disc's SDK and emulator pins must be on their repositories' main.
 # GitHub's compare API answers "identical" or "ahead" when main contains the
 # revision. DEMO_DISC_ALLOW_PSOXIDE_OFF_MAIN=1 skips the check for a deliberate
 # side-branch pressing and says so.
@@ -544,13 +545,14 @@ sdk-on-main: components
 # much, and psx_io::disc_base has to make up the difference. Run the result
 # with the emulator and read the banner.
 relocation-check: launcher mkdisc
-	$(MAKE) -C $(EDITOR) hello-tri hello-pack-disc
+	@test -n "$(EDITOR_TREE)" || { echo "relocation-check: set EDITOR_TREE to a PSoXide-editor checkout (its hello-pack disc is the test payload)"; exit 1; }
+	$(MAKE) -C $(EDITOR_TREE) hello-tri hello-pack-disc
 	@mkdir -p $(ROOT)/dist
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
 		--game "HELLO TRI=$(EXAMPLES)/hello-tri.exe" \
 		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
 	@echo
-	@echo "Now: cd $(EDITOR)/emu && cargo run -p frontend --release -- launch \\"
+	@echo "Now: cd $(EDITOR_TREE)/emu && cargo run -p frontend --release -- launch \\"
 	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
 	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
 	@echo "The dumped frame must read ALL PASS."

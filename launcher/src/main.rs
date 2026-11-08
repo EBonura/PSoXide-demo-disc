@@ -104,11 +104,11 @@ const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
 /// `click` is 0.10 s and the brightest short sound there is, which is what a
 /// tick heard a hundred times a minute over music on a TV speaker needs.
 static SFX_BROWSE: &[u8] =
-    include_bytes!("../../games/PSoXide-editor/assets/audio/voxide-ui/psau/ui_click.psau");
+    include_bytes!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_click.psau");
 static SFX_SELECT: &[u8] =
-    include_bytes!("../../games/PSoXide-editor/assets/audio/voxide-ui/psau/ui_confirm.psau");
+    include_bytes!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_confirm.psau");
 static SFX_LAUNCH: &[u8] =
-    include_bytes!("../../games/PSoXide-editor/assets/audio/freesfx/psau/swoosh.psau");
+    include_bytes!("../../games/PSoXide-sdk/assets/audio/freesfx/psau/swoosh.psau");
 /// Slots into the sound player, in the order its voices were handed over.
 const SFX_BROWSE_SLOT: usize = 0;
 const SFX_SELECT_SLOT: usize = 1;

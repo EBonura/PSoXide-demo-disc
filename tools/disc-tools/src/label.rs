@@ -65,10 +65,10 @@ const MASKS: [MaskPattern; 8] = [
     MaskPattern::Meadow,
 ];
 
-/// The brand wordmark the Python read from the editor's branding assets.
+/// The brand wordmark: this repository's copy, byte-identical to the editor's
+/// `assets/branding/psoxide-logo.svg`.
 fn logo_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../games/PSoXide-editor/assets/branding/psoxide-logo.svg")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/boxart/psoxide-logo.svg")
 }
 
 // ---------------------------------------------------------------------------

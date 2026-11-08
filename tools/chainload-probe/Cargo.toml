@@ -22,6 +22,6 @@ codegen-units = 1
 lto           = true
 
 [dependencies]
-psx-hw  = { path = "../../games/PSoXide-editor/crates/psx-hw" }
-psx-io  = { path = "../../games/PSoXide-editor/sdk/crates/psx-io" }
-psx-rt  = { path = "../../games/PSoXide-editor/sdk/crates/psx-rt", features = ["host-tty"] }
+psx-hw  = { path = "../../games/PSoXide-sdk/crates/psx-hw" }
+psx-io  = { path = "../../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-rt  = { path = "../../games/PSoXide-sdk/sdk/crates/psx-rt", features = ["host-tty"] }

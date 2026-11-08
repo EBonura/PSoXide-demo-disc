@@ -414,7 +414,7 @@ fn verify_hashes(lineup: &Value) -> Result<()> {
 /// by the sha256 of the image the row presses. Cortex Citadel and every other
 /// new-engine build stay out of the Public edition and the browser player
 /// (Manny, 2026-11-03).
-const PUBLIC_CORTEX_IMAGES: [&str; 4] = [
+const PUBLIC_CORTEX_IMAGES: [&str; 5] = [
     // v0.40 and v0.41: editor 1eab4c90.
     "63927fe75133ba6dbe1abdc04f40a9da205f8306f66607d2338420c1c307ef8f",
     // v0.43: editor 309fdf93.
@@ -423,6 +423,9 @@ const PUBLIC_CORTEX_IMAGES: [&str; 4] = [
     "f836c1d1519aa9c2c660bad4b42a7c95d4814a9a3514dcdc06b8dd16ee724d72",
     // v0.53: the same build lifted out of the v0.52 pressing (from_disc).
     "18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df",
+    // The same 0.4b line rebuilt on SDK main (editor cortex/0.4b-xa-2026-10-19 52b5067a9d56,
+    // release-inputs/v0.56/cortex): the Public and Private Cortex input from 2026-11-07.
+    "b43a60665a08e841379716d36c1bfd898caba014e38d7d375a3db66b1648f7fa",
 ];
 /// The v0.52 pressing the lifted 0.4b image sits in, and where: a `from_disc`
 /// Cortex row on a Public lineup must name exactly this slice, since only the
@@ -729,14 +732,12 @@ fn write_components(
     let dirty = git(root, &["status", "--porcelain", "--untracked-files=normal"])?;
     let components = crate::util::read_json(&root.join("release-components.json"))?;
     let mut launcher_inputs = Map::new();
-    for path in ["games/PSoXide-editor", "games/PSoXide-sdk"] {
+    for path in ["games/PSoXide-sdk"] {
         let head = git(&root.join(path), &["rev-parse", "HEAD"])?;
         let link = git(root, &["rev-parse", &format!("HEAD:{path}")])?;
         ensure!(head == link, "{path} is at {head}, the gitlink says {link}");
         launcher_inputs.insert(path.to_string(), json!({"revision": head}));
     }
-    launcher_inputs["games/PSoXide-editor"][".components-receipt.json"] =
-        file_record(&root.join("games/PSoXide-editor/.components-receipt.json"))?;
     let document = json!({
         "schema": 1,
         "kind": "lineup",

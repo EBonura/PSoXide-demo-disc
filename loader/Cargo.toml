@@ -32,6 +32,6 @@ chainload-layout = { path = "../chainload-layout" }
 
 [dependencies]
 chainload-layout = { path = "../chainload-layout" }
-psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
-psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
-psx-chainloader = { path = "../games/PSoXide-editor/engine/crates/psx-chainloader" }
+psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
+psx-chainloader = { path = "../games/PSoXide-sdk/engine/crates/psx-chainloader" }

@@ -35,18 +35,18 @@ private = []
 
 [dependencies]
 chainload-layout = { path = "../chainload-layout" }
-psx-gpu  = { path = "../games/PSoXide-editor/sdk/crates/psx-gpu" }
-psx-pack = { path = "../games/PSoXide-editor/sdk/crates/psx-pack" }
-psx-pad  = { path = "../games/PSoXide-editor/sdk/crates/psx-pad" }
-psx-rt   = { path = "../games/PSoXide-editor/sdk/crates/psx-rt" }
-psx-vram = { path = "../games/PSoXide-editor/sdk/crates/psx-vram" }
-psx-math = { path = "../games/PSoXide-editor/sdk/crates/psx-math" }
-psx-io   = { path = "../games/PSoXide-editor/sdk/crates/psx-io" }
-psx-spu  = { path = "../games/PSoXide-editor/sdk/crates/psx-spu" }
+psx-gpu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gpu" }
+psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
+psx-pad  = { path = "../games/PSoXide-sdk/sdk/crates/psx-pad" }
+psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt" }
+psx-vram = { path = "../games/PSoXide-sdk/sdk/crates/psx-vram" }
+psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
+psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-spu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-spu" }
 stick-nav = { path = "stick-nav" }
-psx-sfx  = { path = "../games/PSoXide-editor/sdk/crates/psx-sfx" }
-disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-editor/engine/crates/psx-disc-toc" }
+psx-sfx  = { path = "../games/PSoXide-sdk/sdk/crates/psx-sfx" }
+disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-sdk/engine/crates/psx-disc-toc" }
 playlist = { path = "playlist" }
-psx-fmv  = { path = "../games/PSoXide-editor/sdk/crates/psx-fmv" }
-psx-hw   = { path = "../games/PSoXide-editor/crates/psx-hw" }
-psx-gte  = { path = "../games/PSoXide-editor/sdk/crates/psx-gte" }
+psx-fmv  = { path = "../games/PSoXide-sdk/sdk/crates/psx-fmv" }
+psx-hw   = { path = "../games/PSoXide-sdk/crates/psx-hw" }
+psx-gte  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gte" }

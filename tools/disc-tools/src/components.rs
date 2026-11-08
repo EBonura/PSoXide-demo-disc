@@ -1,13 +1,15 @@
 //! Verify and bootstrap the exact repositories selected for this demo disc.
 //!
-//! `release-components.json` pins the SDK, editor and emulator revisions. This
-//! checks that the submodule checkouts are those revisions and clean, that the
-//! pins nested inside the editor and emulator agree with the disc's. (The checks
+//! `release-components.json` pins the SDK and emulator revisions (the launcher,
+//! loader and tools read the SDK and its engine straight from the SDK checkout;
+//! the editor is no longer a component). This checks that the submodule
+//! checkouts are those revisions and clean, and that the SDK pin nested inside
+//! the emulator, when it is not vendored, agrees with the disc's. (The checks
 //! of the standalone games' own locks and hydrated trees belonged to the retired
 //! non-lineup `make disc` path and are gone with it.)
 //!
 //! The bootstrap itself, materialising the pinned sources where Cargo expects
-//! them, belongs to the editor and emulator repositories, and they have shipped
+//! them, belongs to the emulator (and any editor a lock lists), and they have shipped
 //! it two ways. An older pin carries `tools/bootstrap-components.py`; a newer
 //! one drops the script and hydrates with the SDK's `psoxide-components`, built
 //! once per locked SDK revision into the tree's `.tools/` (what its `make
@@ -106,7 +108,12 @@ pub fn run_checks(env: &Env, check: bool, check_main: bool, bootstrap: Bootstrap
         ("editor", &["sdk", "emulator"][..]),
         ("emulator", &["sdk"][..]),
     ] {
-        let source = env.root.join(field(&specs[owner], "path")?);
+        // The disc pins the SDK and the emulator. A lock may still list an editor
+        // (Cortex content); the launcher, loader and tools no longer read it.
+        let Some(spec) = specs.get(owner) else {
+            continue;
+        };
+        let source = env.root.join(field(spec, "path")?);
         let nested = read_json(&source.join("components.lock.json"))?;
         // An emulator that vendors its SDK carries the crates in git: it has no
         // SDK pin to agree with the disc's and nothing to bootstrap.
@@ -122,7 +129,10 @@ pub fn run_checks(env: &Env, check: bool, check_main: bool, bootstrap: Bootstrap
         }
     }
     for name in ["emulator", "editor"] {
-        let source = env.root.join(field(&specs[name], "path")?);
+        let Some(spec) = specs.get(name) else {
+            continue;
+        };
+        let source = env.root.join(field(spec, "path")?);
         if name == "emulator" && vendored_sdk(&source) {
             continue;
         }
@@ -480,6 +490,43 @@ mod tests {
         let ran = ran.borrow();
         assert_eq!(ran.len(), 1);
         assert!(ran[0].ends_with("editor"));
+    }
+
+    #[test]
+    fn a_lock_without_an_editor_checks_the_sdk_and_the_emulator_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let mut specs = specs();
+        specs.as_object_mut().unwrap().remove("editor");
+        write(
+            &root.join("release-components.json"),
+            &json!({"schema": 1, "components": specs}).to_string(),
+        );
+        write(
+            &root.join("emulator").join("components.lock.json"),
+            &json!({"components": {"sdk": {"revision": "d".repeat(40), "vendored": true}}})
+                .to_string(),
+        );
+        let revisions = specs.clone();
+        let git_of = move |dir: &Path, args: &[&str]| -> Result<String> {
+            if args[0] == "rev-parse" {
+                let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+                Ok(revisions[&name]["revision"].as_str().unwrap().to_string())
+            } else {
+                Ok(String::new())
+            }
+        };
+        let env = Env {
+            root,
+            git: &git_of,
+        };
+        let ran = RefCell::new(Vec::new());
+        let bootstrap = |tree: &Path, _: &[String]| -> Result<()> {
+            ran.borrow_mut().push(tree.to_path_buf());
+            Ok(())
+        };
+        run_checks(&env, true, false, &bootstrap).unwrap();
+        assert!(ran.borrow().is_empty(), "a vendored emulator needs no bootstrap");
     }
 
     /// A tree that logs the arguments its bootstrap tool was given.

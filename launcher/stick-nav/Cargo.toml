@@ -10,4 +10,4 @@ description = "The left stick as menu d-pad presses, for the launcher."
 # directory runs the logic on the host.
 
 [dependencies]
-psx-pad = { path = "../../games/PSoXide-editor/sdk/crates/psx-pad" }
+psx-pad = { path = "../../games/PSoXide-sdk/sdk/crates/psx-pad" }
