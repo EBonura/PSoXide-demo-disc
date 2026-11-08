@@ -38,7 +38,10 @@ chainload-layout = { path = "../chainload-layout" }
 psx-gpu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gpu" }
 psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
 psx-pad  = { path = "../games/PSoXide-sdk/sdk/crates/psx-pad" }
-psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt" }
+# host-tty: SDK main compiles tty::print out otherwise, and `disc-tools programs` gates every
+# program on the launcher's "launcher: booted" / "launcher: chain-loading" lines. The pressings
+# carried these stores before the SDK made them optional; keep them.
+psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt", features = ["host-tty"] }
 psx-vram = { path = "../games/PSoXide-sdk/sdk/crates/psx-vram" }
 psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
 psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
