@@ -150,8 +150,20 @@ help:
 	@echo "  make check                                host tests"
 	@echo "  make clean                                drop build/"
 
+# The loader and launcher are standalone workspaces whose path dependencies (chainload-layout and the SDK
+# submodule) lie outside them, so Cargo hashes absolute paths and the executables depended on where this
+# repository is checked out (the launcher differed by 171,393 bytes between two checkouts). The SDK's
+# psoxide-rustc takes the checkout out of the crate hash (psoxide-pgo README, "One guest from any directory").
+REPRO_TARGET := $(BUILD)/repro-rustc
+REPRO_RUSTC  := $(REPRO_TARGET)/release/psoxide-rustc
+REPRO        := RUSTC_WRAPPER=$(REPRO_RUSTC) PSOXIDE_REPRO_ROOT=$(ROOT)
+.PHONY: repro-rustc
+repro-rustc:
+	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-pgo/Cargo.toml" --target-dir "$(REPRO_TARGET)" --bin psoxide-rustc
+loader launcher: repro-rustc
+
 loader:
-	cd loader && CARGO_TARGET_DIR=$(BUILD) \
+	cd loader && $(REPRO) CARGO_TARGET_DIR=$(BUILD) \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS)
 
@@ -164,7 +176,7 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 
 # The launcher embeds the blob, so it always rebuilds after it.
 launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
+	cd launcher && $(REPRO) CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
 		cargo build $(PSX_FLAGS) $(if $(PRIVATE),--features private)
 
