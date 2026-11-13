@@ -132,7 +132,14 @@ PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(i
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
 LOADER_EXE  := $(OUT)/loader.exe
-LAUNCHER_EXE := $(OUT)/launcher.exe
+# DIAG=1 builds the debug launcher (psx-rt's host-tty on: the "launcher: booted" and
+# "launcher: chain-loading" lines the gates read) into its own target dir and presses it with
+# mkdisc --diag. The SDK counts host-tty as a diagnostic feature (sdk/docs/GATE.md), so a disc
+# that ships is built without DIAG and the receipt of the launcher says which one it is.
+DIAG ?=
+override DIAG := $(filter-out 0,$(DIAG))
+LAUNCHER_TARGET := $(if $(DIAG),$(BUILD)/diag,$(BUILD))
+LAUNCHER_EXE := $(LAUNCHER_TARGET)/mipsel-sony-psx/release/launcher.exe
 
 help:
 	@echo "Release channels (VERSION=v0.NN names release/lineup-<VERSION>.json and -private.json):"
@@ -154,18 +161,26 @@ help:
 # submodule) lie outside them, so Cargo hashes absolute paths and the executables depended on where this
 # repository is checked out (the launcher differed by 171,393 bytes between two checkouts). The SDK's
 # psoxide-rustc takes the checkout out of the crate hash (psoxide-pgo README, "One guest from any directory").
-REPRO_TARGET := $(BUILD)/repro-rustc
-REPRO_RUSTC  := $(REPRO_TARGET)/release/psoxide-rustc
+# The launcher goes through the SDK's build driver (psoxide-pgo apply), which pins by itself the same way;
+# the loader, a raw blob with its own linker script, runs under psoxide-rustc directly.
+SDK_TOOLS    := $(BUILD)/sdk-tools
+REPRO_RUSTC  := $(SDK_TOOLS)/release/psoxide-rustc
 REPRO        := RUSTC_WRAPPER=$(REPRO_RUSTC) PSOXIDE_REPRO_ROOT=$(ROOT)
-.PHONY: repro-rustc
-repro-rustc:
-	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-pgo/Cargo.toml" --target-dir "$(REPRO_TARGET)" --bin psoxide-rustc
-loader launcher: repro-rustc
+
+# The SDK's architecture gate (sdk/docs/GATE.md). `psx-gate` checks the loader before it is built;
+# `psoxide-pgo apply` runs it on the launcher before the first compile and writes the receipt into the
+# executable that mkdisc checks. Both read this repository's psx-gate.toml.
+PSX_GATE  := $(SDK_TOOLS)/release/psx-gate
+PGO       := $(SDK_TOOLS)/release/psoxide-pgo
+.PHONY: sdk-tools
+sdk-tools:
+	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-hazard/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psx-gate
+	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-pgo/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psoxide-pgo --bin psoxide-rustc
+loader launcher: sdk-tools
 
 loader:
-	cd loader && $(REPRO) CARGO_TARGET_DIR=$(BUILD) \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=--oformat=binary" \
-		cargo build $(PSX_FLAGS)
+	$(PSX_GATE) --sdk "$(SDK)" --crate loader -- build $(PSX_FLAGS)
+	cd loader && $(REPRO) CARGO_TARGET_DIR=$(BUILD) cargo build $(PSX_FLAGS)
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.
@@ -174,11 +189,14 @@ loader:
 DISC_TITLE ?= DEMO DISC
 DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --dirty 2>/dev/null)
 
-# The launcher embeds the blob, so it always rebuilds after it.
+# The launcher embeds the blob, so it always rebuilds after it. The pad, the linker script and the
+# output format come from the crate (launcher/.cargo/config.toml and build.rs), because the build
+# driver refuses a RUSTFLAGS environment.
+LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private) $(if $(DIAG),host-tty))
 launcher: loader
-	cd launcher && $(REPRO) CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
-		RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$(SDK)/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
-		cargo build $(PSX_FLAGS) $(if $(PRIVATE),--features private)
+	cd launcher && CARGO_TARGET_DIR=$(LAUNCHER_TARGET) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) \
+		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
+		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
@@ -433,7 +451,12 @@ endif
 # `make disc` builds. The program order here is the carousel order: the
 # reverse of v0.39 (Manny, 2026-09-26), with PSXcel moved from first to last,
 # just before CREDITS (Manny, 2026-10-05).
+# The architecture gate (sdk/docs/GATE.md): mkdisc judges every executable it presses against the
+# pinned SDK's profile and the program's own psx-gate.toml. A lineup's GATE_ARGS (written by
+# `disc-tools lineup prepare` into lineup.mk) carry each program's file as it was at the revision
+# it was built from; DIAG=1 lets the debug launcher through.
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
+		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" $(GATE_ARGS) $(if $(DIAG),--diag) \
 		$(ARCADE_ARGS) \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -561,6 +584,7 @@ relocation-check: launcher mkdisc
 	$(MAKE) -C $(EDITOR_TREE) hello-tri hello-pack-disc
 	@mkdir -p $(ROOT)/dist
 	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
+		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" \
 		--game "HELLO TRI=$(EXAMPLES)/hello-tri.exe" \
 		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
 	@echo
@@ -574,9 +598,10 @@ relocation-check: launcher mkdisc
 # in the next program. tools/chainload-probe is the payload that checks for it
 # after the launcher chain-loads it. FRONTEND must carry the emulator's silicon
 # Pause model (PSoXide-emulator dddd281 or later).
-chainload-probe: launcher mkdisc
+chainload-probe: mkdisc
 	@test -n "$(FRONTEND)" || { echo "chainload-probe: set FRONTEND to a psoxide-emulator with the silicon Pause model"; exit 1; }
-	sh tools/chainload_probe.sh "$(LAUNCHER_EXE)" "$(FRONTEND)"
+	$(MAKE) launcher DIAG=1
+	sh tools/chainload_probe.sh "$(BUILD)/diag/mipsel-sony-psx/release/launcher.exe" "$(FRONTEND)"
 
 clean:
 	rm -rf $(BUILD) $(ROOT)/dist

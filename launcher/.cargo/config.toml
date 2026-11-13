@@ -1,0 +1,9 @@
+# The launcher's rustflags live here, not in RUSTFLAGS: the SDK's build driver (psoxide-pgo apply)
+# refuses to run when RUSTFLAGS is set, and joins its own flags to this list. The linker script and
+# the output format come from build.rs.
+[target.mipsel-sony-psx]
+rustflags = ["-Cllvm-args=-disable-mips-df-backward-search"]
+
+# The architecture gate (sdk/docs/GATE.md) reads this program's exceptions from here.
+[env]
+PSX_GATE_FILE = { value = "../psx-gate.toml", relative = true }

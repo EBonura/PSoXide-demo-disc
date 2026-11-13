@@ -1,0 +1,6 @@
+[target.mipsel-sony-psx]
+rustflags = ["-Cllvm-args=-disable-mips-df-backward-search", "-Clink-arg=--oformat=binary"]
+
+# The architecture gate (sdk/docs/GATE.md) reads this program's exceptions from here.
+[env]
+PSX_GATE_FILE = { value = "../psx-gate.toml", relative = true }

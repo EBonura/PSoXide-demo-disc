@@ -15,7 +15,8 @@
 # dddd281 or later); an older one answers the second response within 30,000
 # clocks and the control fails, which says so rather than passing.
 #
-# Run as: sh tools/chainload_probe.sh <launcher.exe> <frontend> [workdir]
+# Run as: sh tools/chainload_probe.sh <launcher.exe> <frontend> [workdir]. The launcher is the debug build
+# (make launcher DIAG=1): the probe reads its "launcher: chain-loading" line, and a diag image is pressed with --diag.
 # `make chainload-probe` builds the launcher and runs it. To see it fail, build the
 # launcher over a games/PSoXide-sdk whose engine/crates/psx-chainloader is
 # from before the quiet handoff (editor e22f3508, before the engine moved to the SDK).
@@ -28,18 +29,21 @@ SDK="${SDK:-$ROOT/games/PSoXide-sdk}"
 MKDISC="$ROOT/tools/mkdisc/target/release/mkdisc"
 mkdir -p "$WORK"
 
+# Built through the SDK's build driver, so the probe passes the architecture gate and carries a receipt
+# (a diag one: it has psx-rt's host-tty on, and a diag image goes on a disc only with --diag).
+PGO="${PGO:-$ROOT/build/sdk-tools/release/psoxide-pgo}"
 (cd "$ROOT/tools/chainload-probe" && CARGO_TARGET_DIR="$WORK/target" \
-    RUSTFLAGS="-Cllvm-args=-disable-mips-df-backward-search -Clink-arg=-T$SDK/sdk/psoxide.ld -Clink-arg=--oformat=binary" \
-    cargo build --release --target mipsel-sony-psx -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem)
+    "$PGO" apply --crate . --variant off -- build --release --target mipsel-sony-psx \
+    -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem)
 PROBE="$WORK/target/mipsel-sony-psx/release/chainload-probe.exe"
 
 # The probe reads its own image through the disc base, so it rides as an image.
 # MKISOPSX names a built mkisopsx to use; otherwise it is built from the SDK tree.
 if [ -n "${MKISOPSX:-}" ]; then
-    "$MKISOPSX" --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null
+    "$MKISOPSX" --diag --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null
 else
     (cd "$SDK" && CARGO_TARGET_DIR="$WORK/host" cargo run -q --release -p mkisopsx -- \
-        --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null)
+        --diag --exe "$PROBE" --out "$WORK/chainload-probe.bin" --volume CHAINPROBE >/dev/null)
 fi
 
 # The launcher exe is a flat file the linker leaves short of the whole sectors its
@@ -50,6 +54,7 @@ size=$(wc -c <"$WORK/launcher.exe" | tr -d ' ')
 if [ "$size" -lt $((2048 + payload)) ]; then truncate -s $((2048 + payload)) "$WORK/launcher.exe"; fi
 
 "$MKDISC" --launcher "$WORK/launcher.exe" --out "$WORK/disc.bin" --volume PSXDEMO \
+    --sdk-profile "$SDK/sdk/profile.toml" --own-gate-file "$ROOT/psx-gate.toml" --diag \
     --image "CHAIN PROBE=$WORK/chainload-probe.cue" \
     --menu-xa "$ROOT/audio/launcher/MUSIC1.XA" --menu-xa "$ROOT/audio/launcher/MUSIC2.XA" \
     --menu-spectrum "$ROOT/audio/launcher/menu.spectrum" \

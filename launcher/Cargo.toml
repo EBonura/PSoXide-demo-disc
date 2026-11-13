@@ -32,16 +32,18 @@ lto           = true
 # Public disc must not carry anywhere (`disc-tools public-only` scans for them).
 # The Makefile turns it on whenever a pressing includes one of them.
 private = []
+# The debug build: the launcher's TTY lines ("launcher: booted", "launcher: chain-loading", ...) that
+# `disc-tools programs` and `chainloads` read. The SDK counts psx-rt/host-tty as a diagnostic feature, so
+# an image built with it carries a diag receipt and mkdisc presses it only with --diag. A disc that
+# ships is built without it.
+host-tty = ["psx-rt/host-tty"]
 
 [dependencies]
 chainload-layout = { path = "../chainload-layout" }
 psx-gpu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gpu" }
 psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
 psx-pad  = { path = "../games/PSoXide-sdk/sdk/crates/psx-pad" }
-# host-tty: SDK main compiles tty::print out otherwise, and `disc-tools programs` gates every
-# program on the launcher's "launcher: booted" / "launcher: chain-loading" lines. The pressings
-# carried these stores before the SDK made them optional; keep them.
-psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt", features = ["host-tty"] }
+psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt" }
 psx-vram = { path = "../games/PSoXide-sdk/sdk/crates/psx-vram" }
 psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
 psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }

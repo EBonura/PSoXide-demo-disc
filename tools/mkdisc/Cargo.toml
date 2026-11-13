@@ -15,3 +15,4 @@ chainload-layout = { path = "../../chainload-layout" }
 psx-chainloader  = { path = "../../games/PSoXide-sdk/engine/crates/psx-chainloader" }
 disc-toc = { package = "psx-disc-toc", path = "../../games/PSoXide-sdk/engine/crates/psx-disc-toc" }
 psx-iso  = { path = "../../games/PSoXide-sdk/crates/psx-iso" }
+psx-gate = { path = "../../games/PSoXide-sdk/crates/psx-gate" }

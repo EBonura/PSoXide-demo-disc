@@ -49,9 +49,7 @@ use gfx::Gfx;
 use music::Music;
 use playlist::Slot;
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
-use psx_pad::{
-    button, require_analog_on, AnalogRequirement, ButtonState, PadMode, PadReader, Port,
-};
+use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, Port};
 use psx_rt::{tty, Peripherals};
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, Spu, SpuAddr, Voice, Volume};
@@ -113,11 +111,6 @@ static SFX_LAUNCH: &[u8] =
 const SFX_BROWSE_SLOT: usize = 0;
 const SFX_SELECT_SLOT: usize = 1;
 const SFX_LAUNCH_SLOT: usize = 2;
-
-/// Frames between attempts to put a pad that is not in analog mode there.
-/// Each attempt holds the CPU for a few frames (the commands are spaced the
-/// way Sony's libpad spaces them), so not every frame.
-const ANALOG_RECHECK_TICKS: u32 = 60;
 
 /// Frames the menu fades in from black at boot.
 const BOOT_FADE: u32 = 30;
@@ -213,18 +206,19 @@ fn main() {
     // Frames since the pad last did anything.
     let mut idle: u32 = 0;
     let mut prev_held = ButtonState::default();
-    // The disc needs a DualShock in analog mode. Lock it there now, so the
-    // Analog button cannot drop it back to digital mid-menu, and read it
-    // through a PadReader so a packet that fails validation never turns
-    // into a phantom press. A pad that is not in analog mode (a digital
-    // pad, one plugged in later, an empty port) holds the menu on a notice
-    // and is asked again every ANALOG_RECHECK_TICKS.
-    let mut pad_reader = PadReader::port1();
+    // The disc needs a DualShock in analog mode. `Controllers` puts a pad that
+    // answers there and locks it on the first poll, so the Analog button cannot
+    // drop it back to digital mid-menu, and returns the last clean state when a
+    // packet fails validation, so a garbled one never turns into a phantom press.
+    // A pad that is not in analog mode (a digital pad, one plugged in later, an
+    // empty port) holds the menu on a notice; an empty port is probed once in
+    // 60 polls. This first poll, before the menu draws, runs the handshake.
+    let mut pads = Controllers::new();
+    pads.poll(&mut port, Port::One);
     // The left stick drives the menu like the d-pad: one press per push, the
     // stick back near centre before the next.
     let mut stick = StickNav::new();
-    let mut analog_ok = require_analog_on(&mut port, Port::One) == AnalogRequirement::Analog;
-    let mut next_analog_check: u32 = ANALOG_RECHECK_TICKS;
+    let mut analog_ok = pads.analog(Port::One) == AnalogRequirement::Analog;
 
     loop {
         tick = tick.wrapping_add(1);
@@ -256,12 +250,11 @@ fn main() {
         // key_off: immediate, and owing nothing to envelope behaviour.
         sfx.tick(tick);
 
-        let state = pad_reader.poll_on(&mut port);
-        if state.mode == PadMode::Analog {
-            analog_ok = true;
-        } else if launching < 0 && tick.wrapping_sub(next_analog_check) < u32::MAX / 2 {
-            analog_ok = require_analog_on(&mut port, Port::One) == AnalogRequirement::Analog;
-            next_analog_check = tick.wrapping_add(ANALOG_RECHECK_TICKS);
+        let state = *pads.poll(&mut port, Port::One);
+        // Once a launch is under way the menu no longer reacts to the pad, so
+        // an unplugged one does not put the notice over the animation.
+        if launching < 0 {
+            analog_ok = pads.analog(Port::One) == AnalogRequirement::Analog;
         }
         let pad = ButtonState::from_bits(
             state.buttons.bits() | stick.update(state.mode, state.sticks),

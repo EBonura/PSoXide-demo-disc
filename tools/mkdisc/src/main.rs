@@ -29,11 +29,15 @@
 //!        [--game NAME=<exe>] [--image NAME=<cue>] ...
 //! ```
 //!
+//! Every executable that goes on the disc (the launcher, each `--game` and each PSX-EXE in an
+//! `--image`) is checked against the architecture gate first: see [`gate`].
+//!
 //! `--game` embeds a bare PSX-EXE, for programs that never touch the disc
 //! after boot. `--image` takes a whole `.cue`, for programs that stream data
 //! or play CD-DA. `NAME` is what the menu shows; `=` splits it from the path.
 
 mod cue;
+mod gate;
 mod spectrum;
 mod wav;
 
@@ -139,6 +143,8 @@ struct Args {
     tail_filler: u32,
     /// Print the sector budget and stop before writing the image.
     dry_run: bool,
+    /// What the architecture gate needs (see [`gate`]).
+    gate: gate::Options,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -157,6 +163,10 @@ fn parse_args() -> Result<Args, String> {
     let mut max_sectors = None;
     let mut tail_filler = 0u32;
     let mut dry_run = false;
+    let mut sdk_profile: Option<PathBuf> = None;
+    let mut launcher_file: Option<PathBuf> = None;
+    let mut program_files: Vec<(String, PathBuf)> = Vec::new();
+    let mut allow_diag = false;
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
@@ -267,6 +277,21 @@ fn parse_args() -> Result<Args, String> {
                 })?;
             }
             "--dry-run" => dry_run = true,
+            "--sdk-profile" => {
+                sdk_profile = Some(PathBuf::from(
+                    it.next().ok_or("--sdk-profile takes a path".to_string())?,
+                ))
+            }
+            "--own-gate-file" => {
+                launcher_file = Some(PathBuf::from(
+                    it.next().ok_or("--own-gate-file takes a path".to_string())?,
+                ))
+            }
+            "--gate-file" => program_files.push(split(
+                &it.next().ok_or("--gate-file takes NAME=path")?,
+                "--gate-file",
+            )?),
+            "--diag" => allow_diag = true,
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -292,12 +317,23 @@ fn parse_args() -> Result<Args, String> {
         max_sectors,
         tail_filler,
         dry_run,
+        gate: gate::Options {
+            sdk_profile: sdk_profile.ok_or(
+                "--sdk-profile is required: the sdk/profile.toml of the SDK the launcher links"
+                    .to_string(),
+            )?,
+            launcher_file,
+            program_files,
+            allow_diag,
+        },
     })
 }
 
 fn print_usage() {
     println!(
         "mkdisc --launcher <exe> --out <bin> [--volume ID]\n\
+        \x20      --sdk-profile <sdk/profile.toml> [--own-gate-file <psx-gate.toml>]\n\
+        \x20      [--gate-file NAME=<psx-gate.toml>] [--diag]\n\
         \x20      [--game NAME=<exe>] [--image NAME=<cue>]\n\
         \x20      [--share-cdda BORROWER=LENDER] ...\n\n\
          --game        embeds a bare PSX-EXE (programs that never read the disc)\n\
@@ -316,7 +352,12 @@ fn print_usage() {
          --menu-title  title of each song, in song order, shown as now playing;\n\
         \x20             their count is the song count\n\
          --max-sectors the target blank's capacity; a layout over it is an error\n\
-         --dry-run     print the sector budget and stop without writing the image"
+         --dry-run     print the sector budget and stop without writing the image\n\
+         --sdk-profile the SDK's sdk/profile.toml; every executable on the disc (the launcher,\n\
+        \x20             each --game, each PSX-EXE in an --image) is checked against it first\n\
+         --own-gate-file  this repository's psx-gate.toml, the launcher's own file\n\
+         --gate-file   NAME=<psx-gate.toml> of the program NAME (from its source revision)\n\
+         --diag        accept a diag receipt (a development disc; never the one that ships)"
     );
 }
 
@@ -829,6 +870,11 @@ fn run() -> Result<(), String> {
     let launcher =
         fs::read(&args.launcher).map_err(|e| format!("read {}: {e}", args.launcher.display()))?;
     parse_exe_header(&launcher, &args.launcher)?;
+    // Every executable that goes on the disc is judged by the architecture gate before the image is
+    // built (sdk/docs/GATE.md, G3). The refusals are collected and printed together, then the
+    // build stops.
+    let mut gate = gate::Gate::new(&args.gate)?;
+    gate.check(gate::LAUNCHER, &args.launcher.display().to_string(), &launcher);
 
     let system_cnf = default_system_cnf();
     let toc_lba = psx_iso::PLAYTEST_FIRST_FILE_LBA + sectors_for(system_cnf.len());
@@ -952,6 +998,7 @@ fn run() -> Result<(), String> {
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let header = parse_exe_header(&bytes, path)?;
         check_clear_of_loader(&header, path)?;
+        gate.check(&program.name, &path.display().to_string(), &bytes);
         loaded.push((program.name.clone(), header));
         let payload_end = 2048usize + header.payload_bytes as usize;
         if bytes.len() < payload_end {
@@ -984,6 +1031,9 @@ fn run() -> Result<(), String> {
         let image = load_image(path)?;
         let (boot_exe_lba, header) = find_image_boot_exe(&image.data, path)?;
         check_clear_of_loader(&header, path)?;
+        for (lba, exe) in gate::executables_in(&image.data) {
+            gate.check(&program.name, &format!("{}, sector {lba}", path.display()), &exe);
+        }
         loaded.push((program.name.clone(), header));
         // Checksum the payload as the loader will read it: the 2048-byte
         // data windows of the raw sectors after the header sector.
@@ -1005,6 +1055,8 @@ fn run() -> Result<(), String> {
         }
         images.push((index, path.clone(), image, hash, boot_exe_lba));
     }
+
+    gate.finish()?;
 
     let build_iso = |toc: Vec<u8>| {
         let mut builder = IsoBuilder::new()

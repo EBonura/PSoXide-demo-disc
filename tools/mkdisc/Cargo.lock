@@ -19,6 +19,7 @@ dependencies = [
  "chainload-layout",
  "psx-chainloader",
  "psx-disc-toc",
+ "psx-gate",
  "psx-iso",
 ]
 
@@ -46,6 +47,13 @@ dependencies = [
  "psx-io",
  "psx-math",
  "psx-vram",
+]
+
+[[package]]
+name = "psx-gate"
+version = "0.1.0"
+dependencies = [
+ "psx-iso",
 ]
 
 [[package]]
