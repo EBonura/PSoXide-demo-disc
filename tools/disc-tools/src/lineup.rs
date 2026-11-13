@@ -28,6 +28,8 @@
 //! at the revision the image was built from, staged next to the image. `prepare` hands it to mkdisc
 //! (`GATE_ARGS` in lineup.mk), which judges the program's executables against it. A row without one
 //! has no gate file, and mkdisc accepts the program only if its executables carry a gate receipt.
+//! `gate_programs` lists the executable names (file stems) that file lists an unreceipted
+//! executable under, for the programs whose file does.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -241,6 +243,19 @@ fn gate_file(row: &Value) -> Result<Option<PathBuf>> {
     let file = resolve(&expand_home(file))?;
     check_hash(&file, digest, name)?;
     Ok(Some(file))
+}
+
+/// The names the program's gate file uses for its executables (`gate_programs`): a program
+/// that is not on `apply` yet lists each of its executables by file stem, which the bytes do not
+/// carry, so the row says which names to look for.
+fn gate_programs(row: &Value) -> Result<Vec<String>> {
+    let Some(names) = row.get("gate_programs") else {
+        return Ok(Vec::new());
+    };
+    names
+        .as_array()
+        .and_then(|names| names.iter().map(|n| n.as_str().map(str::to_string)).collect())
+        .ok_or_else(|| Error(format!("{}: gate_programs is a list of names", row["name"])))
 }
 
 /// One input resolved to the file the Makefile will press.
@@ -583,6 +598,12 @@ fn prepare(args: &Args) -> Result<()> {
                 text(row, "name")?,
                 file.display()
             ));
+            for stem in gate_programs(row)? {
+                lines.push(format!(
+                    "GATE_ARGS += --gate-program \"{}={stem}\"",
+                    text(row, "name")?
+                ));
+            }
         }
         if let Some(version_var) = row.get("version_var").and_then(Value::as_str) {
             lines.push(format!("{version_var} := {}", text(row, "version")?));
@@ -1130,6 +1151,12 @@ mod tests {
         assert!(gate_file(&named(json!({}))).is_err(), "a gate file without its hash is refused");
         let wrong = "0".repeat(64);
         assert!(gate_file(&named(json!({"gate_file_sha256": wrong}))).is_err());
+        assert_eq!(
+            gate_programs(&json!({"name": "G", "gate_programs": ["quake-psx", "hl-intro"]})).unwrap(),
+            ["quake-psx", "hl-intro"]
+        );
+        assert!(gate_programs(&json!({"name": "G", "gate_programs": "quake-psx"})).is_err());
+        assert!(gate_programs(&json!({"name": "G"})).unwrap().is_empty());
         let lineup = row(json!({"gate_file": "/lane/psx-gate.toml"}));
         let problems = contained_problems(&lineup, Path::new("/inputs")).unwrap();
         assert!(problems.iter().any(|p| p.contains("gate_file /lane")), "{problems:?}");

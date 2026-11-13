@@ -167,6 +167,7 @@ fn parse_args() -> Result<Args, String> {
     let mut launcher_file: Option<PathBuf> = None;
     let mut program_files: Vec<(String, PathBuf)> = Vec::new();
     let mut allow_diag = false;
+    let mut program_stems: Vec<(String, String)> = Vec::new();
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
@@ -291,6 +292,13 @@ fn parse_args() -> Result<Args, String> {
                 &it.next().ok_or("--gate-file takes NAME=path")?,
                 "--gate-file",
             )?),
+            "--gate-program" => {
+                let (name, stem) = split(
+                    &it.next().ok_or("--gate-program takes NAME=executable-name")?,
+                    "--gate-program",
+                )?;
+                program_stems.push((name, stem.to_string_lossy().into_owned()));
+            }
             "--diag" => allow_diag = true,
             "--help" | "-h" => {
                 print_usage();
@@ -324,6 +332,7 @@ fn parse_args() -> Result<Args, String> {
             )?,
             launcher_file,
             program_files,
+            program_stems,
             allow_diag,
         },
     })
@@ -357,6 +366,8 @@ fn print_usage() {
         \x20             each --game, each PSX-EXE in an --image) is checked against it first\n\
          --own-gate-file  this repository's psx-gate.toml, the launcher's own file\n\
          --gate-file   NAME=<psx-gate.toml> of the program NAME (from its source revision)\n\
+         --gate-program  NAME=<executable name> a program's file lists its unreceipted executables by\n\
+        \x20             (the executable's file stem); repeat for each. A --game is known by its file's stem\n\
          --diag        accept a diag receipt (a development disc; never the one that ships)"
     );
 }
@@ -874,7 +885,7 @@ fn run() -> Result<(), String> {
     // built (sdk/docs/GATE.md, G3). The refusals are collected and printed together, then the
     // build stops.
     let mut gate = gate::Gate::new(&args.gate)?;
-    gate.check(gate::LAUNCHER, &args.launcher.display().to_string(), &launcher);
+    gate.check(gate::LAUNCHER, &args.launcher.display().to_string(), &launcher, None);
 
     let system_cnf = default_system_cnf();
     let toc_lba = psx_iso::PLAYTEST_FIRST_FILE_LBA + sectors_for(system_cnf.len());
@@ -998,7 +1009,12 @@ fn run() -> Result<(), String> {
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let header = parse_exe_header(&bytes, path)?;
         check_clear_of_loader(&header, path)?;
-        gate.check(&program.name, &path.display().to_string(), &bytes);
+        gate.check(
+            &program.name,
+            &path.display().to_string(),
+            &bytes,
+            path.file_stem().and_then(|stem| stem.to_str()),
+        );
         loaded.push((program.name.clone(), header));
         let payload_end = 2048usize + header.payload_bytes as usize;
         if bytes.len() < payload_end {
@@ -1032,7 +1048,7 @@ fn run() -> Result<(), String> {
         let (boot_exe_lba, header) = find_image_boot_exe(&image.data, path)?;
         check_clear_of_loader(&header, path)?;
         for (lba, exe) in gate::executables_in(&image.data) {
-            gate.check(&program.name, &format!("{}, sector {lba}", path.display()), &exe);
+            gate.check(&program.name, &format!("{}, sector {lba}", path.display()), &exe, None);
         }
         loaded.push((program.name.clone(), header));
         // Checksum the payload as the loader will read it: the 2048-byte

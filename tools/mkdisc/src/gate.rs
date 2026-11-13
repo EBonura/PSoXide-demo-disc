@@ -40,6 +40,9 @@ pub struct Options {
     pub launcher_file: Option<PathBuf>,
     /// `(program name, psx-gate.toml)` of each game, from `--gate-file`.
     pub program_files: Vec<(String, PathBuf)>,
+    /// `(program name, executable name)` from `--gate-program`: the names (file stems) the
+    /// program's own file uses for its executables, since an executable carries none.
+    pub program_stems: Vec<(String, String)>,
     /// A diag receipt is accepted (`--diag`): a development disc, never a shipping one.
     pub allow_diag: bool,
 }
@@ -50,6 +53,7 @@ pub struct Gate {
     allow_diag: bool,
     launcher: Option<Profile>,
     games: BTreeMap<String, Profile>,
+    stems: Vec<(String, String)>,
     /// One line per executable that passed.
     pub passed: Vec<String>,
     /// One message per executable refused.
@@ -76,20 +80,36 @@ impl Gate {
             allow_diag: options.allow_diag,
             launcher,
             games,
+            stems: options.program_stems.clone(),
             passed: Vec::new(),
             refused: Vec::new(),
         })
     }
 
     /// Judge one executable. `name` is the program's name on the disc (`LAUNCHER` for the
-    /// launcher), `place` says where the bytes came from, for the message.
-    pub fn check(&mut self, name: &str, place: &str, exe: &[u8]) {
+    /// launcher), `place` says where the bytes came from, for the message, and `file_stem` is
+    /// the name of the executable file when it was a file of its own (`--game`).
+    ///
+    /// The program's own file lists an unreceipted executable under the name of the executable
+    /// (its file stem, as GATE.md has it), which the bytes do not carry: the label is the first
+    /// of `--gate-program` and `file_stem` that the file lists, else the program's name.
+    pub fn check(&mut self, name: &str, place: &str, exe: &[u8], file_stem: Option<&str>) {
         let own = if name == LAUNCHER {
             self.launcher.as_ref()
         } else {
             self.games.get(name)
         };
-        match press::check(exe, name, self.allow_diag, &self.sdk, own) {
+        let label = own
+            .and_then(|own| {
+                self.stems
+                    .iter()
+                    .filter(|(program, _)| program == name)
+                    .map(|(_, stem)| stem.as_str())
+                    .chain(file_stem)
+                    .find(|stem| own.no_receipt(stem).is_some())
+            })
+            .unwrap_or(name);
+        match press::check(exe, label, self.allow_diag, &self.sdk, own) {
             Ok(verdict) => self.passed.push(format!("{name}: {place}: {}", describe(&verdict))),
             Err(message) => self.refused.push(format!("{message} ({place})")),
         }
@@ -191,6 +211,7 @@ mod tests {
             sdk: Profile::parse("", Path::new("sdk/profile.toml")).unwrap(),
             allow_diag: false,
             launcher: None,
+            stems: Vec::new(),
             games: own.iter().map(|(n, t)| (n.to_string(), profile(t))).collect(),
             passed: Vec::new(),
             refused: Vec::new(),
@@ -220,7 +241,7 @@ mod tests {
     #[test]
     fn a_program_without_a_receipt_is_refused_by_name() {
         let mut g = gate(&[]);
-        g.check("HOLLOW KNIGHT", "image sector 22", &exe(0x8001_0000, 2048));
+        g.check("HOLLOW KNIGHT", "image sector 22", &exe(0x8001_0000, 2048), None);
         let text = g.finish().unwrap_err();
         assert!(text.contains("HOLLOW KNIGHT"), "{text}");
         assert!(text.contains("no gate receipt"), "{text}");
@@ -232,11 +253,11 @@ mod tests {
         let mut gated = exe(0x8001_0000, 2048);
         receipt::write(&mut gated, "game", Kind::Shipping).unwrap();
         let mut g = gate(&[]);
-        g.check("A", "exe", &gated);
+        g.check("A", "exe", &gated, None);
         assert!(g.refused.is_empty());
         let mut patched = gated.clone();
         patched[3000] ^= 1;
-        g.check("B", "exe", &patched);
+        g.check("B", "exe", &patched, None);
         assert!(g.finish().unwrap_err().contains("changed"));
     }
 
@@ -245,16 +266,39 @@ mod tests {
         let listed = "[[exception]]\nkind = \"no-receipt\"\nitem = \"-\"\nremove = \"W9\"\n";
         let mut plain = exe(0x8001_0000, 2048);
         let mut g = gate(&[("OLD GAME", listed)]);
-        g.check("OLD GAME", "exe", &plain);
+        g.check("OLD GAME", "exe", &plain, None);
         assert!(g.refused.is_empty(), "{:?}", g.refused);
         // Another game does not borrow that entry.
-        g.check("OTHER", "exe", &plain);
+        g.check("OTHER", "exe", &plain, None);
         assert_eq!(g.refused.len(), 1);
         // Once the game has a receipt, its entry must go.
         receipt::write(&mut plain, "old", Kind::Shipping).unwrap();
         let mut g = gate(&[("OLD GAME", listed)]);
-        g.check("OLD GAME", "exe", &plain);
+        g.check("OLD GAME", "exe", &plain, None);
         assert!(g.finish().unwrap_err().contains("delete the entry"));
+    }
+
+    #[test]
+    fn a_game_lists_its_executables_by_their_names() {
+        // How the games' own files list themselves: by the executable's name, not the disc's.
+        let listed = "[[exception]]\nprogram = \"quake-psx\"\nkind = \"no-receipt\"\nitem = \"-\"\nremove = \"W9\"\n";
+        let plain = exe(0x8001_0000, 2048);
+        // The disc's name for it matches nothing the file lists.
+        let mut g = gate(&[("QUAKE SHAREWARE", listed)]);
+        g.check("QUAKE SHAREWARE", "image", &plain, None);
+        assert_eq!(g.refused.len(), 1);
+        // The lineup says which names the program's file uses (--gate-program).
+        let mut g = gate(&[("QUAKE SHAREWARE", listed)]);
+        g.stems = vec![("QUAKE SHAREWARE".into(), "quake-psx".into())];
+        g.check("QUAKE SHAREWARE", "image", &plain, None);
+        assert!(g.refused.is_empty(), "{:?}", g.refused);
+        // A bare EXE is known by its file's name.
+        let mut g = gate(&[("QUAKE SHAREWARE", listed)]);
+        g.check("QUAKE SHAREWARE", "exe", &plain, Some("quake-psx"));
+        assert!(g.refused.is_empty(), "{:?}", g.refused);
+        // A name that is not listed does not borrow it.
+        g.check("QUAKE SHAREWARE", "exe", &plain, Some("other"));
+        assert_eq!(g.refused.len(), 1);
     }
 
     #[test]
@@ -262,11 +306,11 @@ mod tests {
         let mut tap = exe(0x8001_0000, 2048);
         receipt::write(&mut tap, "launcher", Kind::Diag).unwrap();
         let mut g = gate(&[]);
-        g.check(LAUNCHER, "PSX.EXE", &tap);
+        g.check(LAUNCHER, "PSX.EXE", &tap, None);
         assert!(g.finish().unwrap_err().contains("diagnostic"));
         let mut g = gate(&[]);
         g.allow_diag = true;
-        g.check(LAUNCHER, "PSX.EXE", &tap);
+        g.check(LAUNCHER, "PSX.EXE", &tap, None);
         assert!(g.finish().is_ok());
     }
 }

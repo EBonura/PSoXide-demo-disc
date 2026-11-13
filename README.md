@@ -152,6 +152,31 @@ margin, so that constraint fails the build rather than the console. The loader
 applies the same rule (`psx_chainloader::check_payload`) before it reads a
 sector.
 
+## The architecture gate
+
+The launcher and the loader build under the SDK's architecture gate (`sdk/docs/GATE.md`): `psx-gate.toml` at the
+root is this repository's file and holds no exceptions. `make launcher` builds the launcher through
+`psoxide-pgo apply`, which runs the gate and writes a receipt into the executable; `make loader` runs `psx-gate`
+over the loader first. psx-rt's `host-tty` is a diagnostic feature the SDK refuses on a disc that ships, so the
+launcher a disc carries is built without it. `make launcher DIAG=1` builds the debug launcher into `build/diag/`
+(the `launcher: booted` and `launcher: chain-loading` lines `disc-tools programs` and `chainloads` read); a pressing
+with it needs `DIAG=1` (mkdisc `--diag`) and is for development and the gates, never a burn.
+
+`mkdisc` writes disc images with `psx_iso` itself, so it does what GATE.md asks of such a caller: before it builds
+an image it runs `psx_gate::press::check` on every executable it is going to put on it, and stops, naming the
+program, when one carries no receipt and is not listed. Those are the launcher, each `--game` EXE, and every PSX-EXE
+that starts a sector of the data track of each `--image` (Half-Life has two, the Arcade collection four). Each is
+judged as the program `mkdisc` was given a name for, against the pinned SDK's `sdk/profile.toml`
+(`--sdk-profile`) and that program's own `psx-gate.toml` (`--gate-file NAME=path`). A lineup row carries the file as
+`gate_file` and `gate_file_sha256`, staged next to the image from the program's repository at the revision it was
+built from; `disc-tools lineup prepare` turns the rows into `GATE_ARGS` in `lineup.mk`. A program whose build does not
+run `apply` yet lists itself in that file (`kind = "no-receipt"`), under the name of its executable, which is its file
+stem and which the bytes do not carry: the row names it in `gate_programs` (a bare `--game` EXE is known by its file's
+stem). A program that has a receipt must not be listed. A determined bypass is what GATE.md names: a forged receipt (anyone with the
+SDK can call `psx_iso::receipt::write`), a lineup row pointing at a gate file that lists a program that should not be
+listed, an executable placed somewhere a first stage unpacks it (not at the start of a data sector), or a disc
+written by something other than `mkdisc`.
+
 ## Layout
 
 | Piece | What it is |
