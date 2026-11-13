@@ -338,9 +338,10 @@ of the screen alternates between "press any button" and the music credit. Any
 button ends it at once, on the case it was showing, and is not also taken as a
 menu command.
 
-The disc is meant for a DualShock in analog mode. The launcher locks port 1
-there at boot and asks again every second; until it holds one, the menu shows a
-notice in English and Italian and ignores the buttons.
+The disc is meant for a DualShock in analog mode. The launcher reads port 1
+through the SDK's `psx_pad::Controllers`, whose first poll of a pad locks it in
+analog mode (an empty port is probed once in 60 polls); until the port holds one,
+the menu shows a notice in English and Italian and ignores the buttons.
 
 Choosing a program is an event: the case comes to the middle of the stage, its
 cover swings open on the left hinge like a real jewel case, the disc lifts out
