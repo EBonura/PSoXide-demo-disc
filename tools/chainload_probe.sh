@@ -15,8 +15,8 @@
 # dddd281 or later); an older one answers the second response within 30,000
 # clocks and the control fails, which says so rather than passing.
 #
-# Run as: sh tools/chainload_probe.sh <launcher.exe> <frontend> [workdir]. The launcher is the debug build
-# (make launcher DIAG=1): the probe reads its "launcher: chain-loading" line, and a diag image is pressed with --diag.
+# Run as: sh tools/chainload_probe.sh <launcher.exe> <frontend> [workdir]. The probe is a diagnostic program
+# (psx-rt's host-tty is how it reports), so its image is pressed with --diag; the launcher is the shipping one.
 # `make chainload-probe` builds the launcher and runs it. To see it fail, build the
 # launcher over a games/PSoXide-sdk whose engine/crates/psx-chainloader is
 # from before the quiet handoff (editor e22f3508, before the engine moved to the SDK).
@@ -70,7 +70,7 @@ if [ "$size" -lt $((2048 + payload)) ]; then truncate -s $((2048 + payload)) "$W
     echo "chainload-probe: FAIL: the emulator exited with an error" >&2
     exit 1
 }
-grep -E '^(launcher: chain-loading|chainload-probe:)' "$WORK/out.txt"
+grep -E '^chainload-probe:' "$WORK/out.txt"
 if grep -q '^chainload-probe: PASS' "$WORK/out.txt"; then
     echo "chainload-probe-gate: PASS"
 else

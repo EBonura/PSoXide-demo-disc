@@ -17,7 +17,6 @@ use psx_hw::cd::xa::END_GUARD_SECTORS;
 use psx_io::cd::xa::{DriveSpeed, Event, File, Player, Song};
 use psx_io::timers::{counter, Timer};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
-use psx_rt::tty;
 
 /// The song table `xa-pack` wrote: which file and channel each song is on, and
 /// how long it runs. Song `n` here is song `n` of the disc table.
@@ -86,9 +85,6 @@ impl Music {
         let usable = if found && songs == pack::XA_SONGS.len() {
             songs
         } else {
-            if songs != 0 {
-                tty::println("launcher: menu music does not match this launcher, music off");
-            }
             0
         };
         // The root counters keep running from power on and the CD reads before

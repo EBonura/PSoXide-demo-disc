@@ -16,7 +16,6 @@ use crate::music::Music;
 use disc_toc::Entry;
 use psx_hw::cd::CMD_SEEKL;
 use psx_io::periph::Cd;
-use psx_rt::tty;
 
 /// The chain-load blob, linked at `LOADER_BASE` from `loader/loader.ld`.
 const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
@@ -112,7 +111,6 @@ impl Seek {
 /// is readable; the blob paints the screen red and stops if it is not.
 pub fn boot(entry: &Entry, g: &mut Gfx, seek: &mut Seek) -> ! {
     assert!(LOADER_BLOB.len() <= LOADER_LIMIT, "loader blob too large");
-    tty::println("launcher: chain-loading");
 
     // Let the GPU finish before the blob resets it out from under whatever is
     // still on screen, and hand the drive over with nothing pending.

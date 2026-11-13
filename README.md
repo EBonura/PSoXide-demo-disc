@@ -157,10 +157,8 @@ sector.
 The launcher and the loader build under the SDK's architecture gate (`sdk/docs/GATE.md`): `psx-gate.toml` at the
 root is this repository's file and holds no exceptions. `make launcher` builds the launcher through
 `psoxide-pgo apply`, which runs the gate and writes a receipt into the executable; `make loader` runs `psx-gate`
-over the loader first. psx-rt's `host-tty` is a diagnostic feature the SDK refuses on a disc that ships, so the
-launcher a disc carries is built without it. `make launcher DIAG=1` builds the debug launcher into `build/diag/`
-(the `launcher: booted` and `launcher: chain-loading` lines `disc-tools programs` and `chainloads` read); a pressing
-with it needs `DIAG=1` (mkdisc `--diag`) and is for development and the gates, never a burn.
+over the loader first. The launcher prints nothing (psx-rt's `host-tty` is a diagnostic feature the SDK refuses on a
+disc that ships), so the gates judge the image that ships: see "How the gates tell programs apart" below.
 
 `mkdisc` writes disc images with `psx_iso` itself, so it does what GATE.md asks of such a caller: before it builds
 an image it runs `psx_gate::press::check` on every executable it is going to put on it, and stops, naming the
@@ -176,6 +174,30 @@ stem). A program that has a receipt must not be listed. A determined bypass is w
 SDK can call `psx_iso::receipt::write`), a lineup row pointing at a gate file that lists a program that should not be
 listed, an executable placed somewhere a first stage unpacks it (not at the start of a data sector), or a disc
 written by something other than `mkdisc`.
+
+## How the gates tell programs apart
+
+`disc-tools programs`, `chainloads` and `celeste-nav` (so `gates-private` and `gates-public`) read no text a program
+prints. They read the machine, through logs the emulator writes for an untouched shipping disc: the route log (display
+flips and RAM words, `--route-watch-u32`, read without touching the guest), the PC samples and the CD command log.
+The executables come from the disc itself: every PSX-EXE that starts a data sector, with its load address, size and
+entry point from the header and, when there is one, its gate receipt (the program's name; the check prints it).
+
+All the programs load low in RAM, so an address range does not say who is running. The words of its text do: for each
+executable the tool picks four words of its text, after the entry point, at addresses where no other executable on the
+disc has that word (or covers the address); a program is resident when those four read back as the disc has them. An
+executable that cannot be told from the others (fewer than four such words) stops the gate with that message.
+
+- "The launcher booted": its words are resident before the launching press, the PC was sampled in its code, and the
+  menu's display flipped at least 20 times.
+- "It chain-loaded X": after the launching press one of X's executables (an image may hold several: Half-Life's intro
+  hands over to its game, the Arcade's menu to each cabinet game) becomes resident, the launcher's words never come
+  back, the display flips at least 10 more times and the PC is sampled in that executable's code.
+
+Every stronger check stays: the payload checksum and EXE LBA from the table, the CD reads of the loader and a read after
+it, VRAM and display hashes, the gameplay frame counts, Celeste's route finals, the two replays agreeing byte for byte.
+`--expect-as NAME` (on `programs` and `chainloads`) judges each route as if it should have landed in NAME's code; it
+has to fail, and is how the gate is shown not to pass on the wrong program.
 
 ## Layout
 
@@ -385,8 +407,9 @@ the relocated guest from the built `.cue`. This is emulator evidence, not a
 real-BIOS or original-console claim:
 
 - the standard shelf holds seven programs including Cortex Ignition
-- `hello-pack` streams its pack and reports ALL PASS with its image relocated
-  220 sectors in, and still reports ALL PASS standalone (`make relocation-check`)
+- the relocated images of the real games stream from where they sit on the disc: the chain-load gate proves, for each
+  program, the loader read its executable and the program read the disc after it (`hello-pack`, the early payload for
+  this, reported ALL PASS 220 sectors in)
 - two CD-DA discs on one image play 440 Hz and 1000 Hz respectively, so the
   second one's track base shifted it off track 2
 - PSoXide Arcade owns the Goncharov song by

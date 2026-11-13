@@ -1,7 +1,9 @@
 //! Boot the demo disc's independent programs through the carousel, headless,
-//! and check each one's live output: the launcher booted and chain-loaded the
-//! right number of times, the program printed its marker, the final PC is in
-//! RAM and the last frame is not blank.
+//! and check each one's live behaviour on the image that ships: the launcher
+//! booted, the program's own code became resident in RAM (words of its text
+//! read back as the disc has them, see `identity`), the launcher never came
+//! back, the display kept flipping, the final PC is in RAM and the last frame
+//! is not blank. Nothing here waits for a line a program prints.
 //!
 //! The route for each program is derived from the pressed table, so adding or
 //! reordering carousel cards cannot silently point a route at the wrong game.
@@ -15,6 +17,7 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::args::Args;
 use crate::disc;
+use crate::identity;
 use crate::replay::{
     number, parse_int, pattern, run_merged, shlex_join, shlex_split, toc_rows, Csv, Row,
 };
@@ -30,14 +33,22 @@ pub(crate) const FAILURE_MARKERS: [&str; 4] = [
 static TICK_SUMMARY: OnceLock<regex::Regex> = OnceLock::new();
 static DISPLAY_SUMMARY: OnceLock<regex::Regex> = OnceLock::new();
 
-/// One program's route through the carousel and what it has to print.
+/// One chain-load a route makes: which program's code has to become resident after the press at
+/// route tick `after`, and which of that program's executables (`None`: any of them).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Stage {
+    program: &'static str,
+    exe: Option<usize>,
+    after: i64,
+}
+
+/// One program's route through the carousel and what has to happen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Route {
     name: &'static str,
     presses: String,
     steps: u64,
-    launcher_count: usize,
-    markers: Vec<&'static str>,
+    stages: Vec<Stage>,
     /// The program plays XA music, so its CD log has to show a ReadS (0x1B)
     /// after a Setfilter (0x0D).
     xa_music: bool,
@@ -101,8 +112,8 @@ fn extended(base: &[String], extra: &[String]) -> Vec<String> {
 
 fn routes(entries: &[Row]) -> Result<Vec<Route>> {
     let outer = |name: &str| menu_presses(entries, name);
-    let (voxide, _) = outer("VOXIDE")?;
-    let (nitroxide, _) = outer("NITROXIDE")?;
+    let (voxide, voxide_cross) = outer("VOXIDE")?;
+    let (nitroxide, nitroxide_cross) = outer("NITROXIDE")?;
     let (celeste, celeste_cross) = outer("CELESTE COLLECTION")?;
     // A lineup pressing may leave PSXcel and the Arcade out (LEAVE_OUT in the Makefile); their
     // routes exist only when the table lists them.
@@ -131,19 +142,19 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
         ],
     );
 
-    let route = |name, presses: &[String], steps, launcher_count, markers: &[&'static str]| Route {
+    let stage = |program, exe, after| Stage { program, exe, after };
+    let route = |name, presses: &[String], steps, stages: Vec<Stage>| Route {
         name,
         presses: presses.join(","),
         steps,
-        launcher_count,
-        markers: markers.to_vec(),
+        stages,
         xa_music: false,
     };
     let mut routes = vec![
         // VoXide 0.4.0 opens on a splash that fades through black, so a stop at
         // 450M steps can land on a black frame (it did on the 11-card private
         // pressing); 1.2G steps is the title menu on every pressing.
-        route("voxide", &voxide, 1_200_000_000, 1, &["voxide: boot"]),
+        route("voxide", &voxide, 1_200_000_000, vec![stage("VOXIDE", None, voxide_cross)]),
         // NitroXide and Celeste sit mid-carousel on the 13-card pressing,
         // six moves from either end, so the launch press lands at route tick
         // 2000; 450M steps stopped 19 ticks later, before the chain-load.
@@ -151,16 +162,15 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
             "nitroxide",
             &nitroxide,
             700_000_000,
-            1,
-            &["psx-engine: loading ready"],
+            vec![stage("NITROXIDE", None, nitroxide_cross)],
         ),
-        route("celeste", &celeste, 700_000_000, 1, &[]),
+        route("celeste", &celeste, 700_000_000, vec![stage("CELESTE COLLECTION", None, celeste_cross)]),
         // Wait for the collection intro, choose each cart, then dismiss its
         // title screen. The private pressing adds another outer carousel move;
         // leave time for the cart title fade and retry Cross once after it.
         // These exercise both linked games, not just the collection menu.
-        route("celeste-classic", &classic, 1_100_000_000, 1, &[]),
-        route("celeste-classic-2", &classic2, 1_100_000_000, 1, &[]),
+        route("celeste-classic", &classic, 1_100_000_000, vec![stage("CELESTE COLLECTION", None, celeste_cross)]),
+        route("celeste-classic-2", &classic2, 1_100_000_000, vec![stage("CELESTE COLLECTION", None, celeste_cross)]),
         // PSXcel is the last case, so the walk to it is the longest on the
         // shelf (the shelf does not wrap). Give the launcher enough emulated
         // time (about 250,000 steps a route tick) to reach the delayed launch
@@ -176,8 +186,7 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
             "psxcel",
             psxcel,
             150_000_000 + *psxcel_cross as u64 * 250_000,
-            1,
-            &[],
+            vec![stage("PSXCEL", None, *psxcel_cross)],
         ));
     }
     if let Some((arcade, arcade_cross)) = &arcade {
@@ -206,23 +215,14 @@ fn routes(entries: &[Row]) -> Result<Vec<Route>> {
                 at(inner_ready + 900, "cross", 12),
             ],
         );
-        routes.push(route("arcade-breakout", &breakout, 700_000_000, 2, &[]));
-        routes.push(route(
-            "arcade-invaders",
-            &invaders,
-            700_000_000,
-            2,
-            &["invaders: init ok"],
-        ));
+        // The collection's own menu is its first executable; each game is one of the others, in
+        // the order the cabinet lists them.
+        let arcade_to = |game, press| vec![stage("PSOXIDE ARCADE", Some(0), *arcade_cross), stage("PSOXIDE ARCADE", Some(game), press)];
+        routes.push(route("arcade-breakout", &breakout, 700_000_000, arcade_to(1, inner_ready)));
+        routes.push(route("arcade-invaders", &invaders, 700_000_000, arcade_to(2, inner_ready + 200)));
         routes.push(Route {
             xa_music: true,
-            ..route(
-                "arcade-magikarp",
-                &magikarp,
-                700_000_000,
-                2,
-                &["magikarp: xa ok"],
-            )
+            ..route("arcade-magikarp", &magikarp, 700_000_000, arcade_to(3, inner_ready + 400))
         });
     }
     Ok(routes)
@@ -303,17 +303,85 @@ fn require_xa_read(cd_log: &Path) -> Result<()> {
     bail!("{}: no XA music read (Setfilter then ReadS)", cd_log.display())
 }
 
+/// The executables on the pressed disc and the table, read once for every route.
+pub(crate) struct Disc {
+    pub(crate) rows: Vec<Row>,
+    pub(crate) exes: Vec<identity::DiscExe>,
+}
+
+impl Disc {
+    pub(crate) fn read(image: &Path) -> Result<Disc> {
+        let rows = read_rows(image)?;
+        let exes = identity::scan(image, &rows)?;
+        Ok(Disc { rows, exes })
+    }
+
+    /// Index of the launcher's executable: the first on the disc, ahead of every program.
+    pub(crate) fn launcher(&self) -> Result<usize> {
+        self.exes
+            .iter()
+            .position(|exe| exe.owner.is_none())
+            .ok_or_else(|| Error("no launcher executable ahead of the programs on the disc".into()))
+    }
+
+    /// Indices of the executables of the program called `name`, in disc order.
+    pub(crate) fn program(&self, name: &str) -> Result<Vec<usize>> {
+        let row = self
+            .rows
+            .iter()
+            .position(|row| row.name == name)
+            .ok_or_else(|| Error(format!("{name} is not on the disc")))?;
+        let found: Vec<usize> =
+            (0..self.exes.len()).filter(|&i| self.exes[i].owner == Some(row)).collect();
+        ensure!(!found.is_empty(), "{name}: no executable found in its part of the disc");
+        Ok(found)
+    }
+}
+
+/// What a stage has to find: the executables it may land in and the probes of each.
+type Candidates = (Vec<usize>, Vec<Vec<(u32, u32)>>);
+
+pub(crate) fn stage_candidates(disc: &Disc, program: &str, exe: Option<usize>) -> Result<Candidates> {
+    let mut indices = disc.program(program)?;
+    if let Some(at) = exe {
+        ensure!(at < indices.len(), "{program} has {} executables, not {}", indices.len(), at + 1);
+        indices = vec![indices[at]];
+    }
+    let sets = indices
+        .iter()
+        .map(|&i| identity::probes(&disc.exes, i))
+        .collect::<Result<Vec<_>>>()?;
+    Ok((indices, sets))
+}
+
 fn run_route(
     frontend: &Path,
     cue: &Path,
     output: &Path,
     route: &Route,
+    disc: &Disc,
+    expect_as: Option<&str>,
 ) -> Result<String> {
     let run_dir = output.join(route.name);
     fs::create_dir_all(&run_dir)?;
     let display = run_dir.join("final.ppm");
     let cd_log = run_dir.join("cd.csv");
-    let arguments: Vec<String> = vec![
+    let route_log = run_dir.join("route.csv");
+    let windows = run_dir.join("pc-windows.csv");
+    // What runs is read from the machine: words of RAM at the probe addresses of the launcher and
+    // of each stage's executables.
+    let launcher = disc.launcher()?;
+    let launcher_probes = identity::probes(&disc.exes, launcher)?;
+    let mut stages = Vec::new();
+    for stage in &route.stages {
+        let program = expect_as.unwrap_or(stage.program);
+        let (indices, sets) = stage_candidates(disc, program, stage.exe)?;
+        stages.push((stage, indices, sets));
+    }
+    let mut sets: Vec<&[(u32, u32)]> = vec![&launcher_probes];
+    sets.extend(stages.iter().flat_map(|(_, _, s)| s.iter().map(Vec::as_slice)));
+    let addresses: Vec<u32> = sets.iter().flat_map(|set| set.iter().map(|(a, _)| *a)).collect();
+    let mut arguments: Vec<String> = vec![
         "launch".into(),
         "--embedded-playtest".into(),
         "--config-dir".into(),
@@ -327,10 +395,14 @@ fn run_route(
         "--guest-debug-log".into(),
         "--cd-command-log".into(),
         cd_log.display().to_string(),
+        "--route-log".into(),
+        route_log.display().to_string(),
         "--dump-display".into(),
         display.display().to_string(),
         "--dump-hash".into(),
     ];
+    arguments.extend(identity::watch_args(&sets));
+    arguments.extend(identity::pc_window_args(&windows));
     let mut command_words = vec![frontend.display().to_string()];
     command_words.extend(arguments.iter().cloned());
     fs::write(
@@ -344,26 +416,47 @@ fn run_route(
     )?;
     let name = route.name;
     ensure!(code == 0, "{name}: frontend exited {code}\n{stdout}");
+    // A program built with a diagnostic feature may print its own panic; a shipping one cannot, so
+    // this is a bonus and nothing waits for it.
     for marker in FAILURE_MARKERS {
         ensure!(
             !stdout.contains(marker),
             "{name}: output contains failure marker {marker:?}"
         );
     }
-    ensure!(
-        stdout.matches("launcher: booted").count() == route.launcher_count,
-        "{name}: wrong launcher boot count"
-    );
-    ensure!(
-        stdout.matches("launcher: chain-loading").count() == route.launcher_count,
-        "{name}: wrong chain-load count"
-    );
-    for marker in &route.markers {
+    let ticks = identity::read_route(&route_log, &addresses)?;
+    let first_launch = route.stages.first().map_or(0, |stage| stage.after) as u64;
+    let launcher_exe = &disc.exes[launcher];
+    let launcher_pcs = identity::pc_samples_in(&windows, 0, |pc| launcher_exe.contains(pc))?;
+    let menu_flips = identity::launcher_booted(&ticks, &launcher_probes, first_launch, launcher_pcs)
+        .map_err(|e| Error(format!("{name}: {e}")))?;
+    let mut identities = Vec::new();
+    for (stage, indices, candidates) in &stages {
+        let program = expect_as.unwrap_or(stage.program);
+        let found = identity::chain_loaded(&ticks, &launcher_probes, candidates, stage.after as u64)
+            .map_err(|e| Error(format!("{name}: {program}: {e}")))?;
+        let exe = &disc.exes[indices[found.candidate]];
+        let in_code = identity::pc_samples_in(&windows, found.tick, |pc| exe.contains(pc))?;
         ensure!(
-            stdout.contains(marker),
-            "{name}: missing runtime marker {marker:?}"
+            in_code != 0,
+            "{name}: the PC was never sampled in the code of {program} after it became resident"
         );
+        let back = identity::pc_samples_in(&windows, found.tick + 10, |pc| {
+            launcher_exe.contains(pc) && !indices.iter().any(|&i| disc.exes[i].contains(pc))
+        })?;
+        ensure!(
+            stage.exe.is_some() || back == 0,
+            "{name}: the PC was sampled {back} times in the launcher's own code after {program} was loaded"
+        );
+        identities.push(format!(
+            "{program} exe-LBA {} ({}) resident at tick {} flips {}",
+            exe.lba,
+            exe.receipt.describe(),
+            found.tick,
+            found.flips
+        ));
     }
+    let identity_text = format!("launcher menu flips {menu_flips}; {}", identities.join("; "));
     let tick = pattern(
         &TICK_SUMMARY,
         r"tick=(\d+)\s+cycles=(\d+)\s+pc=(0x[0-9a-f]+)",
@@ -393,11 +486,11 @@ fn run_route(
     if route.xa_music {
         require_xa_read(&cd_log)?;
     }
-    Ok(format!("{name}: PASS {} pc={pc:#010x}", &summary[1]))
+    Ok(format!("{name}: PASS {} pc={pc:#010x} [{identity_text}]", &summary[1]))
 }
 
 pub fn run(raw: &[String]) -> Result<i32> {
-    let args = Args::parse(raw, &["frontend", "cue", "out", "jobs", "only"], &[])?;
+    let args = Args::parse(raw, &["frontend", "cue", "out", "jobs", "only", "expect-as"], &[])?;
     ensure!(
         args.positional.is_empty(),
         "unrecognized arguments: {}",
@@ -408,8 +501,11 @@ pub fn run(raw: &[String]) -> Result<i32> {
     let out = args.require_path("out")?;
     let jobs = args.int("jobs")?.unwrap_or(1).max(1) as usize;
 
-    let entries = read_rows(&cue_bin(&cue)?)?;
-    let mut selected = routes(&entries)?;
+    let disc = Disc::read(&cue_bin(&cue)?)?;
+    // A negative test: judge each route as if it should have landed in this program's code. It has
+    // to fail (the words of that program are not in RAM).
+    let expect_as = args.get("expect-as");
+    let mut selected = routes(&disc.rows)?;
     let wanted = args.all("only");
     if !wanted.is_empty() {
         selected.retain(|route| wanted.contains(&route.name));
@@ -438,7 +534,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
                     break;
                 };
                 // Report every failed route in one pass.
-                match run_route(&frontend, &cue, &out, route) {
+                match run_route(&frontend, &cue, &out, route, &disc, expect_as) {
                     Ok(line) => println!("{line}"),
                     Err(error) => {
                         let line = format!("{}: FAIL {error}", route.name);
@@ -583,7 +679,7 @@ mod tests {
         assert!(all.iter().all(|route| route.presses.contains(":cross:12")));
         let magikarp = all.last().unwrap();
         assert!(magikarp.xa_music);
-        assert_eq!(magikarp.launcher_count, 2);
+        assert_eq!(magikarp.stages.len(), 2);
         // A table missing a program cannot produce a route at all.
         let short = toc_rows(&table(&["VOXIDE"], false)).unwrap();
         assert!(routes(&short).is_err());

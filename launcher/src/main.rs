@@ -50,7 +50,7 @@ use music::Music;
 use playlist::Slot;
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
 use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, Port};
-use psx_rt::{tty, Peripherals};
+use psx_rt::Peripherals;
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, Spu, SpuAddr, Voice, Volume};
 use stick_nav::StickNav;
@@ -129,7 +129,6 @@ static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
 
 #[no_mangle]
 fn main() {
-    tty::println("launcher: booted");
     // The SDK caps presentation at 30 fps by default; the launcher keeps flipping every VBlank.
     psx_rt::interrupts::set_min_flip_vblanks(1);
 
@@ -152,9 +151,6 @@ fn main() {
     let mut reader = SectorReader::with_cd(peripherals.cd);
     let header = read_toc(&mut reader, &mut entries);
     let count = header.map_or(0, |h| h.count);
-    if count == 0 {
-        tty::println("launcher: no table of contents on this disc");
-    }
     let entries = &entries[..count];
 
     // Before the music starts, for the same reason the table is.
@@ -593,7 +589,6 @@ fn read_spectrum(reader: &mut SectorReader, header: Option<&Header>) -> u32 {
     let bytes = total as usize * disc_toc::SPECTRUM_BANDS;
     let sectors = bytes.div_ceil(SECTOR_WORDS * 4);
     if sectors > SPECTRUM_MAX_SECTORS {
-        tty::println("launcher: spectrum too large for the buffer, meter off");
         return 0;
     }
     // SAFETY: single-threaded, polled; only `main` reaches this static.

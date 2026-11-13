@@ -12,19 +12,16 @@
 # was retired on 2026-10-29: lineups have been the only real path since v0.45, and
 # the old path carried stale pins nobody could press from.
 
-.PHONY: help disc-tools disc-budget program-headless-check celeste-navigation-check loader launcher mkdisc check relocation-check chainload-probe clean
+.PHONY: help disc-tools disc-budget program-headless-check celeste-navigation-check loader launcher mkdisc check chainload-probe clean
 
 ROOT       := $(CURDIR)
 # The launcher, the loader and the host tools read the SDK and the engine (both live in
 # the SDK repository since 2026-11-08) straight from the pinned SDK submodule. The editor
-# repository is not a dependency of the disc; only `relocation-check` uses an editor
-# checkout, through EDITOR_TREE (it builds the editor's hello-pack disc).
-EDITOR_TREE ?=
+# repository is not a dependency of the disc.
 SDK        ?= $(ROOT)/games/PSoXide-sdk
 EMULATOR   ?= $(ROOT)/games/PSoXide-emulator
 BUILD      := $(ROOT)/build
 OUT        := $(BUILD)/mipsel-sony-psx/release
-EXAMPLES   := $(EDITOR_TREE)/build/examples/mipsel-sony-psx/release
 MKDISC     := $(ROOT)/tools/mkdisc/target/release/mkdisc
 DISC_TOOLS := $(ROOT)/tools/disc-tools/target/release/disc-tools
 
@@ -132,14 +129,7 @@ PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(i
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
 LOADER_EXE  := $(OUT)/loader.exe
-# DIAG=1 builds the debug launcher (psx-rt's host-tty on: the "launcher: booted" and
-# "launcher: chain-loading" lines the gates read) into its own target dir and presses it with
-# mkdisc --diag. The SDK counts host-tty as a diagnostic feature (sdk/docs/GATE.md), so a disc
-# that ships is built without DIAG and the receipt of the launcher says which one it is.
-DIAG ?=
-override DIAG := $(filter-out 0,$(DIAG))
-LAUNCHER_TARGET := $(if $(DIAG),$(BUILD)/diag,$(BUILD))
-LAUNCHER_EXE := $(LAUNCHER_TARGET)/mipsel-sony-psx/release/launcher.exe
+LAUNCHER_EXE := $(OUT)/launcher.exe
 
 help:
 	@echo "Release channels (VERSION=v0.NN names release/lineup-<VERSION>.json and -private.json):"
@@ -192,9 +182,9 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # The launcher embeds the blob, so it always rebuilds after it. The pad, the linker script and the
 # output format come from the crate (launcher/.cargo/config.toml and build.rs), because the build
 # driver refuses a RUSTFLAGS environment.
-LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private) $(if $(DIAG),host-tty))
+LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(LAUNCHER_TARGET) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) \
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) \
 		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
 
@@ -454,9 +444,9 @@ endif
 # The architecture gate (sdk/docs/GATE.md): mkdisc judges every executable it presses against the
 # pinned SDK's profile and the program's own psx-gate.toml. A lineup's GATE_ARGS (written by
 # `disc-tools lineup prepare` into lineup.mk) carry each program's file as it was at the revision
-# it was built from; DIAG=1 lets the debug launcher through.
+# it was built from. mkdisc refuses a diag receipt: nothing that ships has a diagnostic feature on.
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
-		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" $(GATE_ARGS) $(if $(DIAG),--diag) \
+		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" $(GATE_ARGS) \
 		$(ARCADE_ARGS) \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -574,34 +564,14 @@ check:
 sdk-on-main: components
 	@$(DISC_TOOLS) components --check-main
 
-# hello-pack streams WORLD.PAK off the disc and paints ALL PASS or a failure
-# list, which makes it the end-to-end test for the relocation machinery: its
-# image lands 200-odd sectors in, every LBA it was cooked with is wrong by that
-# much, and psx_io::disc_base has to make up the difference. Run the result
-# with the emulator and read the banner.
-relocation-check: launcher mkdisc
-	@test -n "$(EDITOR_TREE)" || { echo "relocation-check: set EDITOR_TREE to a PSoXide-editor checkout (its hello-pack disc is the test payload)"; exit 1; }
-	$(MAKE) -C $(EDITOR_TREE) hello-tri hello-pack-disc
-	@mkdir -p $(ROOT)/dist
-	$(MKDISC) --launcher $(LAUNCHER_EXE) --out $(ROOT)/dist/relocation.bin --volume PSXRELOC \
-		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" \
-		--game "HELLO TRI=$(EXAMPLES)/hello-tri.exe" \
-		--image "HELLO PACK=$(EXAMPLES)/hello-pack.cue"
-	@echo
-	@echo "Now: cd $(EDITOR_TREE)/emu && cargo run -p frontend --release -- launch \\"
-	@echo "       --path $(ROOT)/dist/relocation.cue --steps 200000000 \\"
-	@echo "       --press '250:right:8,320:cross:8' --dump-hw /tmp/relocation.ppm"
-	@echo "The dumped frame must read ALL PASS."
-
 # The chain loader must hand the CD drive over quiet: a plain Pause leaves its
 # second response (INT2, 1.2 to 3.9 million clocks later on the console) to land
 # in the next program. tools/chainload-probe is the payload that checks for it
 # after the launcher chain-loads it. FRONTEND must carry the emulator's silicon
 # Pause model (PSoXide-emulator dddd281 or later).
-chainload-probe: mkdisc
+chainload-probe: launcher mkdisc
 	@test -n "$(FRONTEND)" || { echo "chainload-probe: set FRONTEND to a psoxide-emulator with the silicon Pause model"; exit 1; }
-	$(MAKE) launcher DIAG=1
-	sh tools/chainload_probe.sh "$(BUILD)/diag/mipsel-sony-psx/release/launcher.exe" "$(FRONTEND)"
+	sh tools/chainload_probe.sh "$(LAUNCHER_EXE)" "$(FRONTEND)"
 
 clean:
 	rm -rf $(BUILD) $(ROOT)/dist

@@ -18,6 +18,7 @@ mod chainloads;
 mod components;
 mod deploy;
 mod icons;
+mod identity;
 mod install;
 mod label;
 mod lineup;

@@ -32,11 +32,6 @@ lto           = true
 # Public disc must not carry anywhere (`disc-tools public-only` scans for them).
 # The Makefile turns it on whenever a pressing includes one of them.
 private = []
-# The debug build: the launcher's TTY lines ("launcher: booted", "launcher: chain-loading", ...) that
-# `disc-tools programs` and `chainloads` read. The SDK counts psx-rt/host-tty as a diagnostic feature, so
-# an image built with it carries a diag receipt and mkdisc presses it only with --diag. A disc that
-# ships is built without it.
-host-tty = ["psx-rt/host-tty"]
 
 [dependencies]
 chainload-layout = { path = "../chainload-layout" }

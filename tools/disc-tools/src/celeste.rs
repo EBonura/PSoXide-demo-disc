@@ -16,7 +16,8 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use crate::args::Args;
-use crate::programs::{cue_bin, menu_presses, read_rows, FAILURE_MARKERS};
+use crate::identity;
+use crate::programs::{cue_bin, menu_presses, stage_candidates, Disc, FAILURE_MARKERS};
 use crate::replay::Ppm;
 use crate::util::{dumps, resolve, sha256_file, Error, Result};
 
@@ -241,6 +242,7 @@ struct Shared<'a> {
     out: &'a Path,
     prefix: &'a [String],
     launch: i64,
+    disc: &'a Disc,
 }
 
 fn run_case(shared: &Shared, case: Case) -> Result<Value> {
@@ -269,6 +271,14 @@ fn run_case(shared: &Shared, case: Case) -> Result<Value> {
         Suite::Basic => route(shared.prefix, shared.launch, cart, chord),
     };
     let last = checks.iter().map(|check| check.0).max().unwrap_or(0);
+    // Which program runs is read from RAM (see `identity`), not from a line the launcher prints.
+    let launcher = shared.disc.launcher()?;
+    let launcher_probes = identity::probes(&shared.disc.exes, launcher)?;
+    let (_, celeste_probes) = stage_candidates(shared.disc, "CELESTE COLLECTION", None)?;
+    let mut sets: Vec<&[(u32, u32)]> = vec![&launcher_probes];
+    sets.extend(celeste_probes.iter().map(Vec::as_slice));
+    let addresses: Vec<u32> = sets.iter().flat_map(|set| set.iter().map(|(a, _)| *a)).collect();
+    let route_log = folder.join("route.csv");
     let mut command = Command::new(shared.frontend);
     command
         .arg("--config-dir")
@@ -282,7 +292,10 @@ fn run_case(shared: &Shared, case: Case) -> Result<Value> {
         .arg(events.join(","))
         .arg("--route-screenshot-dir")
         .arg(&shots)
-        .args(["--route-screenshot-interval", "100", "--dump-hash"]);
+        .args(["--route-screenshot-interval", "100", "--dump-hash"])
+        .arg("--route-log")
+        .arg(&route_log)
+        .args(identity::watch_args(&sets));
     if digital {
         command.arg("--digital-pad");
     }
@@ -321,12 +334,30 @@ fn run_case(shared: &Shared, case: Case) -> Result<Value> {
     }
     // Exactly one outer chain-load: an accidental return to the demo
     // carousel and relaunch must not masquerade as a collection return.
-    let chainloads = log_text.matches("launcher: chain-loading").count();
+    let chained = identity::read_route(&route_log, &addresses).and_then(|ticks| {
+        identity::chain_loaded(&ticks, &launcher_probes, &celeste_probes, shared.launch as u64)
+    });
+    let chainloads = usize::from(chained.is_ok());
     let mut failures: Vec<String> = FAILURE_MARKERS
         .iter()
         .filter(|marker| log_text.contains(**marker))
         .map(|marker| marker.to_string())
         .collect();
+    // The disc needs an analog pad: with a digital one the launcher holds the menu on its notice
+    // and ignores the buttons, so the collection is not reachable and no route inside it can run.
+    // That is what a digital case checks: nothing was launched, the menu stayed up and kept moving.
+    if digital {
+        if chained.is_ok() {
+            failures.push("the launcher started a program with a digital pad".into());
+        }
+        let ticks = identity::read_route(&route_log, &addresses)?;
+        let menu = identity::launcher_booted(&ticks, &launcher_probes, u64::MAX, 1);
+        if let Err(error) = menu {
+            failures.push(format!("the menu did not stay up with a digital pad: {}", error.0));
+        }
+    } else if let Err(error) = &chained {
+        failures.push(format!("the collection did not chain-load once and stay: {}", error.0));
+    }
     if suite == Suite::Save {
         let data = fs::read(&card).unwrap_or_default();
         let has = |needle: &[u8]| data.windows(needle.len()).any(|window| window == needle);
@@ -335,9 +366,12 @@ fn run_case(shared: &Shared, case: Case) -> Result<Value> {
         }
     }
     let ok = rc == 0
-        && chainloads == 1
         && failures.is_empty()
-        && results.iter().all(|r| r["passed"] == json!(true));
+        && if digital {
+            chainloads == 0
+        } else {
+            chainloads == 1 && results.iter().all(|r| r["passed"] == json!(true))
+        };
     let result = json!({
         "name": name,
         "passed": ok,
@@ -370,8 +404,8 @@ pub fn run(raw: &[String]) -> Result<i32> {
     let cue = resolve(&args.require_path("cue")?)?;
     let out = args.require_path("out")?;
     let image = cue_bin(&cue)?;
-    let entries = read_rows(&image)?;
-    let (prefix, launch) = menu_presses(&entries, "CELESTE COLLECTION")?;
+    let disc = Disc::read(&image)?;
+    let (prefix, launch) = menu_presses(&disc.rows, "CELESTE COLLECTION")?;
     ensure!(
         !out.exists(),
         "{}: evidence directory already exists",
@@ -424,6 +458,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
         out: &out,
         prefix: &prefix,
         launch,
+        disc: &disc,
     };
     let next = AtomicUsize::new(0);
     let slots: Mutex<Vec<Option<Result<Value>>>> = Mutex::new(cases.iter().map(|_| None).collect());

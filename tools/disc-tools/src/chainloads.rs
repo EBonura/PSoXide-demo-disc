@@ -13,7 +13,8 @@ use std::sync::OnceLock;
 
 use crate::args::Args;
 use crate::disc::{self, USER_DATA_BYTES};
-use crate::programs::read_rows;
+use crate::identity;
+use crate::programs::{read_rows, stage_candidates, Disc};
 use crate::replay::{
     number, parse_int, pattern, run_merged, setloc_lba, stdout_core, Csv, Scratch,
 };
@@ -53,20 +54,8 @@ fn is_cortex(target: &str) -> bool {
     CORTEX_TARGETS.contains(&target)
 }
 
-/// Markers the target must print exactly once after the launcher's own two.
-fn target_markers(target: &str) -> &'static [&'static str] {
-    match target {
-        // cs-psx is built on hl-psx's renderer and keeps its log prefix.
-        "HALF-LIFE" | "COUNTER-STRIKE" => &["hl-psx: booting renderer"],
-        "QUAKE SHAREWARE" => &[
-            "quake-psx: all-Rust PSoXide boot",
-            "quake-psx: Rust Start map resident",
-        ],
-        _ => &[],
-    }
-}
-
-/// Output that fails the run if it appears at all.
+/// Output that fails the run if it appears at all. A shipping program prints nothing, so this only
+/// catches a program that was built to report its own panic: nothing waits for it.
 fn target_failures(target: &str) -> &'static [&'static str] {
     match target {
         "HALF-LIFE" | "COUNTER-STRIKE" => &[
@@ -150,6 +139,17 @@ fn threshold_gameplay(target: &str) -> Option<Threshold> {
             min_frames: HL_GAMEPLAY_MIN_FRAMES,
             min_hashes: HL_GAMEPLAY_MIN_HASHES,
             what: "textured train-ride gameplay",
+        }),
+        // Replaces the "Start map resident" line the shipping build no longer prints: the first
+        // map's textured world, measured 2026-11-13 on the library build (302 frames of 200 or more
+        // textured triangles, 279 distinct hashes, from route tick ~3000; the menu draws none).
+        "QUAKE SHAREWARE" => Some(Threshold {
+            triangles: 150,
+            quads: 0,
+            rects: 0,
+            min_frames: 100,
+            min_hashes: 50,
+            what: "textured start map",
         }),
         "COUNTER-STRIKE" => Some(Threshold {
             triangles: 150,
@@ -617,6 +617,8 @@ struct Replay {
     gpu: PathBuf,
     pc: PathBuf,
     display_ppm: PathBuf,
+    windows: PathBuf,
+    identity: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -628,6 +630,8 @@ fn run_once(
     steps: u64,
     root: &Path,
     label: &str,
+    disc: &Disc,
+    expect_as: Option<&str>,
 ) -> Result<Replay> {
     let run_dir = root.join(format!(
         "{}-{label}",
@@ -639,6 +643,17 @@ fn run_once(
     let gpu = run_dir.join("gpu.csv");
     let pc = run_dir.join("pc.csv");
     let display_ppm = run_dir.join("display.ppm");
+    let windows = run_dir.join("pc-windows.csv");
+    // What runs is read from the machine, not from anything a program prints: words of RAM at the
+    // probe addresses of the launcher and of the executables of the program (see `identity`).
+    let program = expect_as.unwrap_or(&target.name);
+    let launcher = disc.launcher()?;
+    let launcher_probes = identity::probes(&disc.exes, launcher)?;
+    let (indices, candidates) = stage_candidates(disc, program, None)?;
+    let mut sets: Vec<&[(u32, u32)]> = vec![&launcher_probes];
+    sets.extend(candidates.iter().map(Vec::as_slice));
+    let addresses: Vec<u32> = sets.iter().flat_map(|set| set.iter().map(|(a, _)| *a)).collect();
+    let launch_tick = launcher_route(target.visible_index).1 as u64;
     let mut command = Command::new(frontend);
     command
         .args(["launch", "--embedded-playtest", "--path"])
@@ -657,20 +672,30 @@ fn run_once(
         .arg(&pc)
         .arg("--dump-display")
         .arg(&display_ppm)
-        .arg("--dump-hash");
+        .arg("--dump-hash")
+        .args(identity::watch_args(&sets))
+        .args(identity::pc_window_args(&windows));
     let (code, stdout) = run_merged(&mut command, &root.join(format!("{label}.out")), None)?;
     let name = &target.name;
     ensure!(code == 0, "{name} {label} failed:\n{stdout}");
-    let launcher = ["launcher: booted", "launcher: chain-loading"];
-    for marker in launcher
-        .into_iter()
-        .chain(target_markers(name).iter().copied())
-    {
-        ensure!(
-            stdout.matches(marker).count() == 1,
-            "{name}: expected one {marker:?}"
-        );
-    }
+    let ticks = identity::read_route(&route_log, &addresses)?;
+    let launcher_exe = &disc.exes[launcher];
+    let launcher_pcs = identity::pc_samples_in(&windows, 0, |pc| launcher_exe.contains(pc))?;
+    identity::launcher_booted(&ticks, &launcher_probes, launch_tick, launcher_pcs)
+        .map_err(|e| Error(format!("{name}: {e}")))?;
+    let chained = identity::chain_loaded(&ticks, &launcher_probes, &candidates, launch_tick)
+        .map_err(|e| Error(format!("{name}: {program}: {e}")))?;
+    let resident = &disc.exes[indices[chained.candidate]];
+    ensure!(
+        identity::pc_samples_in(&windows, chained.tick, |pc| resident.contains(pc))? != 0,
+        "{name}: the PC was never sampled in the code of {program} after it became resident"
+    );
+    // The launcher's range overlaps the program's, so only code that is the launcher's and not the
+    // program's counts as the launcher running again.
+    let back = identity::pc_samples_in(&windows, chained.tick + 10, |pc| {
+        launcher_exe.contains(pc) && !indices.iter().any(|&i| disc.exes[i].contains(pc))
+    })?;
+    ensure!(back == 0, "{name}: the PC was sampled {back} times in the launcher's own code after {program} was loaded");
     for marker in target_failures(name) {
         ensure!(
             !stdout.contains(marker),
@@ -740,6 +765,14 @@ fn run_once(
         gpu,
         pc,
         display_ppm,
+        windows,
+        identity: format!(
+            "exe-LBA {} ({}) resident at tick {} flips {}",
+            resident.lba,
+            resident.receipt.describe(),
+            chained.tick,
+            chained.flips
+        ),
     })
 }
 
@@ -815,6 +848,7 @@ fn compare(first: &Replay, second: &Replay, target: &str) -> Result<()> {
         ("cd", &first.cd, &second.cd),
         ("gpu", &first.gpu, &second.gpu),
         ("pc", &first.pc, &second.pc),
+        ("pc windows", &first.windows, &second.windows),
         ("display_ppm", &first.display_ppm, &second.display_ppm),
     ];
     for (key, a, b) in logs {
@@ -829,7 +863,7 @@ fn compare(first: &Replay, second: &Replay, target: &str) -> Result<()> {
 pub fn run(raw: &[String]) -> Result<i32> {
     let args = Args::parse(
         raw,
-        &["frontend", "cue", "steps", "target", "artifact-dir"],
+        &["frontend", "cue", "steps", "target", "artifact-dir", "expect-as"],
         &[],
     )?;
     ensure!(
@@ -853,6 +887,10 @@ pub fn run(raw: &[String]) -> Result<i32> {
     let cue = resolve(&args.require_path("cue")?)?;
     let image = disc::image_for_cue(&cue)?;
     let (entries, menu) = parse_toc(&image)?;
+    let disc = Disc::read(&image)?;
+    // A negative test: judge every target as if it should have landed in this program's code. It has
+    // to fail.
+    let expect_as = args.get("expect-as");
     // With no --target: the core entries plus every optional one pressed.
     let mut targets: Vec<String> = args.all("target").iter().map(|t| t.to_string()).collect();
     if targets.is_empty() {
@@ -902,6 +940,8 @@ pub fn run(raw: &[String]) -> Result<i32> {
             steps,
             &root,
             "first",
+            &disc,
+            expect_as,
         )?;
         let second = run_once(
             &frontend,
@@ -911,13 +951,15 @@ pub fn run(raw: &[String]) -> Result<i32> {
             steps,
             &root,
             "second",
+            &disc,
+            expect_as,
         )?;
         compare(&first, &second, name)?;
         let (commands, runtime_lba) = cd_evidence(&first.cd, entry, exe)?;
         println!(
             "{name}: PASS route={} version={} EXE-LBA={} image-LBA={} payload-FNV={:#010x} \
              PC={:#010x} samples={} CD={commands} runtime-read={} VRAM={} display={} \
-             gameplay={}/{} hashes={} geometry-edge={}permille",
+             gameplay={}/{} hashes={} geometry-edge={}permille [{}]",
             route_for(name, entry.visible_index),
             if entry.version.is_empty() {
                 "-"
@@ -936,6 +978,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
             first.gameplay.sustained,
             first.gameplay.hashes,
             first.geometry_edge_permille,
+            first.identity,
         );
     }
     println!("all release-critical chain-load replays are byte-deterministic");
@@ -1193,6 +1236,8 @@ mod tests {
             gpu: logs[2].clone(),
             pc: logs[3].clone(),
             display_ppm: logs[4].clone(),
+            windows: logs[3].clone(),
+            identity: String::new(),
         };
         compare(&replay, &replay.clone(), "T").unwrap();
         let mut other = replay.clone();
