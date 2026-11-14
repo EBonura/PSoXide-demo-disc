@@ -84,6 +84,9 @@ HWT ?=
 # (make lineup-disc ... CITADEL=1) and is on the Private edition only. Cortex Ignition
 # 0.4b, the old engine, is on both editions.
 CITADEL ?=
+# 360X and QD Up ride the lineup pressings only (make lineup-disc ... RESTORED=1) and are
+# on the Private edition only. They are taken as built, like every other lineup input.
+RESTORED ?=
 # Ocarina of Time rides the lineup pressings only (make lineup-disc ... OOT=1):
 # it is built from the owner's own ROM in its own repository, has no submodule
 # here, and is on the Private edition only.
@@ -96,7 +99,8 @@ override WO := $(filter-out 0,$(WO))
 override HWT := $(filter-out 0,$(HWT))
 override OOT := $(filter-out 0,$(OOT))
 override CITADEL := $(filter-out 0,$(CITADEL))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL))
+override RESTORED := $(filter-out 0,$(RESTORED))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL)$(RESTORED))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -124,7 +128,7 @@ endif
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0) CITADEL=$(if $(CITADEL),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0) CITADEL=$(if $(CITADEL),1,0) RESTORED=$(if $(RESTORED),1,0)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
@@ -266,6 +270,17 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 
+# 360X and QD Up have no cover art or menu backdrops yet: the launcher shows them with its
+# plain cover and the blurb below, and starts them like any other program.
+ifneq ($(RESTORED),)
+X360_ARGS = --image "360X=$(X360)" \
+	--version-of "360X=$(V_X360)" \
+	--describe "360X=A restored game for the original PlayStation.|Un gioco restaurato per la prima PlayStation."
+QDUP_ARGS = --image "QD UP=$(QDUP)" \
+	--version-of "QD UP=$(V_QDUP)" \
+	--describe "QD UP=A restored game for the original PlayStation.|Un gioco restaurato per la prima PlayStation."
+endif
+
 # Cortex Ignition's blurb, as in the launcher's cover table: the Public edition has one
 # Cortex and says what it is; the Private edition carries the new-engine test too and
 # says which engine this one is.
@@ -321,13 +336,14 @@ PUBLIC_LINEUP  ?= release/lineup-$(VERSION).json
 PRIVATE_LINEUP ?= release/lineup-$(VERSION)-private.json
 PUBLIC_DIST  = $(PRESS_ROOT)/$(VERSION)/public
 PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
-# What the Private disc carries since v0.52: Half-Life, Hollow Knight, WipEout and
-# Ocarina of Time on top of the shared programs (and from v0.54 both Cortex engines:
-# CITADEL=1 adds the new-engine test beside Cortex Ignition 0.4b), no Arcade or PSXcel, no Counter-Strike
-# and no hardware tests. It is pressed for an 80-minute blank (359844 sectors) with a
-# 4500 sector zero filler after the last program, so all game data ends well inside
-# the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+# What the Private disc carries: Half-Life, Hollow Knight, WipEout and Ocarina of Time on
+# top of the shared programs, no Arcade or PSXcel, no Counter-Strike and no hardware tests.
+# From v0.56 it also carries 360X and QD Up (RESTORED=1) and only the old-engine Cortex
+# Ignition 0.4b (CITADEL=0). The v0.54 and v0.55 lineups list Cortex Citadel and no
+# restored games: re-press them with CITADEL=1 RESTORED=0 on the command line. It is
+# pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
+# the last program, so all game data ends well inside the radius the console reads cleanly.
+PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
@@ -459,6 +475,8 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(QUAKE_ARGS) \
 		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
 		$(CITADEL_ARGS) \
+		$(X360_ARGS) \
+		$(QDUP_ARGS) \
 		$(HWT_ARGS) \
 		$(PSXCEL_ARGS) \
 		$(foreach t,$(MENU_XA),--menu-xa "$(t)") \
@@ -538,7 +556,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)$(if $(LEAVE_OUT), LEAVE_OUT='$(LEAVE_OUT)')" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(HWT),,--omit "HARDWARE TESTS") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(RESTORED),,--omit "360X" --omit "QD UP") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 

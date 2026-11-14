@@ -112,7 +112,8 @@ fn cortex_citadel_follows_cortex_ignition() {
 }
 
 /// The Citadel test is Private only: its Makefile block is chosen by a flag
-/// that the Private channel sets and the Public channel does not.
+/// that the Private channel sets (1 on the pressings that carry it, 0 on the
+/// ones that do not) and the Public channel does not.
 #[test]
 fn cortex_citadel_is_pressed_by_the_private_channel_only() {
     let makefile = read(repo_root().join("Makefile"));
@@ -120,7 +121,10 @@ fn cortex_citadel_is_pressed_by_the_private_channel_only() {
         .lines()
         .find(|l| l.starts_with("PRIVATE_PRESS_FLAGS"))
         .expect("the Private channel's flags");
-    assert!(flags.split_whitespace().any(|f| f == "CITADEL=1"), "{flags}");
+    assert!(
+        flags.split_whitespace().any(|f| f == "CITADEL=1" || f == "CITADEL=0"),
+        "{flags}"
+    );
     let public: Vec<&str> = makefile
         .lines()
         .skip_while(|l| !l.starts_with("press-public:"))
@@ -129,9 +133,37 @@ fn cortex_citadel_is_pressed_by_the_private_channel_only() {
     assert!(!public.is_empty() && !public.iter().any(|l| l.contains("CITADEL")), "{public:?}");
     // A flagged pressing is Private (the launcher gets its `private` feature).
     assert!(
-        makefile.contains("PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL))"),
+        makefile.contains("$(OOT)$(CITADEL)"),
         "CITADEL must make a pressing Private"
     );
+}
+
+/// 360X and QD Up are Private only, like the Citadel test: their blocks are
+/// chosen by a flag the Private channel sets and the Public channel does not,
+/// the flag makes a pressing Private, and they follow the Cortex entries.
+#[test]
+fn the_restored_games_are_pressed_by_the_private_channel_only() {
+    let makefile = read(repo_root().join("Makefile"));
+    let flags = makefile
+        .lines()
+        .find(|l| l.starts_with("PRIVATE_PRESS_FLAGS"))
+        .expect("the Private channel's flags");
+    assert!(flags.split_whitespace().any(|f| f == "RESTORED=1"), "{flags}");
+    let public: Vec<&str> = makefile
+        .lines()
+        .skip_while(|l| !l.starts_with("press-public:"))
+        .take_while(|l| !l.starts_with("press-private:"))
+        .collect();
+    assert!(!public.is_empty() && !public.iter().any(|l| l.contains("RESTORED")), "{public:?}");
+    assert!(
+        makefile.contains("$(CITADEL)$(RESTORED))"),
+        "RESTORED must make a pressing Private"
+    );
+    let order = pressed_order();
+    let at = |name: &str| order.iter().position(|n| n == name);
+    let ignition = at("CORTEX IGNITION").expect("Cortex Ignition is pressed");
+    assert!(at("360X").expect("360X is pressed") > ignition, "{order:?}");
+    assert_eq!(at("QD UP"), at("360X").map(|i| i + 1), "{order:?}");
 }
 
 /// No Public lineup file names the new engine, and each Public lineup's Cortex
@@ -147,6 +179,9 @@ fn no_public_lineup_names_cortex_citadel() {
         }
         let text = read(path);
         assert!(!text.to_uppercase().contains("CITADEL"), "{name} names the new engine");
+        for private_only in ["\"360X\"", "\"QD UP\""] {
+            assert!(!text.contains(private_only), "{name} names {private_only}");
+        }
     }
 }
 

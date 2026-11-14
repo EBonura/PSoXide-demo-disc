@@ -471,7 +471,7 @@ See [the repository map](docs/repositories.md) for ownership and dependencies.
 One release is one `VERSION` (`v0.NN`) and a lineup pair,
 `release/lineup-<VERSION>.json` (Public, for itch) and
 `release/lineup-<VERSION>-private.json` (Private, the disc that is burned; Half-Life,
-Hollow Knight, WipEout and Ocarina of Time ride only here, and the Public edition is
+Hollow Knight, WipEout, Ocarina of Time, 360X and QD Up ride only here, and the Public edition is
 never burned). One Make target per step replaces the old wrapper scripts:
 
 ```sh
@@ -496,7 +496,8 @@ the last program; `mkdisc` fails with each program's share when a layout is over
 writing an image.
 
 The optional programs of a lineup are chosen with flags (`HL=1 CS=1 HK=1 WO=1 OOT=1
-HWT=1`, each independent); any flag makes the pressing Private. The disc name
+HWT=1 CITADEL=1 RESTORED=1`, each independent; `RESTORED=1` adds 360X and QD Up, which have no
+cover art yet and show with the launcher's plain cover); any flag makes the pressing Private. The disc name
 gains `HL` when it carries Half-Life. `LEAVE_OUT="ARCADE PSXCEL"` drops those
 entries with their shots, version and description.
 
