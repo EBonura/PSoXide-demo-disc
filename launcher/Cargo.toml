@@ -42,6 +42,7 @@ psx-rt   = { path = "../games/PSoXide-sdk/sdk/crates/psx-rt" }
 psx-vram = { path = "../games/PSoXide-sdk/sdk/crates/psx-vram" }
 psx-math = { path = "../games/PSoXide-sdk/sdk/crates/psx-math" }
 psx-io   = { path = "../games/PSoXide-sdk/sdk/crates/psx-io" }
+psx-tick = { path = "../games/PSoXide-sdk/sdk/crates/psx-tick" }
 psx-spu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-spu" }
 stick-nav = { path = "stick-nav" }
 psx-sfx  = { path = "../games/PSoXide-sdk/sdk/crates/psx-sfx" }
