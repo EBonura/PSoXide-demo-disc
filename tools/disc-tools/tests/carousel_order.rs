@@ -24,7 +24,7 @@ fn read(path: PathBuf) -> String {
 /// optional `*_ARGS` block expanded as if its flag were set.
 fn pressed_order() -> Vec<String> {
     let makefile = read(repo_root().join("Makefile"));
-    let block_name = Regex::new(r#"(?m)^([A-Z_]+_ARGS) = --(?:game|image) "([^=]+)="#).unwrap();
+    let block_name = Regex::new(r#"(?m)^([A-Z0-9_]+_ARGS) = --(?:game|image) "([^=]+)="#).unwrap();
     let optional: Vec<(String, String)> = block_name
         .captures_iter(&makefile)
         .map(|c| (c[1].to_string(), c[2].to_string()))
@@ -42,7 +42,7 @@ fn pressed_order() -> Vec<String> {
         }
     }
 
-    let token = Regex::new(r#"--(?:game|image) "([^=]+)=|\$\(([A-Z_]+_ARGS)\)"#).unwrap();
+    let token = Regex::new(r#"--(?:game|image) "([^=]+)=|\$\(([A-Z0-9_]+_ARGS)\)"#).unwrap();
     let mut order = Vec::new();
     for c in token.captures_iter(&block) {
         if let Some(name) = c.get(1) {
