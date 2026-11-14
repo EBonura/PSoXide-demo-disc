@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.56-private",
-  "note": "PSoXide Demo Disc v0.56, private edition (local, never published or distributed), all XA: no CD-DA track. Every program is the library build of 2026-11-14, and the two restored games, 360X and QD Up, ride the Private disc. Cortex Ignition 0.4b is the only Cortex: the editor test build Cortex Citadel is not on this pressing. The launcher is built on SDK 091551541eee. Left out: Arcade, PSXcel, Counter-Strike and the hardware tests.",
+  "note": "PSoXide Demo Disc v0.56, private edition (local, never published or distributed), all XA: no CD-DA track. Every program is the library build of 2026-11-14, and the two restored games, 360X and QD Up, ride the Private disc. No Cortex program is on this pressing. The launcher is built on SDK 091551541eee. Left out: Arcade, PSXcel, Counter-Strike and the hardware tests.",
   "programs": [
     {
       "name": "CELESTE COLLECTION",
@@ -150,24 +150,6 @@
       },
       "build": "library install of 2026-11-14 (Quake (quake-psx).provenance.json): quake-psx main fc042ad, shareware 1.06 data, XA music, one data track, gate receipt stamped.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/quake/Quake (quake-psx).provenance.json"
-    },
-    {
-      "name": "CORTEX IGNITION",
-      "var": "CORTEX_CURRENT",
-      "version_var": "V_CORTEX_CURRENT",
-      "kind": "image",
-      "bin_sha256": "e5f21606d0f581fd35c9f73bc3c06cf21337d8f468055f55248d65672c4421f1",
-      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/cortex-ignition/Cortex Ignition 0.4b.cue",
-      "cue_sha256": "f1a995efcfedc9936ede9d3d7bfa2b25fd40f46dc803d6e2b37ac98fc299fb07",
-      "version": "0.4b",
-      "source": {
-        "repository": "EBonura/cortex-ignition-psx",
-        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/cortex-ignition.git",
-        "revision": "62949bc76c833286d87f69ca394f5dffaec4f918",
-        "ref": "main"
-      },
-      "build": "library install of 2026-11-14 (Cortex Ignition 0.4b.provenance.json): the old-engine 0.4b game on SDK main 9bb3045bdd63, psoxide-pgo apply, gate receipt stamped. Replaces the editor build Cortex Citadel on this pressing. The record says it has not yet run on a console.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/cortex-ignition/Cortex Ignition 0.4b.provenance.json"
     },
     {
       "name": "360X",

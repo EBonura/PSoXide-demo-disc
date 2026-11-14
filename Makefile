@@ -84,6 +84,9 @@ HWT ?=
 # (make lineup-disc ... CITADEL=1) and is on the Private edition only. Cortex Ignition
 # 0.4b, the old engine, is on both editions.
 CITADEL ?=
+# Cortex Ignition 0.4b is on by default (the Public edition has always carried it) and off on the
+# Private channel from v0.56 (CORTEX=0): the Private lineup then lists no Cortex row.
+CORTEX ?= 1
 # 360X and QD Up ride the lineup pressings only (make lineup-disc ... RESTORED=1) and are
 # on the Private edition only. They are taken as built, like every other lineup input.
 RESTORED ?=
@@ -100,6 +103,7 @@ override HWT := $(filter-out 0,$(HWT))
 override OOT := $(filter-out 0,$(OOT))
 override CITADEL := $(filter-out 0,$(CITADEL))
 override RESTORED := $(filter-out 0,$(RESTORED))
+override CORTEX := $(filter-out 0,$(CORTEX))
 PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL)$(RESTORED))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
@@ -128,7 +132,7 @@ endif
 PSOXIDE_LIB ?= $(HOME)/Downloads/ps1 games
 DIST ?= $(PSOXIDE_LIB)
 RELEASE_RECEIPT ?= $(DIST)/$(DISC_NAME).release-receipt.json
-PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0) CITADEL=$(if $(CITADEL),1,0) RESTORED=$(if $(RESTORED),1,0)
+PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(if $(WO),1,0) HWT=$(if $(HWT),1,0) OOT=$(if $(OOT),1,0) CITADEL=$(if $(CITADEL),1,0) RESTORED=$(if $(RESTORED),1,0) CORTEX=$(if $(CORTEX),1,0)
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
@@ -281,6 +285,14 @@ QDUP_ARGS = --image "QD UP=$(QDUP)" \
 	--describe "QD UP=A restored game for the original PlayStation.|Un gioco restaurato per la prima PlayStation."
 endif
 
+ifneq ($(CORTEX),)
+CORTEX_ARGS = --image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+	--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-menu.shot" \
+	--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-gameplay.shot" \
+	--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
+	--describe "CORTEX IGNITION=$(if $(PRIVATE),$(CORTEX_OLD_DESC),$(CORTEX_ONLY_DESC))"
+endif
+
 # Cortex Ignition's blurb, as in the launcher's cover table: the Public edition has one
 # Cortex and says what it is; the Private edition carries the new-engine test too and
 # says which engine this one is.
@@ -338,12 +350,12 @@ PUBLIC_DIST  = $(PRESS_ROOT)/$(VERSION)/public
 PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # What the Private disc carries: Half-Life, Hollow Knight, WipEout and Ocarina of Time on
 # top of the shared programs, no Arcade or PSXcel, no Counter-Strike and no hardware tests.
-# From v0.56 it also carries 360X and QD Up (RESTORED=1) and only the old-engine Cortex
-# Ignition 0.4b (CITADEL=0). The v0.54 and v0.55 lineups list Cortex Citadel and no
-# restored games: re-press them with CITADEL=1 RESTORED=0 on the command line. It is
+# From v0.56 it also carries 360X and QD Up (RESTORED=1) and no Cortex at all
+# (CORTEX=0 CITADEL=0). The v0.54 and v0.55 lineups list the Cortex programs and no
+# restored games: re-press them with CORTEX=1 CITADEL=1 RESTORED=0 on the command line. It is
 # pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
 # the last program, so all game data ends well inside the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 CORTEX=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
@@ -417,7 +429,7 @@ release-public: need-version $(DISC_TOOLS)
 # pixels always come from the PNGs actually in the repo.
 SHOTS_SRC := $(ROOT)/assets/shots
 SHOTS_OUT := $(BUILD)/shots
-SHOT_NAMES := cortex-current-menu cortex-current-gameplay \
+SHOT_NAMES := $(if $(CORTEX),cortex-current-menu cortex-current-gameplay) \
               voxide-day voxide-night nitroxide-boost \
               nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
               psxcel-editing breakout breakout2 invaders \
@@ -473,7 +485,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(HL_ARGS) \
 		$(OOT_ARGS) \
 		$(QUAKE_ARGS) \
-		--image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
+		$(CORTEX_ARGS) \
 		$(CITADEL_ARGS) \
 		$(X360_ARGS) \
 		$(QDUP_ARGS) \
@@ -485,8 +497,6 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--menu-title "JUNGLE 2 A" --menu-title "JUNGLE 2 B" \
 		--menu-title "JUNGLE DNB A" --menu-title "JUNGLE DNB B" \
 		--credit "$(MENU_CREDIT)" \
-		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-menu.shot" \
-		--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-gameplay.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-day.shot" \
 		--shot "VOXIDE=$(SHOTS_OUT)/voxide-night.shot" \
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-boost.shot" \
@@ -494,11 +504,9 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-goal.shot" \
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste.shot" \
 		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste2.shot" \
-		--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
-		--describe "CORTEX IGNITION=$(if $(PRIVATE),$(CORTEX_OLD_DESC),$(CORTEX_ONLY_DESC))" \
 		--describe "VOXIDE=A Minecraft clone built for the original PlayStation. This is an early playable build: world generation, mining, crafting and survival work.|Un clone di Minecraft per la prima PlayStation. Prima versione giocabile: generazione del mondo, scavo, crafting e sopravvivenza funzionano." \
 		--describe "NITROXIDE=A Rocket League clone built for the original PlayStation. Supports 2 players in split screen.|Un clone di Rocket League per la prima PlayStation. Supporta 2 giocatori a schermo diviso." \
 		--describe "CELESTE COLLECTION=Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.|I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation." \
@@ -556,7 +564,7 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
 		--cue "$(DIST)/$(DISC_NAME).cue" --frontend "$(FRONTEND)" \
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)$(if $(LEAVE_OUT), LEAVE_OUT='$(LEAVE_OUT)')" \
-		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(RESTORED),,--omit "360X" --omit "QD UP") $(if $(HWT),,--omit "HARDWARE TESTS") \
+		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(RESTORED),,--omit "360X" --omit "QD UP") $(if $(CORTEX),,--omit "CORTEX IGNITION") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
 		--components-out "$(DIST)/$(DISC_NAME).components.json"
 
