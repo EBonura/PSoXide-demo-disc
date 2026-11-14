@@ -564,3 +564,14 @@ When a game gets a new build, the re-run is:
 
 Source snapshot **2026.09.05**: Documented the SDK, engine/editor, emulator and game revision pins used by the disc.
 See the [changelog](CHANGELOG.md) for the remaining changes and published download versions.
+
+## Maintenance notes: Cortex is off the disc
+
+No Cortex program is pressed since v0.56 (`CORTEX` and `CITADEL` default to off; the v0.54 and v0.55 Private
+lineups and every Public lineup up to v0.53 still list them and need `CORTEX=1` or `CITADEL=1` to re-press). Left in
+place, unused and removable together: the `CORTEX IGNITION` and `CORTEX CITADEL` entries of `launcher/src/cover.rs`
+with their art (`launcher/assets/art_{l,m,s}_{cortex,citadel}.art`, `back_{cortex,citadel}.art`), the shots
+`assets/shots/cortex-*.png`, the `CORTEX_ARGS` and `CITADEL_ARGS` blocks and `CORTEX_*_DESC` in the Makefile, the
+Cortex entries of `tools/disc-tools/src/chainloads.rs` (both optional targets) and the Public Cortex gate in
+`tools/disc-tools/src/lineup.rs`, the Cortex line of `PRESSED_PROGRAMS` in `tools/mkdisc/src/main.rs`, and the Cortex
+cases in `tools/menu-art`.

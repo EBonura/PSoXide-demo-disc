@@ -84,9 +84,9 @@ HWT ?=
 # (make lineup-disc ... CITADEL=1) and is on the Private edition only. Cortex Ignition
 # 0.4b, the old engine, is on both editions.
 CITADEL ?=
-# Cortex Ignition 0.4b is on by default (the Public edition has always carried it) and off on the
-# Private channel from v0.56 (CORTEX=0): the Private lineup then lists no Cortex row.
-CORTEX ?= 1
+# Cortex Ignition 0.4b is off by default since v0.56 (the owner's decision of 2026-11-14: no Cortex on
+# the demo disc). A lineup that lists it (v0.54 and v0.55 Private, every Public one up to v0.53) needs CORTEX=1.
+CORTEX ?=
 # 360X and QD Up ride the lineup pressings only (make lineup-disc ... RESTORED=1) and are
 # on the Private edition only. They are taken as built, like every other lineup input.
 RESTORED ?=
@@ -275,14 +275,14 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 
 # 360X and QD Up have no cover art or menu backdrops yet: the launcher shows them with its
-# plain cover and the blurb below, and starts them like any other program.
+# plain cover and no blurb, and starts them like any other program.
 ifneq ($(RESTORED),)
 X360_ARGS = --image "360X=$(X360)" \
 	--version-of "360X=$(V_X360)" \
-	--describe "360X=A restored game for the original PlayStation.|Un gioco restaurato per la prima PlayStation."
+	--describe "360X=|"
 QDUP_ARGS = --image "QD UP=$(QDUP)" \
 	--version-of "QD UP=$(V_QDUP)" \
-	--describe "QD UP=A restored game for the original PlayStation.|Un gioco restaurato per la prima PlayStation."
+	--describe "QD UP=|"
 endif
 
 ifneq ($(CORTEX),)
@@ -351,11 +351,11 @@ PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # What the Private disc carries: Half-Life, Hollow Knight, WipEout and Ocarina of Time on
 # top of the shared programs, no Arcade or PSXcel, no Counter-Strike and no hardware tests.
 # From v0.56 it also carries 360X and QD Up (RESTORED=1) and no Cortex at all
-# (CORTEX=0 CITADEL=0). The v0.54 and v0.55 lineups list the Cortex programs and no
+# (the defaults). The v0.54 and v0.55 lineups list the Cortex programs and no
 # restored games: re-press them with CORTEX=1 CITADEL=1 RESTORED=0 on the command line. It is
 # pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
 # the last program, so all game data ends well inside the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 CORTEX=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public

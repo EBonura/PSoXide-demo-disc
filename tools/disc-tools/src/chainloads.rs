@@ -21,10 +21,11 @@ use crate::replay::{
 use crate::util::{fnv1a32, resolve, sha256_file, Error, Result};
 
 const DEFAULT_STEPS: u64 = 700_000_000;
-/// Every pressing carries the core entries; the Private flags add the others.
-/// Cortex Ignition (the old engine, 0.4b) is on both editions.
-const CORE_TARGETS: [&str; 2] = ["CORTEX IGNITION", "QUAKE SHAREWARE"];
-const OPTIONAL_TARGETS: [&str; 6] = [
+/// Every pressing carries the core entries; the flags add the others. No Cortex program is on the
+/// disc since v0.56 (the owner's decision of 2026-11-14), so both Cortex entries are optional.
+const CORE_TARGETS: [&str; 1] = ["QUAKE SHAREWARE"];
+const OPTIONAL_TARGETS: [&str; 7] = [
+    "CORTEX IGNITION",
     "HALF-LIFE",
     "COUNTER-STRIKE",
     "HOLLOW KNIGHT",
@@ -1080,8 +1081,9 @@ mod tests {
             assert_eq!(TARGETS.iter().filter(|t| *t == target).count(), 1, "{target}");
         }
         assert_eq!(TARGETS.len(), CORE_TARGETS.len() + OPTIONAL_TARGETS.len());
-        // The old engine rides every pressing; the Citadel test is Private only.
-        assert!(CORE_TARGETS.contains(&"CORTEX IGNITION"));
+        // Both Cortex programs are optional: a pressing may carry neither.
+        assert!(OPTIONAL_TARGETS.contains(&"CORTEX IGNITION"));
+        assert!(!CORE_TARGETS.contains(&"CORTEX IGNITION"));
         assert!(OPTIONAL_TARGETS.contains(&"CORTEX CITADEL"));
         assert!(!CORE_TARGETS.contains(&"CORTEX CITADEL"));
         for target in CORTEX_TARGETS {
