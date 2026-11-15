@@ -200,3 +200,19 @@ https://www.youtube.com/@magikAAAAArp/videos
 Included with the band's permission. Individual games retain their own credits.
 
 Bonnie Studios: https://bonnie-studios.itch.io
+
+v0.53 Public inputs (lost, and what is recoverable)
+---------------------------------------------------
+lineup-v0.53.json can no longer be re-pressed: under release-inputs/v0.53 the v0.52 disc
+(from-v0.52/PSoXide Demo Disc v0.52.bin, sha256 2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86,
+334,080,432 B), nitroxide/NitroXide.bin (sha256 5af2a43bb3bc...) and quake/Quake (quake-psx).bin
+(sha256 366d5f4ef09b...) are gone and no copy exists. tools/disc-tools/tests/lineup_current.rs lists the
+lineup as RETIRED, so it gets the structural check only and the test prints what is missing.
+
+The two rows that lift out of the v0.52 disc are recoverable from the pressed v0.53 disc
+(sha256 3262ba2ff6e843428475eb61e89666cf15812f09f24087cdd7f7a607ed333f85), as raw 2352-byte sector slices
+(dd bs=2352 skip=LBA count=SECTORS), verified by hash against the lineup rows:
+  PSOXIDE ARCADE   lba 36166   sectors 18097   sha256 fcf15245d3aa7eac2eb5ccd8cd24e1881996c674ac3173643c011f01eca62eca
+  CORTEX IGNITION  lba 134965  sectors 7076    sha256 18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df
+(The v0.52 and v0.53 discs share these ranges.) NitroXide and Quake are NOT recoverable this way: the pressing
+relocates those images, so their v0.53 slices do not hash to the lineup inputs; they would need a rebuild.
