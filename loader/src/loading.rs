@@ -18,6 +18,7 @@
 //!
 //! Interrupts stay off throughout, as in the rest of the blob.
 
+use psx_hw::gpu::{gp0, gp1, packet};
 use crate::disc_art::{self, Canvas, Rgb};
 use crate::paint;
 use crate::text::Face;
@@ -38,7 +39,7 @@ const WHOLE: (i16, i16, i16, i16) = (0, 0, 320, 240);
 /// GP0(E1h): the menu atlas page (x = 832) with additive blending and
 /// dithering, drawing allowed. Opaque primitives ignore the blend bits, so one
 /// state serves every packet the loader sends.
-const DRAW_MODE: u32 = 0xE100_0000 | 13 | (1 << 5) | (1 << 9) | (1 << 10);
+const DRAW_MODE: u32 = gp0::draw_mode(13, 0, 1, 0, true, true);
 /// The menu atlas's palette row, as a sprite's CLUT word: (256, 480).
 const ATLAS_CLUT: u32 = 16 | (480 << 6);
 
@@ -124,12 +125,12 @@ impl LoadingScreen {
     /// (and anything that looks at VRAM while the display is off) keeps the
     /// launcher's last picture, whole, until the first frame is ready.
     pub fn setup(&mut self) {
-        let start = 0x0500_0000 | ((BUFFERS[self.shown] as u32 & 0x1ff) << 10);
+        let start = gp1::display_start_in_range(0, BUFFERS[self.shown] as u32 & 0x1ff);
         for word in [
-            0x0300_0001,                                     // display off while painting
-            0x0800_0001,                                     // 320x240, NTSC
-            0x0600_0000 | 0x260 | ((0x260 + 320 * 8) << 12), // the centred picture
-            0x0700_0000 | 0x10 | ((0x10 + 240) << 10),
+            gp1::display_enable(false),                      // display off while painting
+            gp1::display_mode(1, 0, false, false, false),    // 320x240, NTSC
+            gp1::h_display_range(0x260, 0x260 + 320 * 8),    // the centred picture
+            gp1::v_display_range(0x10, 0x10 + 240),
             start,
         ] {
             psx_io::gpu::write_display_control(word);
@@ -283,7 +284,7 @@ fn gpu_idle() -> bool {
 
 /// Show the buffer at VRAM row `y` now.
 fn display(y: i16) {
-    psx_io::gpu::write_display_control(0x0500_0000 | ((y as u32 & 0x1ff) << 10));
+    psx_io::gpu::write_display_control(gp1::display_start_in_range(0, y as u32 & 0x1ff));
 }
 
 /// Aim drawing at buffer row `y`, clipped to the given screen rectangle.
@@ -292,9 +293,9 @@ fn target(y: i16, x0: i16, y0: i16, w: i16, h: i16) {
     let top = (y + y0) as u32 & 0x1ff;
     let bottom = (y + y0 + h - 1) as u32 & 0x1ff;
     send(&[
-        0xE300_0000 | (top << 10) | x0 as u32,
-        0xE400_0000 | (bottom << 10) | (x0 + w - 1) as u32,
-        0xE500_0000 | ((y as u32 & 0x7ff) << 11),
+        gp0::draw_area_top_left_in_range(x0 as u32, top),
+        gp0::draw_area_bottom_right_in_range((x0 + w - 1) as u32, bottom),
+        gp0::draw_offset_in_range(0, y as u32 & 0x7ff),
     ]);
 }
 
@@ -321,7 +322,7 @@ struct Gp0;
 impl Canvas for Gp0 {
     fn quad_g(&mut self, v: [(i32, i32); 4], c: [Rgb; 4]) {
         send(&[
-            0x3800_0000 | rgb(c[0]),
+            packet::SHADED_QUAD | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
             vertex(v[1]),
@@ -334,7 +335,7 @@ impl Canvas for Gp0 {
 
     fn tri_g(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
         send(&[
-            0x3000_0000 | rgb(c[0]),
+            packet::SHADED_TRIANGLE | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
             vertex(v[1]),
@@ -345,7 +346,7 @@ impl Canvas for Gp0 {
 
     fn tri_g_add(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
         send(&[
-            0x3200_0000 | rgb(c[0]),
+            packet::SHADED_TRIANGLE | packet::SEMI_TRANSPARENT | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
             vertex(v[1]),
@@ -355,7 +356,7 @@ impl Canvas for Gp0 {
     }
 
     fn line_add(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
-        send(&[0x5200_0000 | rgb(ca), vertex(a), rgb(cb), vertex(b)]);
+        send(&[packet::SHADED_LINE | packet::SEMI_TRANSPARENT | rgb(ca), vertex(a), rgb(cb), vertex(b)]);
     }
 }
 
@@ -375,7 +376,7 @@ fn label(alpha: u32) {
         let glyph = face.glyph(c);
         if glyph.w > 0 {
             send(&[
-                0x6600_0000 | tint,
+                packet::TEXTURED_RECT | packet::SEMI_TRANSPARENT | tint,
                 vertex((pen + glyph.xoff as i32, top + glyph.yoff as i32)),
                 (ATLAS_CLUT << 16) | ((glyph.v as u32) << 8) | glyph.u as u32,
                 ((glyph.h as u32) << 16) | glyph.w as u32,

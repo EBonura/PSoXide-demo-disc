@@ -18,6 +18,7 @@ version = "0.1.0"
 dependencies = [
  "chainload-layout",
  "psx-chainloader",
+ "psx-hw",
  "psx-io",
  "psx-math",
 ]
