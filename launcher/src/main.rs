@@ -49,11 +49,10 @@ use gfx::Gfx;
 use music::Music;
 use playlist::Slot;
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
-use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, Port};
+use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, PadMode, Port, RadialStick};
 use psx_rt::Peripherals;
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, Spu, SpuAddr, Voice, Volume};
-use stick_nav::StickNav;
 
 /// Which pressing this is: `git describe` at build time, on screen in the
 /// header so every photo and recording says which disc is in the console.
@@ -211,9 +210,11 @@ fn main() {
     // 60 polls. This first poll, before the menu draws, runs the handshake.
     let mut pads = Controllers::new();
     pads.poll(&mut port, Port::One);
-    // The left stick drives the menu like the d-pad: one press per push, the
-    // stick back near centre before the next.
-    let mut stick = StickNav::new();
+    // The left stick drives the menu like the d-pad: one press per push, no
+    // repeat. A push registers past 64 counts of the 127 a healthy stick reaches
+    // (about half travel) and the stick has to come back inside 32 before it can
+    // press again, so one resting near the threshold cannot chatter.
+    let mut stick = RadialStick::<64, 32>::new();
     let mut analog_ok = pads.analog(Port::One) == AnalogRequirement::Analog;
 
     loop {
@@ -252,9 +253,16 @@ fn main() {
         if launching < 0 {
             analog_ok = pads.analog(Port::One) == AnalogRequirement::Analog;
         }
-        let pad = ButtonState::from_bits(
-            state.buttons.bits() | stick.update(state.mode, state.sticks),
-        );
+        // A pad that is not in analog mode reports no stick: it holds nothing and
+        // lets go of any push.
+        let stick_bits = if state.mode == PadMode::Analog {
+            let (x, y) = state.sticks.left_centered();
+            stick.update(x, y)
+        } else {
+            stick = RadialStick::new();
+            0
+        };
+        let pad = ButtonState::from_bits(state.buttons.bits() | stick_bits);
         // Buttons still track while the notice is up, so one held through
         // it does not fire when the pad is accepted.
         let pressed = |b: u16| analog_ok && pad.is_held(b) && !prev_held.is_held(b);
