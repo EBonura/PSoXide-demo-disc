@@ -160,13 +160,6 @@ fn main() {
     let mut music = Music::locate(reader, header.map_or(0, |h| h.menu_track_count as usize));
     let has_music = music.available();
     let mut tick: u32 = 0;
-    // CD debug overlay state (L2 + R2 toggles the display; capture is always
-    // on so the counters are honest from boot). Built after the first silicon
-    // burn, and kept: the emulator reproduces neither the drive's timing nor
-    // its failures, so the console screen is the debugger.
-    let mut debug = false;
-    let mut adv_btn: u16 = 0;
-    let mut events = [0u8; 10]; // bit6 = button, bit5 = song ended; low bits = song
     if has_music {
         // The CD controller playing is only half of it: the SPU's CD input
         // comes up silent, so without this the drive spins a song nobody
@@ -231,12 +224,8 @@ fn main() {
         };
         // The player reads the head a few times a second and notices when a
         // song ends by itself, which moves the playlist on.
-        let finished_before = music.finished;
         music.frame(tick);
-        if music.finished != finished_before {
-            push_event(&mut events, 0x20 | track);
-        }
-        // One clock read a frame, shared by the meter and the debug overlay.
+        // One clock read a frame, for the meter.
         let song_ms = if !muted && music.playing() {
             music.song_ms(tick)
         } else {
@@ -271,8 +260,6 @@ fn main() {
             shelf.pos = sel * 256;
             woke = true;
         }
-        let both_shoulders = |s: &ButtonState| s.is_held(button::L2) && s.is_held(button::R2);
-        let debug_chord = analog_ok && both_shoulders(&pad) && !both_shoulders(&prev_held);
 
         // The pad goes quiet once a launch is under way: the animation is
         // short, and half a browse queued behind it would land in the game.
@@ -280,21 +267,14 @@ fn main() {
             if pressed(button::TRIANGLE) {
                 italian = !italian;
             }
-            if debug_chord {
-                debug = !debug;
-            }
             // Skipping songs by hand, through the shuffle and then the MUSIC
             // OFF slot. A skip while the last song is still starting is fine:
             // starting a song begins with a stop.
             if has_music {
                 if pressed(button::R1) {
                     music.skip_forward(tick);
-                    adv_btn = adv_btn.saturating_add(1);
-                    push_event(&mut events, 0x40 | music_event_song(&music));
                 } else if pressed(button::L1) {
                     music.skip_back(tick);
-                    adv_btn = adv_btn.saturating_add(1);
-                    push_event(&mut events, 0x40 | music_event_song(&music));
                 }
             }
             match screen {
@@ -406,12 +386,6 @@ fn main() {
                 launch::draw(&mut g, launching, from, &entries[sel as usize], &ctx);
             }
         }
-        if debug && analog_ok {
-            let dur_ms = header
-                .and_then(|h| h.spectrum_span(track as usize))
-                .map_or(0, |(_, frames)| frames * 1000 / disc_toc::SPECTRUM_FRAME_RATE);
-            draw_music_debug(&mut g, &music, adv_btn, &events, tick, dur_ms);
-        }
         if tick < BOOT_FADE {
             let v = (255 * (BOOT_FADE - tick) / BOOT_FADE) as u8;
             g.quad_g_sub([(0, 0), (320, 0), (0, 240), (320, 240)], [(v, v, v); 4]);
@@ -467,116 +441,6 @@ fn draw_controller_notice(g: &mut Gfx) {
             0,
         );
     }
-}
-
-// --- CD debug overlay ---------------------------------------------------
-
-fn push_event(events: &mut [u8; 10], ev: u8) {
-    events.copy_within(0..9, 1);
-    events[0] = ev;
-}
-
-fn put_dec(buf: &mut [u8], at: usize, v: u32) -> usize {
-    let mut digits = [0u8; 10];
-    let mut n = 0;
-    let mut v = v;
-    loop {
-        digits[n] = b'0' + (v % 10) as u8;
-        v /= 10;
-        n += 1;
-        if v == 0 {
-            break;
-        }
-    }
-    for i in 0..n {
-        buf[at + i] = digits[n - 1 - i];
-    }
-    at + n
-}
-
-fn put_str(buf: &mut [u8], at: usize, s: &str) -> usize {
-    buf[at..at + s.len()].copy_from_slice(s.as_bytes());
-    at + s.len()
-}
-
-/// The song a debug event names: its number, or 15 for MUSIC OFF.
-fn music_event_song(music: &Music) -> u8 {
-    match music.slot() {
-        Slot::Song(n) => n & 0x0F,
-        Slot::Off => 0x0F,
-    }
-}
-
-/// The L2 + R2 overlay, drawn over the middle of the screen: where the
-/// playlist stands, what the player is doing, how far in the song is against
-/// the drive head and its known length, and what moved the music on.
-/// Everything a console session needs to tell a drive problem from a launcher
-/// one, photographable from the couch.
-fn draw_music_debug(
-    g: &mut Gfx,
-    music: &Music,
-    adv_btn: u16,
-    events: &[u8; 10],
-    tick: u32,
-    dur_ms: u32,
-) {
-    let x = 10;
-    let mut y = 96;
-    let mut buf = [0u8; 56];
-    g.rect(x - 4, y - 6, 300, 52, (0, 0, 0));
-    let emit = |g: &mut Gfx, y: &mut i32, buf: &[u8], n: usize| {
-        // SAFETY: every byte written above is ASCII.
-        let line = unsafe { core::str::from_utf8_unchecked(&buf[..n]) };
-        text::draw(g, &ui_atlas::SMALL8, x, *y - 4, line, gfx::TEXT, 0);
-        *y += 11;
-    };
-
-    let mut n = put_str(&mut buf, 0, "SONG ");
-    match music.slot() {
-        Slot::Song(song) => n = put_dec(&mut buf, n, song as u32),
-        Slot::Off => n = put_str(&mut buf, n, "OFF"),
-    }
-    n = put_str(&mut buf, n, " STATE ");
-    n = put_dec(&mut buf, n, music.state_code() as u32);
-    n = put_str(&mut buf, n, " STREAM ");
-    n = put_dec(&mut buf, n, music.playing() as u32);
-    emit(g, &mut y, &buf, n);
-
-    let mut n = put_str(&mut buf, 0, "HEAD ");
-    n = put_dec(&mut buf, n, music.head_ms());
-    n = put_str(&mut buf, n, " CLOCK ");
-    n = put_dec(&mut buf, n, music.song_ms(tick));
-    buf[n] = b'/';
-    n = put_dec(&mut buf, n + 1, dur_ms);
-    emit(g, &mut y, &buf, n);
-
-    let mut n = put_str(&mut buf, 0, "ENDED ");
-    n = put_dec(&mut buf, n, music.finished as u32);
-    n = put_str(&mut buf, n, " BTN ");
-    n = put_dec(&mut buf, n, adv_btn as u32);
-    n = put_str(&mut buf, n, " STALL ");
-    n = put_dec(&mut buf, n, music.stalls as u32);
-    n = put_str(&mut buf, n, " REFUSED ");
-    n = put_dec(&mut buf, n, music.refusals as u32);
-    buf[n] = b'/';
-    n = put_dec(&mut buf, n + 1, music.last_refusal as u32);
-    emit(g, &mut y, &buf, n);
-
-    let mut n = put_str(&mut buf, 0, "EV ");
-    for ev in events {
-        let cause = if ev & 0x40 != 0 {
-            b'B'
-        } else if ev & 0x20 != 0 {
-            b'E' // the song ended by itself
-        } else {
-            b'-'
-        };
-        buf[n] = cause;
-        buf[n + 1] = b'0' + (ev & 0x0F).min(9);
-        buf[n + 2] = b' ';
-        n += 3;
-    }
-    emit(g, &mut y, &buf, n);
 }
 
 /// Read the level-meter data for every menu track. Returns how many frames

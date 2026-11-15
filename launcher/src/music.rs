@@ -64,14 +64,6 @@ pub struct Music {
     clock: SongClock,
     state: State,
     next_poll: u32,
-    /// Starts that were redone because the song never began streaming.
-    pub stalls: u16,
-    /// Starts the drive refused outright.
-    pub refusals: u16,
-    /// Songs that ended by themselves and moved the playlist on.
-    pub finished: u16,
-    /// Which command of the last refused start failed, 1 to 5 (0 for none).
-    pub last_refusal: u8,
 }
 
 impl Music {
@@ -103,10 +95,6 @@ impl Music {
             clock: SongClock::new(crate::TICKS_HZ),
             state: State::Silent,
             next_poll: 0,
-            stalls: 0,
-            refusals: 0,
-            finished: 0,
-            last_refusal: 0,
         }
     }
 
@@ -134,21 +122,6 @@ impl Music {
     /// Song time in milliseconds at frame `now`; 0 when nothing is playing.
     pub fn song_ms(&self, now: u32) -> u32 {
         self.clock.now(now)
-    }
-
-    /// Debug overlay code: 0 silent, 1 starting, 2 refused, 3 playing.
-    pub fn state_code(&self) -> u8 {
-        match self.state {
-            State::Silent => 0,
-            State::Starting(_) => 1,
-            State::Retry(_) => 2,
-            State::Playing => 3,
-        }
-    }
-
-    /// The head position the drive last reported, in milliseconds.
-    pub fn head_ms(&self) -> u32 {
-        self.player.elapsed_millis()
     }
 
     /// Begin at the playlist's first slot.
@@ -193,7 +166,6 @@ impl Music {
                 self.next_poll = now.wrapping_add(POLL_TICKS);
                 let event = self.player.poll();
                 if event == Event::Finished {
-                    self.finished = self.finished.saturating_add(1);
                     self.list.song_finished();
                     self.apply(now);
                 } else if self.player.is_streaming() {
@@ -202,7 +174,6 @@ impl Music {
                     self.clock.observe(now, ms);
                 } else if let State::Starting(since) = self.state {
                     if now.wrapping_sub(since) > START_TIMEOUT_TICKS {
-                        self.stalls = self.stalls.saturating_add(1);
                         self.apply(now);
                     }
                 }
@@ -225,9 +196,7 @@ impl Music {
         self.next_poll = now.wrapping_add(POLL_TICKS);
         match self.player.play(song, false) {
             Ok(()) => self.state = State::Starting(now),
-            Err(error) => {
-                self.refusals = self.refusals.saturating_add(1);
-                self.last_refusal = error_code(error);
+            Err(_) => {
                 self.state = State::Retry(now.wrapping_add(RETRY_TICKS));
             }
         }
@@ -255,17 +224,6 @@ impl Music {
             )
             .song(channel),
         )
-    }
-}
-
-fn error_code(error: psx_io::cd::xa::Error) -> u8 {
-    use psx_io::cd::xa::Error;
-    match error {
-        Error::Unmute => 1,
-        Error::SetMode => 2,
-        Error::SetFilter => 3,
-        Error::Seek => 4,
-        Error::Read => 5,
     }
 }
 
