@@ -21,4 +21,9 @@ fn main() {
     let out = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR")).join("loader.ld");
     fs::write(&out, script).expect("write the generated linker script");
     println!("cargo:rustc-link-arg=-T{}", out.display());
+    // The link map the Makefile hands to `hazard-scan --raw`.
+    println!("cargo:rerun-if-env-changed=LOADER_MAP");
+    if let Ok(map) = env::var("LOADER_MAP") {
+        println!("cargo:rustc-link-arg=-Map={map}");
+    }
 }

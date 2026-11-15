@@ -142,6 +142,8 @@ PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-fea
 PSX_DELAY_SLOT_FLAGS = $(shell sed -n 's/^PSX_DELAY_SLOT_FLAGS := //p' "$(SDK)/tools/sdk-examples.mk")
 PSX_POLICY = --config 'target.$(PSX_TARGET).rustflags=[$(shell $(SDK_TOOLS)/release/psoxide-size panic-flags --toml),$(PSX_DELAY_SLOT_FLAGS)]'
 LOADER_EXE  := $(OUT)/loader.exe
+LOADER_MAP  := $(OUT)/loader.map
+LOADER_BASE := $(shell sed -n 's/^pub const LOADER_BASE: u32 = \(0x[0-9A-Fa-f_]*\);.*/\1/p' chainload-layout/src/lib.rs | tr -d _)
 LAUNCHER_EXE := $(OUT)/launcher.exe
 
 help:
@@ -174,17 +176,19 @@ REPRO        := RUSTC_WRAPPER=$(REPRO_RUSTC) PSOXIDE_REPRO_ROOT=$(ROOT)
 # `psoxide-pgo apply` runs it on the launcher before the first compile and writes the receipt into the
 # executable that mkdisc checks. Both read this repository's psx-gate.toml.
 PSX_GATE  := $(SDK_TOOLS)/release/psx-gate
+HAZARD_SCAN ?= $(SDK_TOOLS)/release/hazard-scan
 PGO       := $(SDK_TOOLS)/release/psoxide-pgo
 .PHONY: sdk-tools
 sdk-tools:
-	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-hazard/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psx-gate
+	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-hazard/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psx-gate --bin hazard-scan
 	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-pgo/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psoxide-pgo --bin psoxide-rustc
 	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-size/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psoxide-size
 loader launcher: sdk-tools
 
 loader:
 	$(PSX_GATE) --sdk "$(SDK)" --crate loader -- build $(PSX_FLAGS)
-	cd loader && $(REPRO) CARGO_TARGET_DIR=$(BUILD) cargo build $(PSX_FLAGS)
+	cd loader && $(REPRO) CARGO_TARGET_DIR=$(BUILD) LOADER_MAP=$(LOADER_MAP) cargo build $(PSX_FLAGS) $(PSX_POLICY)
+	$(HAZARD_SCAN) "$(LOADER_EXE)" --raw $(LOADER_BASE) --map "$(LOADER_MAP)"
 
 # Which pressing this is, drawn in the launcher's header. Tag a burn
 # (`git tag v0.3 && make disc`) and the disc identifies itself on camera.

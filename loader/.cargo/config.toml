@@ -1,5 +1,7 @@
+# The delay-slot flags and the panic policy are the SDK's: the Makefile passes them as
+# `PSX_POLICY`, as for the launcher, and `hazard-scan --raw` proves the blob clean afterwards.
 [target.mipsel-sony-psx]
-rustflags = ["-Cllvm-args=-disable-mips-df-backward-search", "-Clink-arg=--oformat=binary"]
+rustflags = ["-Clink-arg=--oformat=binary"]
 
 # The architecture gate (sdk/docs/GATE.md) reads this program's exceptions from here.
 [env]
