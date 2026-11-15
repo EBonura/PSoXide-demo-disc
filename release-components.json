@@ -4,7 +4,7 @@
     "sdk": {
       "path": "games/PSoXide-sdk",
       "repository": "EBonura/PSoXide",
-      "revision": "fecc1dcf7da5d24bb53b6f29deef71c902f5eaa5"
+      "revision": "6c0ed4ebd5ed647fd913aacaf94a69c548f89c0e"
     },
     "emulator": {
       "path": "games/PSoXide-emulator",
