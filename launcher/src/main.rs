@@ -49,7 +49,7 @@ use gfx::Gfx;
 use music::Music;
 use playlist::Slot;
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
-use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, PadMode, Port, RadialStick};
+use psx_pad::{button, AnalogRequirement, ButtonState, Controllers, Port, RadialStick};
 use psx_rt::Peripherals;
 use psx_sfx::{Bank, OneShot, Player};
 use psx_spu::{self as spu, Adsr, CdVolume, Pitch, Spu, SpuAddr, Voice, Volume};
@@ -253,15 +253,9 @@ fn main() {
         if launching < 0 {
             analog_ok = pads.analog(Port::One) == AnalogRequirement::Analog;
         }
-        // A pad that is not in analog mode reports no stick: it holds nothing and
+        // The SDK's one stick rule: a pad that reports no sticks holds nothing and
         // lets go of any push.
-        let stick_bits = if state.mode == PadMode::Analog {
-            let (x, y) = state.sticks.left_centered();
-            stick.update(x, y)
-        } else {
-            stick = RadialStick::new();
-            0
-        };
+        let stick_bits = stick.update_pad(&state);
         let pad = ButtonState::from_bits(state.buttons.bits() | stick_bits);
         // Buttons still track while the notice is up, so one held through
         // it does not fire when the pad is accepted.
