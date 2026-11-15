@@ -19,7 +19,6 @@ dependencies = [
  "chainload-layout",
  "playlist",
  "psx-disc-toc",
- "psx-fmv",
  "psx-gpu",
  "psx-gte",
  "psx-hw",
@@ -50,19 +49,6 @@ dependencies = [
 [[package]]
 name = "psx-disc-toc"
 version = "0.1.0"
-
-[[package]]
-name = "psx-fmv"
-version = "0.1.0"
-dependencies = [
- "psx-gpu",
- "psx-hw",
- "psx-io",
- "psx-pack",
- "psx-rt",
- "psx-spu",
- "psx-vram",
-]
 
 [[package]]
 name = "psx-gpu"

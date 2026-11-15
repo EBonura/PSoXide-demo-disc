@@ -13,8 +13,8 @@
 
 use playlist::{Playlist, Slot};
 use psx_io::cd::xa_clock::SongClock;
-use psx_fmv::iso;
 use psx_hw::cd::xa::END_GUARD_SECTORS;
+use psx_io::iso;
 use psx_io::cd::xa::{DriveSpeed, Event, File, Player, Song};
 use psx_io::timers::{counter, Timer};
 use psx_pack::cd::{SectorReader, SECTOR_WORDS};
@@ -243,7 +243,7 @@ fn locate_files(
     if !read_one(reader, iso::PVD_LBA, &mut sector) {
         return false;
     }
-    let Some((root_lba, _)) = iso::root_directory(as_bytes(&sector)) else {
+    let Some((root_lba, _)) = iso::root_directory(iso::as_bytes(&sector)) else {
         return false;
     };
     if !read_one(reader, root_lba, &mut sector) {
@@ -251,7 +251,7 @@ fn locate_files(
     }
     let mut all = true;
     for (slot, name) in files.iter_mut().zip(pack::XA_FILE_NAMES) {
-        match iso::find_in_directory(as_bytes(&sector), name) {
+        match iso::find_in_directory(iso::as_bytes(&sector), name) {
             Some((lba, bytes)) if bytes / 2048 == sectors_of(name) => {
                 *slot = Some((lba, bytes / 2048));
             }
@@ -273,9 +273,4 @@ fn read_one(reader: &mut SectorReader, lba: u32, into: &mut [u32; SECTOR_WORDS])
     let ok = reader.prepare() && reader.start_read(lba) && reader.read_sector(into);
     reader.stop();
     ok
-}
-
-fn as_bytes(sector: &[u32; SECTOR_WORDS]) -> &[u8] {
-    // SAFETY: a [u32; 512] is 2048 initialised bytes, and u8 has no alignment.
-    unsafe { core::slice::from_raw_parts(sector.as_ptr() as *const u8, SECTOR_WORDS * 4) }
 }
