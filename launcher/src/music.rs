@@ -11,7 +11,8 @@
 //! one: the table, the meter data and the backdrops are all read before the
 //! first note, and [`Music::stop`] pauses the drive before a program is loaded.
 
-use playlist::{Playlist, Slot, SongClock};
+use playlist::{Playlist, Slot};
+use psx_io::cd::xa_clock::SongClock;
 use psx_fmv::iso;
 use psx_hw::cd::xa::END_GUARD_SECTORS;
 use psx_io::cd::xa::{DriveSpeed, Event, File, Player, Song};
@@ -39,7 +40,7 @@ const RETRY_TICKS: u32 = 60;
 /// four-sector groups, so the position read is early by a few tens of
 /// milliseconds. This is an estimate from the SDK's notes, not a console
 /// measurement; it only shifts when the visuals land against the audio.
-const HEAD_LEAD_MS: u32 = 40;
+const HEAD_LEAD_MS: i32 = 40;
 /// Sectors a second a single-speed XA file is read at.
 const SECTORS_PER_SECOND: u32 = 75;
 
@@ -62,6 +63,8 @@ pub struct Music {
     files: [Option<(u32, u32)>; pack::XA_FILE_COUNT],
     list: Playlist,
     clock: SongClock,
+    /// Song time at the last frame, `None` while nothing is streaming.
+    ms: Option<u32>,
     state: State,
     next_poll: u32,
 }
@@ -92,7 +95,8 @@ impl Music {
             player,
             files,
             list: Playlist::new(usable, seed),
-            clock: SongClock::new(crate::TICKS_HZ),
+            clock: SongClock::new(crate::TICKS_HZ).with_head_lead_ms(HEAD_LEAD_MS),
+            ms: None,
             state: State::Silent,
             next_poll: 0,
         }
@@ -116,12 +120,12 @@ impl Music {
     /// Whether the clock has a reading to run from, so the beat visuals can
     /// follow the song.
     pub fn playing(&self) -> bool {
-        self.state == State::Playing && self.clock.running()
+        self.ms.is_some()
     }
 
     /// Song time in milliseconds at frame `now`; 0 when nothing is playing.
-    pub fn song_ms(&self, now: u32) -> u32 {
-        self.clock.now(now)
+    pub fn song_ms(&self) -> u32 {
+        self.ms.unwrap_or(0)
     }
 
     /// Begin at the playlist's first slot.
@@ -144,7 +148,7 @@ impl Music {
     /// Pause the drive for good before a program is loaded. The song restarts
     /// nowhere: the menu is gone.
     pub fn stop(&mut self) {
-        self.clock.stop();
+        self.ms = None;
         self.state = State::Silent;
         self.player.stop();
     }
@@ -160,30 +164,32 @@ impl Music {
                 }
             }
             State::Starting(_) | State::Playing => {
-                if now.wrapping_sub(self.next_poll) >= u32::MAX / 2 {
-                    return;
-                }
-                self.next_poll = now.wrapping_add(POLL_TICKS);
-                let event = self.player.poll();
-                if event == Event::Finished {
-                    self.list.song_finished();
-                    self.apply(now);
-                } else if self.player.is_streaming() {
-                    self.state = State::Playing;
-                    let ms = self.player.elapsed_millis().saturating_sub(HEAD_LEAD_MS);
-                    self.clock.observe(now, ms);
-                } else if let State::Starting(since) = self.state {
-                    if now.wrapping_sub(since) > START_TIMEOUT_TICKS {
+                if now.wrapping_sub(self.next_poll) < u32::MAX / 2 {
+                    self.next_poll = now.wrapping_add(POLL_TICKS);
+                    let event = self.player.poll();
+                    if event == Event::Finished {
+                        self.list.song_finished();
                         self.apply(now);
+                    } else if self.player.is_streaming() {
+                        self.state = State::Playing;
+                    } else if let State::Starting(since) = self.state {
+                        if now.wrapping_sub(since) > START_TIMEOUT_TICKS {
+                            self.apply(now);
+                        }
                     }
                 }
             }
         }
+        // The SDK's clock runs on the tick counter between the head readings the poll takes.
+        self.ms = match self.state {
+            State::Playing => self.clock.update(&self.player, now),
+            _ => None,
+        };
     }
 
     /// Make the drive match the playlist's slot.
     fn apply(&mut self, now: u32) {
-        self.clock.stop();
+        self.ms = None;
         self.player.stop();
         let Slot::Song(n) = self.list.slot() else {
             self.state = State::Silent;

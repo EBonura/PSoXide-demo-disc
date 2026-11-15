@@ -227,7 +227,7 @@ fn main() {
         music.frame(tick);
         // One clock read a frame, for the meter.
         let song_ms = if !muted && music.playing() {
-            music.song_ms(tick)
+            music.song_ms()
         } else {
             0
         };

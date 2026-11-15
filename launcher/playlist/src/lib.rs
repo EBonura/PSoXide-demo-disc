@@ -9,14 +9,6 @@
 //! [`Slot::Off`] (MUSIC OFF): the shoulder buttons walk through every song
 //! and then silence, so muting needs no button of its own. A song that ends
 //! by itself goes straight on to the next song and never lands on `Off`.
-//!
-//! # Time
-//!
-//! The XA player reports the drive head's position a sector at a time (13 ms),
-//! only when it is polled, and the head runs a little ahead of the sound.
-//! [`SongClock`] turns that into a time that moves every frame: it counts
-//! frames between polls and pulls itself toward each new reading instead of
-//! jumping to it, so the beat visuals do not stutter on a late poll.
 
 #![no_std]
 
@@ -144,18 +136,6 @@ impl Playlist {
     }
 }
 
-/// `frames * 1000 / ticks_per_second`, wrapped to `u32`, in 32-bit operations:
-/// whole seconds of frames and a remainder below `ticks_per_second`, so the
-/// remainder's product is at most `ticks_per_second * 1000` (a frame rate, not
-/// above four million). Equal to the `u64` expression for every input.
-pub const fn millis_of_frames(frames: u32, ticks_per_second: u32) -> u32 {
-    let whole = frames / ticks_per_second;
-    let part = frames % ticks_per_second;
-    whole
-        .wrapping_mul(1000)
-        .wrapping_add(part * 1000 / ticks_per_second)
-}
-
 /// `ceil(millis * sectors_per_second / 1000)`, wrapped to `u32`, in 32-bit
 /// operations: the sectors of a song `millis` long on a drive reading
 /// `sectors_per_second` (75 or 150). Whole seconds of the length and a
@@ -167,75 +147,6 @@ pub const fn sectors_for_millis(millis: u32, sectors_per_second: u32) -> u32 {
     whole
         .wrapping_mul(sectors_per_second)
         .wrapping_add((part * sectors_per_second).div_ceil(1000))
-}
-
-/// Newest reading further than this from the running time is a seek or a
-/// restart, not jitter: take it whole.
-const SNAP_MS: u32 = 80;
-
-/// A song time that advances every frame between drive readings.
-#[derive(Copy, Clone, Debug)]
-pub struct SongClock {
-    ticks_per_second: u32,
-    anchor_ms: u32,
-    anchor_tick: u32,
-    running: bool,
-}
-
-impl SongClock {
-    /// A stopped clock counting frames at `ticks_per_second`.
-    pub const fn new(ticks_per_second: u32) -> Self {
-        SongClock {
-            ticks_per_second,
-            anchor_ms: 0,
-            anchor_tick: 0,
-            running: false,
-        }
-    }
-
-    /// Back to a stopped clock: a new song, or none.
-    pub fn stop(&mut self) {
-        self.running = false;
-        self.anchor_ms = 0;
-    }
-
-    /// Whether the clock has a reading to run from.
-    pub fn running(&self) -> bool {
-        self.running
-    }
-
-    /// Song time at frame `tick`; 0 while stopped.
-    pub fn now(&self, tick: u32) -> u32 {
-        if !self.running {
-            return 0;
-        }
-        let frames = tick.wrapping_sub(self.anchor_tick);
-        self.anchor_ms
-            .saturating_add(millis_of_frames(frames, self.ticks_per_second))
-    }
-
-    /// The drive says the song is `song_ms` in, at frame `tick`.
-    pub fn observe(&mut self, tick: u32, song_ms: u32) {
-        if self.running {
-            let predicted = self.now(tick);
-            let error = song_ms.abs_diff(predicted);
-            self.anchor_ms = if error > SNAP_MS {
-                song_ms
-            } else {
-                // A quarter of the way, so one late poll moves the beat a
-                // few milliseconds rather than a sector.
-                if song_ms >= predicted {
-                    predicted + error / 4
-                } else {
-                    predicted - error / 4
-                }
-            };
-        } else {
-            self.anchor_ms = song_ms;
-            self.running = true;
-        }
-        self.anchor_tick = tick;
-    }
 }
 
 #[cfg(test)]
@@ -252,20 +163,6 @@ mod tests {
             state
         };
         let edges = [0, 1, 2, 59, 60, 61, 74, 75, 76, 149, 150, 151, 999, 1000, 1001];
-        for rate in [30u32, 50, 60, 75, 150] {
-            for frames in edges
-                .into_iter()
-                .chain([u32::MAX, u32::MAX - 1, 1 << 31, (1 << 31) - 1])
-                .chain((0..100_000).map(|_| next()))
-            {
-                let wide = (u64::from(frames) * 1000 / u64::from(rate)) as u32;
-                assert_eq!(millis_of_frames(frames, rate), wide, "{frames} at {rate}");
-            }
-            for frames in 0..200_000 {
-                let wide = (u64::from(frames) * 1000 / u64::from(rate)) as u32;
-                assert_eq!(millis_of_frames(frames, rate), wide, "{frames} at {rate}");
-            }
-        }
         for rate in [75u32, 150] {
             for millis in edges
                 .into_iter()
@@ -376,29 +273,5 @@ mod tests {
         assert_eq!(none.song_finished(), Slot::Off);
         assert_eq!(none.skip_forward(), Slot::Off);
         assert_eq!(Playlist::new(40, 5).count() as usize, MAX_SONGS);
-    }
-
-    #[test]
-    fn the_clock_runs_between_readings_and_snaps_on_a_seek() {
-        let mut clock = SongClock::new(60);
-        assert_eq!(clock.now(100), 0, "stopped reads zero");
-        clock.observe(100, 5_000);
-        assert_eq!(clock.now(100), 5_000);
-        assert_eq!(clock.now(160), 6_000, "sixty frames is a second");
-        clock.observe(160, 6_040);
-        let t = clock.now(160);
-        assert!((6_001..6_040).contains(&t), "pulled part way: {t}");
-        clock.observe(220, 40_000);
-        assert_eq!(clock.now(220), 40_000, "a seek is taken whole");
-        clock.stop();
-        assert!(!clock.running());
-        assert_eq!(clock.now(300), 0);
-    }
-
-    #[test]
-    fn the_clock_survives_the_frame_counter_wrapping() {
-        let mut clock = SongClock::new(60);
-        clock.observe(u32::MAX - 29, 1_000);
-        assert_eq!(clock.now(30), 2_000, "sixty frames across the wrap");
     }
 }
