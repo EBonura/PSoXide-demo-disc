@@ -136,6 +136,11 @@ PRESSING_FLAGS = HL=$(if $(HL),1,0) CS=$(if $(CS),1,0) HK=$(if $(HK),1,0) WO=$(i
 
 PSX_TARGET  := mipsel-sony-psx
 PSX_FLAGS   := --release --target $(PSX_TARGET) -Zbuild-std=core -Zbuild-std-features=compiler-builtins-mem
+# The fleet's build policy, read from the SDK (tools/sdk-examples.mk, tools/psoxide-size): every delay-slot filler
+# search on (the post-link hazard patch reroutes what it creates) and the shared panic policy, a panic is a
+# bare break. PSOXIDE_PANIC_MESSAGES=1 restores the formatted panic. They join the crate's config rustflags.
+PSX_DELAY_SLOT_FLAGS = $(shell sed -n 's/^PSX_DELAY_SLOT_FLAGS := //p' "$(SDK)/tools/sdk-examples.mk")
+PSX_POLICY = --config 'target.$(PSX_TARGET).rustflags=[$(shell $(SDK_TOOLS)/release/psoxide-size panic-flags --toml),$(PSX_DELAY_SLOT_FLAGS)]'
 LOADER_EXE  := $(OUT)/loader.exe
 LAUNCHER_EXE := $(OUT)/launcher.exe
 
@@ -174,6 +179,7 @@ PGO       := $(SDK_TOOLS)/release/psoxide-pgo
 sdk-tools:
 	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-hazard/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psx-gate
 	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-pgo/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psoxide-pgo --bin psoxide-rustc
+	cargo build -q --release --manifest-path "$(SDK)/tools/psoxide-size/Cargo.toml" --target-dir "$(SDK_TOOLS)" --bin psoxide-size
 loader launcher: sdk-tools
 
 loader:
@@ -194,7 +200,7 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) \
 		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
-		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
+		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(PSX_POLICY) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
 
 mkdisc:
 	cd tools/mkdisc && cargo build --release
