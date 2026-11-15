@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.56-private",
-  "note": "PSoXide Demo Disc v0.56, private edition (local, never published or distributed), all XA: no CD-DA track. Every program is the library build of 2026-11-14, and the two restored games, 360X and QD Up, ride the Private disc. No Cortex program is on this pressing. The launcher is built on SDK 091551541eee. Left out: Arcade, PSXcel, Counter-Strike and the hardware tests.",
+  "note": "PSoXide Demo Disc v0.56, private edition (local, never published or distributed), all XA: no CD-DA track. Every program is the library build of 2026-11-15, and the two restored games, 360X and QD Up, ride the Private disc. No Cortex program is on this pressing. The launcher is built on SDK 091551541eee. Left out: Arcade, PSXcel, Counter-Strike and the hardware tests.",
   "programs": [
     {
       "name": "CELESTE COLLECTION",
@@ -28,17 +28,17 @@
       "var": "NITROXIDE",
       "version_var": "V_NITROXIDE",
       "kind": "image",
-      "bin_sha256": "cb35e5b2805ac7b7a2136a341f57f3eb6ad276ec9a897959f9baac3bc7a3d8f2",
+      "bin_sha256": "16b8d05bfaa02906e20aa4bed270219f916ef93255b4b982eedd06129125d5bb",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/nitroxide/NitroXide.cue",
       "cue_sha256": "5e6b42319ca9c514f86af041f2afd6c978136d3b427b141cb3ce5b9e1dbdae30",
       "version": "0.6.0",
       "source": {
         "repository": "EBonura/nitroxide",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/nitroxide.git",
-        "revision": "bdd6ba6db750960d10da30a213ca77eda4cb7663",
+        "revision": "06525eacf68e74ddead63cf01f86812d3039c8a9",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (INSTALLED.json): nitroxide main bdd6ba6, make build then make pack, SDK 091551541eee, shipping executable, gate receipt stamped. The version stays 0.6.0 (the install record carries none).",
+      "build": "library install of 2026-11-14 17:38Z (INSTALLED.json): nitroxide at 06525ea, shipping executable, gate receipt stamped. The version stays 0.6.0 (the install record carries none).",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/nitroxide/INSTALLED.json"
     },
     {
@@ -46,17 +46,17 @@
       "var": "VOXIDE",
       "version_var": "V_VOXIDE",
       "kind": "image",
-      "bin_sha256": "617893d5b8632c8d888c0450fc163dc9bd085021ee6863f8e9b2cbf23b6e067a",
+      "bin_sha256": "c97ff3f9c6cff97bd007109730569590920ddc0b28b5c94a5564956cc4878067",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/voxide/VoXide.cue",
       "cue_sha256": "3c0e112269359819880eacd0f7bfa40c13f29bb5504e32474fe10315c0246108",
       "version": "0.4.1",
       "source": {
         "repository": "EBonura/voxide",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/voxide.git",
-        "revision": "8585c0d0c3107c66d4c92ac9eac0a58971ef0622",
+        "revision": "9290ddd7eb2bf02929f372bc807694e63238f0cf",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (INSTALLED.json): voxide main 8585c0d, SDK 091551541eee, stamped PGO profile, gate receipt stamped.",
+      "build": "library install of 2026-11-14 18:26Z (INSTALLED.json): voxide 9290ddd (lane build on main 8585c0d), SDK 9bb3045bdd63.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/voxide/INSTALLED.json"
     },
     {
@@ -64,17 +64,17 @@
       "var": "WIPEOUT",
       "version_var": "V_WIPEOUT",
       "kind": "image",
-      "bin_sha256": "14ffd18cbcc3001f50ab9dfdc3ebddfd701f9e628151d3fad21ea0e1f2b85584",
+      "bin_sha256": "7a0d5659879ee22f68606a6a084249dd90ddf0031b56705e7e5579f7132a233f",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/wipeout/WipEout PSoXide.cue",
       "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/wipeout-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/wipeout-psx.git",
-        "revision": "8cf4a24e2ced6acee7bbe750477b2c1d5fb95d08",
+        "revision": "d24cbe8e45cc337779bd7ce0bae5b81654078231",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (WipEout PSoXide.provenance.json): wipeout-psx main 8cf4a24, SDK main 3185a4a3419d, shipping build from the US disc with the private texture pack, gate receipt stamped.",
+      "build": "library install of 2026-11-14 19:08 (WipEout PSoXide.provenance.json): wipeout-psx main d24cbe8, SDK main 9bb3045bdd63, shipping build from the US disc with the private texture pack.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/wipeout/WipEout PSoXide.provenance.json"
     },
     {
@@ -82,17 +82,17 @@
       "var": "HKPSX",
       "version_var": "V_HKPSX",
       "kind": "image",
-      "bin_sha256": "e4c8c40de08f108e83eb839ddee5701b9eeeaa391b93d2e2b6c2a3a2ee458856",
+      "bin_sha256": "df3e8443c5fb22238992446c62fc0bf07b712fce1a15a7aab6834643c9d2c91b",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/hk/Hollow Knight (hk-psx).cue",
       "cue_sha256": "1182082d7a19db0e0825a4758f23d94e7f26dcdcd023805d6d7f8e359f2dbcea",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/hk-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hk-psx.git",
-        "revision": "0de11977d2135e989cb0a2ec17a880447c72a273",
+        "revision": "fb36119d390c812222690dbcd8e83bef2388fb31",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (Hollow Knight (hk-psx).provenance.json): hk-psx main 0de1197, clean tree, SDK 35b285c78ad3, emulator 3ce0aa9c, gate receipt stamped.",
+      "build": "library install of 2026-11-15 02:57Z (Hollow Knight (hk-psx).provenance.json): hk-psx main fb36119, clean tree, gate receipt stamped.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/hk/Hollow Knight (hk-psx).provenance.json",
       "library": "Hollow Knight (hk-psx).cue"
     },
@@ -119,17 +119,17 @@
       "var": "OOTPSX",
       "version_var": "V_OOTPSX",
       "kind": "image",
-      "bin_sha256": "a42d4c3760262f444131d3d1534216b9b6ed66424f839b05ea571a1ee7078418",
+      "bin_sha256": "e92e5f2b99afb9ee9a8cdf992651fede038ac0b01a41979d6190fe1d732b39eb",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/oot/Ocarina of Time (oot-psx).cue",
       "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/oot-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/oot-psx.git",
-        "revision": "f2884b56f2a0bf2d3c173cdf542308b32fdcdff6",
+        "revision": "7183e2e4b6470b8ffea2c03fe5795c34fed4ebea",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (INSTALLED.json): oot-psx main f2884b5, tools/qualified/build-disc.sh shipping features, SDK 6918583c36b0, gate receipt stamped.",
+      "build": "library install of 2026-11-14 21:22Z (INSTALLED.json): oot-psx main 7183e2e, shipping features, gate receipt stamped.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/oot/INSTALLED.json",
       "library": "Ocarina of Time (oot-psx)/Ocarina of Time (oot-psx).cue"
     },
@@ -138,17 +138,17 @@
       "var": "QUAKE_CUE",
       "version_var": "QUAKE_VERSION",
       "kind": "image",
-      "bin_sha256": "4ac4bc1385d2a8cd5a13159434fd5a0fa5cf656253b2c44b0c25f5b44c4707f8",
+      "bin_sha256": "f2291640749ca4815110148a99b94ca3d98ef33099f86de9f5cfac4783d08c67",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/quake/Quake (quake-psx).cue",
       "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
-        "revision": "fc042ada534a5caa897da1b7e338a061efa21a01",
+        "revision": "059199e4852b5666777946b9d7bfe1192b807541",
         "ref": "main"
       },
-      "build": "library install of 2026-11-14 (Quake (quake-psx).provenance.json): quake-psx main fc042ad, shareware 1.06 data, XA music, one data track, gate receipt stamped.",
+      "build": "library install of 2026-11-14 19:42Z (Quake (quake-psx).provenance.json): quake-psx main 059199e, shareware 1.06 data, XA music, one data track, gate receipt stamped.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/quake/Quake (quake-psx).provenance.json"
     },
     {
@@ -156,15 +156,15 @@
       "var": "X360",
       "version_var": "V_X360",
       "kind": "image",
-      "bin_sha256": "56bbc271cb1a66bfd8d76c0b879aaa38bc75c676afa80ee0497484265ab99f77",
+      "bin_sha256": "e207c710b8fa7d0113712901ccb1d51d806b0e09cfefaf2ea353676e9b34c523",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/360x/360x.cue",
       "cue_sha256": "fbe5c3c90e1ae533135b949e7a03cb1f4f60cc12cdd34b6c4b6df49e40686fbe",
-      "version": "4c8a52d",
+      "version": "cd3e504",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "4c8a52d2ae0443a4db46bb93d386d7cc302d6323"
+        "revision": "cd3e50483e746eb01ca9e92e5b5db9823b6d2edf"
       },
-      "build": "library install of 2026-11-14 (provenance record beside the image): SDK 35b285c78ad3, gate receipt stamped. The version is the short source revision.",
+      "build": "library install of 2026-11-14 20:07Z (provenance record beside the image): gate receipt stamped. The version is the short source revision.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/360x/360x.provenance.json"
     },
     {
@@ -172,15 +172,15 @@
       "var": "QDUP",
       "version_var": "V_QDUP",
       "kind": "image",
-      "bin_sha256": "f27048d3f5e97dfab074252b0c39c3488e8097a88d9d4f3574f8712e333bc5b4",
+      "bin_sha256": "24f2d326edb2a05bff518fe9d787c8303a5e39fd437151e9db3de0601edf0208",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/qdup/qdup.cue",
       "cue_sha256": "2fbbb3a8492b5a2ce53bc30b9c0ea025d323535ae85aebb509a72e96db639758",
-      "version": "6ceaca8",
+      "version": "cd3e504",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "6ceaca8dc30f370a8e0e4485738e4f142f23c979"
+        "revision": "cd3e50483e746eb01ca9e92e5b5db9823b6d2edf"
       },
-      "build": "library install of 2026-11-14 (provenance record beside the image): SDK 35b285c78ad3, gate receipt stamped. The version is the short source revision.",
+      "build": "library install of 2026-11-14 20:07Z (provenance record beside the image): gate receipt stamped. The version is the short source revision.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.56-private/qdup/qdup.provenance.json"
     }
   ]
