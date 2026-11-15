@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The launcher, the loader and the host tools move to SDK main 6c0ed4ebd5ed (the `games/PSoXide-sdk` gitlink and `release-components.json`). The loader is now built with the SDK delay-slot flags and the immediate-abort panic policy the launcher already used (20,248 B, was 21,928 B), `make loader` proves the blob with `hazard-scan --raw` (0 hazards), and its GPU words are the `psx_hw::gpu` constructors (blob byte-identical). The launcher code is unchanged.
+
 - The launcher, the loader and the host tools move to SDK main 9bb3045bdd63. The launcher's one refused call, the presentation cap (`psx_rt::interrupts::set_min_flip_vblanks`, deprecated), is now `psx_rt::present::set_cap(psx_tick::PresentCap::UNCAPPED)`: the menu still flips on every VBlank. `psx-gate.toml` still holds no exceptions.
 
 - v0.56 Private (`release/lineup-v0.56-private.json`, for a real PS1, no Public v0.56) is every program as it stands in the games library on 2026-11-14, with two changes to what the disc carries. The restored games 360X and QD Up are on it (`RESTORED=1`, Private only: they show with the launcher's plain cover and a short blurb, no backdrops, and sit last). No Cortex program is on it: neither Cortex Ignition 0.4b nor the editor test build Cortex Citadel (`CORTEX=0 CITADEL=0`; the Cortex flag is on by default, so the Public pressings are unchanged). `PRIVATE_PRESS_FLAGS` now says so; re-press v0.54 or v0.55 with `CORTEX=1 CITADEL=1 RESTORED=0`. The launcher is the SDK 9bb3045bdd63 build (previous entry).
