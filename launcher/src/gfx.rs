@@ -11,6 +11,7 @@ use psx_gpu::prim::{
     FillRect, LineGouraud, QuadFlat, QuadGouraud, QuadTexturedMaterial, Sprite, TriGouraud,
 };
 use psx_gpu::Gpu;
+use psx_rt::present::Presenter;
 use psx_io::periph::GpuDma;
 use psx_vram::{Clut, TextureDepth, TexturePage, VramRect};
 
@@ -104,6 +105,7 @@ impl Size {
 pub struct Gfx {
     gpu: Gpu,
     pub fb: DoubleBuffer,
+    presenter: Presenter,
     key: u32,
     /// Primitives drawn this frame, for the cost table.
     pub prims: u32,
@@ -135,6 +137,7 @@ impl Gfx {
         let mut g = Gfx {
             gpu,
             fb: DoubleBuffer::new(Resolution::R320X240),
+            presenter: Presenter::new(None),
             key: u32::MAX,
             prims: 0,
             ui_sub: false,
@@ -215,6 +218,7 @@ impl Gfx {
 
     /// Wait for the GPU to finish everything queued (before a hand-off).
     pub fn wait_idle(&mut self) {
+        psx_rt::present::wait_idle();
         self.gpu.wait_idle();
     }
 
@@ -239,15 +243,14 @@ impl Gfx {
     // ---- frame -----------------------------------------------------------
 
     pub fn begin(&mut self) {
+        self.presenter.begin_frame(&self.fb);
         self.prims = 0;
         self.key = u32::MAX;
         self.blend(BlendMode::Opaque);
     }
 
     pub fn end(&mut self) {
-        self.gpu.wait_idle();
-        psx_rt::interrupts::wait_vblank();
-        self.fb.swap(&mut self.gpu);
+        self.presenter.present_drawn(&mut self.fb);
     }
 
     pub fn clear(&mut self, c: Rgb) {

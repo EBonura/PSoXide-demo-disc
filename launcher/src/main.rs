@@ -127,6 +127,8 @@ static mut SPECTRUM: [u32; SECTOR_WORDS * SPECTRUM_MAX_SECTORS] =
 
 #[no_mangle]
 fn main() {
+    // psx-rt's VBlank handler flips every frame the presenter queues.
+    psx_rt::interrupts::install_vblank_counter();
     // The SDK caps presentation at 30 fps by default; the launcher keeps flipping every VBlank.
     psx_rt::present::set_cap(psx_tick::PresentCap::UNCAPPED);
 

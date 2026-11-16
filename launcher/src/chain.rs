@@ -117,6 +117,16 @@ pub fn boot(entry: &Entry, g: &mut Gfx, seek: &mut Seek) -> ! {
     g.wait_idle();
     seek.finish();
 
+    // The loader owns the whole machine: psx-rt's VBlank handler and every interrupt source
+    // go quiet before the blob is copied over anything the handler might run.
+    // SAFETY: nothing pending (`wait_idle` saw the last flip land) and nothing after this point
+    // needs an interrupt.
+    unsafe {
+        psx_io::irq::disable_cpu_interrupts();
+    }
+    psx_io::irq::set_mask(0);
+    psx_io::irq::acknowledge(!0);
+
     // SAFETY: `LOADER_BASE` is clear of every program's payload (mkdisc enforces
     // that) and of the stack, so nothing live is being overwritten. The
     // blob is position-dependent and linked for exactly this address.
