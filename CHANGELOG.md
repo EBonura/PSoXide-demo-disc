@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The launcher, the loader and mkdisc move to SDK main c6db13cdc4b8, and adopt what it provides: `psx_math::ease` (launcher text -468 B), `psx_math::color::scale_rgb_q8`, `psx_fx::Xorshift32` for the playlist shuffle (same sequence), the chainloader's `paint::{gp0_packet, display_buffer, set_draw_rect}` in the loader (blob 20,248 to 20,152 B), and `psx_pack::{fnv1a32, Fnv32}` in mkdisc. Launcher text 137,032 to 136,520 B, free heap 838,160 to 838,768 B.
+
 - The launcher, the loader and the host tools move to SDK main 6c0ed4ebd5ed (the `games/PSoXide-sdk` gitlink and `release-components.json`). The loader is now built with the SDK delay-slot flags and the immediate-abort panic policy the launcher already used (20,248 B, was 21,928 B), `make loader` proves the blob with `hazard-scan --raw` (0 hazards), and its GPU words are the `psx_hw::gpu` constructors (blob byte-identical). The launcher code is unchanged.
 
 - The launcher, the loader and the host tools move to SDK main 9bb3045bdd63. The launcher's one refused call, the presentation cap (`psx_rt::interrupts::set_min_flip_vblanks`, deprecated), is now `psx_rt::present::set_cap(psx_tick::PresentCap::UNCAPPED)`: the menu still flips on every VBlank. `psx-gate.toml` still holds no exceptions.
