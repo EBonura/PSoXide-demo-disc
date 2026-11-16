@@ -218,7 +218,7 @@ impl Gfx {
 
     /// Wait for the GPU to finish everything queued (before a hand-off).
     pub fn wait_idle(&mut self) {
-        psx_rt::present::wait_idle();
+        psx_rt::present::wait_drawn_idle();
         self.gpu.wait_idle();
     }
 
