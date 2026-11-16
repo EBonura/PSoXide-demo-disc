@@ -240,13 +240,7 @@ fn locate_files(
     files: &mut [Option<(u32, u32)>; pack::XA_FILE_COUNT],
 ) -> bool {
     let mut sector = [0u32; SECTOR_WORDS];
-    if !read_one(reader, iso::PVD_LBA, &mut sector) {
-        return false;
-    }
-    let Some((root_lba, _)) = iso::root_directory(iso::as_bytes(&sector)) else {
-        return false;
-    };
-    if !read_one(reader, root_lba, &mut sector) {
+    if !iso::read_root_sector(&mut sector, |lba, into| read_one(reader, lba, into)) {
         return false;
     }
     let mut all = true;
