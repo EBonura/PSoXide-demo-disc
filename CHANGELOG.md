@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The launcher presents through `psx_rt::present` (`Presenter::begin_frame` and `present_drawn`, hand-off waits with `wait_drawn_idle`) on SDK main 3168e2cbcb37. Against the same tree without it: launcher text 134,000 to 133,964 B. Menu frame rate unchanged (one flip per VBlank on real, mister and mister gpu-irq=never).
+
 - The launcher, the loader and mkdisc move to SDK main 1c3133beae69, and adopt what it provides: `psx_math::ease` (launcher text -468 B), `psx_math::color::scale_rgb_q8`, `psx_fx::Xorshift32` for the playlist shuffle (same sequence), the chainloader's `paint::{gp0_packet, display_buffer, set_draw_rect}` in the loader (blob smaller), and `psx_pack::{fnv1a32, Fnv32}` in mkdisc. `locate_files` reads the root through `iso::read_root_sector` (executable identical). Launcher text 137,032 to 133,928 B, free heap 838,160 to 841,792 B, loader blob 20,248 to 19,720 B.
 
 - The launcher, the loader and the host tools move to SDK main 6c0ed4ebd5ed (the `games/PSoXide-sdk` gitlink and `release-components.json`). The loader is now built with the SDK delay-slot flags and the immediate-abort panic policy the launcher already used (20,248 B, was 21,928 B), `make loader` proves the blob with `hazard-scan --raw` (0 hazards), and its GPU words are the `psx_hw::gpu` constructors (blob byte-identical). The launcher code is unchanged.
