@@ -18,7 +18,7 @@
 //!
 //! Interrupts stay off throughout, as in the rest of the blob.
 
-use psx_hw::gpu::{gp0, gp1, packet};
+use psx_hw::gpu::{gp0, gp1, pack_color, pack_vertex, packet};
 use crate::disc_art::{self, Canvas, Rgb};
 use crate::paint;
 use crate::text::Face;
@@ -309,11 +309,11 @@ fn send(words: &[u32]) {
 }
 
 fn rgb((r, g, b): Rgb) -> u32 {
-    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
+    pack_color(r, g, b)
 }
 
 fn vertex((x, y): (i32, i32)) -> u32 {
-    ((y.clamp(-1000, 1000) as u32) << 16) | (x.clamp(-1000, 1000) as u32 & 0xffff)
+    pack_vertex(x.clamp(-1000, 1000) as i16, y.clamp(-1000, 1000) as i16)
 }
 
 /// The disc's primitives as raw GP0 packets.
