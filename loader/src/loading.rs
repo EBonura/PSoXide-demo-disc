@@ -144,12 +144,12 @@ impl LoadingScreen {
     /// screen is not kept waiting for it. Both get the whole scene once; after
     /// that a frame only repaints what changes.
     pub fn begin(&mut self) {
-        send(&[DRAW_MODE]);
+        paint::gp0_packet(&[DRAW_MODE]);
         self.t += 1;
         self.draw(BUFFERS[self.shown ^ 1], Pass::Whole, 256);
         paint::draw_sync();
         self.shown ^= 1;
-        display(BUFFERS[self.shown]);
+        paint::display_buffer(BUFFERS[self.shown]);
         paint::show();
         // An edge latched before now is not a frame of this screen.
         paint::ack_vblank();
@@ -181,7 +181,7 @@ impl LoadingScreen {
         // A frame still drawing is shown at the next edge instead.
         if self.ready && gpu_idle() {
             self.shown ^= 1;
-            display(BUFFERS[self.shown]);
+            paint::display_buffer(BUFFERS[self.shown]);
             self.ready = false;
         }
         let period = if self.verifying.is_some() && self.level() == 256 {
@@ -254,7 +254,7 @@ impl LoadingScreen {
             Pass::Disc => DISC_BOX,
             Pass::Label => LABEL_BOX,
         };
-        target(y, x0, y0, w, h);
+        paint::set_draw_rect(y, x0, y0, w, h);
         paint::rect(x0, y0, w, h, 0);
         let mut canvas = Gp0;
         disc_art::disc_glow(&mut canvas, level * disc_art::glow_level(self.t) >> 8);
@@ -282,32 +282,6 @@ fn gpu_idle() -> bool {
     psx_io::gpu::try_wait_dma_ready(0) && psx_io::gpu::try_wait_command_ready(0)
 }
 
-/// Show the buffer at VRAM row `y` now.
-fn display(y: i16) {
-    psx_io::gpu::write_display_control(gp1::display_start_in_range(0, y as u32 & 0x1ff));
-}
-
-/// Aim drawing at buffer row `y`, clipped to the given screen rectangle.
-/// Coordinates sent afterwards stay screen-relative through the draw offset.
-fn target(y: i16, x0: i16, y0: i16, w: i16, h: i16) {
-    let top = (y + y0) as u32 & 0x1ff;
-    let bottom = (y + y0 + h - 1) as u32 & 0x1ff;
-    send(&[
-        gp0::draw_area_top_left_in_range(x0 as u32, top),
-        gp0::draw_area_bottom_right_in_range((x0 + w - 1) as u32, bottom),
-        gp0::draw_offset_in_range(0, y as u32 & 0x7ff),
-    ]);
-}
-
-/// One GP0 packet: wait once for the GPU to take commands, then every word.
-fn send(words: &[u32]) {
-    // Best effort: a dead GPU must not hang the loader.
-    let _ = psx_io::gpu::try_wait_command_ready(1_000_000);
-    for &word in words {
-        psx_io::gpu::write_command(word);
-    }
-}
-
 fn rgb((r, g, b): Rgb) -> u32 {
     pack_color(r, g, b)
 }
@@ -321,7 +295,7 @@ struct Gp0;
 
 impl Canvas for Gp0 {
     fn quad_g(&mut self, v: [(i32, i32); 4], c: [Rgb; 4]) {
-        send(&[
+        paint::gp0_packet(&[
             packet::SHADED_QUAD | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
@@ -334,7 +308,7 @@ impl Canvas for Gp0 {
     }
 
     fn tri_g(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
-        send(&[
+        paint::gp0_packet(&[
             packet::SHADED_TRIANGLE | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
@@ -345,7 +319,7 @@ impl Canvas for Gp0 {
     }
 
     fn tri_g_add(&mut self, v: [(i32, i32); 3], c: [Rgb; 3]) {
-        send(&[
+        paint::gp0_packet(&[
             packet::SHADED_TRIANGLE | packet::SEMI_TRANSPARENT | rgb(c[0]),
             vertex(v[0]),
             rgb(c[1]),
@@ -356,7 +330,7 @@ impl Canvas for Gp0 {
     }
 
     fn line_add(&mut self, a: (i32, i32), b: (i32, i32), ca: Rgb, cb: Rgb) {
-        send(&[packet::SHADED_LINE | packet::SEMI_TRANSPARENT | rgb(ca), vertex(a), rgb(cb), vertex(b)]);
+        paint::gp0_packet(&[packet::SHADED_LINE | packet::SEMI_TRANSPARENT | rgb(ca), vertex(a), rgb(cb), vertex(b)]);
     }
 }
 
@@ -375,7 +349,7 @@ fn label(alpha: u32) {
     for c in LABEL.bytes() {
         let glyph = face.glyph(c);
         if glyph.w > 0 {
-            send(&[
+            paint::gp0_packet(&[
                 packet::TEXTURED_RECT | packet::SEMI_TRANSPARENT | tint,
                 vertex((pen + glyph.xoff as i32, top + glyph.yoff as i32)),
                 (ATLAS_CLUT << 16) | ((glyph.v as u32) << 8) | glyph.u as u32,
