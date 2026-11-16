@@ -22,7 +22,7 @@
 
 use crate::common::{footer, header, CaseGeom, Ctx, HEAD_MID, MARGIN};
 use crate::cover::{self, Cover, PROGRAMS};
-use crate::ease;
+use psx_math::ease;
 use disc_toc::Entry;
 use crate::gfx::*;
 use crate::shelf::{self, FLOOR, HORIZON};
@@ -117,7 +117,7 @@ fn turn_pose(st: i32) -> (i32, i32) {
     let b4 = b3 + TURN_BACK;
     let b5 = b4 + HOLD_BACK;
     let b6 = b5 + TURN_HOME;
-    let io = |a: i32, b: i32| ease::in_out(ease::span(st, a, b));
+    let io = |a: i32, b: i32| ease::ease_in_out_cubic_q8(ease::span_q8(st, a, b));
     let angle = if st < b1 {
         0
     } else if st < b2 {
@@ -295,8 +295,8 @@ impl Attract {
             self.st = 0;
         }
         let to = self.stops[self.stop] as i32 * 256;
-        let g = ease::in_out(ease::span(self.st, 0, self.glide_len));
-        self.pos = ease::lerp(self.from, to, g);
+        let g = ease::ease_in_out_cubic_q8(ease::span_q8(self.st, 0, self.glide_len));
+        self.pos = ease::lerp_q8(self.from, to, g);
     }
 
     /// The turn the focused case is in: (angle, zoom), or none while gliding.
@@ -344,7 +344,7 @@ impl Attract {
         if self.t < 40 {
             header(g, ctx);
             footer(g, ctx);
-            let v = (ease::span(self.t as i32, 0, 30) * 255 >> 8) as u8;
+            let v = (ease::span_q8(self.t as i32, 0, 30) * 255 >> 8) as u8;
             g.quad_g_sub([(0, 0), (320, 0), (0, 24), (320, 24)], [(v, v, v); 4]);
             g.quad_g_sub([(0, 216), (320, 216), (0, 240), (320, 240)], [(v, v, v); 4]);
         }
@@ -439,11 +439,11 @@ impl Attract {
         let near = if self.st < self.glide_len {
             let c = (self.glide_len / 2) as i32;
             let away = (self.st as i32 - c).abs();
-            ease::span(away, 0, c / 2) as u32
+            ease::span_q8(away, 0, c / 2) as u32
         } else {
             256
         };
-        let fade_in = ease::span(self.t as i32, 0, 40) as u32;
+        let fade_in = ease::span_q8(self.t as i32, 0, 40) as u32;
         let a = (near * (256 - ((256 - fade_in) >> 1)) >> 8).min(256);
         if a > 8 {
             shelf::title_row(g, e, 141, a);
@@ -461,7 +461,7 @@ impl Attract {
         // six seconds to the music credit (each fades in and out).
         if self.t >= 36 {
             let phase = (self.t % 360) as i32;
-            let fade = (ease::span(phase, 0, 30) * (256 - ease::span(phase, 330, 360)) >> 8) as u32;
+            let fade = (ease::span_q8(phase, 0, 30) * (256 - ease::span_q8(phase, 330, 360)) >> 8) as u32;
             if (self.t / 360) % 2 == 1 && !ctx.credit.is_empty() {
                 text::draw_centered_mid(g, &SMALL8, 160, 228, ctx.credit, scale(MUTED, fade), 0);
             } else {

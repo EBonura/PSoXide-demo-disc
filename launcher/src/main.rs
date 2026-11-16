@@ -32,7 +32,6 @@ mod credits;
 #[path = "../../loader/src/disc_art.rs"]
 #[allow(dead_code)] // the loader uses the rest
 mod disc_art;
-mod ease;
 mod face;
 mod gfx;
 mod launch;

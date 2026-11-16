@@ -16,7 +16,7 @@
 use crate::common::*;
 use crate::cover::{self, Cover};
 use crate::disc_art;
-use crate::ease;
+use psx_math::ease;
 use crate::gfx::*;
 use crate::shelf;
 use disc_toc::Entry;
@@ -129,7 +129,7 @@ fn cover(g: &mut Gfx, geom: &CaseGeom, art: usize, angle: i32, dim: u32) {
         );
         // A diagonal glare that slides across the glass as it catches the
         // light: a band leaning from top-left to bottom-right.
-        let peak = (ease::span(angle, 150, 480) * (256 - ease::span(angle, 520, 960)) >> 8) as u32;
+        let peak = (ease::span_q8(angle, 150, 480) * (256 - ease::span_q8(angle, 520, 960)) >> 8) as u32;
         if peak > 4 {
             let k = 2 + (angle * 3 / QUARTER).clamp(0, 3) as usize;
             let hi = scale((40, 66, 74), peak * dim >> 8);
@@ -172,23 +172,23 @@ fn tray(g: &mut Gfx, geom: &CaseGeom, dim: u32) {
 pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
     // Veil the menu: subtract toward the dark stage (the menu stops being
     // drawn once the veil has taken it to black).
-    let veil = ease::out(ease::span(t, 0, 28)) * 230 / 256;
+    let veil = ease::ease_out_quart_q8(ease::span_q8(t, 0, 28)) * 230 / 256;
     let v = veil as u8;
     g.quad_g_sub([(0, 0), (320, 0), (0, 240), (320, 240)], [(v, v, v); 4]);
-    let rise = ease::out(ease::span(t, 0, 30)) as u32;
+    let rise = ease::ease_out_quart_q8(ease::span_q8(t, 0, 30)) as u32;
 
     // Case travels to the stage and grows a little, sliding right as it
     // opens.
-    let move_t = ease::out(ease::span(t, 0, 26));
-    let sc = ease::lerp(from.sc, 285, move_t);
-    let cx = ease::lerp(from.cx, 160, move_t);
-    let mut bottom = ease::lerp(from.bottom, 150, move_t);
-    let pan = (ease::out(ease::span(t, OPEN_FROM - 4, OPEN_TO)) * PAN) >> 8;
+    let move_t = ease::ease_out_quart_q8(ease::span_q8(t, 0, 26));
+    let sc = ease::lerp_q8(from.sc, 285, move_t);
+    let cx = ease::lerp_q8(from.cx, 160, move_t);
+    let mut bottom = ease::lerp_q8(from.bottom, 150, move_t);
+    let pan = (ease::ease_out_quart_q8(ease::span_q8(t, OPEN_FROM - 4, OPEN_TO)) * PAN) >> 8;
     // Recede: after the disc leaves, the case slides back and down.
-    let rec = ease::in_out(ease::span(t, 38, 60));
+    let rec = ease::ease_in_out_cubic_q8(ease::span_q8(t, 38, 60));
     bottom += (rec * 18) >> 8;
-    let sc = ease::lerp(sc, 200, rec);
-    let dim = ease::lerp(256, 0, rec);
+    let sc = ease::lerp_q8(sc, 200, rec);
+    let dim = ease::lerp_q8(256, 0, rec);
     let d = dim as u32;
     let cv = CaseView {
         cx: cx + pan,
@@ -197,7 +197,7 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
         dim,
         focus: 256,
         // The menu's sway carries on and settles flat before the cover opens.
-        yaw: (shelf::sway_yaw(ctx.t) * (256 - ease::span(t, 0, OPEN_FROM))) >> 8,
+        yaw: (shelf::sway_yaw(ctx.t) * (256 - ease::span_q8(t, 0, OPEN_FROM))) >> 8,
     };
     let geom = CaseGeom::new(cv.cx, cv.bottom, sc);
     let xf = CaseXform::aim(&geom, cv.yaw);
@@ -213,15 +213,15 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
 
     // One disc for the whole sequence: seated in the tray, lifted out of the
     // case, then flown to the middle where it spins up.
-    let open = ease::in_out(ease::span(t, OPEN_FROM, OPEN_TO));
-    let lift = ease::in_out(ease::span(t, 34, 56));
-    let fly = ease::in_out(ease::span(t, 50, 72));
+    let open = ease::ease_in_out_cubic_q8(ease::span_q8(t, OPEN_FROM, OPEN_TO));
+    let lift = ease::ease_in_out_cubic_q8(ease::span_q8(t, 34, 56));
+    let fly = ease::ease_in_out_cubic_q8(ease::span_q8(t, 50, 72));
     let seat = (geom.ax + geom.aw / 2, geom.ay + geom.ah / 2);
     let top = (seat.0, seat.1 - 54);
-    let dcx = ease::lerp(ease::lerp(seat.0, top.0, lift), 160, fly);
-    let dcy = ease::lerp(ease::lerp(seat.1, top.1, lift), 112, fly);
-    let dr = ease::lerp(
-        ease::lerp(geom.ah * 40 / 100, geom.ah * 40 / 100 + 18, lift),
+    let dcx = ease::lerp_q8(ease::lerp_q8(seat.0, top.0, lift), 160, fly);
+    let dcy = ease::lerp_q8(ease::lerp_q8(seat.1, top.1, lift), 112, fly);
+    let dr = ease::lerp_q8(
+        ease::lerp_q8(geom.ah * 40 / 100, geom.ah * 40 / 100 + 18, lift),
         52,
         fly,
     );
@@ -240,12 +240,12 @@ pub fn draw(g: &mut Gfx, t: i32, from: From, e: &Entry, ctx: &Ctx) {
             dcy,
             dr,
             spin,
-            120 + (136 * ease::span(t, 14, 60) as u32 >> 8),
+            120 + (136 * ease::span_q8(t, 14, 60) as u32 >> 8),
         );
         // Two echo rings behind the spin-up, as the shell's tray echoes.
         if t > 47 {
             for k in 0..2i32 {
-                let e = ease::span(t - 47 - k * 4, 0, 20);
+                let e = ease::span_q8(t - 47 - k * 4, 0, 20);
                 if e > 0 && e < 256 {
                     let fade = (256 - e) as u32;
                     g.ellipse_ring(

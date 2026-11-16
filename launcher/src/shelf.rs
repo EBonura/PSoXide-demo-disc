@@ -7,7 +7,7 @@
 //! positions are fixed rows (see the constants) so nothing drifts.
 
 use crate::common::*;
-use crate::ease;
+use psx_math::ease;
 use disc_toc::Entry;
 use crate::gfx::*;
 use crate::text;
@@ -84,9 +84,9 @@ pub fn sway_yaw(t: u32) -> i32 {
 /// Where a case `d` (Q8 slots from the centre) sits: (x offset, scale, dim).
 pub fn layout(d: i32) -> (i32, i32, i32) {
     let a = d.abs();
-    let x = ease::knots(a, &[(0, 0), (256, 98), (512, 158), (768, 215)]);
-    let sc = ease::knots(a, &[(0, 256), (256, 168), (512, 128), (768, 100)]);
-    let dim = ease::knots(a, &[(0, 256), (256, 128), (512, 74), (768, 40)]);
+    let x = ease::knots_q8(a, &[(0, 0), (256, 98), (512, 158), (768, 215)]);
+    let sc = ease::knots_q8(a, &[(0, 256), (256, 168), (512, 128), (768, 100)]);
+    let dim = ease::knots_q8(a, &[(0, 256), (256, 128), (512, 74), (768, 40)]);
     (if d < 0 { -x } else { x }, sc, dim)
 }
 
@@ -159,7 +159,7 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
     let e = &entries[sel as usize];
     let near = ((256 - (sel * 256 - s.pos).abs() * 2).max(0)) as u32;
     let gone = if hide_sel {
-        256 - ease::span(launch, 0, 16) as u32
+        256 - ease::span_q8(launch, 0, 16) as u32
     } else {
         256
     };
