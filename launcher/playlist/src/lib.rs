@@ -12,6 +12,8 @@
 
 #![no_std]
 
+use psx_fx::Xorshift32;
+
 /// Songs a playlist can hold; the disc table's limit.
 pub const MAX_SONGS: usize = 8;
 
@@ -111,12 +113,8 @@ impl Playlist {
     }
 
     fn next_random(&mut self) -> u32 {
-        let mut x = self.rng;
-        x ^= x << 13;
-        x ^= x >> 17;
-        x ^= x << 5;
-        self.rng = x;
-        x
+        self.rng = Xorshift32::step(self.rng);
+        self.rng
     }
 
     /// Deal a new permutation (Fisher-Yates). With `avoid_first`, the song
@@ -152,6 +150,23 @@ pub const fn sectors_for_millis(millis: u32, sectors_per_second: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The shuffle drew from the launcher's own xorshift32 before it used the SDK's; the
+    /// stream, and so every song order a seed gives, must not move.
+    #[test]
+    fn the_shuffle_stream_is_the_launchers_old_xorshift32() {
+        for seed in [1u32, 2, 0x2545_f491, 0x9E37_79B1, 0xdead_beef, u32::MAX] {
+            let mut old = seed;
+            let mut new = seed;
+            for _ in 0..100_000 {
+                old ^= old << 13;
+                old ^= old >> 17;
+                old ^= old << 5;
+                new = Xorshift32::step(new);
+                assert_eq!(old, new);
+            }
+        }
+    }
 
     #[test]
     fn the_32_bit_time_conversions_match_the_wide_forms() {

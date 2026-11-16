@@ -36,6 +36,9 @@ dependencies = [
 [[package]]
 name = "playlist"
 version = "0.1.0"
+dependencies = [
+ "psx-fx",
+]
 
 [[package]]
 name = "psx-asset"
@@ -50,6 +53,13 @@ dependencies = [
 [[package]]
 name = "psx-disc-toc"
 version = "0.1.0"
+
+[[package]]
+name = "psx-fx"
+version = "0.1.0"
+dependencies = [
+ "psx-gpu",
+]
 
 [[package]]
 name = "psx-gpu"

@@ -10,3 +10,4 @@ description = "The launcher's shuffled song order and song clock."
 # logic on the host.
 
 [dependencies]
+psx-fx = { path = "../../games/PSoXide-sdk/sdk/crates/psx-fx" }
