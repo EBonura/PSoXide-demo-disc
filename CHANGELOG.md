@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The menu music playlist is `psx_fx::playlist` (SDK lane/audio2 d3603ff28, with the shared MUSIC OFF slot) instead of a private copy in `launcher/playlist`, which keeps only the song clock's sector arithmetic. The song order for a given boot seed changes (the SDK takes the draw and swap of NitroXide's playlist); nothing pins it. Against the same tree without it, both on SDK main f2a78b4d4: launcher text 135,656 to 135,648 B, menu one flip per VBlank on real, mister and mister gpu-irq=never.
+
 - The launcher presents through `psx_rt::present` (`Presenter::begin_frame` and `present_drawn`, hand-off waits with `wait_drawn_idle`) on SDK main 3168e2cbcb37. Against the same tree without it: launcher text 134,000 to 133,964 B. Menu frame rate unchanged (one flip per VBlank on real, mister and mister gpu-irq=never).
 
 - The launcher, the loader and mkdisc move to SDK main 1c3133beae69, and adopt what it provides: `psx_math::ease` (launcher text -468 B), `psx_math::color::scale_rgb_q8`, `psx_fx::Xorshift32` for the playlist shuffle (same sequence), the chainloader's `paint::{gp0_packet, display_buffer, set_draw_rect}` in the loader (blob smaller), and `psx_pack::{fnv1a32, Fnv32}` in mkdisc. `locate_files` reads the root through `iso::read_root_sector` (executable identical). Launcher text 137,032 to 133,928 B, free heap 838,160 to 841,792 B, loader blob 20,248 to 19,720 B.
