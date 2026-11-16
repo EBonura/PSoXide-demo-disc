@@ -65,11 +65,7 @@ pub fn glow_level(t: i32) -> u32 {
 
 pub fn scale(c: Rgb, num: u32) -> Rgb {
     // num: 0..=256
-    (
-        ((c.0 as u32 * num) >> 8) as u8,
-        ((c.1 as u32 * num) >> 8) as u8,
-        ((c.2 as u32 * num) >> 8) as u8,
-    )
+    psx_math::color::scale_rgb_q8(c, num)
 }
 
 /// A soft glow: an additive fan from `c` at the centre to black at the rim.
