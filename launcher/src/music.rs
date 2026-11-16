@@ -11,7 +11,7 @@
 //! one: the table, the meter data and the backdrops are all read before the
 //! first note, and [`Music::stop`] pauses the drive before a program is loaded.
 
-use playlist::{Playlist, Slot};
+use playlist::{OffSlot, Playlist, Slot};
 use psx_io::cd::xa_clock::SongClock;
 use psx_hw::cd::xa::END_GUARD_SECTORS;
 use psx_io::iso;
@@ -94,7 +94,7 @@ impl Music {
         Music {
             player,
             files,
-            list: Playlist::new(usable, seed),
+            list: Playlist::new(usable, seed, OffSlot::After),
             clock: SongClock::new(crate::TICKS_HZ).with_head_lead_ms(HEAD_LEAD_MS),
             ms: None,
             state: State::Silent,
