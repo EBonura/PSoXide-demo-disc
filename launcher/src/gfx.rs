@@ -25,14 +25,8 @@ pub const RING: Rgb = (108, 127, 143);
 pub const ACCENT: Rgb = (34, 200, 229);
 pub const FOCUS: Rgb = (128, 239, 255);
 
-pub fn scale(c: Rgb, num: u32) -> Rgb {
-    // num: 0..=256
-    (
-        ((c.0 as u32 * num) >> 8) as u8,
-        ((c.1 as u32 * num) >> 8) as u8,
-        ((c.2 as u32 * num) >> 8) as u8,
-    )
-}
+// The loader shares this body (`num`: 0..=256), so the disc has one.
+pub use crate::disc_art::scale;
 
 pub fn mix(a: Rgb, b: Rgb, t: u32) -> Rgb {
     // t: 0..=256
