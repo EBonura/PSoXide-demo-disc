@@ -74,17 +74,6 @@ const EXE_MAGIC: &[u8; 8] = b"PS-X EXE";
 /// subheader and the 2328 bytes that follow.
 const XA_SECTOR_BYTES: usize = 2336;
 
-/// FNV-1a-32 over `bytes`: the payload checksum the chain loader recomputes
-/// over RAM before jumping. Must match the loader's implementation.
-fn fnv1a32(bytes: &[u8]) -> u32 {
-    let mut hash: u32 = 0x811C_9DC5;
-    for &b in bytes {
-        hash ^= b as u32;
-        hash = hash.wrapping_mul(0x0100_0193);
-    }
-    hash
-}
-
 /// Pre-analysed level-meter data for every menu song, end to end.
 const SPECTRUM_FILE_NAME: &str = "SPECTRUM.BIN";
 
@@ -1025,7 +1014,7 @@ fn run() -> Result<(), String> {
                 bytes.len().saturating_sub(2048)
             ));
         }
-        let fnv = fnv1a32(&bytes[2048..payload_end]);
+        let fnv = psx_pack::fnv1a32(&bytes[2048..payload_end]);
         entries[index] = Some(Entry::new(&program.name, next_lba, 0, 0).with_payload_fnv(fnv));
         map.push((
             next_lba,
@@ -1054,7 +1043,7 @@ fn run() -> Result<(), String> {
         // Checksum the payload as the loader will read it: the 2048-byte
         // data windows of the raw sectors after the header sector.
         let mut remaining = header.payload_bytes as usize;
-        let mut hash: u32 = 0x811C_9DC5;
+        let mut hash = psx_pack::Fnv32::new();
         let mut sector = boot_exe_lba as usize + 1;
         while remaining > 0 {
             let at = sector * SECTOR_BYTES + 24;
@@ -1062,14 +1051,11 @@ fn run() -> Result<(), String> {
             let data = image.data.get(at..at + take).ok_or_else(|| {
                 format!("{}: image ends inside its boot EXE payload", path.display())
             })?;
-            for &b in data {
-                hash ^= b as u32;
-                hash = hash.wrapping_mul(0x0100_0193);
-            }
+            hash.update(data);
             remaining -= take;
             sector += 1;
         }
-        images.push((index, path.clone(), image, hash, boot_exe_lba));
+        images.push((index, path.clone(), image, hash.finish(), boot_exe_lba));
     }
 
     gate.finish()?;
