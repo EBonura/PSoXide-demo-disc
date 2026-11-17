@@ -150,12 +150,15 @@ impl Music {
     pub fn stop(&mut self) {
         self.ms = None;
         self.state = State::Silent;
-        self.player.stop();
+        // The next thing to use the drive is the chain-load's seek: wait for the Pause.
+        self.player.stop_and_wait();
     }
 
     /// Once a frame: read the head every few frames, notice the end of a song,
     /// retry a start that did not take.
     pub fn frame(&mut self, now: u32) {
+        // A stop sends its Pause and returns; one look a frame completes it (also in `Silent`).
+        self.player.poll_stop();
         match self.state {
             State::Silent => {}
             State::Retry(at) => {
