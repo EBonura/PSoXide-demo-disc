@@ -359,13 +359,13 @@ PRIVATE_LINEUP ?= release/lineup-$(VERSION)-private.json
 PUBLIC_DIST  = $(PRESS_ROOT)/$(VERSION)/public
 PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # What the Private disc carries: Half-Life, Hollow Knight, WipEout and Ocarina of Time on
-# top of the shared programs, no Arcade or PSXcel, no Counter-Strike and no hardware tests.
+# top of the shared programs, no Arcade or PSXcel and no hardware tests.
 # From v0.56 it also carries 360X and QD Up (RESTORED=1) and no Cortex at all
-# (the defaults). The v0.54 and v0.55 lineups list the Cortex programs and no
+# (the defaults), and from v0.57 Counter-Strike again (CS=1; v0.56 is re-pressed with CS=0). The v0.54 and v0.55 lineups list the Cortex programs and no
 # restored games: re-press them with CORTEX=1 CITADEL=1 RESTORED=0 on the command line. It is
 # pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
 # the last program, so all game data ends well inside the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=0 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+PRIVATE_PRESS_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
