@@ -37,6 +37,7 @@ mod gfx;
 mod launch;
 mod music;
 mod shelf;
+mod state;
 mod text;
 #[path = "../assets/ui_atlas.rs"]
 #[allow(dead_code)]
@@ -320,6 +321,16 @@ fn main() {
             attract = Some(attract::Attract::new(entries, sel as usize));
         }
         prev_held = pad;
+        state::publish(&state::Frame {
+            entries: count,
+            analog_ok,
+            pad: pads.analog(Port::One),
+            screen,
+            attract: attract.is_some(),
+            selected: sel,
+            launching: launching >= 0,
+            frames: tick,
+        });
 
         // The playing state for the header.
         let playback = if !has_music {
@@ -407,6 +418,7 @@ fn main() {
             if let Some(seek) = seek.as_mut() {
                 seek.frame();
                 if launching >= launch::FRAMES {
+                    state::hand_off();
                     // Never returns when the disc is readable.
                     chain::boot(chosen, &mut g, seek);
                 }
