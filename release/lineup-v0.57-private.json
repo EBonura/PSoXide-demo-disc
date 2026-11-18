@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.57-private",
-  "note": "PSoXide Demo Disc v0.57, private edition (local, never published or distributed), all XA: no CD-DA track. Eleven programs: every program is the library build installed at SDK main 0187c5f4fab8 (the final pin, 2026-11-18), each the exact disc its own psoxide-test full run passed (the harness result is named in each row's build text), and Counter-Strike rides the disc again (CS=1). 360X and QD Up are on it as on v0.56. No Cortex program. The launcher is built on SDK 0187c5f4fab8 and publishes LAUNCHER_STATE for the disc gate. Left out: Arcade, PSXcel and the hardware tests.",
+  "note": "PSoXide Demo Disc v0.57, private edition (local, never published or distributed), all XA: no CD-DA track. Eleven programs: every program is the library build installed at SDK main 0187c5f4fab8 (the final pin, 2026-11-18), each the exact disc its own psoxide-test full run passed (the harness result is named in each row's build text), and Counter-Strike rides the disc again (CS=1). 360X and QD Up are on it as on v0.56, at their final build. No Cortex program. The launcher is built on SDK 0187c5f4fab8 and publishes LAUNCHER_STATE for the disc gate. Left out: Arcade, PSXcel and the hardware tests.",
   "programs": [
     {
       "name": "CELESTE COLLECTION",
@@ -180,16 +180,16 @@
       "var": "X360",
       "version_var": "V_X360",
       "kind": "image",
-      "bin_sha256": "3f986cdb45bdcffd7e5249fdb022f3a9c12d16fdecbe41ff40801959fbf7af10",
+      "bin_sha256": "4173258bd79bce6412d785fea4b05114bbd4f8e8231272b1c64951f8f4d26d4a",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.57-private/360x/360x.cue",
       "cue_sha256": "fbe5c3c90e1ae533135b949e7a03cb1f4f60cc12cdd34b6c4b6df49e40686fbe",
-      "version": "fed642d",
+      "version": "072005b",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "fed642d8aa859710a48254beb96421f1db9fe994",
+        "revision": "072005b7de8fab13d53d2767c0132d13f3886544",
         "ref": "main"
       },
-      "build": "PLACEHOLDER: library install of 2026-11-17 (provenance record beside the image), SDK 3779d464513f, the first-pin build; the final build replaces it. The version is the short source revision.",
+      "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is the short source revision.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.57-private/360x/360x.provenance.json"
     },
     {
@@ -197,16 +197,16 @@
       "var": "QDUP",
       "version_var": "V_QDUP",
       "kind": "image",
-      "bin_sha256": "5f28b75187840d2dcb0be9e30f342f0f2edde031c06b0be8ea5232f9a0e65455",
+      "bin_sha256": "50fc6c98a15f5e925c678de827bc30d6b04f0fd01be069f683a5995d8596eb7e",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.57-private/qdup/qdup.cue",
       "cue_sha256": "2fbbb3a8492b5a2ce53bc30b9c0ea025d323535ae85aebb509a72e96db639758",
-      "version": "fed642d",
+      "version": "072005b",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "fed642d8aa859710a48254beb96421f1db9fe994",
+        "revision": "072005b7de8fab13d53d2767c0132d13f3886544",
         "ref": "main"
       },
-      "build": "PLACEHOLDER: library install of 2026-11-17 (provenance record beside the image), SDK 3779d464513f, the first-pin build; the final build replaces it. The version is the short source revision.",
+      "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is the short source revision.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.57-private/qdup/qdup.provenance.json"
     }
   ]
