@@ -3,7 +3,7 @@
 # judged ([[requires]]), the launcher boots and refuses a digital pad, the shelf moves, and every
 # member chain-loads and runs on the four PSoXide models, PCSX-ReARMed and PCSX-Redux.
 schema = 1
-name = "PSoXide Demo Disc v0.57 Private"
+name = "PSoXide Demo Disc v0.58 Private"
 repository = "EBonura/PSoXide-demo-disc"
 
 # The SDK pin is the first "revision" in release-components.json (its sdk component).
@@ -18,19 +18,20 @@ after = "\"revision\": \""
 name = "private"
 out = "build/private"
 commands = [
-  ["make", "-o", "components", "lineup-disc", "LINEUP=release/lineup-v0.57-private.json",
+  ["make", "-o", "components", "lineup-disc", "LINEUP=release/lineup-v0.58-private.json",
    "RELEASE_INPUTS={input:release-inputs}", "HL=1", "CS=1", "HK=1", "WO=1", "OOT=1", "CITADEL=0",
    "RESTORED=1", "HWT=0", "TAIL_FILLER=4500", "DISC_MAX_SECTORS=359844", "LEAVE_OUT=ARCADE PSXCEL",
-   "DISC_NAME=PSoXide Demo Disc v0.57 Private", "DISC_VERSION=v0.57", "DIST={out}",
-   "FRONTEND={input:psoxide-emulator}"],
+   "DISC_NAME=PSoXide Demo Disc v0.58 Private", "DISC_VERSION=v0.58", "DIST={out}",
+   "FRONTEND={input:psoxide-emulator}", "ART_SRC={input:launcher-art}",
+   "RESTORED_ART={input:restored-art}", "LAUNCHER_ART=$(PRIVATE_ART)"],
   ["tools/disc-tools/target/release/disc-tools", "members",
-   "--image", "{out}/PSoXide Demo Disc v0.57 Private.bin",
-   "--receipt", "{out}/PSoXide Demo Disc v0.57 Private.release-receipt.json",
-   "--lineup", "release/lineup-v0.57-private.json", "--inputs", "{input:release-inputs}",
+   "--image", "{out}/PSoXide Demo Disc v0.58 Private.bin",
+   "--receipt", "{out}/PSoXide Demo Disc v0.58 Private.release-receipt.json",
+   "--lineup", "release/lineup-v0.58-private.json", "--inputs", "{input:release-inputs}",
    "--out", "{out}"],
 ]
 collect = { "launcher.map" = "build/mipsel-sony-psx/psoxide-pgo-maps/*" }
-disc = "PSoXide Demo Disc v0.57 Private.cue"
+disc = "PSoXide Demo Disc v0.58 Private.cue"
 map = "launcher.map"
 members = "members.json"
 
@@ -55,11 +56,11 @@ command = ["make", "check"]
 [[clean]]
 build = "private"
 seed = [".psoxide"]
-compare = ["PSoXide Demo Disc v0.57 Private.bin", "PSoXide Demo Disc v0.57 Private.cue"]
+compare = ["PSoXide Demo Disc v0.58 Private.bin", "PSoXide Demo Disc v0.58 Private.cue"]
 
 [[install]]
 build = "private"
-name = "PSoXide Demo Disc v0.57 Private"
+name = "PSoXide Demo Disc v0.58 Private"
 
 # Every member: the content hash of its complete full-tier PASS result and the judged disc image
 # the lineup took (members.json bin_sha256). Results are found under the config's `results` dirs.

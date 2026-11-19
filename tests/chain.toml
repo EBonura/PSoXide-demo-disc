@@ -5,7 +5,7 @@
 # checkpoint, all kind = "ram"), so it never waits a fixed time.
 name = "chain-{member}"
 title = "{id} through the launcher"
-disc = ["{repo}/build/private/PSoXide Demo Disc v0.57 Private.cue"]
+disc = ["{repo}/build/private/PSoXide Demo Disc v0.58 Private.cue"]
 symbols = ["{repo}/build/private/launcher.map", "{repo}/build/private/members.sym"]
 pad = "dualshock"
 max_ticks = 20000

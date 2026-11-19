@@ -1,7 +1,7 @@
 # A pure digital pad gets the launcher's "needs an analog controller" screen, and stays there.
 name = "pad-refusal"
 title = "Digital pad refused"
-disc = ["build/private/PSoXide Demo Disc v0.57 Private.cue"]
+disc = ["build/private/PSoXide Demo Disc v0.58 Private.cue"]
 symbols = ["build/private/launcher.map"]
 pad = "digital"
 max_ticks = 2000
