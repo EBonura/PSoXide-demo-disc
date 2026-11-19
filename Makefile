@@ -208,8 +208,8 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
 # missing from it, that program's case is plain. Local inputs, like the lineup's:
 #   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
-#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art"     (Public, G = the games' checkouts)
-# A Private press adds the Private programs' directories (the lineup names them). The list is
+#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art"     (Public, G = the games' checkouts)
+# (Cortex Ignition's pictures are in the editor repository.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art

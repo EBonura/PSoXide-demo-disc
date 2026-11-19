@@ -1,10 +1,10 @@
 //! Cover art: which pictures go on which program's case.
 //!
 //! The pictures are baked into the launcher by `tools/menu-art` (three sizes
-//! of each, and the attract mode's back-cover shots). The Cortex pair's are
-//! cut from `assets/shots`; every other program's come from its own
-//! repository's `launcher-art/` (`external_program!`). They are found by the
-//! program's name in the disc table. A program with no
+//! of each, and the attract mode's back-cover shots). Citadel's are cut from
+//! `assets/shots`; every other program's come from its own repository's
+//! `launcher-art/` (`external_program!`). They are found by the program's name
+//! in the disc table. A program with no
 //! picture here gets a plain cover, so a new lineup entry still shows and
 //! starts.
 //!
@@ -118,16 +118,16 @@ pub static PROGRAMS: &[Program] = &[
     ),
     // The Public edition has one Cortex, so its case says what it is. The Private
     // edition carries both engines and says which one this is.
-    #[cfg(not(feature = "private"))]
-    program!(
+    #[cfg(all(not(feature = "private"), art_cortex))]
+    external_program!(
         "CORTEX IGNITION",
         "cortex",
         "CORTEX",
         "A Souls-like built from scratch for the original PlayStation. Early tech demo.",
         "Un souls-like sviluppato da zero per PlayStation. Primo tech demo."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_cortex))]
+    external_program!(
         "CORTEX IGNITION",
         "cortex",
         "CORTEX",

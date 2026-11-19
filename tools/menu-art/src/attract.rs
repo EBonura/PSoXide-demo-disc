@@ -15,10 +15,6 @@ const SHOT_H: u32 = 48;
 
 /// Program id used by the guest, and its screenshots in the shots directory.
 const BACKS: &[(&str, &[&str])] = &[
-    (
-        "cortex",
-        &["cortex-current-gameplay", "cortex-current-menu"],
-    ),
     ("citadel", &["cortex-citadel1", "cortex-citadel2"]),
 ];
 

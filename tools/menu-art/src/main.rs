@@ -365,7 +365,6 @@ fn cook_art(src: &Path, sizes: &[(&str, u32, u32)]) -> Vec<(String, Vec<u8>)> {
 
 /// (file stem in the shots directory, id used by the guest).
 const ARTS: &[(&str, &str)] = &[
-    ("cortex-current-gameplay", "cortex"),
     ("cortex-citadel1", "citadel"),
 ];
 
