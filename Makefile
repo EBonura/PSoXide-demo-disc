@@ -207,7 +207,10 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # bakes them into $(ART_OUT) at build time, so no baked blob is committed anywhere. The launcher
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
 # missing from it, that program's case is plain. Local inputs, like the lineup's:
-#   make launcher PRIVATE=1 LAUNCHER_ART="/path/to/restored-games/launcher-art"
+#   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
+#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art"     (Public, G = the games' checkouts)
+# A Private press adds cs-psx, oot-psx, wipeout-psx, hl-psx, hk-psx and the restored games' directories. The list is
+# typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art
 .PHONY: launcher-art

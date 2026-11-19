@@ -317,8 +317,9 @@ inside corner brackets and sways on its hinge; its neighbours recede in scale
 and light and lean toward it. Under the row sit the program's name with its
 own version beside it, its description in English or Italian, and the start
 button. The cover on each case is a picture baked into the launcher by
-`tools/menu-art` from `assets/shots` (a program the launcher has no picture
-for gets a plain cover and still starts).
+`tools/menu-art` (a program the launcher has no picture for gets a plain cover
+and still starts). The two Cortex programs' pictures are cut from `assets/shots`;
+every other program's live in its own repository, below.
 
 A program's art can instead live in its own repository, in a `launcher-art/`
 directory with the same layout for every game: a `manifest.txt` (per program an
@@ -328,7 +329,12 @@ launcher`), so no baked blob is stored in a game repository, and
 `LAUNCHER_ART="dir1 dir2"` names the directories to take. The launcher's
 `cover.rs` entry for such a program carries `#[cfg(art_<id>)]` and `build.rs`
 lists the id; without the directory the entry is left out and the case is plain.
-360X and QD Up (Private) work this way.
+Every program except the two Cortex ones works this way (Arcade, Celeste, NitroXide,
+VoXide, Quake, PSXcel on a Public disc; the Private games, the restored 360X and QD Up
+included, on a Private one). `assets/shots` still holds the pictures too, because the shelf's
+screenshot panel (`SHOT_NAMES`, cooked by `cook-shot`) and the cook golden test read them.
+`LAUNCHER_ART` is a list typed by hand: a Public press names the six Public games'
+`launcher-art` directories, a Private one adds the others.
 
 | Control | Does |
 |---|---|
@@ -362,8 +368,8 @@ the project links behind their platform marks, and the QR code for the link hub.
 After 20 seconds without a button the menu hands over to its attract mode
 (`launcher/src/attract.rs`): the text and hints fade out and the camera tours the
 shelf, lifting each case in turn, turning it to show its spine and then its back
-cover (a blurb and two small screenshots, `launcher/assets/back_*.art`, baked by
-`menu-art backs`), and turning it home; the grid floor lights from the level
+cover (a blurb and two small screenshots, `back_<id>.art`, baked by
+`menu-art ext`, or `menu-art backs` for the Cortex pair), and turning it home; the grid floor lights from the level
 meter (each cell is one band, older rows further away), the light pools swell on
 every beat and the PSoXide logo's X catches a sweep of light. The line at the foot
 of the screen alternates between "press any button" and the music credit. Any

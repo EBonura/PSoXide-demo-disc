@@ -1,8 +1,10 @@
 //! Cover art: which pictures go on which program's case.
 //!
 //! The pictures are baked into the launcher by `tools/menu-art` (three sizes
-//! of each, cut from `assets/shots`, and the attract mode's back-cover shots)
-//! and found by the program's name in the disc table. A program with no
+//! of each, and the attract mode's back-cover shots). The Cortex pair's are
+//! cut from `assets/shots`; every other program's come from its own
+//! repository's `launcher-art/` (`external_program!`). They are found by the
+//! program's name in the disc table. A program with no
 //! picture here gets a plain cover, so a new lineup entry still shows and
 //! starts.
 //!
@@ -74,35 +76,40 @@ pub enum Cover {
 /// Every program in this build. The index is the cover's slot in VRAM (fifteen
 /// fit: the medium cover page holds 15, the large 18, the small 24).
 pub static PROGRAMS: &[Program] = &[
-    program!(
+    #[cfg(art_arcade)]
+    external_program!(
         "PSOXIDE ARCADE",
         "arcade",
         "ARCADE",
         "Breakout, Space Invaders and Magikarp Pong, with a live CD-audio visualizer.",
         "Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio."
     ),
-    program!(
+    #[cfg(art_celeste)]
+    external_program!(
         "CELESTE COLLECTION",
         "celeste",
         "CELESTE",
         "Both Celeste Classic games, rebuilt from PICO-8 as native PlayStation games.",
         "I due Celeste Classic, ricostruiti da PICO-8 come giochi nativi PlayStation."
     ),
-    program!(
+    #[cfg(art_nitro)]
+    external_program!(
         "NITROXIDE",
         "nitro",
         "NITROXIDE",
         "A Rocket League clone for the original PlayStation, with 2-player split screen.",
         "Un clone di Rocket League per PlayStation, con schermo diviso per 2 giocatori."
     ),
-    program!(
+    #[cfg(art_voxide)]
+    external_program!(
         "VOXIDE",
         "voxide",
         "VOXIDE",
         "A Minecraft clone for the original PlayStation: mining, crafting and survival.",
         "Un clone di Minecraft per PlayStation: scavo, crafting e sopravvivenza."
     ),
-    program!(
+    #[cfg(art_quake)]
+    external_program!(
         "QUAKE SHAREWARE",
         "quake",
         "QUAKE",
@@ -127,47 +134,48 @@ pub static PROGRAMS: &[Program] = &[
         "The old Cortex engine demo, 0.4b: a Souls-like built from scratch for PlayStation.",
         "La demo del vecchio motore di Cortex, 0.4b: un souls-like sviluppato da zero."
     ),
-    program!(
+    #[cfg(art_psxcel)]
+    external_program!(
         "PSXCEL",
         "psxcel",
         "PSXCEL",
         "A working Excel clone for PlayStation, played with a joypad: formulas, charts, saves.",
         "Un clone di Excel per PlayStation, col joypad: formule, grafici, salvataggi."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_wipeout))]
+    external_program!(
         "WIPEOUT PSOXIDE",
         "wipeout",
         "WIPEOUT",
         "WipEout (1995) rewritten in Rust: tracks, ships, weapons and split screen.",
         "WipEout (1995) riscritto in Rust: piste, navi, armi e schermo diviso."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_hollow))]
+    external_program!(
         "HOLLOW KNIGHT",
         "hollow",
         "HOLLOW KNIGHT",
         "An early port of Hollow Knight: King's Pass, Dirtmouth and the Forgotten Crossroads.",
         "Un primo port di Hollow Knight: King's Pass, Dirtmouth e il Crocevia Dimenticato."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_cstrike))]
+    external_program!(
         "COUNTER-STRIKE",
         "cstrike",
         "COUNTER-STRIKE",
         "Counter-Strike 1.6 from scratch: bots, buy menu, bomb and hostage rounds, split screen.",
         "Counter-Strike 1.6 da zero: bot, acquisti, bomba, ostaggi e schermo diviso."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_halflife))]
+    external_program!(
         "HALF-LIFE",
         "halflife",
         "HALF-LIFE",
         "Half-Life from scratch: the campaign is converted, not yet playable end to end.",
         "Half-Life da zero: campagna convertita, non ancora giocabile da capo a fondo."
     ),
-    #[cfg(feature = "private")]
-    program!(
+    #[cfg(all(feature = "private", art_oot))]
+    external_program!(
         "OCARINA OF TIME",
         "oot",
         "OCARINA OF TIME",

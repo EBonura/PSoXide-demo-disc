@@ -33,7 +33,9 @@ fn main() {
 
 /// Programs whose cover art comes from their own repository (see `cover.rs`).
 /// Adding a program here is the one launcher-side step of moving its art out.
-const EXTERNAL_ART: &[&str] = &["x360", "qdup"];
+const EXTERNAL_ART: &[&str] = &[
+    "arcade", "celeste", "nitro", "voxide", "quake", "psxcel", "wipeout", "cstrike", "halflife", "hollow", "oot", "x360", "qdup",
+];
 
 /// `LAUNCHER_ART_DIR` is a directory of baked blobs (`menu-art ext`). A program
 /// whose four blobs are all there gets `--cfg art_<id>`; one that is missing

@@ -15,21 +15,10 @@ const SHOT_H: u32 = 48;
 
 /// Program id used by the guest, and its screenshots in the shots directory.
 const BACKS: &[(&str, &[&str])] = &[
-    ("arcade", &["breakout", "invaders"]),
-    ("celeste", &["celeste", "celeste2"]),
-    ("nitro", &["nitroxide-aerial", "nitroxide-goal"]),
-    ("voxide", &["voxide-day", "voxide-night"]),
-    ("quake", &["quake-gameplay", "quake-menu"]),
     (
         "cortex",
         &["cortex-current-gameplay", "cortex-current-menu"],
     ),
-    ("psxcel", &["psxcel-chart", "psxcel-editing"]),
-    ("wipeout", &["wipeout1", "wipeout2"]),
-    ("hollow", &["hollowknight"]),
-    ("cstrike", &["counterstrike"]),
-    ("halflife", &["halflife"]),
-    ("oot", &["oot1", "oot2"]),
     ("citadel", &["cortex-citadel1", "cortex-citadel2"]),
 ];
 

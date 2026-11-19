@@ -365,18 +365,7 @@ fn cook_art(src: &Path, sizes: &[(&str, u32, u32)]) -> Vec<(String, Vec<u8>)> {
 
 /// (file stem in the shots directory, id used by the guest).
 const ARTS: &[(&str, &str)] = &[
-    ("breakout", "arcade"),
-    ("celeste", "celeste"),
-    ("nitroxide-aerial", "nitro"),
-    ("voxide-day", "voxide"),
-    ("quake-gameplay", "quake"),
     ("cortex-current-gameplay", "cortex"),
-    ("psxcel-chart", "psxcel"),
-    ("wipeout1", "wipeout"),
-    ("hollowknight", "hollow"),
-    ("counterstrike", "cstrike"),
-    ("halflife", "halflife"),
-    ("oot1", "oot"),
     ("cortex-citadel1", "citadel"),
 ];
 
