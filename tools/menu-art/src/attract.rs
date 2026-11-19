@@ -15,7 +15,6 @@ const SHOT_H: u32 = 48;
 
 /// Program id used by the guest, and its screenshots in the shots directory.
 const BACKS: &[(&str, &[&str])] = &[
-    ("citadel", &["cortex-citadel1", "cortex-citadel2"]),
 ];
 
 pub fn bake_backs(shots: &Path, out: &Path) {

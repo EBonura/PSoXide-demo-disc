@@ -287,8 +287,7 @@ endif
 
 ifneq ($(CITADEL),)
 CITADEL_ARGS = --image "CORTEX CITADEL=$(CORTEX_CITADEL)" \
-	--shot "CORTEX CITADEL=$(SHOTS_OUT)/cortex-citadel1.shot" \
-	--shot "CORTEX CITADEL=$(SHOTS_OUT)/cortex-citadel2.shot" \
+	$(call SHOTARGS,CORTEX CITADEL,citadel) \
 	--version-of "CORTEX CITADEL=$(V_CORTEX_CITADEL)" \
 	--describe "CORTEX CITADEL=The new Cortex engine, tested on a small Citadel level. This is an engine test, not a game demo; Cortex Ignition is the old-engine demo.|Il nuovo motore di Cortex, provato su un piccolo livello della Cittadella. E un test del motore, non una demo; Cortex Ignition e la demo del vecchio motore."
 endif
@@ -457,9 +456,9 @@ release-public: need-version $(DISC_TOOLS)
 # pixels always come from the PNGs actually in the repo.
 SHOTS_SRC := $(ROOT)/assets/shots
 SHOTS_OUT := $(BUILD)/shots
-# The pictures with no game repository of their own are still here; every other program's shelf
+# The hardware tests' pictures have no game repository and are still here; every other program's shelf
 # screenshots come from its launcher-art directory (the manifest's `shots` line, see tools/menu-art).
-SHOT_NAMES := $(if $(CITADEL),cortex-citadel1 cortex-citadel2) $(if $(HWT),hwtests hwtests2)
+SHOT_NAMES := $(if $(HWT),hwtests hwtests2)
 -include $(ART_OUT)/shots.mk
 SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot) $(foreach v,$(filter SHOTS_%,$(.VARIABLES)),$($(v)))
 # --shot arguments for the program the disc table calls $(1), from the shots of art id $(2)

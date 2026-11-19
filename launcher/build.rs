@@ -35,7 +35,7 @@ fn main() {
 /// same ids in the same order, and a const assertion there checks it), with
 /// where each one's art comes from: `None` is a `launcher-art` directory
 /// (`LAUNCHER_ART_DIR`, the baked blobs of `menu-art ext`), `Some(dir)` a
-/// directory of this crate. Cortex appears twice, for its Public and Private
+/// directory of this crate (none now). Cortex appears twice, for its Public and Private
 /// entries.
 const PROGRAMS: &[(&str, Option<&str>)] = &[
     ("arcade", None),
@@ -51,7 +51,7 @@ const PROGRAMS: &[(&str, Option<&str>)] = &[
     ("cstrike", None),
     ("halflife", None),
     ("oot", None),
-    ("citadel", Some("assets")),
+    ("citadel", None),
     ("x360", None),
     ("qdup", None),
 ];

@@ -5,7 +5,7 @@
 //! program's name in the disc table. Each program's own repository carries
 //! them in `launcher-art/`; `build.rs` includes the ones it was given and
 //! writes them into the generated table (`art.rs`) that this file filters.
-//! Cortex Citadel's are still in `launcher/assets`. A program with no picture
+//! A program with no picture
 //! gets a plain cover, so a new lineup entry still shows and starts.
 //!
 //! The Private programs' art and names exist only in a build with the
