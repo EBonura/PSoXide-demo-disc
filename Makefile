@@ -211,6 +211,14 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 #       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art"     (Public, G = the games' checkouts)
 # (Cortex Ignition's pictures are in the editor repository.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
+#
+# The Private pressing's list (v0.58 on), so a re-press takes the same directories: ART_SRC is a
+# directory holding the programs' repositories under their GitHub names (each at the commit the
+# pressing's notes record), RESTORED_ART the restored games' launcher-art directory, a local
+# input like the lineup's. Press with LAUNCHER_ART='$(PRIVATE_ART)' ART_SRC=... RESTORED_ART=...
+ART_REPOS := nitroxide voxide celeste-collection-psx quake-psx psoxide-arcade psxcel cs-psx oot-psx \
+	wipeout-psx hl-psx hk-psx PSoXide-editor
+PRIVATE_ART = $(foreach r,$(ART_REPOS),$(ART_SRC)/$(r)/launcher-art) $(RESTORED_ART)
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art
 # Baked when make reads this file (so `disc-budget` and the lineup sub-makes see the same blobs and
