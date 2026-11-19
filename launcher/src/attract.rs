@@ -21,7 +21,7 @@
 //! calls [`Attract::draw`] in place of the shelf.
 
 use crate::common::{footer, header, CaseGeom, Ctx, HEAD_MID, MARGIN};
-use crate::cover::{self, Cover, PROGRAMS};
+use crate::cover::{self, Cover, MAX_ROWS, PROGRAMS};
 use psx_math::ease;
 use disc_toc::Entry;
 use crate::gfx::*;
@@ -225,7 +225,7 @@ pub struct Attract {
     /// Frames since the attract mode began.
     t: u32,
     /// Entry indices of the stops (the programs with a cover), in row order.
-    stops: [u8; 16],
+    stops: [u8; MAX_ROWS],
     n_stops: usize,
     /// Current stop and frames since its glide began.
     stop: usize,
@@ -241,7 +241,7 @@ pub struct Attract {
 impl Attract {
     /// Begin at the program nearest entry `first`.
     pub fn new(entries: &[Entry], first: usize) -> Self {
-        let mut stops = [0u8; 16];
+        let mut stops = [0u8; MAX_ROWS];
         let mut n = 0;
         let mut stop = 0;
         for (i, e) in entries.iter().enumerate() {
@@ -352,9 +352,9 @@ impl Attract {
 
         // Cases, far to near.
         let n = entries.len() as i32;
-        let mut order = [0i32; 16];
+        let mut order = [0i32; MAX_ROWS];
         let mut count = 0;
-        for i in 0..n.min(16) {
+        for i in 0..n.min(MAX_ROWS as i32) {
             order[count] = i;
             count += 1;
         }

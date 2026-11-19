@@ -36,26 +36,93 @@ pub fn mix(a: Rgb, b: Rgb, t: u32) -> Rgb {
 }
 
 // ---- VRAM layout (halfword coordinates) -----------------------------------
+//
+// VRAM is 1024 x 512 halfwords. The two 320x240 frame buffers take x 0..320, y 0..480.
+// Below them, y 480..512 holds one CLUT row per program (the cover palettes at x 0, the
+// back-cover palettes at x 320) and the two small palettes of the UI atlas and the credits'
+// marks. Everything right of x 320 is texture pages: an 8bpp page is 128 halfwords (256
+// texels) wide and 256 high, a 4bpp page 64 wide, and a page starts at a multiple of 64 in x
+// and 0 or 256 in y (checked by [`VRAM_CHECK`]).
+//
+//   x:   320      448      576      704      832      896      960
+//   y 0   L 0      L 1      M 0      S 0      UI      icons    (free)
+//   y 256 shots 0  shots 1  L 2      M 1      shots 2  (free)  (free)
+//   y 480 CLUTs: art 0..256, UI 256, icons 288, back covers 320..576
+//
+// A cover size is a [`PageSet`]: pages of equal cells, so adding a page is adding a
+// coordinate, and the cover table's capacity ([`crate::cover::MAX_COVERS`]) follows.
+
+/// One size of cover art, spread over 8bpp texture pages: `w` x `h` texel cells in rows,
+/// as many to a page as fit in 256x256, and as many pages as `pages` lists.
+#[derive(Clone, Copy)]
+pub struct PageSet {
+    /// Top-left of each page in VRAM halfwords.
+    pub pages: &'static [(u16, u16)],
+    /// Size of one cell in texels.
+    pub w: i32,
+    pub h: i32,
+}
+
+impl PageSet {
+    /// Cells across one page.
+    pub const fn across(&self) -> usize {
+        256 / self.w as usize
+    }
+
+    /// Cells down one page.
+    pub const fn down(&self) -> usize {
+        256 / self.h as usize
+    }
+
+    /// Cells one page holds.
+    pub const fn per_page(&self) -> usize {
+        self.across() * self.down()
+    }
+
+    /// Cells all the pages hold.
+    pub const fn capacity(&self) -> usize {
+        self.pages.len() * self.per_page()
+    }
+
+    /// (tpage x, tpage y, u0, v0) of cell `i`.
+    pub fn cell(&self, i: usize) -> (u16, u16, i32, i32) {
+        let (px, py) = self.pages[i / self.per_page()];
+        let at = i % self.per_page();
+        (px, py, (at % self.across()) as i32 * self.w, (at / self.across()) as i32 * self.h)
+    }
+
+    /// VRAM halfwords the used cells of one page cover: (x, y, width, height).
+    const fn used(&self, page: usize) -> (u16, u16, u16, u16) {
+        let (x, y) = self.pages[page];
+        (x, y, (self.across() as i32 * self.w / 2) as u16, (self.down() as i32 * self.h) as u16)
+    }
+}
 
 /// Large cover pages: 104x78, 6 per page (2 across, 3 down). The third sits
 /// below the UI atlas's columns, right of the back-cover shots and clear of the
 /// CLUT rows at y 480 (x 576..704, y 256..512).
 pub const L_PAGES: [(u16, u16); 3] = [(320, 0), (448, 0), (576, 256)];
-/// Medium covers: 68x51, 15 per page (3 across, 5 down).
-pub const M_PAGE: (u16, u16) = (576, 0);
+/// Medium covers: 68x51, 15 per page (3 across, 5 down); the second page is the one
+/// below the small covers.
+pub const M_PAGES: [(u16, u16); 2] = [(576, 0), (704, 256)];
 /// Small covers: 52x39, 24 per page (4 across, 6 down).
-pub const S_PAGE: (u16, u16) = (704, 0);
+pub const S_PAGES: [(u16, u16); 1] = [(704, 0)];
 /// The UI atlas, 4bpp, 256x256 texels.
 pub const UI_PAGE: (u16, u16) = (832, 0);
 /// One 256-entry CLUT row per game, below the framebuffers.
 pub const ART_CLUT_X: u16 = 0;
 pub const ART_CLUT_Y: u16 = 480;
+/// CLUT rows from [`ART_CLUT_Y`] to the bottom of VRAM: the most programs that can have a
+/// palette, for the covers and for the back covers alike.
+pub const CLUT_ROWS: usize = 512 - ART_CLUT_Y as usize;
 /// The UI atlas ramp.
-pub const UI_CLUT: Clut = Clut::new(256, 480);
+const UI_CLUT_AT: (u16, u16) = (256, 480);
+pub const UI_CLUT: Clut = Clut::new(UI_CLUT_AT.0, UI_CLUT_AT.1);
 /// The credits screen's platform marks: a 4bpp strip of six 12x12 cells.
 pub const ICON_PAGE: (u16, u16) = (896, 0);
 /// Their palette, a grey ramp the tint colours.
-pub const ICON_CLUT: Clut = Clut::new(288, 480);
+const ICON_CLUT_AT: (u16, u16) = (288, 480);
+pub const ICON_CLUT: Clut = Clut::new(ICON_CLUT_AT.0, ICON_CLUT_AT.1);
 /// Width of one mark's cell in the strip, and the mark's size.
 pub const ICON_CELL: i32 = 12;
 
@@ -65,6 +132,11 @@ pub const M_W: i32 = 68;
 pub const M_H: i32 = 51;
 pub const S_W: i32 = 52;
 pub const S_H: i32 = 39;
+
+/// The three sizes' pages.
+pub const L_SET: PageSet = PageSet { pages: &L_PAGES, w: L_W, h: L_H };
+pub const M_SET: PageSet = PageSet { pages: &M_PAGES, w: M_W, h: M_H };
+pub const S_SET: PageSet = PageSet { pages: &S_PAGES, w: S_W, h: S_H };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Size {
@@ -85,19 +157,9 @@ impl Size {
     /// (tpage x, tpage y, u0, v0) of cover `i`.
     fn slot(self, i: usize) -> (u16, u16, i32, i32) {
         match self {
-            Size::L => {
-                let (px, py) = L_PAGES[i / 6];
-                let (col, row) = ((i % 2) as i32, ((i / 2) % 3) as i32);
-                (px, py, col * L_W, row * L_H)
-            }
-            Size::M => {
-                let (col, row) = ((i % 3) as i32, (i / 3) as i32);
-                (M_PAGE.0, M_PAGE.1, col * M_W, row * M_H)
-            }
-            Size::S => {
-                let (col, row) = ((i % 4) as i32, (i / 4) as i32);
-                (S_PAGE.0, S_PAGE.1, col * S_W, row * S_H)
-            }
+            Size::L => L_SET.cell(i),
+            Size::M => M_SET.cell(i),
+            Size::S => S_SET.cell(i),
         }
     }
 }
@@ -450,11 +512,17 @@ impl Gfx {
 
 // ---- attract mode primitives ------------------------------------------------
 
-/// Where the back-cover screenshots live: two 8bpp pages below the covers'
-/// pages, 64x48 texels per shot, four across and four down (sixteen a page).
-pub const SHOT_PAGES: [(u16, u16); 2] = [(320, 256), (448, 256)];
+/// Where the back-cover screenshots live: 8bpp pages below the covers' first
+/// pages and the UI atlas, 64x48 texels per shot, four across and four down (sixteen a
+/// page; the first two pages stop short of the CLUT rows at y 480).
+pub const SHOT_PAGES: [(u16, u16); 3] = [(320, 256), (448, 256), (832, 256)];
 /// Shots one page holds.
 pub const SHOTS_PER_PAGE: usize = 16;
+/// Shots across a page, and down.
+const SHOTS_ACROSS: usize = 4;
+const SHOTS_DOWN: usize = 4;
+/// Shots all the pages hold. A program's back cover takes one or two.
+pub const SHOT_SLOTS: usize = SHOT_PAGES.len() * SHOTS_PER_PAGE;
 /// One 256-entry CLUT row per program, right of the cover CLUTs and below the
 /// framebuffers.
 pub const SHOT_CLUT_X: u16 = 320;
@@ -545,7 +613,7 @@ impl Gfx {
 fn shot_cell(slot: usize) -> ((u16, u16), i32, i32) {
     let page = SHOT_PAGES[slot / SHOTS_PER_PAGE];
     let at = slot % SHOTS_PER_PAGE;
-    (page, (at % 4) as i32, (at / 4) as i32)
+    (page, (at % SHOTS_ACROSS) as i32, (at / SHOTS_ACROSS) as i32)
 }
 
 /// The disc is drawn through the same four primitives the chain loader uses.
@@ -563,3 +631,88 @@ impl crate::disc_art::Canvas for Gfx {
         Gfx::line_add(self, a, b, ca, cb);
     }
 }
+
+// ---- VRAM map check ---------------------------------------------------------------
+
+/// A rectangle of VRAM halfwords: x, y, width, height.
+type Rect = (u16, u16, u16, u16);
+
+const fn overlap(a: Rect, b: Rect) -> bool {
+    a.0 < b.0 + b.2 && b.0 < a.0 + a.2 && a.1 < b.1 + b.3 && b.1 < a.1 + a.3
+}
+
+/// Every region the launcher uses, and how many of the slots hold one.
+const fn regions() -> ([Rect; 32], usize) {
+    let mut r = [(0, 0, 0, 0); 32];
+    let mut n = 0;
+    // The two frame buffers, one above the other.
+    r[n] = (0, 0, 320, 480);
+    n += 1;
+    r[n] = (ART_CLUT_X, ART_CLUT_Y, 256, CLUT_ROWS as u16);
+    n += 1;
+    r[n] = (SHOT_CLUT_X, SHOT_CLUT_Y, 256, CLUT_ROWS as u16);
+    n += 1;
+    r[n] = (UI_CLUT_AT.0, UI_CLUT_AT.1, 16, 1);
+    n += 1;
+    r[n] = (ICON_CLUT_AT.0, ICON_CLUT_AT.1, 16, 1);
+    n += 1;
+    // The UI atlas and the marks' strip: 4bpp pages, 64 halfwords wide.
+    r[n] = (UI_PAGE.0, UI_PAGE.1, 64, 256);
+    n += 1;
+    r[n] = (ICON_PAGE.0, ICON_PAGE.1, 64, ICON_CELL as u16);
+    n += 1;
+    let sets = [L_SET, M_SET, S_SET];
+    let mut s = 0;
+    while s < sets.len() {
+        let mut k = 0;
+        while k < sets[s].pages.len() {
+            r[n] = sets[s].used(k);
+            n += 1;
+            k += 1;
+        }
+        s += 1;
+    }
+    let mut k = 0;
+    while k < SHOT_PAGES.len() {
+        let (x, y) = SHOT_PAGES[k];
+        r[n] = (x, y, (SHOTS_ACROSS as i32 * SHOT_W / 2) as u16, (SHOTS_DOWN as i32 * SHOT_H) as u16);
+        n += 1;
+        k += 1;
+    }
+    (r, n)
+}
+
+/// No two regions overlap, every one is inside VRAM, and every 8bpp page starts where a
+/// texture page can (x a multiple of 64, y 0 or 256) and keeps its 256 texels inside VRAM.
+const _: () = {
+    let (r, n) = regions();
+    let mut i = 0;
+    while i < n {
+        assert!(r[i].0 + r[i].2 <= 1024 && r[i].1 + r[i].3 <= 512, "a VRAM region is off the end of VRAM");
+        let mut j = i + 1;
+        while j < n {
+            assert!(!overlap(r[i], r[j]), "two VRAM regions overlap");
+            j += 1;
+        }
+        i += 1;
+    }
+    let sets = [L_SET, M_SET, S_SET];
+    let mut s = 0;
+    while s < sets.len() {
+        let mut k = 0;
+        while k < sets[s].pages.len() {
+            let (x, y) = sets[s].pages[k];
+            assert!(x % 64 == 0 && (y == 0 || y == 256), "a texture page is not where a page can start");
+            assert!(x + 128 <= 1024, "an 8bpp texture page runs off the end of VRAM");
+            k += 1;
+        }
+        s += 1;
+    }
+    let mut k = 0;
+    while k < SHOT_PAGES.len() {
+        let (x, y) = SHOT_PAGES[k];
+        assert!(x % 64 == 0 && (y == 0 || y == 256), "a shot page is not where a page can start");
+        assert!(x + 128 <= 1024, "a shot page runs off the end of VRAM");
+        k += 1;
+    }
+};

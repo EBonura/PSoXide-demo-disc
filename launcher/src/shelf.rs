@@ -7,6 +7,7 @@
 //! positions are fixed rows (see the constants) so nothing drifts.
 
 use crate::common::*;
+use crate::cover::MAX_ROWS;
 use psx_math::ease;
 use disc_toc::Entry;
 use crate::gfx::*;
@@ -108,7 +109,7 @@ pub fn draw(g: &mut Gfx, s: &State, ctx: &Ctx, entries: &[Entry], sel: i32, laun
     let hide_sel = launch >= 0;
     let n = entries.len() as i32;
     // Far to near so the focused case overlaps its neighbours.
-    let mut order = [0i32; 16];
+    let mut order = [0i32; MAX_ROWS];
     let mut count = 0;
     for i in 0..n {
         order[count] = i;
