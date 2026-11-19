@@ -1,0 +1,83 @@
+# Written by `psoxide-test bless`; edit only by blessing again (decision 4: a bar changes by editing
+# psoxide-test.toml with a reason, never by hand-editing these numbers).
+schema = 1
+blessed_commit = "dd502086b588d5e0fb559ccec279f0291d759220+dirty"
+sdk_pin = "0187c5f4fab876cbeaa9a99a37df305ccae1e4a3"
+
+[size.private]
+text = 131408
+data = 403384
+bss = 663712
+free = 800080
+
+[speed]
+
+[journeys.carousel]
+ticks = 175
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-360x]
+ticks = 284
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-celeste-collection]
+ticks = 271
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-counter-strike]
+ticks = 564
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-half-life]
+ticks = 1485
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-hollow-knight]
+ticks = 686
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-nitroxide]
+ticks = 792
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-ocarina-of-time]
+ticks = 893
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-qd-up]
+ticks = 288
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-quake-shareware]
+ticks = 283
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-voxide]
+ticks = 625
+open_loop = 0
+clock_waits = 0
+
+[journeys.chain-wipeout-psoxide]
+ticks = 543
+open_loop = 0
+clock_waits = 0
+
+[journeys.pad-refusal]
+ticks = 230
+open_loop = 0
+clock_waits = 0
+
+[host]
+
+[maps]
+private = "2852e1f927d740e0492a97e0c0a2dec66d903a0d111e1135e15a23dda6fbf705"
