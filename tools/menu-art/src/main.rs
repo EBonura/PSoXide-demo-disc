@@ -25,7 +25,13 @@
 //! id x360
 //! front 360x-title.png
 //! back 360x-explosion.png 360x-planet.png
+//! shots 360x-title.png 360x-explosion.png
 //! ```
+//!
+//! `shots` (optional) lists the pictures of the shelf's screenshot panel in
+//! order. `ext` writes `shots.mk` beside the blobs: for each program a
+//! `SHOTS_<id>` list of the cooked `.shot` files and the rules that cook them
+//! with `disc-tools cook-shot`, which the Makefile includes.
 //!
 //! Both fonts are SIL OFL and sit in the editor's `psx-font/vendor/google-fonts`.
 //! Tiny5 is drawn on a pixel grid, so at its own size (8 px) it rasterises to
@@ -393,6 +399,8 @@ struct ExtProgram {
     id: String,
     front: String,
     back: Vec<String>,
+    /// The pictures of the shelf's screenshot panel, in order (may be none).
+    shots: Vec<String>,
 }
 
 fn parse_manifest(text: &str) -> Vec<ExtProgram> {
@@ -403,7 +411,7 @@ fn parse_manifest(text: &str) -> Vec<ExtProgram> {
         let rest: Vec<String> = words.map(String::from).collect();
         if key == "id" {
             assert!(rest.len() == 1, "manifest: `id <name>`");
-            out.push(ExtProgram { id: rest[0].clone(), front: String::new(), back: Vec::new() });
+            out.push(ExtProgram { id: rest[0].clone(), front: String::new(), back: Vec::new(), shots: Vec::new() });
             continue;
         }
         let cur = out.last_mut().expect("manifest: `id` comes first");
@@ -415,6 +423,10 @@ fn parse_manifest(text: &str) -> Vec<ExtProgram> {
             "back" => {
                 assert!((1..=2).contains(&rest.len()), "manifest: `back` takes one or two pictures");
                 cur.back = rest;
+            }
+            "shots" => {
+                assert!(!rest.is_empty(), "manifest: `shots` takes at least one picture");
+                cur.shots = rest;
             }
             _ => panic!("manifest: unknown line `{line}`"),
         }
@@ -428,18 +440,28 @@ fn parse_manifest(text: &str) -> Vec<ExtProgram> {
 fn bake_ext(out: &Path, dirs: &[String]) {
     fs::create_dir_all(out).expect("create the output directory");
     let mut n = 0;
+    let mut mk = String::from("# written by `menu-art ext`: the shelf screenshots of the launcher-art directories\n");
     for dir in dirs {
         let dir = Path::new(dir);
+        let dir = dir.canonicalize().unwrap_or(dir.to_path_buf());
         let m = dir.join("manifest.txt");
         let text = fs::read_to_string(&m).unwrap_or_else(|e| panic!("{}: {e}", m.display()));
         for p in parse_manifest(&text) {
             for (tag, blob) in cook_art(&dir.join(&p.front), SIZES) {
                 fs::write(out.join(format!("art_{tag}_{}.art", p.id)), blob).unwrap();
             }
-            attract::bake_back(dir, out, &p.id, &p.back);
+            attract::bake_back(&dir, out, &p.id, &p.back);
+            let cooked: Vec<String> = (1..=p.shots.len()).map(|k| format!("$(SHOTS_OUT)/{}-{k}.shot", p.id)).collect();
+            mk.push_str(&format!("SHOTS_{} := {}\n", p.id, cooked.join(" ")));
+            for (shot, file) in p.shots.iter().zip(&cooked) {
+                let src = dir.join(shot);
+                assert!(src.is_file(), "manifest: {} lists {shot}, which is not in {}", p.id, dir.display());
+                mk.push_str(&format!("{file}: {} $(DISC_TOOLS)\n\t@mkdir -p \"$(SHOTS_OUT)\"\n\t$(DISC_TOOLS) cook-shot \"$<\" \"$@\"\n", src.display()));
+            }
             n += 1;
         }
     }
+    fs::write(out.join("shots.mk"), mk).expect("write shots.mk");
     println!("baked the art of {n} programs from {} directories", dirs.len());
 }
 

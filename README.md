@@ -318,21 +318,24 @@ and light and lean toward it. Under the row sit the program's name with its
 own version beside it, its description in English or Italian, and the start
 button. The cover on each case is a picture baked into the launcher by
 `tools/menu-art` (a program the launcher has no picture for gets a plain cover
-and still starts). Cortex Citadel's pictures are cut from `assets/shots`;
+and still starts). Cortex Citadel's pictures (and the hardware tests' shelf shots) stay in `assets/shots`;
 every other program's live in its own repository, below.
 
 A program's art can instead live in its own repository, in a `launcher-art/`
 directory with the same layout for every game: a `manifest.txt` (per program an
-`id`, a `front` picture and one or two `back` pictures, each cut from a capture; the baker scales it to the cover, stretching one that is not 4:3)
+`id`, a `front` picture, one or two `back` pictures and the `shots` of the shelf's screenshot panel, each cut from a capture; the baker scales it to the cover, stretching one that is not 4:3)
 and those pictures. The disc build bakes them (`menu-art ext`, run by `make
 launcher`), so no baked blob is stored in a game repository, and
-`LAUNCHER_ART="dir1 dir2"` names the directories to take. The launcher's
-`cover.rs` entry for such a program carries `#[cfg(art_<id>)]` and `build.rs`
-lists the id; without the directory the entry is left out and the case is plain.
+`LAUNCHER_ART="dir1 dir2"` names the directories to take (make bakes them when it reads the
+Makefile, writing `build/launcher-art/shots.mk` too, which cooks the `shots` pictures for the
+`--shot` arguments). `cover.rs` lists every program's words in the shelf's order; `build.rs`
+lists the same ids and writes `art.rs`, each program's blobs or `None`, and the launcher
+keeps the entries of its edition that have art. There is no cfg flag per program, so the
+launcher's code does not depend on which art was supplied; without a directory the case is
+plain. A table past the VRAM pages' capacity (`MAX_COVERS`) does not build.
 Every program except Cortex Citadel works this way (Arcade, Celeste, NitroXide,
 VoXide, Quake, PSXcel, Cortex Ignition on a Public disc; the Private games, the restored 360X and QD Up
-included, on a Private one). `assets/shots` still holds the pictures too, because the shelf's
-screenshot panel (`SHOT_NAMES`, cooked by `cook-shot`) and the cook golden test read them.
+included, on a Private one).
 `LAUNCHER_ART` is a list typed by hand: a Public press names the seven Public programs'
 `launcher-art` directories, a Private one adds the others.
 

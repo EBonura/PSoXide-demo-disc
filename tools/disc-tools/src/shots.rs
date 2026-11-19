@@ -115,9 +115,12 @@ mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
 
-    // sha256 of the cooked shot for every PNG in assets/shots, generated once
-    // by the retired cook-shots.py running on Pillow 12.0.0.
-    const GOLDEN: [(&str, &str); 30] = [
+    // sha256 of the cooked shot for every picture the shelf's screenshot panel has
+    // used, generated once by the retired cook-shots.py running on Pillow 12.0.0.
+    // The pictures live in each game's own launcher-art directory (and the few
+    // with no game repository in assets/shots), so the test below checks the
+    // directories it is given and not a fixed count of files.
+    const GOLDEN: &[(&str, &str)] = &[
         (
             "breakout",
             "d51db0ca89a8fb6c388212e8a850126e7d833ae36a099aabc7e7be8d06619c3d",
@@ -250,31 +253,51 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn cooks_every_checked_in_shot_to_the_pillow_bytes() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/shots");
-        for (name, want) in GOLDEN {
-            let png = fs::read(dir.join(format!("{name}.png"))).unwrap();
-            let (shot, _) = cook_png(&png).unwrap();
+    /// Every picture of `dir` that has a golden hash cooks to exactly those
+    /// bytes. With `strict`, a picture without a golden hash fails (nothing in
+    /// assets/shots may be added unpinned); in a game's launcher-art directory
+    /// the pictures that are not shelf shots (front covers) are skipped.
+    fn check_dir(dir: &Path, strict: bool) -> Vec<String> {
+        let mut checked = Vec::new();
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|x| x != "png") {
+                continue;
+            }
+            let name = path.file_stem().unwrap().to_str().unwrap().to_string();
+            let Some((_, want)) = GOLDEN.iter().find(|(n, _)| *n == name) else {
+                assert!(!strict, "{name} was added to {} without a golden hash", dir.display());
+                continue;
+            };
+            let (shot, _) = cook_png(&fs::read(&path).unwrap()).unwrap();
             assert_eq!(shot.len(), 512 + W * H, "{name}");
-            assert_eq!(
-                sha256(&shot),
-                want,
-                "{name} differs from the Pillow-cooked shot"
-            );
+            assert_eq!(sha256(&shot), *want, "{name} differs from the Pillow-cooked shot");
+            checked.push(name);
         }
-        let pngs = fs::read_dir(&dir).unwrap().filter(|e| {
-            e.as_ref()
-                .unwrap()
-                .path()
-                .extension()
-                .is_some_and(|x| x == "png")
-        });
-        assert_eq!(
-            pngs.count(),
-            GOLDEN.len(),
-            "a shot was added without a golden hash"
-        );
+        checked
+    }
+
+    /// assets/shots (what has no game repository) is checked in full and every
+    /// picture there must be pinned. `SHOT_GOLDEN_DIRS` (a PATH-style list) adds
+    /// game launcher-art directories, whose shelf shots are checked the same way.
+    #[test]
+    fn cooks_the_given_shots_to_the_pillow_bytes() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/shots");
+        let checked = check_dir(&repo, true);
+        assert!(!checked.is_empty(), "no picture in assets/shots was checked");
+        if let Some(dirs) = std::env::var_os("SHOT_GOLDEN_DIRS") {
+            for dir in std::env::split_paths(&dirs).filter(|d| !d.as_os_str().is_empty()) {
+                check_dir(&dir, false);
+            }
+        }
+    }
+
+    #[test]
+    fn every_golden_hash_names_a_distinct_picture() {
+        let mut names: Vec<&str> = GOLDEN.iter().map(|(n, _)| *n).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), GOLDEN.len());
     }
 
     #[test]

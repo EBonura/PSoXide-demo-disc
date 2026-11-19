@@ -206,19 +206,23 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # directories (each a manifest.txt and the pictures it names, see tools/menu-art) and `menu-art ext`
 # bakes them into $(ART_OUT) at build time, so no baked blob is committed anywhere. The launcher
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
-# missing from it, that program's case is plain. Local inputs, like the lineup's:
+# missing from it, that program's case is plain (and has no shelf screenshots). Local inputs, like the lineup's:
 #   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
 #       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art"     (Public, G = the games' checkouts)
 # (Cortex Ignition's pictures are in the editor repository.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art
-.PHONY: launcher-art
-launcher-art:
-	rm -rf "$(ART_OUT)"
-	$(if $(LAUNCHER_ART),cd tools/menu-art && cargo run -q --release -- ext "$(ART_OUT)" $(foreach d,$(LAUNCHER_ART),"$(d)"))
+# Baked when make reads this file (so `disc-budget` and the lineup sub-makes see the same blobs and
+# shots.mk as the launcher build): menu-art ext writes the blobs, and the shelf screenshots' rules, into ART_OUT.
+ifneq ($(LAUNCHER_ART),)
+ART_BAKE := $(shell rm -rf "$(ART_OUT)"; cd tools/menu-art && cargo run -q --release -- ext "$(ART_OUT)" $(foreach d,$(LAUNCHER_ART),"$(d)") >/dev/null 2>&1 && echo ok)
+ifneq ($(ART_BAKE),ok)
+$(error menu-art ext failed: run it by hand to see why)
+endif
+endif
 
-launcher: loader launcher-art
+launcher: loader
 	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) $(if $(LAUNCHER_ART),LAUNCHER_ART_DIR=$(ART_OUT)) \
 		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(PSX_POLICY) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
@@ -245,13 +249,13 @@ disc-tools: $(DISC_TOOLS)
 # and description would press, but announce itself wrong.
 ifneq ($(HL),)
 HL_ARGS = --image "HALF-LIFE=$(HLPSX)" \
-	--shot "HALF-LIFE=$(SHOTS_OUT)/halflife.shot" \
+	$(call SHOTARGS,HALF-LIFE,halflife) \
 	--version-of "HALF-LIFE=$(V_HLPSX)" \
 	--describe "HALF-LIFE=A from-scratch PlayStation port of Half-Life. The full campaign has been converted and much of the game works, but it is not yet playable from start to finish.|Half-Life portato su PlayStation da zero. L'intera campagna e stata convertita e gran parte del gioco funziona, ma non e ancora giocabile dall'inizio alla fine."
 endif
 ifneq ($(CS),)
 CS_ARGS = --image "COUNTER-STRIKE=$(CSPSX)" \
-	--shot "COUNTER-STRIKE=$(SHOTS_OUT)/counterstrike.shot" \
+	$(call SHOTARGS,COUNTER-STRIKE,cstrike) \
 	--version-of "COUNTER-STRIKE=$(V_CSPSX)" \
 	--describe "COUNTER-STRIKE=A from-scratch PlayStation port of Counter-Strike 1.6, cooked from your own copy. Bots, the buy menu, bomb and hostage rounds, and two-player split screen. Still in development.|Counter-Strike 1.6 portato su PlayStation da zero, partendo dalla propria copia del gioco. Bot, menu acquisti, bomba, ostaggi e schermo diviso per due giocatori. In sviluppo."
 endif
@@ -264,21 +268,19 @@ HWT_ARGS = --image "HARDWARE TESTS=$(HWTESTS)" \
 endif
 ifneq ($(WO),)
 WO_ARGS = --image "WIPEOUT PSOXIDE=$(WIPEOUT)" \
-	--shot "WIPEOUT PSOXIDE=$(SHOTS_OUT)/wipeout1.shot" \
-	--shot "WIPEOUT PSOXIDE=$(SHOTS_OUT)/wipeout2.shot" \
+	$(call SHOTARGS,WIPEOUT PSOXIDE,wipeout) \
 	--version-of "WIPEOUT PSOXIDE=$(V_WIPEOUT)" \
 	--describe "WIPEOUT PSOXIDE=WipEout (1995) rewritten in Rust for the original PlayStation, cooked from your own copy of the game. Tracks, ships, weapons and two-player split screen.|WipEout (1995) riscritto in Rust per la prima PlayStation, partendo dalla propria copia del gioco. Piste, navi, armi e schermo diviso per due."
 endif
 ifneq ($(OOT),)
 OOT_ARGS = --image "OCARINA OF TIME=$(OOTPSX)" \
-	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot1.shot" \
-	--shot "OCARINA OF TIME=$(SHOTS_OUT)/oot2.shot" \
+	$(call SHOTARGS,OCARINA OF TIME,oot) \
 	--version-of "OCARINA OF TIME=$(V_OOTPSX)" \
 	--describe "OCARINA OF TIME=An early from-scratch PlayStation port of Ocarina of Time, cooked from your own ROM. The opening and Kokiri Forest can be explored. Still in development and slow.|Un primo port di Ocarina of Time per PlayStation, fatto da zero partendo dalla propria ROM. Si esplorano l'inizio e la Foresta Kokiri. In sviluppo e lento."
 endif
 ifneq ($(HK),)
 HK_ARGS = --image "HOLLOW KNIGHT=$(HKPSX)" \
-	--shot "HOLLOW KNIGHT=$(SHOTS_OUT)/hollowknight.shot" \
+	$(call SHOTARGS,HOLLOW KNIGHT,hollow) \
 	--version-of "HOLLOW KNIGHT=$(V_HKPSX)" \
 	--describe "HOLLOW KNIGHT=An early from-scratch PlayStation port of Hollow Knight, cooked from your own copy. King's Pass, Dirtmouth and the Forgotten Crossroads can be explored, with enemies, benches and saves.|Un primo port di Hollow Knight per PlayStation, fatto da zero partendo dalla propria copia. Si esplorano King's Pass, Dirtmouth e il Crocevia Dimenticato, con nemici, panchine e salvataggi."
 endif
@@ -296,8 +298,7 @@ endif
 # Quake on it. QUAKE_PREREQS is what stops a disc being laid out around an
 # unverified payload. disc-only cannot run until the stamp and the pins check.
 QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
-	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-menu.shot" \
-	--shot "QUAKE SHAREWARE=$(SHOTS_OUT)/quake-gameplay.shot" \
+	$(call SHOTARGS,QUAKE SHAREWARE,quake) \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 
@@ -315,8 +316,7 @@ endif
 
 ifneq ($(CORTEX),)
 CORTEX_ARGS = --image "CORTEX IGNITION=$(CORTEX_CURRENT)" \
-	--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-menu.shot" \
-	--shot "CORTEX IGNITION=$(SHOTS_OUT)/cortex-current-gameplay.shot" \
+	$(call SHOTARGS,CORTEX IGNITION,cortex) \
 	--version-of "CORTEX IGNITION=$(V_CORTEX_CURRENT)" \
 	--describe "CORTEX IGNITION=$(if $(PRIVATE),$(CORTEX_OLD_DESC),$(CORTEX_ONLY_DESC))"
 endif
@@ -457,14 +457,13 @@ release-public: need-version $(DISC_TOOLS)
 # pixels always come from the PNGs actually in the repo.
 SHOTS_SRC := $(ROOT)/assets/shots
 SHOTS_OUT := $(BUILD)/shots
-SHOT_NAMES := $(if $(CORTEX),cortex-current-menu cortex-current-gameplay) \
-              voxide-day voxide-night nitroxide-boost \
-              nitroxide-aerial nitroxide-goal celeste celeste2 psxcel-chart \
-              psxcel-editing breakout breakout2 invaders \
-              invaders2 pong pong2 halflife quake-menu \
-              quake-gameplay $(if $(CS),counterstrike) $(if $(HK),hollowknight) \
-              $(if $(WO),wipeout1 wipeout2) $(if $(OOT),oot1 oot2) $(if $(CITADEL),cortex-citadel1 cortex-citadel2) $(if $(HWT),hwtests hwtests2)
-SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot)
+# The pictures with no game repository of their own are still here; every other program's shelf
+# screenshots come from its launcher-art directory (the manifest's `shots` line, see tools/menu-art).
+SHOT_NAMES := $(if $(CITADEL),cortex-citadel1 cortex-citadel2) $(if $(HWT),hwtests hwtests2)
+-include $(ART_OUT)/shots.mk
+SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot) $(foreach v,$(filter SHOTS_%,$(.VARIABLES)),$($(v)))
+# --shot arguments for the program the disc table calls $(1), from the shots of art id $(2)
+SHOTARGS = $(foreach f,$(SHOTS_$(2)),--shot "$(1)=$(f)")
 
 $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
 	@mkdir -p "$(SHOTS_OUT)"
@@ -475,19 +474,13 @@ $(SHOTS_OUT)/%.shot: $(SHOTS_SRC)/%.png $(DISC_TOOLS)
 LEAVE_OUT ?=
 ifeq ($(filter ARCADE,$(LEAVE_OUT)),)
 ARCADE_ARGS = --image "PSOXIDE ARCADE=$(ARCADE)" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout.shot" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/breakout2.shot" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders.shot" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/invaders2.shot" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong.shot" \
-	--shot "PSOXIDE ARCADE=$(SHOTS_OUT)/pong2.shot" \
+	$(call SHOTARGS,PSOXIDE ARCADE,arcade) \
 	--version-of "PSOXIDE ARCADE=$(V_ARCADE)" \
 	--describe "PSOXIDE ARCADE=Three complete native PlayStation arcade games in one collection: Breakout, Space Invaders and Magikarp Pong, with its own live CD-audio visualizer.|Tre giochi arcade completi e nativi per PlayStation in una raccolta: Breakout, Space Invaders e Magikarp Pong, con visualizzatore CD audio."
 endif
 ifeq ($(filter PSXCEL,$(LEAVE_OUT)),)
 PSXCEL_ARGS = --game "PSXCEL=$(PSXCEL)" \
-	--shot "PSXCEL=$(SHOTS_OUT)/psxcel-chart.shot" \
-	--shot "PSXCEL=$(SHOTS_OUT)/psxcel-editing.shot" \
+	$(call SHOTARGS,PSXCEL,psxcel) \
 	--version-of "PSXCEL=$(V_PSXCEL)" \
 	--describe "PSXCEL=A working Microsoft Excel clone for the original PlayStation, controlled with a joypad. This build is fully functional, with formulas, charts, themes and memory-card saves.|Un clone funzionante di Microsoft Excel per PlayStation, controllato col joypad. Questa versione e completa e include formule, grafici, temi e salvataggi su memory card."
 endif
@@ -525,13 +518,9 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--menu-title "JUNGLE 2 A" --menu-title "JUNGLE 2 B" \
 		--menu-title "JUNGLE DNB A" --menu-title "JUNGLE DNB B" \
 		--credit "$(MENU_CREDIT)" \
-		--shot "VOXIDE=$(SHOTS_OUT)/voxide-day.shot" \
-		--shot "VOXIDE=$(SHOTS_OUT)/voxide-night.shot" \
-		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-boost.shot" \
-		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-aerial.shot" \
-		--shot "NITROXIDE=$(SHOTS_OUT)/nitroxide-goal.shot" \
-		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste.shot" \
-		--shot "CELESTE COLLECTION=$(SHOTS_OUT)/celeste2.shot" \
+		$(call SHOTARGS,VOXIDE,voxide) \
+		$(call SHOTARGS,NITROXIDE,nitro) \
+		$(call SHOTARGS,CELESTE COLLECTION,celeste) \
 		--version-of "VOXIDE=$(V_VOXIDE)" \
 		--version-of "NITROXIDE=$(V_NITROXIDE)" \
 		--version-of "CELESTE COLLECTION=$(V_CELESTE)" \
