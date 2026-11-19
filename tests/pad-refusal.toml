@@ -1,0 +1,21 @@
+# A pure digital pad gets the launcher's "needs an analog controller" screen, and stays there.
+name = "pad-refusal"
+title = "Digital pad refused"
+disc = ["build/private/PSoXide Demo Disc v0.57 Private.cue"]
+symbols = ["build/private/launcher.map"]
+pad = "digital"
+max_ticks = 2000
+
+[[step]]
+wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 1 }
+timeout = 1500
+
+[[step]]  # Cross for 60 of the launcher's own pad polls: nothing starts
+press = ["cross"]
+hold = 60
+sync = "poll"
+
+[[step]]
+checkpoint = "notice"
+golden = false
+assert = [{ kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 1 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 12, op = "eq", value = 1 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 16, op = "eq", value = 4294967295 }]

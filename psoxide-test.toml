@@ -1,0 +1,120 @@
+# The Private demo disc's test description for psoxide-test (the SDK's harness). One command,
+# `psoxide-test run --tier full`, gates the image: every member is the bytes its own full run
+# judged ([[requires]]), the launcher boots and refuses a digital pad, the shelf moves, and every
+# member chain-loads and runs on the four PSoXide models, PCSX-ReARMed and PCSX-Redux.
+schema = 1
+name = "PSoXide Demo Disc v0.57 Private"
+repository = "EBonura/PSoXide-demo-disc"
+
+# The SDK pin is the first "revision" in release-components.json (its sdk component).
+[sdk]
+file = "release-components.json"
+after = "\"revision\": \""
+
+# The image, from the lineup and the release inputs (the members' library discs, machine-local).
+# `disc-tools members` writes members.json (index, id, exe_sha256, bin_sha256, map, words) and
+# copies each member's map under maps/; the harness writes members.sym beside it.
+[[build]]
+name = "private"
+out = "build/private"
+commands = [
+  ["make", "-o", "components", "lineup-disc", "LINEUP=release/lineup-v0.57-private.json",
+   "RELEASE_INPUTS={input:release-inputs}", "HL=1", "CS=1", "HK=1", "WO=1", "OOT=1", "CITADEL=0",
+   "RESTORED=1", "HWT=0", "TAIL_FILLER=4500", "DISC_MAX_SECTORS=359844", "LEAVE_OUT=ARCADE PSXCEL",
+   "DISC_NAME=PSoXide Demo Disc v0.57 Private", "DISC_VERSION=v0.57", "DIST={out}",
+   "FRONTEND={input:psoxide-emulator}"],
+  ["tools/disc-tools/target/release/disc-tools", "members",
+   "--image", "{out}/PSoXide Demo Disc v0.57 Private.bin",
+   "--receipt", "{out}/PSoXide Demo Disc v0.57 Private.release-receipt.json",
+   "--lineup", "release/lineup-v0.57-private.json", "--inputs", "{input:release-inputs}",
+   "--out", "{out}"],
+]
+collect = { "launcher.map" = "build/mipsel-sony-psx/psoxide-pgo-maps/*" }
+disc = "PSoXide Demo Disc v0.57 Private.cue"
+map = "launcher.map"
+members = "members.json"
+
+# The launcher's own link: text, data, bss and free RAM against the baseline.
+[[size]]
+build = "private"
+
+[journeys]
+files = "tests/*.toml"
+# chain.toml is played once per [[requires]] member (and is the cross-emulator smoke).
+instances = ["chain"]
+precheck = ["carousel", "pad-refusal", "chain"]
+
+[cross]
+smoke = ["tests/chain.toml"]
+pads = ["dualshock"]
+
+[[host]]
+name = "check"
+command = ["make", "check"]
+
+[[clean]]
+build = "private"
+seed = [".psoxide"]
+compare = ["PSoXide Demo Disc v0.57 Private.bin", "PSoXide Demo Disc v0.57 Private.cue"]
+
+[[install]]
+build = "private"
+name = "PSoXide Demo Disc v0.57 Private"
+
+# Every member: the content hash of its complete full-tier PASS result and the judged disc image
+# the lineup took (members.json bin_sha256). Results are found under the config's `results` dirs.
+# Filled with the final results when the members are re-proven on the landed tool.
+[[requires]]
+id = "CELESTE COLLECTION"
+result = "8c3b30f0704fec28e35801c44a9bc46d1c7e773faea692777724241dde41532a"
+file = "ship/celeste-collection.bin"
+
+[[requires]]
+id = "HOLLOW KNIGHT"
+result = "9b0a5ce2b114b6d99cdfd373d15d69849fcc5c4d6df38e8974149abeca5c0f96"
+file = "ship/Hollow Knight (hk-psx).bin"
+
+[[requires]]
+id = "COUNTER-STRIKE"
+result = "287a7acf6b31922cae524b67c0e79f1b440e43b091ab27ac7138b9fb5142f4ff"
+file = "ship/cs-psx.bin"
+
+[[requires]]
+id = "HALF-LIFE"
+result = "24943e11bb705172d51c634db04a3bfe487969ba3d8fbceded38e094f222bf88"
+file = "ship/hl-psx.bin"
+
+[[requires]]
+id = "NITROXIDE"
+result = "b9fd862d5810b3d1f35d256e24a8ab69ad2c9825fae7f43fd451771bbb14a268"
+file = "ship/NitroXide.bin"
+
+[[requires]]
+id = "OCARINA OF TIME"
+result = "c864917bc4e542990a2d2a2f32f5f5fbd013106d89c4df5690f28d08308df3f0"
+file = "ship/oot-psx.bin"
+
+[[requires]]
+id = "QUAKE SHAREWARE"
+result = "2324184ff17da4d5359cfd8a727cee4ee3494f0ee8affbf5a250880bec68a403"
+file = "ship/quake-psx.bin"
+
+[[requires]]
+id = "VOXIDE"
+result = "9d5f7c87f373862a10d3c7c43ed29d0e1350c4448dcdaa887613ceb37673a974"
+file = "ship/voxide.bin"
+
+[[requires]]
+id = "WIPEOUT PSOXIDE"
+result = "b02e8973f95efb090dc5a8a4da556a53bc088112da0f7025b92250ce58ce6ec9"
+file = "ship/wipeout-psx.bin"
+
+[[requires]]
+id = "360X"
+result = "84492665139ef20a09a82eaeb2c1d6521147d368919578a8dcb6f82021913902"
+file = "x360/360x.bin"
+
+[[requires]]
+id = "QD UP"
+result = "84492665139ef20a09a82eaeb2c1d6521147d368919578a8dcb6f82021913902"
+file = "qdup/qdup.bin"

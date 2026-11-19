@@ -1,0 +1,67 @@
+# One program through the launcher, played once per [[requires]] member by psoxide-test
+# ([journeys] instances), with the member's slug, id, shelf index, the repo root and its signature
+# words substituted; the block marked repeat/end is written once per shelf step (k = 1..index).
+# The same file is the cross-emulator smoke (adapter subset: press + hold_until, wait_until,
+# checkpoint, all kind = "ram"), so it never waits a fixed time.
+name = "chain-{member}"
+title = "{id} through the launcher"
+disc = ["{repo}/build/private/PSoXide Demo Disc v0.57 Private.cue"]
+symbols = ["{repo}/build/private/launcher.map", "{repo}/build/private/members.sym"]
+pad = "dualshock"
+max_ticks = 20000
+
+[[step]]  # the shelf takes input: the DualShock that powered up digital was switched to analog
+wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }
+timeout = 1500
+
+[[step]]
+checkpoint = "shelf"
+golden = false
+assert = [{ kind = "ram", sym = "LAUNCHER_STATE", offset = 12, op = "eq", value = 2 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 0 }]
+
+# {repeat}
+[[step]]  # focus moves one program right
+press = ["right"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = {k} }
+timeout = 120
+
+[[step]]  # the launcher acts on a press edge: a trip to the credits and back releases Right
+press = ["select"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 4 }
+timeout = 120
+
+[[step]]
+press = ["circle"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }
+timeout = 120
+# {end}
+
+[[step]]  # launch the focused program
+press = ["cross"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "ge", value = 5 }
+timeout = 120
+
+[[step]]
+wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 16, op = "eq", value = {index} }
+timeout = 30
+
+[[step]]  # hand-off to the loader
+wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 6 }
+timeout = 200
+
+[[step]]  # the member's own text is resident (four words no other program on the image holds there)
+wait_until = { kind = "ram", sym = "{member}:word0", op = "eq", value = {word:0} }
+timeout = 12000
+
+[[step]]
+wait_until = { kind = "ram", sym = "{member}:word3", op = "eq", value = {word:3} }
+timeout = 12000
+
+[[step]]  # and running: its own VBlank counter, from its own map
+wait_until = { kind = "ram", sym = "{member}:__psx_rt_vblank_count", op = "ge", value = 120 }
+timeout = 12000
+
+[[step]]
+checkpoint = "running"
+golden = false
+assert = [{ kind = "ram", sym = "{member}:word0", op = "eq", value = {word:0} }, { kind = "ram", sym = "{member}:word1", op = "eq", value = {word:1} }, { kind = "ram", sym = "{member}:word2", op = "eq", value = {word:2} }, { kind = "ram", sym = "{member}:word3", op = "eq", value = {word:3} }, { kind = "ram", sym = "{member}:__psx_rt_vblank_count", op = "ge", value = 120 }]

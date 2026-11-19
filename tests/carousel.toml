@@ -1,0 +1,61 @@
+# The shelf moves both ways with a DualShock that powers up digital, and the credits open and close.
+name = "carousel"
+title = "Launcher carousel"
+disc = ["build/private/PSoXide Demo Disc v0.57 Private.cue"]
+symbols = ["build/private/launcher.map"]
+pad = "dualshock"
+max_ticks = 4000
+
+[[step]]
+wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }
+timeout = 1500
+
+[[step]]
+checkpoint = "shelf"
+golden = false
+assert = [{ kind = "ram", sym = "LAUNCHER_STATE", offset = 12, op = "eq", value = 2 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 0 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 16, op = "eq", value = 4294967295 }]
+
+[[step]]
+press = ["right"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 1 }
+timeout = 120
+
+[[step]]
+press = ["select"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 4 }
+timeout = 120
+
+[[step]]
+checkpoint = "credits"
+golden = false
+assert = [{ kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 4 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 1 }]
+
+[[step]]
+press = ["circle"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }
+timeout = 120
+
+[[step]]
+press = ["right"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 2 }
+timeout = 120
+
+[[step]]
+press = ["select"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 4 }
+timeout = 120
+
+[[step]]
+press = ["circle"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }
+timeout = 120
+
+[[step]]
+press = ["left"]
+hold_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 1 }
+timeout = 120
+
+[[step]]
+checkpoint = "back-left"
+golden = false
+assert = [{ kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 2 }, { kind = "ram", sym = "LAUNCHER_STATE", offset = 4, op = "eq", value = 1 }]
