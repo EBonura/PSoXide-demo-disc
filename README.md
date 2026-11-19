@@ -322,7 +322,7 @@ for gets a plain cover and still starts).
 
 A program's art can instead live in its own repository, in a `launcher-art/`
 directory with the same layout for every game: a `manifest.txt` (per program an
-`id`, a `front` picture and one or two `back` pictures, each already cut to 4:3)
+`id`, a `front` picture and one or two `back` pictures, each cut from a capture; the baker scales it to the cover, stretching one that is not 4:3)
 and those pictures. The disc build bakes them (`menu-art ext`, run by `make
 launcher`), so no baked blob is stored in a game repository, and
 `LAUNCHER_ART="dir1 dir2"` names the directories to take. The launcher's

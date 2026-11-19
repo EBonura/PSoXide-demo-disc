@@ -18,7 +18,7 @@
 //!
 //! `ext` bakes the art that lives in a program's own repository: each
 //! `launcher-art` directory holds a `manifest.txt` and the pictures it names
-//! (already cut to 4:3), and gives `art_{l,m,s}_<id>.art` and `back_<id>.art`.
+//! (cut from a capture; any shape, the baker scales it to the cover), and gives `art_{l,m,s}_<id>.art` and `back_<id>.art`.
 //! A manifest is a list of programs, each a block of lines:
 //!
 //! ```text
