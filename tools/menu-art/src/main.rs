@@ -14,6 +14,18 @@
 //!
 //! Usage: `menu-art bake <michroma.ttf> <tiny5.ttf> <shots-dir> <out-dir>`
 //!        `menu-art backs <shots-dir> <out-dir>`
+//!        `menu-art ext <out-dir> <launcher-art-dir>...`
+//!
+//! `ext` bakes the art that lives in a program's own repository: each
+//! `launcher-art` directory holds a `manifest.txt` and the pictures it names
+//! (already cut to 4:3), and gives `art_{l,m,s}_<id>.art` and `back_<id>.art`.
+//! A manifest is a list of programs, each a block of lines:
+//!
+//! ```text
+//! id x360
+//! front 360x-title.png
+//! back 360x-explosion.png 360x-planet.png
+//! ```
 //!
 //! Both fonts are SIL OFL and sit in the editor's `psx-font/vendor/google-fonts`.
 //! Tiny5 is drawn on a pixel grid, so at its own size (8 px) it rasterises to
@@ -388,14 +400,73 @@ fn emit_face(s: &mut String, f: &Face) {
     writeln!(s, "    ],\n}};").unwrap();
 }
 
+/// One program of a `launcher-art/manifest.txt`.
+struct ExtProgram {
+    id: String,
+    front: String,
+    back: Vec<String>,
+}
+
+fn parse_manifest(text: &str) -> Vec<ExtProgram> {
+    let mut out: Vec<ExtProgram> = Vec::new();
+    for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+        let mut words = line.split_whitespace();
+        let key = words.next().unwrap();
+        let rest: Vec<String> = words.map(String::from).collect();
+        if key == "id" {
+            assert!(rest.len() == 1, "manifest: `id <name>`");
+            out.push(ExtProgram { id: rest[0].clone(), front: String::new(), back: Vec::new() });
+            continue;
+        }
+        let cur = out.last_mut().expect("manifest: `id` comes first");
+        match key {
+            "front" => {
+                assert!(rest.len() == 1, "manifest: `front <picture>`");
+                cur.front = rest[0].clone();
+            }
+            "back" => {
+                assert!((1..=2).contains(&rest.len()), "manifest: `back` takes one or two pictures");
+                cur.back = rest;
+            }
+            _ => panic!("manifest: unknown line `{line}`"),
+        }
+    }
+    for p in &out {
+        assert!(!p.front.is_empty() && !p.back.is_empty(), "manifest: {} needs front and back", p.id);
+    }
+    out
+}
+
+fn bake_ext(out: &Path, dirs: &[String]) {
+    fs::create_dir_all(out).expect("create the output directory");
+    let mut n = 0;
+    for dir in dirs {
+        let dir = Path::new(dir);
+        let m = dir.join("manifest.txt");
+        let text = fs::read_to_string(&m).unwrap_or_else(|e| panic!("{}: {e}", m.display()));
+        for p in parse_manifest(&text) {
+            for (tag, blob) in cook_art(&dir.join(&p.front), SIZES) {
+                fs::write(out.join(format!("art_{tag}_{}.art", p.id)), blob).unwrap();
+            }
+            attract::bake_back(dir, out, &p.id, &p.back);
+            n += 1;
+        }
+    }
+    println!("baked the art of {n} programs from {} directories", dirs.len());
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 4 && args[1] == "backs" {
         return attract::bake_backs(Path::new(&args[2]), Path::new(&args[3]));
     }
+    if args.len() >= 3 && args[1] == "ext" {
+        return bake_ext(Path::new(&args[2]), &args[3..]);
+    }
     if args.len() != 6 || args[1] != "bake" {
         eprintln!("usage: menu-art bake <michroma.ttf> <tiny5.ttf> <shots-dir> <out-dir>");
         eprintln!("       menu-art backs <shots-dir> <out-dir>");
+        eprintln!("       menu-art ext <out-dir> <launcher-art-dir>...");
         std::process::exit(2);
     }
     let load = |p: &str| {

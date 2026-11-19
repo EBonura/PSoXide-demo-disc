@@ -28,4 +28,34 @@ fn main() {
     if let Ok(path) = std::env::var("XA_SONGS_RS") {
         println!("cargo:rerun-if-changed={path}");
     }
+    external_art();
+}
+
+/// Programs whose cover art comes from their own repository (see `cover.rs`).
+/// Adding a program here is the one launcher-side step of moving its art out.
+const EXTERNAL_ART: &[&str] = &["x360", "qdup"];
+
+/// `LAUNCHER_ART_DIR` is a directory of baked blobs (`menu-art ext`). A program
+/// whose four blobs are all there gets `--cfg art_<id>`; one that is missing
+/// keeps the plain cover, and the build still succeeds.
+fn external_art() {
+    println!("cargo:rerun-if-env-changed=LAUNCHER_ART_DIR");
+    for id in EXTERNAL_ART {
+        println!("cargo:rustc-check-cfg=cfg(art_{id})");
+    }
+    let Some(dir) = std::env::var_os("LAUNCHER_ART_DIR") else {
+        return;
+    };
+    let dir = PathBuf::from(dir);
+    let dir = dir.canonicalize().unwrap_or(dir);
+    println!("cargo:rustc-env=LAUNCHER_ART_DIR={}", dir.display());
+    for id in EXTERNAL_ART {
+        let files = ["art_l_", "art_m_", "art_s_", "back_"].map(|p| dir.join(format!("{p}{id}.art")));
+        for f in &files {
+            println!("cargo:rerun-if-changed={}", f.display());
+        }
+        if files.iter().all(|f| f.is_file()) {
+            println!("cargo:rustc-cfg=art_{id}");
+        }
+    }
 }

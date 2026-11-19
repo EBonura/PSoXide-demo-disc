@@ -320,6 +320,16 @@ button. The cover on each case is a picture baked into the launcher by
 `tools/menu-art` from `assets/shots` (a program the launcher has no picture
 for gets a plain cover and still starts).
 
+A program's art can instead live in its own repository, in a `launcher-art/`
+directory with the same layout for every game: a `manifest.txt` (per program an
+`id`, a `front` picture and one or two `back` pictures, each already cut to 4:3)
+and those pictures. The disc build bakes them (`menu-art ext`, run by `make
+launcher`), so no baked blob is stored in a game repository, and
+`LAUNCHER_ART="dir1 dir2"` names the directories to take. The launcher's
+`cover.rs` entry for such a program carries `#[cfg(art_<id>)]` and `build.rs`
+lists the id; without the directory the entry is left out and the case is plain.
+360X and QD Up (Private) work this way.
+
 | Control | Does |
 |---|---|
 | Left, right (d-pad or left stick) | browse the shelf |

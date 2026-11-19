@@ -201,8 +201,22 @@ DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --d
 # output format come from the crate (launcher/.cargo/config.toml and build.rs), because the build
 # driver refuses a RUSTFLAGS environment.
 LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
-launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) \
+#
+# Cover art that lives in a program's own repository: LAUNCHER_ART lists the `launcher-art`
+# directories (each a manifest.txt and the pictures it names, see tools/menu-art) and `menu-art ext`
+# bakes them into $(ART_OUT) at build time, so no baked blob is committed anywhere. The launcher
+# gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
+# missing from it, that program's case is plain. Local inputs, like the lineup's:
+#   make launcher PRIVATE=1 LAUNCHER_ART="/path/to/restored-games/launcher-art"
+LAUNCHER_ART ?=
+ART_OUT := $(BUILD)/launcher-art
+.PHONY: launcher-art
+launcher-art:
+	rm -rf "$(ART_OUT)"
+	$(if $(LAUNCHER_ART),cd tools/menu-art && cargo run -q --release -- ext "$(ART_OUT)" $(foreach d,$(LAUNCHER_ART),"$(d)"))
+
+launcher: loader launcher-art
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) $(if $(LAUNCHER_ART),LAUNCHER_ART_DIR=$(ART_OUT)) \
 		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(PSX_POLICY) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
 
@@ -284,15 +298,16 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 
-# 360X and QD Up have no cover art or menu backdrops yet: the launcher shows them with its
-# plain cover and no blurb, and starts them like any other program.
+# 360X and QD Up: the launcher's cover entries (cover.rs, Private feature) carry their spine
+# and blurb; their pictures come from the restored games' own repository (LAUNCHER_ART,
+# below). The table's description is the same blurb, shown under the shelf.
 ifneq ($(RESTORED),)
 X360_ARGS = --image "360X=$(X360)" \
 	--version-of "360X=$(V_X360)" \
-	--describe "360X=|"
+	--describe "360X=Turn, thrust, fire and grab pods across alien planets. Restored from its original source.|Ruota, spingi, spara e raccogli le capsule su pianeti alieni. Restaurato dai sorgenti originali."
 QDUP_ARGS = --image "QD UP=$(QDUP)" \
 	--version-of "QD UP=$(V_QDUP)" \
-	--describe "QD UP=|"
+	--describe "QD UP=A pool game restored from its original source, on a 3D table or a flat 2D one.|Un gioco di biliardo restaurato dai sorgenti originali, su tavolo 3D o in 2D."
 endif
 
 ifneq ($(CORTEX),)

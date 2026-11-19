@@ -36,26 +36,32 @@ const BACKS: &[(&str, &[&str])] = &[
 pub fn bake_backs(shots: &Path, out: &Path) {
     fs::create_dir_all(out).expect("create the output directory");
     for (id, stems) in BACKS {
-        let pixels: Vec<Vec<Rgb>> = stems
-            .iter()
-            .map(|stem| {
-                let path = shots.join(format!("{stem}.png"));
-                image::open(&path)
-                    .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
-                    .resize_exact(SHOT_W, SHOT_H, FilterType::Lanczos3)
-                    .to_rgb8()
-                    .pixels()
-                    .map(|p| p.0)
-                    .collect()
-            })
-            .collect();
-        let all: Vec<Rgb> = pixels.iter().flatten().copied().collect();
-        let palette = median_cut(&all);
-        let mut blob = palette_to_clut(&palette);
-        for shot in &pixels {
-            blob.extend(index_with(&palette, shot));
-        }
-        fs::write(out.join(format!("back_{id}.art")), blob).expect("write a back-cover blob");
+        let files: Vec<String> = stems.iter().map(|s| format!("{s}.png")).collect();
+        bake_back(shots, out, id, &files);
     }
     println!("baked {} back covers", BACKS.len());
+}
+
+/// One program's `back_<id>.art` from the pictures `files` (names in `shots`).
+pub fn bake_back(shots: &Path, out: &Path, id: &str, files: &[String]) {
+    let pixels: Vec<Vec<Rgb>> = files
+        .iter()
+        .map(|file| {
+            let path = shots.join(file);
+            image::open(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+                .resize_exact(SHOT_W, SHOT_H, FilterType::Lanczos3)
+                .to_rgb8()
+                .pixels()
+                .map(|p| p.0)
+                .collect()
+        })
+        .collect();
+    let all: Vec<Rgb> = pixels.iter().flatten().copied().collect();
+    let palette = median_cut(&all);
+    let mut blob = palette_to_clut(&palette);
+    for shot in &pixels {
+        blob.extend(index_with(&palette, shot));
+    }
+    fs::write(out.join(format!("back_{id}.art")), blob).expect("write a back-cover blob");
 }

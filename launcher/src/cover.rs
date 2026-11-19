@@ -42,6 +42,27 @@ macro_rules! program {
     };
 }
 
+/// A program whose art lives in its own repository: the same entry, with the
+/// blobs read from the directory `build.rs` was given (`LAUNCHER_ART_DIR`). The
+/// entry using it carries `#[cfg(art_<id>)]`, so a build without that program's
+/// blobs has no entry and its case is plain.
+#[allow(unused_macros)]
+macro_rules! external_program {
+    ($name:literal, $id:literal, $spine:literal, $en:literal, $it:literal) => {
+        Program {
+            name: $name,
+            art: CoverArt {
+                l: include_bytes!(concat!(env!("LAUNCHER_ART_DIR"), "/art_l_", $id, ".art")),
+                m: include_bytes!(concat!(env!("LAUNCHER_ART_DIR"), "/art_m_", $id, ".art")),
+                s: include_bytes!(concat!(env!("LAUNCHER_ART_DIR"), "/art_s_", $id, ".art")),
+            },
+            back: include_bytes!(concat!(env!("LAUNCHER_ART_DIR"), "/back_", $id, ".art")),
+            spine: $spine,
+            blurb: ($en, $it),
+        }
+    };
+}
+
 /// What a case shows.
 #[derive(Clone, Copy)]
 pub enum Cover {
@@ -50,8 +71,8 @@ pub enum Cover {
     Plain,
 }
 
-/// Every program in this build. The index is the cover's slot in VRAM (thirteen
-/// fit).
+/// Every program in this build. The index is the cover's slot in VRAM (fifteen
+/// fit: the medium cover page holds 15, the large 18, the small 24).
 pub static PROGRAMS: &[Program] = &[
     program!(
         "PSOXIDE ARCADE",
@@ -160,6 +181,23 @@ pub static PROGRAMS: &[Program] = &[
         "CITADEL",
         "The new Cortex engine, tested on a small Citadel level. An engine test, not a game demo.",
         "Il nuovo motore di Cortex, provato su un piccolo livello della Cittadella. Solo un test."
+    ),
+    // The restored games' art is in their own repository (launcher-art/).
+    #[cfg(all(feature = "private", art_x360))]
+    external_program!(
+        "360X",
+        "x360",
+        "360X",
+        "Turn, thrust, fire and grab pods across alien planets. Restored from its original source.",
+        "Ruota, spingi, spara e raccogli le capsule su pianeti alieni. Restaurato dai sorgenti originali."
+    ),
+    #[cfg(all(feature = "private", art_qdup))]
+    external_program!(
+        "QD UP",
+        "qdup",
+        "QD UP",
+        "A pool game restored from its original source, on a 3D table or a flat 2D one.",
+        "Un gioco di biliardo restaurato dai sorgenti originali, su tavolo 3D o in 2D."
     ),
 ];
 
