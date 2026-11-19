@@ -30,6 +30,15 @@
 //! has no gate file, and mkdisc accepts the program only if its executables carry a gate receipt.
 //! `gate_programs` lists the executable names (file stems) that file lists an unreceipted
 //! executable under, for the programs whose file does.
+//!
+//! A row may carry `edge_tail`, a list of the image's trailing files that tolerate a bad read
+//! (streamed music the program never waits on; mkdisc `--edge-tail`, see
+//! tools/mkdisc/src/layout.rs): only those may lie past the safe-read limit (77:28). The lineup
+//! may carry `aliases`, `[{"name": OUTER, "member": PROGRAM, "file": FILE}]`: outer-root directory
+//! records pointing at FILE inside the member's image (mkdisc `--alias`), so one copy of a file
+//! serves several programs. An OUTER that is one of the launcher's menu song files must be
+//! byte-identical to it and replaces it. `receipt --layout` puts mkdisc's layout record, with each
+//! alias checked against the pressed root directory and hashed, into the release receipt.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -571,6 +580,59 @@ fn programs_of(lineup: &Value) -> Result<&Vec<Value>> {
         .ok_or_else(|| Error("'programs'".into()))
 }
 
+/// A row's `edge_tail`: the image's trailing files that tolerate a bad read
+/// (streamed music the program never waits on), which mkdisc may place past the
+/// safe-read limit. A list of file names, or absent.
+fn edge_tail(row: &Value) -> Result<Vec<String>> {
+    let Some(value) = row.get("edge_tail") else {
+        return Ok(Vec::new());
+    };
+    let files = value
+        .as_array()
+        .ok_or_else(|| Error("'edge_tail' must be a list of file names".into()))?;
+    files
+        .iter()
+        .map(|f| {
+            f.as_str()
+                .filter(|s| !s.is_empty() && !s.contains(['"', '=']))
+                .map(str::to_string)
+                .ok_or_else(|| Error(format!("'edge_tail' entry {f} is not a file name")))
+        })
+        .collect()
+}
+
+/// The lineup's `aliases`: outer-root names pointing at a file inside a member
+/// image, as mkdisc's `--alias OUTER=MEMBER:FILE`. Each is
+/// `{"name": OUTER, "member": PROGRAM NAME, "file": FILE}`.
+fn aliases(lineup: &Value) -> Result<Vec<String>> {
+    let Some(value) = lineup.get("aliases") else {
+        return Ok(Vec::new());
+    };
+    let rows = value
+        .as_array()
+        .ok_or_else(|| Error("'aliases' must be a list".into()))?;
+    let names: Vec<&str> = programs_of(lineup)?
+        .iter()
+        .filter_map(|r| r.get("name").and_then(Value::as_str))
+        .collect();
+    let mut out = Vec::new();
+    for row in rows {
+        let (outer, member, file) = (text(row, "name")?, text(row, "member")?, text(row, "file")?);
+        ensure!(
+            names.contains(&member),
+            "alias {outer}: no program named {member} in the lineup"
+        );
+        for part in [outer, member, file] {
+            ensure!(
+                !part.is_empty() && !part.contains('"'),
+                "alias {outer}: bad field {part:?}"
+            );
+        }
+        out.push(format!("{outer}={member}:{file}"));
+    }
+    Ok(out)
+}
+
 fn prepare(args: &Args) -> Result<()> {
     let lineup_path = args.require_path("lineup")?;
     let lineup = load(&lineup_path)?;
@@ -589,6 +651,9 @@ fn prepare(args: &Args) -> Result<()> {
     )];
     // Each program's own gate file, for mkdisc (see `gate_file`).
     lines.push("GATE_ARGS :=".to_string());
+    // Edge-tolerant tails and outer-root aliases, for mkdisc (see `edge_tail`, `aliases`).
+    lines.push("EDGE_ARGS :=".to_string());
+    lines.push("ALIAS_ARGS :=".to_string());
     for row in programs_of(&lineup)? {
         let target = prepare_row(row, &out)?;
         lines.push(format!("{} := {}", text(row, "var")?, target.display()));
@@ -608,7 +673,16 @@ fn prepare(args: &Args) -> Result<()> {
         if let Some(version_var) = row.get("version_var").and_then(Value::as_str) {
             lines.push(format!("{version_var} := {}", text(row, "version")?));
         }
+        for file in edge_tail(row)? {
+            lines.push(format!(
+                "EDGE_ARGS += --edge-tail \"{}={file}\"",
+                text(row, "name")?
+            ));
+        }
         println!("{}: {}", text(row, "name")?, target.display());
+    }
+    for alias in aliases(&lineup)? {
+        lines.push(format!("ALIAS_ARGS += --alias \"{alias}\""));
     }
     fs::write(out.join("lineup.mk"), lines.join("\n") + "\n")?;
     println!(
@@ -761,6 +835,11 @@ fn receipt(args: &Args) -> Result<()> {
         },
         "programs": programs,
     });
+    let mut release = release;
+    if let Some(path) = args.path("layout") {
+        let layout = verified_layout(&path, &combined, &release["programs"])?;
+        release["layout"] = layout;
+    }
     write_receipt(&args.require_path("release-out")?, &release)?;
     write_components(
         &root,
@@ -778,6 +857,98 @@ fn receipt(args: &Args) -> Result<()> {
     );
     println!("components: {}", args.require("components-out")?);
     Ok(())
+}
+
+/// mkdisc's layout record (`<image>.layout.json`), checked against the pressed
+/// image: every member row starts where the disc table puts the member, and every
+/// alias is a root directory record that points at the recorded extent, which
+/// gains the sha256 of its sectors (bytes 16..2352 of each: subheader to EDC, the
+/// part that does not depend on where the sector sits).
+fn verified_layout(path: &Path, combined: &Path, programs: &Value) -> Result<Value> {
+    let mut layout = crate::util::read_json(path)?;
+    let rows = layout["rows"]
+        .as_array()
+        .ok_or_else(|| Error(format!("{}: no rows", path.display())))?;
+    for row in rows {
+        let name = row["name"].as_str().unwrap_or_default();
+        if let Some(start) = programs
+            .get(name)
+            .and_then(|p| p.pointer("/embedded/image_lba_start"))
+            .and_then(Value::as_u64)
+        {
+            ensure!(
+                row["lba_start"].as_u64() == Some(start),
+                "layout: {name} starts at {} but the disc table says {start}",
+                row["lba_start"]
+            );
+        }
+    }
+    ensure!(
+        layout["needed_end_exclusive"].as_u64().unwrap_or(u64::MAX)
+            <= layout["safe_read_end_lba"].as_u64().unwrap_or(0),
+        "layout: needed data ends past the safe-read limit"
+    );
+    let records = root_records(combined)?;
+    let mut stream = File::open(combined)?;
+    for alias in layout["aliases"].as_array_mut().into_iter().flatten() {
+        let name = alias["name"].as_str().unwrap_or_default().to_string();
+        let (lba, sectors, bytes) = (
+            alias["lba"].as_u64().unwrap_or(0),
+            alias["sectors"].as_u64().unwrap_or(0),
+            alias["bytes"].as_u64().unwrap_or(0),
+        );
+        let found = records
+            .iter()
+            .find(|(n, ..)| *n == name)
+            .ok_or_else(|| Error(format!("alias {name}: no such root record on the disc")))?;
+        ensure!(
+            (found.1, found.2) == (lba, bytes),
+            "alias {name}: root record says LBA {} size {}, layout says LBA {lba} size {bytes}",
+            found.1,
+            found.2
+        );
+        let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
+        let mut sector = vec![0u8; SECTOR_BYTES as usize];
+        for at in lba..lba + sectors {
+            stream.seek(SeekFrom::Start(at * SECTOR_BYTES))?;
+            stream.read_exact(&mut sector)?;
+            sha2::Digest::update(&mut hasher, &sector[16..]);
+        }
+        alias["sha256"] = json!(format!("{:x}", sha2::Digest::finalize(hasher)));
+    }
+    layout["record"] = json!(file_record(path)?);
+    Ok(layout)
+}
+
+/// The outer root directory of a pressed image: `(name, extent LBA, size)` per
+/// file record, the `;1` version removed.
+fn root_records(image: &Path) -> Result<Vec<(String, u64, u64)>> {
+    let mut stream = File::open(image)?;
+    let pvd = read_user_sector(&mut stream, 16)?;
+    ensure!(&pvd[1..6] == b"CD001", "no primary volume descriptor at LBA 16");
+    let le = |b: &[u8], at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as u64;
+    let (root_lba, root_size) = (le(&pvd, 156 + 2), le(&pvd, 156 + 10));
+    let mut dir = Vec::new();
+    for lba in root_lba..root_lba + root_size.div_ceil(2048) {
+        dir.extend(read_user_sector(&mut stream, lba)?);
+    }
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    while at + 33 < dir.len().min(root_size as usize) {
+        let len = dir[at] as usize;
+        if len == 0 {
+            at = (at / 2048 + 1) * 2048;
+            continue;
+        }
+        let id_len = dir[at + 32] as usize;
+        let id = String::from_utf8_lossy(&dir[at + 33..at + 33 + id_len]).into_owned();
+        if dir[at + 25] & 2 == 0 {
+            let name = id.split(';').next().unwrap_or_default().to_string();
+            out.push((name, le(&dir, at + 2), le(&dir, at + 10)));
+        }
+        at += len;
+    }
+    Ok(out)
 }
 
 /// The component receipt beside the release receipt: which sources built the
@@ -979,6 +1150,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
                 "release-out",
                 "omit",
                 "components-out",
+                "layout",
             ],
             &[],
         )?)?,
@@ -1211,5 +1383,32 @@ mod tests {
         let before = fs::read_to_string(&lineup_path).unwrap();
         refresh(&Args::parse(&arguments, &["lineup", "library", "only"], &[]).unwrap()).unwrap();
         assert_eq!(fs::read_to_string(&lineup_path).unwrap(), before);
+    }
+
+    #[test]
+    fn edge_tails_and_aliases_become_mkdisc_arguments() {
+        let lineup = json!({
+            "programs": [
+                {"name": "NITROXIDE"},
+                {"name": "VOXIDE", "edge_tail": ["MUSIC1.XA"]}
+            ],
+            "aliases": [
+                {"name": "MUSIC1.XA", "member": "NITROXIDE", "file": "MUSIC1.XA"},
+                {"name": "PIANO1.XA", "member": "VOXIDE", "file": "MUSIC1.XA"}
+            ]
+        });
+        let rows = programs_of(&lineup).unwrap();
+        assert!(edge_tail(&rows[0]).unwrap().is_empty());
+        assert_eq!(edge_tail(&rows[1]).unwrap(), vec!["MUSIC1.XA".to_string()]);
+        assert_eq!(
+            aliases(&lineup).unwrap(),
+            vec!["MUSIC1.XA=NITROXIDE:MUSIC1.XA", "PIANO1.XA=VOXIDE:MUSIC1.XA"]
+        );
+        let stray = json!({
+            "programs": [{"name": "VOXIDE"}],
+            "aliases": [{"name": "X.XA", "member": "GONE", "file": "MUSIC1.XA"}]
+        });
+        assert!(aliases(&stray).is_err());
+        assert!(edge_tail(&json!({"edge_tail": "MUSIC1.XA"})).is_err());
     }
 }

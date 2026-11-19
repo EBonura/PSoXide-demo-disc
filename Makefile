@@ -388,9 +388,12 @@ PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # From v0.56 it also carries 360X and QD Up (RESTORED=1) and no Cortex at all
 # (the defaults), and from v0.57 Counter-Strike again (CS=1; v0.56 is re-pressed with CS=0). The v0.54 and v0.55 lineups list the Cortex programs and no
 # restored games: re-press them with CORTEX=1 CITADEL=1 RESTORED=0 on the command line. It is
-# pressed for an 80-minute blank (359844 sectors) with a 4500 sector zero filler after
-# the last program, so all game data ends well inside the radius the console reads cleanly.
-PRIVATE_PRESS_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 TAIL_FILLER=4500 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+# pressed for an 80-minute blank (359844 sectors). Up to v0.58 a 4500 sector zero filler
+# followed the last program to keep game data off the outer edge; it did not (v0.58's last
+# game had its tables at 78:13), and mkdisc's edge rule replaces it: every sector a program
+# needs must end inside the safe-read limit, 77:28 in the radius sweep of 2026-10-19, and
+# only a member's declared edge-tolerant music may lie past it (tools/mkdisc/src/layout.rs).
+PRIVATE_PRESS_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
@@ -503,6 +506,7 @@ endif
 # it was built from. mkdisc refuses a diag receipt: nothing that ships has a diagnostic feature on.
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" $(GATE_ARGS) \
+		$(EDGE_ARGS) $(ALIAS_ARGS) \
 		$(ARCADE_ARGS) \
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
@@ -590,7 +594,8 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 		--build-command "make lineup-disc LINEUP=$(LINEUP) $(PRESSING_FLAGS)$(if $(LEAVE_OUT), LEAVE_OUT='$(LEAVE_OUT)')" \
 		$(if $(HL),,--omit HALF-LIFE) $(if $(CS),,--omit COUNTER-STRIKE) $(if $(HK),,--omit "HOLLOW KNIGHT") $(if $(WO),,--omit "WIPEOUT PSOXIDE") $(if $(OOT),,--omit "OCARINA OF TIME") $(if $(CITADEL),,--omit "CORTEX CITADEL") $(if $(RESTORED),,--omit "360X" --omit "QD UP") $(if $(CORTEX),,--omit "CORTEX IGNITION") $(if $(HWT),,--omit "HARDWARE TESTS") \
 		--release-out "$(RELEASE_RECEIPT)" \
-		--components-out "$(DIST)/$(DISC_NAME).components.json"
+		--components-out "$(DIST)/$(DISC_NAME).components.json" \
+		--layout "$(DIST)/$(DISC_NAME).layout.json"
 
 # The sector budget of the pressing these flags select, from inputs already
 # built, without writing an image.

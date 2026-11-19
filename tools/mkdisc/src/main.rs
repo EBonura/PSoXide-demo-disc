@@ -38,6 +38,7 @@
 
 mod cue;
 mod gate;
+mod layout;
 mod spectrum;
 mod wav;
 
@@ -130,6 +131,11 @@ struct Args {
     /// stretch of the pressing (where silicon reads are least reliable) holds nothing
     /// that matters. They count against `--max-sectors`.
     tail_filler: u32,
+    /// `(member, file)`: the member image's trailing file that tolerates a bad read (streamed
+    /// music the program never waits on), so it may sit past the safe-read limit.
+    edge_tails: Vec<(String, String)>,
+    /// Outer-root names pointing at files inside member images, no sectors duplicated.
+    aliases: Vec<layout::Alias>,
     /// Print the sector budget and stop before writing the image.
     dry_run: bool,
     /// What the architecture gate needs (see [`gate`]).
@@ -158,6 +164,8 @@ fn parse_args() -> Result<Args, String> {
     let mut allow_diag = false;
     let mut program_stems: Vec<(String, String)> = Vec::new();
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
+    let mut edge_tails: Vec<(String, String)> = Vec::new();
+    let mut aliases: Vec<layout::Alias> = Vec::new();
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -266,6 +274,16 @@ fn parse_args() -> Result<Args, String> {
                     format!("--tail-filler wants a sector count, got {value:?}")
                 })?;
             }
+            "--edge-tail" => {
+                let (name, file) = split(
+                    &it.next().ok_or("--edge-tail takes NAME=FILE")?,
+                    "--edge-tail",
+                )?;
+                edge_tails.push((name, file.to_string_lossy().into_owned()));
+            }
+            "--alias" => aliases.push(layout::Alias::parse(
+                &it.next().ok_or("--alias takes OUTER=MEMBER:FILE")?,
+            )?),
             "--dry-run" => dry_run = true,
             "--sdk-profile" => {
                 sdk_profile = Some(PathBuf::from(
@@ -313,6 +331,8 @@ fn parse_args() -> Result<Args, String> {
         shots,
         max_sectors,
         tail_filler,
+        edge_tails,
+        aliases,
         dry_run,
         gate: gate::Options {
             sdk_profile: sdk_profile.ok_or(
@@ -350,6 +370,12 @@ fn print_usage() {
          --menu-title  title of each song, in song order, shown as now playing;\n\
         \x20             their count is the song count\n\
          --max-sectors the target blank's capacity; a layout over it is an error\n\
+         --edge-tail   NAME=FILE declares a trailing file of the image NAME edge-tolerant (a bad\n\
+        \x20             read cannot hang or corrupt the program); only such files may lie past\n\
+        \x20             the safe-read limit (77:28), see layout.rs\n\
+         --alias       OUTER=MEMBER:FILE adds the outer root record OUTER pointing at FILE inside\n\
+        \x20             the image MEMBER; an OUTER that is a --menu-xa file must be identical\n\
+        \x20             to it and replaces it\n\
          --dry-run     print the sector budget and stop without writing the image\n\
          --sdk-profile the SDK's sdk/profile.toml; every executable on the disc (the launcher,\n\
         \x20             each --game, each PSX-EXE in an --image) is checked against it first\n\
@@ -1060,6 +1086,86 @@ fn run() -> Result<(), String> {
 
     gate.finish()?;
 
+    // Each image's file list (for the edge rule's table and refusals, and the aliases), and the
+    // start of its declared edge-tolerant tail, in image sectors.
+    let mut image_files = Vec::with_capacity(images.len());
+    let mut tail_starts = Vec::with_capacity(images.len());
+    for (index, path, image, _, _) in &images {
+        let name = &args.programs[*index].name;
+        let files =
+            layout::image_files(&image.data).map_err(|e| format!("{}: {e}", path.display()))?;
+        let declared: Vec<String> = args
+            .edge_tails
+            .iter()
+            .filter(|(n, _)| n == name)
+            .map(|(_, f)| f.clone())
+            .collect();
+        let sectors = (image.data.len() / SECTOR_BYTES) as u32;
+        tail_starts.push(layout::tail_start(name, &files, sectors, &declared)?);
+        image_files.push(files);
+    }
+    for (name, _) in &args.edge_tails {
+        if !images.iter().any(|(i, ..)| &args.programs[*i].name == name) {
+            return Err(format!("--edge-tail {name}: no --image of that name"));
+        }
+    }
+
+    // Aliases: outer root names that point into a member image. The name must not collide with
+    // anything else in the outer root; one that names a menu song file must hold exactly that
+    // file's sectors, and then takes its place (no sectors duplicated).
+    let mut outer_names: Vec<String> = vec![
+        "SYSTEM.CNF".into(),
+        disc_toc::TOC_FILE_NAME.to_ascii_uppercase(),
+        SPECTRUM_FILE_NAME.into(),
+        SHOTS_FILE_NAME.into(),
+        "PSX.EXE".into(),
+    ];
+    outer_names.extend(iso_files.iter().map(|(n, _)| n.to_ascii_uppercase()));
+    // (alias, image slot, file, replaces a menu song)
+    let mut alias_plan: Vec<(layout::Alias, usize, layout::ImageFile, bool)> = Vec::new();
+    for alias in &args.aliases {
+        if outer_names.contains(&alias.outer)
+            || alias_plan.iter().any(|(a, ..)| a.outer == alias.outer)
+        {
+            return Err(format!(
+                "--alias {}: the outer root already has a file of that name",
+                alias.outer
+            ));
+        }
+        let slot = images
+            .iter()
+            .position(|(i, ..)| args.programs[*i].name == alias.member)
+            .ok_or_else(|| format!("--alias {}: no --image named {}", alias.outer, alias.member))?;
+        let file = image_files[slot]
+            .iter()
+            .find(|f| f.path.eq_ignore_ascii_case(&alias.inner))
+            .cloned()
+            .ok_or_else(|| {
+                format!("--alias {}: {} has no file {}", alias.outer, alias.member, alias.inner)
+            })?;
+        let replaces = match menu_xa.iter().find(|(n, _)| *n == alias.outer) {
+            Some((_, bytes)) => {
+                let data = &images[slot].2.data;
+                let from = file.lba as usize * SECTOR_BYTES;
+                let to = from + file.sectors as usize * SECTOR_BYTES;
+                let sectors = data.get(from..to).ok_or_else(|| {
+                    format!("--alias {}: {} ends past its image", alias.outer, alias.inner)
+                })?;
+                layout::xa_matches_image(bytes, sectors).map_err(|e| {
+                    format!(
+                        "--alias {}: the menu song file is not {}'s {}: {e}. Refusing to alias \
+                         different data.",
+                        alias.outer, alias.member, alias.inner
+                    )
+                })?;
+                true
+            }
+            None => false,
+        };
+        alias_plan.push((alias.clone(), slot, file, replaces));
+    }
+    let alias_names: Vec<String> = alias_plan.iter().map(|(a, ..)| a.outer.clone()).collect();
+
     let build_iso = |toc: Vec<u8>| {
         let mut builder = IsoBuilder::new()
             .volume_id(&args.volume)
@@ -1077,9 +1183,20 @@ fn run() -> Result<(), String> {
             builder.add_file(name, bytes.clone());
         }
         for (name, bytes) in &menu_xa {
-            builder
-                .add_xa_file(name, bytes.clone())
-                .expect("lengths were checked when the files were read");
+            if alias_names.contains(name) {
+                // One placeholder sector; the record is pointed into the member image once
+                // the images are placed (layout::patch_root_record).
+                builder.add_file(name, vec![0u8; SECTOR_SIZE]);
+            } else {
+                builder
+                    .add_xa_file(name, bytes.clone())
+                    .expect("lengths were checked when the files were read");
+            }
+        }
+        for (alias, _, _, replaces) in &alias_plan {
+            if !replaces {
+                builder.add_file(&alias.outer, vec![0u8; SECTOR_SIZE]);
+            }
         }
         builder.build_bin()
     };
@@ -1110,6 +1227,86 @@ fn run() -> Result<(), String> {
     print!("{}", memory_map(&loaded));
     print!("{}", budget_table(&budget, args.max_sectors));
     check_budget(&budget, args.max_sectors)?;
+
+    // The edge rule (layout.rs): placement keeps the carousel order when every needed sector
+    // lies inside the safe-read limit with it; otherwise the member with the longest declared
+    // edge-tolerant tail goes last; a layout that still leaves needed data past the limit is
+    // refused. The table goes to stdout and, as JSON, beside the image for the receipt.
+    let audio_sectors: u32 = images
+        .iter()
+        .map(|(_, _, image, _, _)| (image.audio_bytes.len() / SECTOR_BYTES) as u32)
+        .sum();
+    let rows_for = |order: &[usize]| -> Vec<layout::Row> {
+        let mut rows = vec![layout::Row {
+            name: String::from("launcher ISO"),
+            start: 0,
+            sectors: iso_frames,
+            needed: iso_frames,
+            tail: layout::Tail::None,
+            files: Vec::new(),
+        }];
+        let mut at = iso_frames;
+        for &slot in order {
+            let (index, _, image, _, _) = &images[slot];
+            let sectors = (image.data.len() / SECTOR_BYTES) as u32;
+            let needed = tail_starts[slot];
+            let tail_files: Vec<String> = image_files[slot]
+                .iter()
+                .filter(|f| f.lba >= needed)
+                .map(|f| f.path.clone())
+                .collect();
+            rows.push(layout::Row {
+                name: args.programs[*index].name.clone(),
+                start: at,
+                sectors,
+                needed,
+                tail: if needed == sectors {
+                    layout::Tail::None
+                } else {
+                    layout::Tail::Tolerant(tail_files)
+                },
+                files: image_files[slot].clone(),
+            });
+            at += sectors;
+        }
+        if args.tail_filler != 0 {
+            rows.push(layout::Row {
+                name: String::from("tail filler"),
+                start: at,
+                sectors: args.tail_filler,
+                needed: 0,
+                tail: layout::Tail::Filler,
+                files: Vec::new(),
+            });
+            at += args.tail_filler;
+        }
+        if audio_sectors != 0 {
+            // CD-DA a program plays: counted as needed, nothing proves it tolerates a bad read.
+            rows.push(layout::Row {
+                name: String::from("CD-DA tracks"),
+                start: at,
+                sectors: audio_sectors,
+                needed: audio_sectors,
+                tail: layout::Tail::None,
+                files: Vec::new(),
+            });
+        }
+        rows
+    };
+    let tail_sectors: Vec<u32> = images
+        .iter()
+        .zip(&tail_starts)
+        .map(|((_, _, image, _, _), start)| (image.data.len() / SECTOR_BYTES) as u32 - start)
+        .collect();
+    let order = layout::choose_order(
+        images.len(),
+        &tail_sectors,
+        rows_for,
+        layout::SAFE_READ_END_LBA,
+    );
+    let rows = rows_for(&order);
+    print!("{}", layout::table(&rows, layout::SAFE_READ_END_LBA));
+    layout::check(&rows, layout::SAFE_READ_END_LBA)?;
     if args.dry_run {
         return Ok(());
     }
@@ -1119,8 +1316,13 @@ fn run() -> Result<(), String> {
     // so the first game's audio is track 2 and every base counts only the
     // games' own tracks. Nothing on the disc reads a track by a fixed number
     // any more: the old "menu songs are tracks 2-5" convention is gone.
+    // Images (and their CD-DA) go down in placement order, which is the carousel order unless
+    // the edge rule moved a member to the end; each table entry keeps its carousel slot.
     let mut cdda_track_base = 0u32;
-    for (index, path, image, payload_fnv, boot_exe_lba) in &images {
+    let mut image_starts = vec![0u32; images.len()];
+    for &slot in &order {
+        let (index, path, image, payload_fnv, boot_exe_lba) = &images[slot];
+        image_starts[slot] = image_lba;
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
         let program = &args.programs[*index];
         entries[*index] = Some(
@@ -1235,9 +1437,26 @@ fn run() -> Result<(), String> {
     }
 
     let mut lba = iso_frames;
-    for (_, _, image, _, _) in &images {
+    for &slot in &order {
+        let image = &images[slot].2;
         place_data_track(&mut disc, &image.data, lba)?;
         lba += (image.data.len() / SECTOR_BYTES) as u32;
+    }
+
+    // Point each alias's root record at its file inside the placed member image.
+    let mut placed_aliases = Vec::new();
+    for (alias, slot, file, replaces) in &alias_plan {
+        let at = image_starts[*slot] + file.lba;
+        layout::patch_root_record(&mut disc, &alias.outer, at, file.bytes)?;
+        placed_aliases.push(layout::PlacedAlias {
+            outer: alias.outer.clone(),
+            member: alias.member.clone(),
+            inner: file.path.clone(),
+            lba: at,
+            sectors: file.sectors,
+            bytes: file.bytes,
+            replaces_menu_xa: *replaces,
+        });
     }
 
     // The tail filler: a zero-data Form 1 sector (the ISO's own empty system-area sector 1,
@@ -1254,9 +1473,10 @@ fn run() -> Result<(), String> {
         }
     }
 
-    // All CD-DA follows all data, each game's in program order.
+    // All CD-DA follows all data, each game's in placement order.
     let mut placed_audio = Vec::new();
-    for (_, _, image, _, _) in &images {
+    for &slot in &order {
+        let image = &images[slot].2;
         let base = (disc.len() / SECTOR_BYTES) as u32;
         for track in &image.audio {
             placed_audio.push(PlacedAudio {
@@ -1275,6 +1495,23 @@ fn run() -> Result<(), String> {
         .and_then(|n| n.to_str())
         .ok_or("output path has no file name")?;
     write_cue(&cue_path, bin_name, &placed_audio)?;
+    let layout_path = args.out.with_extension("layout.json");
+    fs::write(
+        &layout_path,
+        layout::json(&rows, layout::SAFE_READ_END_LBA, &placed_aliases),
+    )
+    .map_err(|e| format!("write {}: {e}", layout_path.display()))?;
+    for alias in &placed_aliases {
+        println!(
+            "alias {} -> {} {} at LBA {} ({} sectors){}",
+            alias.outer,
+            alias.member,
+            alias.inner,
+            alias.lba,
+            alias.sectors,
+            if alias.replaces_menu_xa { ", replaces the menu song file" } else { "" }
+        );
+    }
 
     let frames = (disc.len() / SECTOR_BYTES) as u32;
     println!(

@@ -175,6 +175,25 @@ SDK can call `psx_iso::receipt::write`), a lineup row pointing at a gate file th
 listed, an executable placed somewhere a first stage unpacks it (not at the start of a data sector), or a disc
 written by something other than `mkdisc`.
 
+## The outer edge and shared files
+
+The owner's console reads a burned CD-R reliably only up to disc time 77:28 (radius sweep of 2026-10-19; LBA 348,450
+with LBA 0 at 00:02:00). On v0.58 a game whose tables sat at 78:13 never reached gameplay. `mkdisc` therefore refuses a
+layout in which data a program needs ends past that limit, naming the member, the file and its position, and prints the
+layout table (member, LBA and time range, where its needed data ends, what fills its tail) with the margin left. Only a
+member's declared edge-tolerant tail may sit past the limit: trailing files a bad read cannot hang or corrupt the program
+with, which in practice means streamed music the program never waits on (lineup row `edge_tail`, `--edge-tail
+NAME=FILE`; the files must run back to back to the image end). Placement keeps the carousel order when it passes the
+rule; otherwise the member with the longest declared tail goes last. The limit and its source live in
+`tools/mkdisc/src/layout.rs`. The table also goes beside the image as `<disc>.layout.json` and into the release receipt
+(`layout`).
+
+One copy of a file can serve several programs: a lineup's `aliases` add outer-root directory records that point at a
+file inside a member image (`--alias OUTER=MEMBER:FILE`). The launcher's menu songs are NitroXide's `MUSIC1.XA` and
+`MUSIC2.XA` byte for byte, so aliasing them saves 35,100 sectors; `mkdisc` checks the bytes and refuses an alias whose
+menu song file differs. The receipt records every alias with its LBA, size and sha256, checked against the pressed root
+directory.
+
 ## How the gates tell programs apart
 
 `disc-tools programs`, `chainloads` and `celeste-nav` (so `gates-private` and `gates-public`) read no text a program
