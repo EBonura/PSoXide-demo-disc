@@ -101,11 +101,11 @@ const SFX_BASE: SpuAddr = SpuAddr::new(0x1010);
 /// `click` is 0.10 s and the brightest short sound there is, which is what a
 /// tick heard a hundred times a minute over music on a TV speaker needs.
 static SFX_BROWSE: &[u8] =
-    include_bytes!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_click.psau");
+    psx_sfx::include_psau!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_click.psau");
 static SFX_SELECT: &[u8] =
-    include_bytes!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_confirm.psau");
+    psx_sfx::include_psau!("../../games/PSoXide-sdk/assets/audio/voxide-ui/psau/ui_confirm.psau");
 static SFX_LAUNCH: &[u8] =
-    include_bytes!("../../games/PSoXide-sdk/assets/audio/freesfx/psau/swoosh.psau");
+    psx_sfx::include_psau!("../../games/PSoXide-sdk/assets/audio/freesfx/psau/swoosh.psau");
 /// Slots into the sound player, in the order its voices were handed over.
 const SFX_BROWSE_SLOT: usize = 0;
 const SFX_SELECT_SLOT: usize = 1;
@@ -176,13 +176,21 @@ fn main() {
     // that writes a repeat address, and the cutoff that stops a one-shot on a
     // clock because END will not.
     let mut bank = Bank::new(SFX_BASE);
-    let sfx_browse = OneShot::new(bank.upload_on(&mut spu, SFX_BROWSE), BROWSE_GAIN);
-    let sfx_select =
-        OneShot::new(bank.upload_on(&mut spu, SFX_SELECT), SELECT_GAIN).with_adsr(Adsr::percussive());
+    // A sample whose upload failed is never played (the SDK latches the fault; no retry).
+    let sfx_browse = bank
+        .upload_on(&mut spu, SFX_BROWSE)
+        .ok()
+        .map(|sample| OneShot::new(sample, BROWSE_GAIN));
+    let sfx_select = bank
+        .upload_on(&mut spu, SFX_SELECT)
+        .ok()
+        .map(|sample| OneShot::new(sample, SELECT_GAIN).with_adsr(Adsr::percussive()));
     // 0x1000 is unity; scaling it down stretches the sample over the launch.
-    let sfx_launch = OneShot::new(bank.upload_on(&mut spu, SFX_LAUNCH), LAUNCH_GAIN).with_pitch(Pitch::raw(
-        (0x1000 * LAUNCH_STRETCH_NUM / LAUNCH_STRETCH_DEN) as u16,
-    ));
+    let sfx_launch = bank.upload_on(&mut spu, SFX_LAUNCH).ok().map(|sample| {
+        OneShot::new(sample, LAUNCH_GAIN).with_pitch(Pitch::raw(
+            (0x1000 * LAUNCH_STRETCH_NUM / LAUNCH_STRETCH_DEN) as u16,
+        ))
+    });
     let mut sfx: Player<3> = Player::new([VOICE_BROWSE, VOICE_SELECT, VOICE_LAUNCH], TICKS_HZ);
 
     let mut sel: i32 = 0;
@@ -285,15 +293,21 @@ fn main() {
                     let moved = (sel + step).clamp(0, count as i32 - 1);
                     if moved != sel {
                         sel = moved;
-                        sfx.play_on(SFX_BROWSE_SLOT, &sfx_browse, tick);
+                        if let Some(shot) = &sfx_browse {
+                            sfx.play_on(SFX_BROWSE_SLOT, shot, tick);
+                        }
                     }
                     if pressed(button::SELECT) {
                         screen = Screen::Credits;
-                        sfx.play_on(SFX_SELECT_SLOT, &sfx_select, tick);
+                        if let Some(shot) = &sfx_select {
+                            sfx.play_on(SFX_SELECT_SLOT, shot, tick);
+                        }
                     }
                     if pressed(button::CROSS) || pressed(button::START) {
                         // Confirm chirp now; the swoosh joins on its frame.
-                        sfx.play_on(SFX_SELECT_SLOT, &sfx_select, tick);
+                        if let Some(shot) = &sfx_select {
+                            sfx.play_on(SFX_SELECT_SLOT, shot, tick);
+                        }
                         launching = 0;
                     }
                 }
@@ -305,7 +319,9 @@ fn main() {
                 Screen::Credits => {
                     if pressed(button::CIRCLE) || pressed(button::SELECT) {
                         screen = Screen::Shelf;
-                        sfx.play_on(SFX_BROWSE_SLOT, &sfx_browse, tick);
+                        if let Some(shot) = &sfx_browse {
+                            sfx.play_on(SFX_BROWSE_SLOT, shot, tick);
+                        }
                     }
                 }
             }
@@ -413,7 +429,9 @@ fn main() {
                 seek = Some(chain::Seek::start(chosen, &mut music));
             }
             if launching == SWOOSH_FRAME {
-                sfx.play_on(SFX_LAUNCH_SLOT, &sfx_launch, tick);
+                if let Some(shot) = &sfx_launch {
+                    sfx.play_on(SFX_LAUNCH_SLOT, shot, tick);
+                }
             }
             if let Some(seek) = seek.as_mut() {
                 seek.frame();
