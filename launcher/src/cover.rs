@@ -72,7 +72,7 @@ pub enum Cover {
 /// Every program the launcher knows, in the order the shelf shows them. The
 /// same ids in the same order as `build.rs`'s list (checked below). An entry
 /// is in [`PROGRAMS`] when this edition shows it and its art was supplied.
-const ALL: [Entry; 16] = [
+const ALL: [Entry; 17] = [
     Entry {
         id: "arcade",
         vis: Vis::Both,
@@ -100,6 +100,13 @@ const ALL: [Entry; 16] = [
         name: "VOXIDE",
         spine: "VOXIDE",
         blurb: ("A Minecraft clone for the original PlayStation: mining, crafting and survival.", "Un clone di Minecraft per PlayStation: scavo, crafting e sopravvivenza."),
+    },
+    Entry {
+        id: "splat",
+        vis: Vis::Both,
+        name: "SPLAT DEMO",
+        spine: "SPLAT DEMO",
+        blurb: ("Gaussian splatting on the original PlayStation: five small animated scenes drawn from thousands of splats.", "Gaussian splatting sulla prima PlayStation: cinque piccole scene animate disegnate con migliaia di splat."),
     },
     Entry {
         id: "quake",

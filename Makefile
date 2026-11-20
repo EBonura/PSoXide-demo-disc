@@ -208,7 +208,8 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
 # missing from it, that program's case is plain (and has no shelf screenshots). Local inputs, like the lineup's:
 #   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
-#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art"     (Public, G = the games' checkouts)
+#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art \
+#       $(G)/ps1-splat-mock/launcher-art"     (Public, G = the games' checkouts)
 # (Cortex Ignition's pictures are in the editor repository.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 #
@@ -216,8 +217,11 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # directory holding the programs' repositories under their GitHub names (each at the commit the
 # pressing's notes record), RESTORED_ART the restored games' launcher-art directory, a local
 # input like the lineup's. Press with LAUNCHER_ART='$(PRIVATE_ART)' ART_SRC=... RESTORED_ART=...
-ART_REPOS := nitroxide voxide celeste-collection-psx quake-psx psoxide-arcade psxcel cs-psx oot-psx \
-	wipeout-psx hl-psx hk-psx PSoXide-editor
+# Only programs that are on the Private disc: Arcade, PSXcel (LEAVE_OUT) and the Cortex programs (CORTEX=0,
+# CITADEL=0) are not, and a cover for each would cost launcher RAM and a VRAM slot for nothing (lane
+# launcher-16 measured about 87 KB for four). A pressing that carries them adds their launcher-art by hand.
+ART_REPOS := nitroxide voxide ps1-splat-mock celeste-collection-psx quake-psx cs-psx oot-psx \
+	wipeout-psx hl-psx hk-psx
 PRIVATE_ART = $(foreach r,$(ART_REPOS),$(ART_SRC)/$(r)/launcher-art) $(RESTORED_ART)
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art
@@ -299,6 +303,14 @@ CITADEL_ARGS = --image "CORTEX CITADEL=$(CORTEX_CITADEL)" \
 	--version-of "CORTEX CITADEL=$(V_CORTEX_CITADEL)" \
 	--describe "CORTEX CITADEL=The new Cortex engine, tested on a small Citadel level. This is an engine test, not a game demo; Cortex Ignition is the old-engine demo.|Il nuovo motore di Cortex, provato su un piccolo livello della Cittadella. E un test del motore, non una demo; Cortex Ignition e la demo del vecchio motore."
 endif
+
+# Splat Demo is on both editions, from the lineup row that defines SPLAT (lineup.mk, read further down; an
+# older lineup has none, and MKDISC_ARGS then leaves these out, so it re-presses as it was). Its cover comes from its own repository's launcher-art (ART_REPOS, id splat).
+# The shelf text is the owner's, approved 2026-11-19 (the Italian without accents, as every other text here).
+SPLAT_ARGS = --image "SPLAT DEMO=$(SPLAT)" \
+	$(call SHOTARGS,SPLAT DEMO,splat) \
+	--version-of "SPLAT DEMO=$(V_SPLAT)" \
+	--describe "SPLAT DEMO=Five animated scenes built only from splats: thousands of small soft discs. Trade detail for frame rate and move the camera yourself.|Cinque scene animate fatte solo di splat: migliaia di piccoli dischi sfumati. Scambia dettaglio e fluidita e muovi tu la camera."
 
 # The QUAKE SHAREWARE arguments travel together for the same reason the
 # HALF-LIFE ones do, and they are not conditional: there is no pressing without
@@ -511,6 +523,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		--game "CELESTE COLLECTION=$(CELESTE)" \
 		--image "NITROXIDE=$(NITROXIDE)" \
 		--image "VOXIDE=$(VOXIDE)" \
+		$(if $(SPLAT),$(SPLAT_ARGS)) \
 		$(WO_ARGS) \
 		$(HK_ARGS) \
 		$(CS_ARGS) \

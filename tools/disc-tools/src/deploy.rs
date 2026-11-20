@@ -35,13 +35,14 @@ use crate::util::{
 };
 
 /// The menu a public pressing must show, in order: the visible table entries
-/// then the launcher's own CREDITS card. PSXcel sits last before CREDITS
+/// then the launcher's own CREDITS card. Splat Demo follows VoXide (the repin pressing). PSXcel sits last before CREDITS
 /// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order.
-pub(crate) const PUBLIC_GAMES: [&str; 8] = [
+pub(crate) const PUBLIC_GAMES: [&str; 9] = [
     "PSOXIDE ARCADE",
     "CELESTE COLLECTION",
     "NITROXIDE",
     "VOXIDE",
+    "SPLAT DEMO",
     "QUAKE SHAREWARE",
     "CORTEX IGNITION",
     "PSXCEL",
@@ -576,7 +577,7 @@ mod tests {
     }
 
     fn public_rows() -> Vec<(&'static str, u32, u32, u32)> {
-        PUBLIC_GAMES[..7]
+        PUBLIC_GAMES[..PUBLIC_GAMES.len() - 1]
             .iter()
             .map(|name| (*name, 30, 8, 0))
             .collect()

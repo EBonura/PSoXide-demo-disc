@@ -42,6 +42,7 @@ const PROGRAMS: &[(&str, Option<&str>)] = &[
     ("celeste", None),
     ("nitro", None),
     ("voxide", None),
+    ("splat", None),
     ("quake", None),
     ("cortex", None),
     ("cortex", None),
