@@ -22,6 +22,7 @@ mod identity;
 mod install;
 mod label;
 mod lineup;
+mod members;
 mod programs;
 mod publiconly;
 mod receipt;
@@ -110,6 +111,11 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "find the beat grid of a raw CD-DA track",
     ),
     ("disc-label", label::run, "print the disc label SVG"),
+    (
+        "members",
+        members::run,
+        "write members.json (and copy the link maps) for a pressed image, from its receipt and lineup",
+    ),
 ];
 
 fn usage() {

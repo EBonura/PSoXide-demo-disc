@@ -212,7 +212,8 @@
         "ref": "main"
       },
       "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/360x/360x.provenance.json"
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/360x/360x.provenance.json",
+      "title_probe": {"sym": "gamecycle", "op": "ge", "value": 100}
     },
     {
       "name": "QD UP",
@@ -229,7 +230,8 @@
         "ref": "main"
       },
       "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/qdup/qdup.provenance.json"
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/qdup/qdup.provenance.json",
+      "title_probe": {"sym": "cursor", "op": "eq", "value": 4}
     }
   ],
   "aliases": [
