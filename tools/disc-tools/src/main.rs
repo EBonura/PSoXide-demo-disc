@@ -20,6 +20,7 @@ mod deploy;
 mod icons;
 mod identity;
 mod install;
+mod journeys;
 mod label;
 mod lineup;
 mod members;
@@ -111,6 +112,11 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "find the beat grid of a raw CD-DA track",
     ),
     ("disc-label", label::run, "print the disc label SVG"),
+    (
+        "journeys",
+        journeys::run,
+        "generate the disc's headless journeys (a chain-load per member, carousel, covers) from members.json",
+    ),
     (
         "members",
         members::run,
