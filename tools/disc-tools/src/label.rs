@@ -30,14 +30,15 @@ use crate::args::Args;
 use crate::util::{Error, Result};
 
 /// The public pressing in menu order: the three arcade games of PSoXide
-/// Arcade, then every other program.
-const GAMES: [&str; 9] = [
+/// Arcade, then every other program (the same order as `PUBLIC_GAMES`).
+const GAMES: [&str; 10] = [
     "BREAKOUT",
     "SPACE INVADERS",
     "MAGIKAAAAARP PONG",
     "CELESTE COLLECTION",
     "NITROXIDE",
     "VOXIDE",
+    "SPLAT DEMO",
     "QUAKE SHAREWARE",
     "CORTEX IGNITION",
     "PSXCEL",
@@ -857,26 +858,27 @@ mod tests {
             eprintln!("skipping: the brand logo submodule is not checked out");
             return;
         };
-        // sha256 of what tools/disc_label.py printed for the same arguments.
+        // sha256 of the label for each argument set. Pinned to what tools/disc_label.py printed
+        // until Splat Demo joined the rim (2026-11-20, deliberately re-pinned with the rim list).
         let plain = build(false, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(plain.as_bytes()),
-            "91bd70918a4ebedfdf62f6dfc16ef4df73e4029d4a991859fd828c9429853357"
+            "4b89c424708557d2a80f314a2425784b52737df906d8e9b12ec276feaebee122"
         );
         let hl = build(true, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(hl.as_bytes()),
-            "e92c87e4b95f8566c8cd1b91f9d9cf1a227a271add40fff40a74b8c81a7b2f65"
+            "2b879d8f15fa6fc08cb5471927df396dcd83a1a40f98fca8d51b025242185c8e"
         );
         let linked = build(false, &links(), &logo).unwrap();
         assert_eq!(
             sha256_bytes(linked.as_bytes()),
-            "6af9fbb71ac45b7465531ee7f3d106439de160aa5554733957ee2024c753c2f7"
+            "ce0759afddeeaa4b5a1f76c0fbaec1c732e1d91d4641443dbffe8797a91e15c4"
         );
         let one = build(true, &links()[..1], &logo).unwrap();
         assert_eq!(
             sha256_bytes(one.as_bytes()),
-            "f69ed97ac6cd5229de87a5de90510a6f849dcb14fc7d2e890be5959354ca9268"
+            "9652b01581fae6c8862a5a9ca5c20e76280232c9f4809d3d39987bbcd91e2d28"
         );
     }
 
