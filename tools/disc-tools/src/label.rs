@@ -31,7 +31,7 @@ use crate::util::{Error, Result};
 
 /// The public pressing in menu order: the three arcade games of PSoXide
 /// Arcade, then every other program (the same order as `PUBLIC_GAMES`).
-const GAMES: [&str; 10] = [
+const GAMES: [&str; 9] = [
     "BREAKOUT",
     "SPACE INVADERS",
     "MAGIKAAAAARP PONG",
@@ -40,7 +40,6 @@ const GAMES: [&str; 10] = [
     "VOXIDE",
     "SPLAT DEMO",
     "QUAKE SHAREWARE",
-    "CORTEX IGNITION",
     "PSXCEL",
 ];
 
@@ -859,26 +858,26 @@ mod tests {
             return;
         };
         // sha256 of the label for each argument set. Pinned to what tools/disc_label.py printed
-        // until Splat Demo joined the rim (2026-11-20, deliberately re-pinned with the rim list).
+        // until the rim list changed (2026-11-20: Splat Demo added, Cortex Ignition removed), re-pinned deliberately.
         let plain = build(false, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(plain.as_bytes()),
-            "4b89c424708557d2a80f314a2425784b52737df906d8e9b12ec276feaebee122"
+            "366c3ee232715a5c04fb39e1491724625cc01847dd65bc7d23749742901adb8a"
         );
         let hl = build(true, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(hl.as_bytes()),
-            "2b879d8f15fa6fc08cb5471927df396dcd83a1a40f98fca8d51b025242185c8e"
+            "f643a4a5615eedab5c33462339881b7f0ce4489d9af80c90c5312331918d6dba"
         );
         let linked = build(false, &links(), &logo).unwrap();
         assert_eq!(
             sha256_bytes(linked.as_bytes()),
-            "ce0759afddeeaa4b5a1f76c0fbaec1c732e1d91d4641443dbffe8797a91e15c4"
+            "fa8a8f5c882fecbf11221527eb145dc69e4b9cebb3caa0a1bad542117ae58415"
         );
         let one = build(true, &links()[..1], &logo).unwrap();
         assert_eq!(
             sha256_bytes(one.as_bytes()),
-            "9652b01581fae6c8862a5a9ca5c20e76280232c9f4809d3d39987bbcd91e2d28"
+            "405eb289ead4c5ff71473726faf15bbcbda40165958ad2d203c3b6eb3fb5544c"
         );
     }
 
@@ -965,5 +964,19 @@ mod tests {
                     .matches("<text x=\"0\" y=\"0\"")
                     .count()
         );
+    }
+
+    #[test]
+    fn the_rim_lists_the_public_menu_and_no_cortex() {
+        // PSoXide Arcade is its three games on the rim; CREDITS is not a program.
+        let menu: Vec<&str> = crate::deploy::PUBLIC_GAMES[..crate::deploy::PUBLIC_GAMES.len() - 1]
+            .iter()
+            .flat_map(|name| match *name {
+                "PSOXIDE ARCADE" => vec!["BREAKOUT", "SPACE INVADERS", "MAGIKAAAAARP PONG"],
+                other => vec![other],
+            })
+            .collect();
+        assert_eq!(GAMES.to_vec(), menu);
+        assert!(!GAMES.iter().any(|name| name.contains("CORTEX")));
     }
 }

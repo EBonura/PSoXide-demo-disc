@@ -208,9 +208,9 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
 # missing from it, that program's case is plain (and has no shelf screenshots). Local inputs, like the lineup's:
 #   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
-#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art $(G)/PSoXide-editor/launcher-art \
+#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art \
 #       $(G)/ps1-splat-mock/launcher-art"     (Public, G = the games' checkouts)
-# (Cortex Ignition's pictures are in the editor repository.) A Private press adds the Private programs' directories (the lineup names them). The list is
+# (No Cortex cover on either edition: Cortex Ignition is off the disc.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 #
 # The Private pressing's list (v0.58 on), so a re-press takes the same directories: ART_SRC is a

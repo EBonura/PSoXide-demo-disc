@@ -36,15 +36,15 @@ use crate::util::{
 
 /// The menu a public pressing must show, in order: the visible table entries
 /// then the launcher's own CREDITS card. Splat Demo follows VoXide (the repin pressing). PSXcel sits last before CREDITS
-/// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order.
-pub(crate) const PUBLIC_GAMES: [&str; 9] = [
+/// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order. Cortex Ignition is not on the disc
+/// (Manny, 2026-11-14): a Public lineup that still carries it fails this menu check.
+pub(crate) const PUBLIC_GAMES: [&str; 8] = [
     "PSOXIDE ARCADE",
     "CELESTE COLLECTION",
     "NITROXIDE",
     "VOXIDE",
     "SPLAT DEMO",
     "QUAKE SHAREWARE",
-    "CORTEX IGNITION",
     "PSXCEL",
     "CREDITS",
 ];
@@ -574,6 +574,21 @@ mod tests {
                 &toc[sector * USER_DATA_BYTES..(sector + 1) * USER_DATA_BYTES],
             );
         }
+    }
+
+    #[test]
+    fn the_public_menu_and_the_newest_public_lineup_carry_no_cortex() {
+        assert!(PUBLIC_GAMES.iter().all(|name| !name.contains("CORTEX")));
+        let root = crate::util::repo_root().unwrap();
+        let lineup = read_json(&root.join("release/lineup-v0.59.json")).unwrap();
+        let names: Vec<&str> = lineup["programs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["name"].as_str().unwrap())
+            .collect();
+        // The lineup lists the programs in menu order; CREDITS is the launcher's own card.
+        assert_eq!(names, PUBLIC_GAMES[..PUBLIC_GAMES.len() - 1]);
     }
 
     fn public_rows() -> Vec<(&'static str, u32, u32, u32)> {

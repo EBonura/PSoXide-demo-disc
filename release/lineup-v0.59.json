@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.59 (draft)",
-  "note": "PSoXide Demo Disc, public pressing, all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.53 public programs (each row's pin, hash and build text are to be replaced by the repin's builds) plus Splat Demo (five authored scenes), the launcher's MUSIC1.XA and MUSIC2.XA as NitroXide's extents and Splat Demo's PIANO1.XA as VoXide's MUSIC1.XA. Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time, 360X, QD Up and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only).",
+  "note": "PSoXide Demo Disc, public pressing, all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.53 public programs without Cortex Ignition (taken off the disc by Manny, 2026-11-14; each row's pin, hash and build text are to be replaced by the repin's builds) plus Splat Demo (five authored scenes), the launcher's MUSIC1.XA and MUSIC2.XA as NitroXide's extents and Splat Demo's PIANO1.XA as VoXide's MUSIC1.XA. Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time, 360X, QD Up and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only).",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -120,28 +120,6 @@
       "build": "library install of 2026-10-25 10:51 (Quake (quake-psx).provenance.json): quake-psx main c6412e2, shareware 1.06 data, XA music, one data track, no CD-DA.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/quake/Quake (quake-psx).provenance.json",
       "library": "Quake (quake-psx).cue"
-    },
-    {
-      "name": "CORTEX IGNITION",
-      "var": "CORTEX_CURRENT",
-      "version_var": "V_CORTEX_CURRENT",
-      "kind": "image",
-      "bin_sha256": "18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df",
-      "version": "0.4b",
-      "source": {
-        "repository": "EBonura/PSoXide-editor",
-        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/PSoXide-editor.git",
-        "revision": "066fe3a2",
-        "ref": "cortex/0.4b-xa-2026-10-19"
-      },
-      "build": "frontend build-project-disc --project editor/projects/default on cortex/0.4b-xa-2026-10-19 (SDK 6518a5eb6, emulator 3f45f0eb): the v0.43 public Cortex line (editor main 309fdf93: the Palermo Comicon update, the approved 09-30 animations, the two-hit R1 combo) with its two Music nodes as MUSIC1.XA after UI.PAK, one data track, no CD-DA. Poll-bound replay against the plain 309fdf93 CD-DA build: VRAM and display hashes and dump-hw frames byte-identical at five stop polls; same frame count and 30 fps. Lifted out of the v0.52 pressing: the same image (f836c1d1519a) with that disc's sector addresses.",
-      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/from-v0.52/PSoXide Demo Disc v0.52.release-receipt.json",
-      "derive": {
-        "from_disc": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/from-v0.52/PSoXide Demo Disc v0.52.bin",
-        "disc_sha256": "2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86",
-        "image_lba": 134965,
-        "sectors": 7076
-      }
     },
     {
       "name": "PSXCEL",
