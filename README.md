@@ -351,7 +351,11 @@ Makefile, writing `build/launcher-art/shots.mk` too, which cooks the `shots` pic
 lists the same ids and writes `art.rs`, each program's blobs or `None`, and the launcher
 keeps the entries of its edition that have art. There is no cfg flag per program, so the
 launcher's code does not depend on which art was supplied; without a directory the case is
-plain. A table past the VRAM pages' capacity (`MAX_COVERS`) does not build.
+plain. A table past the VRAM pages' capacity (`MAX_COVERS`, 18) does not build, and neither does
+a VRAM map whose regions overlap: `launcher/src/gfx.rs` holds the map (every size's pages are a
+`PageSet`, so another page is another coordinate) and checks it at compile time; `cover.rs`
+derives `MAX_COVERS` from the pages and checks the table's back-cover shots against their cells.
+The shelf's and the attract tour's row arrays are sized from the same numbers (`MAX_ROWS`).
 Every program works this way (Arcade, Celeste, NitroXide,
 VoXide, Quake, PSXcel, Cortex Ignition on a Public disc; the Private games, the restored 360X and QD Up
 included, on a Private one).

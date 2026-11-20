@@ -11,7 +11,8 @@
 //! The Private programs' art and names exist only in a build with the
 //! `private` feature: a Public disc must not carry them anywhere.
 
-use crate::gfx::{CoverArt, L_PAGES, M_H, M_W, SHOTS_PER_PAGE, SHOT_PAGES};
+use crate::gfx::{CoverArt, CLUT_ROWS, L_SET, M_SET, SHOT_SLOTS, SHOT_W, SHOT_H, S_SET};
+use disc_toc::MAX_ENTRIES;
 
 /// One program's art and the words printed on its case.
 pub struct Program {
@@ -261,25 +262,57 @@ const fn table() -> [Program; COUNT] {
     out
 }
 
-/// How many covers the launcher's VRAM pages hold: the large pages take six
-/// each, the medium page as many as fit in 256x256, the small page 24 and the
-/// back-cover pages two shots per program. A table past it does not build.
-pub const MAX_COVERS: usize = {
-    let l = L_PAGES.len() * 6;
-    let m = (256 / M_W as usize) * (256 / M_H as usize);
-    let back = SHOT_PAGES.len() * SHOTS_PER_PAGE / 2;
-    let mut max = if l < m { l } else { m };
-    if back < max {
-        max = back;
+const fn least(a: usize, b: usize) -> usize {
+    if a < b {
+        a
+    } else {
+        b
     }
-    max
+}
+
+/// How many covers the launcher's VRAM holds, from the page geometry in `gfx.rs`: the
+/// least of what each size's pages hold, the CLUT rows (one per program, for the cover and
+/// again for the back cover) and the back-cover shot cells (a back cover has one or two
+/// shots, and two is assumed here; the table's real shot count is checked below). A table
+/// past it does not build.
+pub const MAX_COVERS: usize = {
+    let mut max = L_SET.capacity();
+    max = least(max, M_SET.capacity());
+    max = least(max, S_SET.capacity());
+    max = least(max, CLUT_ROWS);
+    least(max, SHOT_SLOTS / 2)
 };
 const _: () = assert!(COUNT <= MAX_COVERS, "more covers than the launcher's VRAM pages hold");
+
+/// Rows the shelf and the attract tour keep room for: one per disc table entry
+/// (`MAX_ENTRIES`) and at least one per cover. A stop is a `u8` entry index.
+pub const MAX_ROWS: usize = if MAX_ENTRIES > MAX_COVERS { MAX_ENTRIES } else { MAX_COVERS };
+const _: () = assert!(MAX_ROWS <= 255, "an attract stop is a u8 entry index");
+
+/// Bytes of one back-cover shot's pixels, and of its palette.
+const SHOT_BYTES: usize = (SHOT_W * SHOT_H) as usize;
+const SHOT_CLUT_BYTES: usize = 512;
+
+/// The back-cover shots of every program in the table. Each back is a palette and one or
+/// two whole shots, and together they have to fit the shot cells.
+const fn table_shots(table: &[Program]) -> usize {
+    let (mut i, mut n) = (0, 0);
+    while i < table.len() {
+        let pixels = table[i].back.len() - SHOT_CLUT_BYTES;
+        assert!(pixels % SHOT_BYTES == 0, "a back cover is not whole shots");
+        assert!(pixels == SHOT_BYTES || pixels == 2 * SHOT_BYTES, "a back cover has one or two shots");
+        n += pixels / SHOT_BYTES;
+        i += 1;
+    }
+    n
+}
 
 const TABLE: [Program; COUNT] = table();
 
 /// Every program in this build. The index is the cover's slot in VRAM.
 pub static PROGRAMS: &[Program] = &TABLE;
+
+const _: () = assert!(table_shots(&TABLE) <= SHOT_SLOTS, "more back-cover shots than the launcher's VRAM pages hold");
 
 /// The cover for the program the table calls `name`.
 pub fn of(name: &str) -> Cover {
