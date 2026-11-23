@@ -87,8 +87,9 @@ CITADEL ?=
 # Cortex Ignition 0.4b is off by default since v0.56 (the owner's decision of 2026-11-14: no Cortex on
 # the demo disc). A lineup that lists it (v0.54 and v0.55 Private, every Public one up to v0.53) needs CORTEX=1.
 CORTEX ?=
-# 360X and QD Up ride the lineup pressings only (make lineup-disc ... RESTORED=1) and are
-# on the Private edition only. They are taken as built, like every other lineup input.
+# 360X and QD Up ride the lineup pressings only (make lineup-disc ... RESTORED=1). They are
+# on both editions from v0.59 (Manny, 2026-11-23), so the flag does not make a pressing
+# Private; both release channels set it. They are taken as built, like every other lineup input.
 RESTORED ?=
 # Ocarina of Time rides the lineup pressings only (make lineup-disc ... OOT=1):
 # it is built from the owner's own ROM in its own repository, has no submodule
@@ -104,7 +105,7 @@ override OOT := $(filter-out 0,$(OOT))
 override CITADEL := $(filter-out 0,$(CITADEL))
 override RESTORED := $(filter-out 0,$(RESTORED))
 override CORTEX := $(filter-out 0,$(CORTEX))
-PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL)$(RESTORED))
+PRIVATE := $(strip $(HL)$(CS)$(HK)$(WO)$(HWT)$(OOT)$(CITADEL))
 
 # The pressing has to fit the blank it is burned on. mkdisc adds up every
 # sector before it writes anything and fails with each program's share when
@@ -206,10 +207,8 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 # directories (each a manifest.txt and the pictures it names, see tools/menu-art) and `menu-art ext`
 # bakes them into $(ART_OUT) at build time, so no baked blob is committed anywhere. The launcher
 # gives a cover to each program whose blobs are there; with LAUNCHER_ART empty, or a program
-# missing from it, that program's case is plain (and has no shelf screenshots). Local inputs, like the lineup's:
-#   make launcher LAUNCHER_ART="$(G)/nitroxide/launcher-art $(G)/voxide/launcher-art $(G)/celeste-collection-psx/launcher-art \
-#       $(G)/quake-psx/launcher-art $(G)/psoxide-arcade/launcher-art $(G)/psxcel/launcher-art \
-#       $(G)/ps1-splat-mock/launcher-art"     (Public, G = the games' checkouts)
+# missing from it, that program's case is plain (and has no shelf screenshots). Local inputs, like the lineup's.
+# The Public pressing's list is PUBLIC_ART (below): press with LAUNCHER_ART='$(PUBLIC_ART)' ART_SRC=... RESTORED_ART=...
 # (No Cortex cover on either edition: Cortex Ignition is off the disc.) A Private press adds the Private programs' directories (the lineup names them). The list is
 # typed by hand: the lineup knows each game's repository and pinned revision, which predates launcher-art/.
 #
@@ -223,6 +222,9 @@ LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 ART_REPOS := nitroxide voxide ps1-splat-mock celeste-collection-psx quake-psx cs-psx oot-psx \
 	wipeout-psx hl-psx hk-psx
 PRIVATE_ART = $(foreach r,$(ART_REPOS),$(ART_SRC)/$(r)/launcher-art) $(RESTORED_ART)
+# The Public pressing's list, the same way: the programs on the Public disc (v0.59 on) and the restored games.
+PUBLIC_ART_REPOS := psoxide-arcade celeste-collection-psx nitroxide voxide ps1-splat-mock quake-psx psxcel
+PUBLIC_ART = $(foreach r,$(PUBLIC_ART_REPOS),$(ART_SRC)/$(r)/launcher-art) $(RESTORED_ART)
 LAUNCHER_ART ?=
 ART_OUT := $(BUILD)/launcher-art
 # Baked when make reads this file (so `disc-budget` and the lineup sub-makes see the same blobs and
@@ -321,7 +323,7 @@ QUAKE_ARGS = --image "QUAKE SHAREWARE=$(QUAKE_CUE)" \
 	--version-of "QUAKE SHAREWARE=$(QUAKE_VERSION)" \
 	--describe "QUAKE SHAREWARE=Quake 1.06 shareware for PS1, built on PSoXide with id's GPL source and the QuakePSX C port as references. All nine maps, the full arsenal and Chthon. Still in development.|Quake 1.06 shareware per PS1, costruito su PSoXide usando il sorgente GPL di id e il port C QuakePSX come riferimenti. Nove mappe, arsenale completo e Chthon. In sviluppo."
 
-# 360X and QD Up: the launcher's cover entries (cover.rs, Private feature) carry their spine
+# 360X and QD Up: the launcher's cover entries (cover.rs, both editions) carry their spine
 # and blurb; their pictures come from the restored games' own repository (LAUNCHER_ART,
 # below). The table's description is the same blurb, shown under the shelf.
 ifneq ($(RESTORED),)
@@ -406,6 +408,9 @@ PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # needs must end inside the safe-read limit, 77:28 in the radius sweep of 2026-10-19, and
 # only a member's declared edge-tolerant music may lie past it (tools/mkdisc/src/layout.rs).
 PRIVATE_PRESS_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
+# What the Public disc adds to its lineup's shared programs: 360X and QD Up, from v0.59 (Manny,
+# 2026-11-23). A Public lineup older than v0.59 lists neither: re-press it with PUBLIC_PRESS_FLAGS=.
+PUBLIC_PRESS_FLAGS := RESTORED=1
 RELEASE_ARGS ?=
 
 .PHONY: need-version release-inputs-check press-public press-private gates-public gates-private install-public install-private release-public-dry-run release-public
@@ -421,7 +426,7 @@ release-inputs-check: need-version
 
 press-public: need-version
 	rm -rf "$(PUBLIC_DIST)"
-	PSOXIDE_CHECK_GPU_LL_FIFO=1 $(MAKE) lineup-disc LINEUP=$(PUBLIC_LINEUP) DISC_NAME="$(PUBLIC_NAME)" DISC_VERSION=$(VERSION) \
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 $(MAKE) lineup-disc LINEUP=$(PUBLIC_LINEUP) $(PUBLIC_PRESS_FLAGS) DISC_NAME="$(PUBLIC_NAME)" DISC_VERSION=$(VERSION) \
 		DIST="$(PUBLIC_DIST)" FRONTEND="$(RELEASE_FRONTEND)"
 	@shasum -a 256 "$(PUBLIC_DIST)/$(PUBLIC_NAME).bin" "$(PUBLIC_DIST)/$(PUBLIC_NAME).cue"
 

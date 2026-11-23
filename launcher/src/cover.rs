@@ -9,7 +9,8 @@
 //! gets a plain cover, so a new lineup entry still shows and starts.
 //!
 //! The Private programs' art and names exist only in a build with the
-//! `private` feature: a Public disc must not carry them anywhere.
+//! `private` feature: a Public disc must not carry them anywhere. The restored
+//! games 360X and QD Up are on both editions (Manny, 2026-11-23).
 
 use crate::gfx::{CoverArt, CLUT_ROWS, L_SET, M_SET, SHOT_SLOTS, SHOT_W, SHOT_H, S_SET};
 use disc_toc::MAX_ENTRIES;
@@ -182,14 +183,14 @@ const ALL: [Entry; 17] = [
     },
     Entry {
         id: "x360",
-        vis: Vis::Private,
+        vis: Vis::Both,
         name: "360X",
         spine: "360X",
         blurb: ("Turn, thrust, fire and grab pods across alien planets. Restored from its original source.", "Ruota, spingi, spara e raccogli le capsule su pianeti alieni. Restaurato dai sorgenti originali."),
     },
     Entry {
         id: "qdup",
-        vis: Vis::Private,
+        vis: Vis::Both,
         name: "QD UP",
         spine: "QD UP",
         blurb: ("A pool game restored from its original source, on a 3D table or a flat 2D one.", "Un gioco di biliardo restaurato dai sorgenti originali, su tavolo 3D o in 2D."),

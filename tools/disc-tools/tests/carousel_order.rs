@@ -138,27 +138,30 @@ fn cortex_citadel_is_pressed_by_the_private_channel_only() {
     );
 }
 
-/// 360X and QD Up are Private only, like the Citadel test: their blocks are
-/// chosen by a flag the Private channel sets and the Public channel does not,
-/// the flag makes a pressing Private, and they follow the Cortex entries.
+/// 360X and QD Up are on both editions (Manny, 2026-11-23): both release channels set
+/// the flag that chooses their blocks, the flag no longer makes a pressing Private, and
+/// they follow the Cortex entries.
 #[test]
-fn the_restored_games_are_pressed_by_the_private_channel_only() {
+fn the_restored_games_are_pressed_by_both_channels() {
     let makefile = read(repo_root().join("Makefile"));
-    let flags = makefile
-        .lines()
-        .find(|l| l.starts_with("PRIVATE_PRESS_FLAGS"))
-        .expect("the Private channel's flags");
-    assert!(flags.split_whitespace().any(|f| f == "RESTORED=1"), "{flags}");
+    for channel in ["PRIVATE_PRESS_FLAGS", "PUBLIC_PRESS_FLAGS"] {
+        let flags = makefile
+            .lines()
+            .find(|l| l.starts_with(channel))
+            .unwrap_or_else(|| panic!("the {channel} line"));
+        assert!(flags.split_whitespace().any(|f| f == "RESTORED=1"), "{flags}");
+    }
     let public: Vec<&str> = makefile
         .lines()
         .skip_while(|l| !l.starts_with("press-public:"))
         .take_while(|l| !l.starts_with("press-private:"))
         .collect();
-    assert!(!public.is_empty() && !public.iter().any(|l| l.contains("RESTORED")), "{public:?}");
-    assert!(
-        makefile.contains("$(CITADEL)$(RESTORED))"),
-        "RESTORED must make a pressing Private"
-    );
+    assert!(public.iter().any(|l| l.contains("$(PUBLIC_PRESS_FLAGS)")), "{public:?}");
+    let private = makefile
+        .lines()
+        .find(|l| l.starts_with("PRIVATE :="))
+        .expect("the PRIVATE line");
+    assert!(!private.contains("RESTORED"), "RESTORED must not make a pressing Private: {private}");
     let order = pressed_order();
     let at = |name: &str| order.iter().position(|n| n == name);
     let ignition = at("CORTEX IGNITION").expect("Cortex Ignition is pressed");
@@ -179,9 +182,21 @@ fn no_public_lineup_names_cortex_citadel() {
         }
         let text = read(path);
         assert!(!text.to_uppercase().contains("CITADEL"), "{name} names the new engine");
-        for private_only in ["\"360X\"", "\"QD UP\""] {
-            assert!(!text.contains(private_only), "{name} names {private_only}");
+    }
+}
+
+/// This repository is public, so no lineup of either edition names the private repository the
+/// restored games are built in: their rows carry no `source.repository` and a neutral mirror name.
+#[test]
+fn no_lineup_names_the_restored_games_repository() {
+    let release = repo_root().join("release");
+    for entry in fs::read_dir(&release).expect("release/ exists") {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !(name.starts_with("lineup-") && name.ends_with(".json")) {
+            continue;
         }
+        assert!(!read(path).to_lowercase().contains("nms-restore"), "{name} names the private repository");
     }
 }
 

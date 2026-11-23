@@ -31,7 +31,7 @@ use crate::util::{Error, Result};
 
 /// The public pressing in menu order: the three arcade games of PSoXide
 /// Arcade, then every other program (the same order as `PUBLIC_GAMES`).
-const GAMES: [&str; 9] = [
+const GAMES: [&str; 11] = [
     "BREAKOUT",
     "SPACE INVADERS",
     "MAGIKAAAAARP PONG",
@@ -40,6 +40,8 @@ const GAMES: [&str; 9] = [
     "VOXIDE",
     "SPLAT DEMO",
     "QUAKE SHAREWARE",
+    "360X",
+    "QD UP",
     "PSXCEL",
 ];
 
@@ -858,26 +860,26 @@ mod tests {
             return;
         };
         // sha256 of the label for each argument set. Pinned to what tools/disc_label.py printed
-        // until the rim list changed (2026-11-20: Splat Demo added, Cortex Ignition removed), re-pinned deliberately.
+        // until the rim list changed (2026-11-20: Splat Demo added, Cortex Ignition removed; 2026-11-23: 360X and QD Up added), re-pinned deliberately.
         let plain = build(false, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(plain.as_bytes()),
-            "366c3ee232715a5c04fb39e1491724625cc01847dd65bc7d23749742901adb8a"
+            "c0d902a169961d698c555d81845d2f2ce90d2d13bcd5e9a8a0c3b01a71ec407c"
         );
         let hl = build(true, &[], &logo).unwrap();
         assert_eq!(
             sha256_bytes(hl.as_bytes()),
-            "f643a4a5615eedab5c33462339881b7f0ce4489d9af80c90c5312331918d6dba"
+            "3f13435a2dd806f9bf617df76ec36ec2a833356d591b740b96b1222077cbd4aa"
         );
         let linked = build(false, &links(), &logo).unwrap();
         assert_eq!(
             sha256_bytes(linked.as_bytes()),
-            "fa8a8f5c882fecbf11221527eb145dc69e4b9cebb3caa0a1bad542117ae58415"
+            "b430fc92135a693881e4911e44205e476b0b3a8d3069be2c520cfa7e460b7b11"
         );
         let one = build(true, &links()[..1], &logo).unwrap();
         assert_eq!(
             sha256_bytes(one.as_bytes()),
-            "405eb289ead4c5ff71473726faf15bbcbda40165958ad2d203c3b6eb3fb5544c"
+            "c5459e02080ad1ea565754f96a25c31bcea31e54c932e3b3f91379156eae9266"
         );
     }
 

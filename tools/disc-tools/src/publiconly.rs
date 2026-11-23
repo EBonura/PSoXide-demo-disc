@@ -76,6 +76,9 @@ const FORBIDDEN: &[&str] = &[
     "cortex citadel",
     "cortex-citadel",
     "cortexcitadel",
+    // 360X and QD Up are on the Public edition by title only (Manny, 2026-11-23); the
+    // private repository they are built in is never named in a public file.
+    "nms-restore",
 ];
 
 /// File names that are receipts of a pressing, which list every program.

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.59 (draft)",
-  "note": "PSoXide Demo Disc, public pressing, all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.53 public programs without Cortex Ignition (taken off the disc by Manny, 2026-11-14; each row's pin, hash and build text are to be replaced by the repin's builds) plus Splat Demo (five authored scenes), the launcher's MUSIC1.XA and MUSIC2.XA as NitroXide's extents and Splat Demo's PIANO1.XA as VoXide's MUSIC1.XA. Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time, 360X, QD Up and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only).",
+  "note": "PSoXide Demo Disc, public pressing, all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.53 public programs without Cortex Ignition (taken off the disc by Manny, 2026-11-14; each row's pin, hash and build text are to be replaced by the repin's builds) plus Splat Demo (five authored scenes), the launcher's MUSIC1.XA and MUSIC2.XA as NitroXide's extents and Splat Demo's PIANO1.XA as VoXide's MUSIC1.XA. From v0.59 the restored games 360X and QD Up are on it too, by title only, after Quake (Manny, 2026-11-23). Public pressing only: Half-Life, Hollow Knight, WipEout, Counter-Strike, Ocarina of Time and the hardware tests are never on it, and a public file is checked for that (disc-tools public-only).",
   "programs": [
     {
       "name": "PSOXIDE ARCADE",
@@ -109,17 +109,64 @@
       "kind": "image",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/quake/Quake (quake-psx).cue",
       "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
-      "bin_sha256": "366d5f4ef09b71a2ab4b83bcd5166b7f4155673f3075058f9e14b7ff672699ec",
+      "bin_sha256": "119bdba7e932786681234afc644856cbecbe65bbb6c6a6c9a2a4957e2cc025e0",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
-        "revision": "c6412e29cbf5342fd995fc95d37a6394e05e4f56",
+        "revision": "33d011ca39bd38041e11debf363cfeac919450d0",
         "ref": "main"
       },
-      "build": "library install of 2026-10-25 10:51 (Quake (quake-psx).provenance.json): quake-psx main c6412e2, shareware 1.06 data, XA music, one data track, no CD-DA.",
+      "build": "library install of 2026-11-23 04:39Z (Quake (quake-psx).provenance.json): quake-psx 33d011c, SDK 6bfe478ff0e0, shareware 1.06 data, XA music, one data track, the landed ship disc installed without a rebuild, psoxide-test full PASS result da4f38cfb807.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/quake/Quake (quake-psx).provenance.json",
       "library": "Quake (quake-psx).cue"
+    },
+    {
+      "name": "360X",
+      "var": "X360",
+      "version_var": "V_X360",
+      "kind": "image",
+      "journey": {
+        "movie": "in_game"
+      },
+      "bin_sha256": "949c2bfb2a04ffb835161726013ac47319be0365a94e8ab31204704fc743b86b",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/360x/360x.cue",
+      "cue_sha256": "fbe5c3c90e1ae533135b949e7a03cb1f4f60cc12cdd34b6c4b6df49e40686fbe",
+      "version": "0.5",
+      "source": {
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
+        "revision": "9419a9aa16bf96e1653e8a4b279b12d2d6a299e9",
+        "ref": "main"
+      },
+      "build": "library install of 2026-11-22 23:05Z (provenance record beside the image): restored games 9419a9a, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 3c05c543ba69. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/360x/360x.provenance.json",
+      "title_probe": {
+        "sym": "gamecycle",
+        "op": "ge",
+        "value": 100
+      }
+    },
+    {
+      "name": "QD UP",
+      "var": "QDUP",
+      "version_var": "V_QDUP",
+      "kind": "image",
+      "bin_sha256": "1571e818e188a1eafe8a8109c92e7c6134c5d8fa2a8313be96bc3b53b216819f",
+      "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/qdup/qdup.cue",
+      "cue_sha256": "2fbbb3a8492b5a2ce53bc30b9c0ea025d323535ae85aebb509a72e96db639758",
+      "version": "0.5",
+      "source": {
+        "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
+        "revision": "9419a9aa16bf96e1653e8a4b279b12d2d6a299e9",
+        "ref": "main"
+      },
+      "build": "library install of 2026-11-22 23:05Z (provenance record beside the image): restored games 9419a9a, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 3c05c543ba69. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
+      "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/qdup/qdup.provenance.json",
+      "title_probe": {
+        "sym": "cursor",
+        "op": "eq",
+        "value": 4
+      }
     },
     {
       "name": "PSXCEL",
@@ -129,15 +176,15 @@
       "derive": {
         "boot_exe_of": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/psxcel/PSXcel.cue"
       },
-      "bin_sha256": "a04a2c63530cccb4c66e2555f2846b3be4190d4a52860155c37ffb1334867c96",
+      "bin_sha256": "1aa0de8c720000b36d074e76fd0d9dad25888ed1381e4bf5cc545e598ea44138",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/psxcel",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/psxcel.git",
-        "revision": "ba0a00d23a1b370268c5fd1b0220c8da2a5804de",
-        "ref": "main (chore/abort-panics-2026-10-17)"
+        "revision": "e482579884e7a1dea4cc63b9e669a8782b1fc929",
+        "ref": "main"
       },
-      "build": "the library PSXcel install of 2026-10-17 (PSXcel.provenance.json): make disc with panic=immediate-abort, SDK b5365b18, editor c096eee0, emulator b3848054; the disc carries the image's boot EXE as a bare program.",
+      "build": "the library PSXcel install of 2026-11-23 05:54Z (PSXcel.provenance.json): psxcel e482579, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 60cb05ee4071; the disc carries the image's boot EXE as a bare program.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59/psxcel/PSXcel.provenance.json"
     }
   ],

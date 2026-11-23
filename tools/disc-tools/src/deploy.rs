@@ -37,14 +37,17 @@ use crate::util::{
 /// The menu a public pressing must show, in order: the visible table entries
 /// then the launcher's own CREDITS card. Splat Demo follows VoXide (the repin pressing). PSXcel sits last before CREDITS
 /// (Manny, 2026-10-05), matching the Makefile's MKDISC_ARGS order. Cortex Ignition is not on the disc
-/// (Manny, 2026-11-14): a Public lineup that still carries it fails this menu check.
-pub(crate) const PUBLIC_GAMES: [&str; 8] = [
+/// (Manny, 2026-11-14): a Public lineup that still carries it fails this menu check. The restored games
+/// 360X and QD Up follow Quake (Manny, 2026-11-23: on the Public disc as well), as `MKDISC_ARGS` lays them out.
+pub(crate) const PUBLIC_GAMES: [&str; 10] = [
     "PSOXIDE ARCADE",
     "CELESTE COLLECTION",
     "NITROXIDE",
     "VOXIDE",
     "SPLAT DEMO",
     "QUAKE SHAREWARE",
+    "360X",
+    "QD UP",
     "PSXCEL",
     "CREDITS",
 ];
