@@ -13,7 +13,10 @@
 //! named here by hand:
 //!
 //! * the image range of a member is its receipt's `embedded` record;
-//! * the executable whose map is kept is the table's, unless the member's build record names
+//! * the executable whose map is kept is the one the member's build record names as the map's
+//!   own (`artifacts.exe`), which must be inside the member's image range: on a disc whose boot
+//!   program is not the game (a scene core's boot scene), the table's executable is the boot
+//!   one. A record without it keeps the older rule: the table's, unless the record names
 //!   executables (`files` entries ending in `.exe`) and the table's is not one of them, in which
 //!   case it is the executable inside the member's image range that is (Half-Life's intro hands
 //!   over to a second executable, the game);
@@ -309,7 +312,21 @@ fn members(
             .iter()
             .find(|f| f.lba == entry.exe_lba as u64)
             .ok_or_else(|| Error(format!("{name}: no executable at LBA {}", entry.exe_lba)))?;
-        let chosen = if listed.is_empty() || listed.contains(table_exe.whole_sha().as_str()) {
+        let named = source.provenance["artifacts"]["exe"]["sha256"].as_str();
+        let chosen = if let Some(sha) = named {
+            let (start, end) = ranges[index];
+            others
+                .iter()
+                .filter(|f| (f.lba >= start && f.lba < end) || f.lba == table_exe.lba)
+                .find(|f| f.whole_sha() == sha)
+                .ok_or_else(|| {
+                    Error(format!(
+                        "{name}: the build record names executable {} (artifacts.exe), which is \
+                         not on the image in the member's range",
+                        &sha[..sha.len().min(12)]
+                    ))
+                })?
+        } else if listed.is_empty() || listed.contains(table_exe.whole_sha().as_str()) {
             table_exe
         } else {
             let (start, end) = ranges[index];
@@ -595,6 +612,39 @@ mod tests {
         assert_eq!(records[1]["payload_sha256"], sha256_bytes(&game.payload));
         let first = disc::parse_exe_at(&w.image, 40).unwrap();
         assert_eq!(records[0]["payload_sha256"], sha256_bytes(&first.payload));
+    }
+
+    #[test]
+    fn a_record_naming_the_maps_executable_picks_it_over_a_listed_boot_executable() {
+        let w = world(false);
+        // B's record lists both executables (a boot scene and the game, as a core-hosted disc's
+        // keep dir holds them) and names the game as the map's own.
+        let intro = disc::parse_exe_at(&w.image, 60).unwrap();
+        let game = disc::parse_exe_at(&w.image, 70).unwrap();
+        let whole = |e: &Exe| {
+            let mut v = e.header.clone();
+            v.extend_from_slice(&e.payload);
+            sha256_bytes(&v)
+        };
+        let path = inputs(&w).join("B.provenance.json");
+        let mut record: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        record["files"] = json!({"boot.exe": whole(&intro), "game.exe": whole(&game)});
+        // Without artifacts.exe the listed table executable (the boot one) is taken.
+        fs::write(&path, record.to_string()).unwrap();
+        let (records, _) =
+            members(&w.image, &w.receipt, &w.lineup, Some(&inputs(&w)), &[]).unwrap();
+        assert_eq!(records[1]["payload_sha256"], sha256_bytes(&intro.payload));
+        // With it, the game.
+        record["artifacts"]["exe"] = json!({"file": "game.exe", "sha256": whole(&game)});
+        fs::write(&path, record.to_string()).unwrap();
+        let (records, _) =
+            members(&w.image, &w.receipt, &w.lineup, Some(&inputs(&w)), &[]).unwrap();
+        assert_eq!(records[1]["payload_sha256"], sha256_bytes(&game.payload));
+        // An executable the image does not carry is refused, never replaced by the table's.
+        record["artifacts"]["exe"]["sha256"] = json!("00".repeat(32));
+        fs::write(&path, record.to_string()).unwrap();
+        let err = members(&w.image, &w.receipt, &w.lineup, Some(&inputs(&w)), &[]).unwrap_err();
+        assert!(err.0.contains("artifacts.exe"), "{}", err.0);
     }
 
     #[test]
