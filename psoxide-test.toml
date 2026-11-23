@@ -82,7 +82,7 @@ file = "ship/cs-psx.bin"
 
 [[requires]]
 id = "HALF-LIFE"
-result = "24943e11bb705172d51c634db04a3bfe487969ba3d8fbceded38e094f222bf88"
+result = "c6105f1a7b9a9fa12c7c2e025a6635ee322213451cbcebc7f0abd270015b036d"
 file = "ship/hl-psx.bin"
 
 [[requires]]
@@ -92,12 +92,12 @@ file = "ship/NitroXide.bin"
 
 [[requires]]
 id = "OCARINA OF TIME"
-result = "c864917bc4e542990a2d2a2f32f5f5fbd013106d89c4df5690f28d08308df3f0"
+result = "62d7328d3a6b84f27587c3a3bef4df61d4b7c42f1cda0a5475456315c0a30f23"
 file = "ship/oot-psx.bin"
 
 [[requires]]
 id = "QUAKE SHAREWARE"
-result = "2324184ff17da4d5359cfd8a727cee4ee3494f0ee8affbf5a250880bec68a403"
+result = "da4f38cfb80756b7dee38442b774eeb7e578e035b5dd4b286b1135edfac8b01c"
 file = "ship/quake-psx.bin"
 
 [[requires]]
@@ -112,15 +112,15 @@ file = "ship/splat-demo.bin"
 
 [[requires]]
 id = "WIPEOUT PSOXIDE"
-result = "b02e8973f95efb090dc5a8a4da556a53bc088112da0f7025b92250ce58ce6ec9"
+result = "35a06a7df1464353ae59a432ca456e50ca169888098f7967f0421945c30f519b"
 file = "ship/wipeout-psx.bin"
 
 [[requires]]
 id = "360X"
-result = "84492665139ef20a09a82eaeb2c1d6521147d368919578a8dcb6f82021913902"
+result = "3c05c543ba69fffa23aaffd64094753af508d1f1ac7ab86c91527cf5f1a63200"
 file = "x360/360x.bin"
 
 [[requires]]
 id = "QD UP"
-result = "84492665139ef20a09a82eaeb2c1d6521147d368919578a8dcb6f82021913902"
+result = "3c05c543ba69fffa23aaffd64094753af508d1f1ac7ab86c91527cf5f1a63200"
 file = "qdup/qdup.bin"

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "pressing": "v0.59-private (draft)",
-  "note": "PSoXide Demo Disc, Private edition (local, never published or distributed), all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.58 Private programs at the builds installed on 2026-11-20 (each row's pin, hash and build text are to be replaced by the repin's builds), plus Splat Demo (five authored scenes), with the outer-edge rule and the shared music files: the launcher's MUSIC1.XA and MUSIC2.XA are NitroXide's extents (aliases) and Splat Demo's PIANO1.XA is VoXide's MUSIC1.XA. Left out: Arcade, PSXcel and the hardware tests.",
+  "note": "PSoXide Demo Disc, Private edition (local, never published or distributed), all XA: no CD-DA track. DRAFT lineup for the pressing after the repin: the v0.58 Private programs at the builds installed on 2026-11-20 (each row's pin, hash and build text are to be replaced by the repin's builds), plus Splat Demo (five authored scenes), with the outer-edge rule and the shared music files: the launcher's MUSIC1.XA and MUSIC2.XA are NitroXide's extents (aliases) and Splat Demo's PIANO1.XA is VoXide's MUSIC1.XA. WipEout, Half-Life, Ocarina of Time, Quake, 360X and QD Up are their library installs on SDK 6bfe478ff0e0 (2026-11-22 and 11-23); the other rows are still the builds of 2026-11-18 until their programs are installed on 6bfe. 360X and QD Up are on the Public disc too from v0.59. Left out: Arcade, PSXcel and the hardware tests.",
   "programs": [
     {
       "name": "CELESTE COLLECTION",
@@ -89,17 +89,17 @@
       "version_var": "V_WIPEOUT",
       "kind": "image",
       "journey": {"timeout": 9000},
-      "bin_sha256": "f2fc06897ed11d64c6e9ca37b50586ae656cc77b33562d8c3f01b374c5e724f4",
+      "bin_sha256": "6af58092dd9d51a99c784b0894799a54dabafff353e8e31994936cecdc6b004f",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/wipeout/WipEout PSoXide.cue",
       "cue_sha256": "0c48a5ed51edfc2cb8782f797c05617174e0bc7cf89a28d30c406d7454708db2",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/wipeout-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/wipeout-psx.git",
-        "revision": "3555fa2b30c3a57730720bff552af2491fb8966f",
+        "revision": "a1a3aec5f7bfa5e5f47e0674376dd03fe5403c92",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 16:27Z (WipEout PSoXide.provenance.json): wipeout-psx 3555fa2, SDK 0187c5f4fab8, shipping build from the US disc with the private texture pack, psoxide-test install, harness result b57de1d2eac6.",
+      "build": "library install of 2026-11-22 22:25Z (WipEout PSoXide.provenance.json): wipeout-psx a1a3aec, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 35a06a7df146.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/wipeout/WipEout PSoXide.provenance.json",
       "library": "WipEout PSoXide.cue"
     },
@@ -148,17 +148,17 @@
       "version_var": "V_HLPSX",
       "kind": "image",
       "journey": {"timeout": 12000, "movie": "intro"},
-      "bin_sha256": "b9b1e59d5fd5c8450eff78f9358d39af6de2ffa86118a1f2d388ac6b18854e78",
+      "bin_sha256": "047a651dafb2e2fbcdb2f9e15b192a468bae8cbb63ca514c8f77b2950173434f",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/hl/Half-Life (hl-psx).cue",
       "cue_sha256": "e935ea18030bb7fdc97e875a429181f5c51b209058cb1691d393ca7d5d3d0b92",
       "version": "0.2.0",
       "source": {
         "repository": "EBonura/hl-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/hl-psx.git",
-        "revision": "05fc78e4ed97e3809c168852ba60fc44e0214a16",
+        "revision": "96507975051c20c4835c7d29202df0afd0297038",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 12:12Z (Half-Life (hl-psx).provenance.json): hl-psx 05fc78e, intro disc on SDK 0187c5f4fab8, psoxide-test install, harness result 40e842d8ad9c.",
+      "build": "library install of 2026-11-23 04:09Z (Half-Life (hl-psx).provenance.json): hl-psx 9650797, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result c6105f1a7b9a.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/hl/Half-Life (hl-psx).provenance.json",
       "library": "Half-Life (hl-psx).cue"
     },
@@ -168,17 +168,17 @@
       "version_var": "V_OOTPSX",
       "kind": "image",
       "journey": {"timeout": 9000},
-      "bin_sha256": "91adf417f23df45b5a2ce423e0e3295dee63924cca87e6933a1ae484ab0895fc",
+      "bin_sha256": "4ee07bc7ad56066d2aee4113953e9bee6e2a39b55267a1ec9d43d6e99b8032a3",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/oot/Ocarina of Time (oot-psx).cue",
       "cue_sha256": "9e870d0429df98e717a7c7e61f63b4dedeea4b62bf9baf8a35f38baa176a9d2a",
       "version": "0.1.0",
       "source": {
         "repository": "EBonura/oot-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/oot-psx.git",
-        "revision": "d64d7b4d178df49603c3c7a93458d77509768d21",
+        "revision": "78e0d470954ed7e278c028b1e0722c7cf197dda5",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 16:12Z (Ocarina of Time (oot-psx).provenance.json): oot-psx d64d7b4, SDK 0187c5f4fab8, shipping features, psoxide-test install, harness result 0b2d2818188c.",
+      "build": "library install of 2026-11-23 09:18Z (Ocarina of Time (oot-psx).provenance.json): oot-psx 78e0d47, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 62d7328d3a6b. The library's own cue names oot-psx.bin, not the BIN beside it; the input cue names the BIN beside it.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/oot/Ocarina of Time (oot-psx).provenance.json",
       "library": "Ocarina of Time (oot-psx).cue"
     },
@@ -187,17 +187,17 @@
       "var": "QUAKE_CUE",
       "version_var": "QUAKE_VERSION",
       "kind": "image",
-      "bin_sha256": "713428ac04a168ad6b9a98d1d77d1b9c107bf603dde1e0be98f45999a9be4937",
+      "bin_sha256": "119bdba7e932786681234afc644856cbecbe65bbb6c6a6c9a2a4957e2cc025e0",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/quake/Quake (quake-psx).cue",
       "cue_sha256": "f37def4a57b3785fadd2efe2feb6f19cee465f7a9c858e87ff2b7a63bfdf3bec",
       "version": "0.1.1",
       "source": {
         "repository": "EBonura/quake-psx",
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/quake-psx.git",
-        "revision": "2db57ff0c32ab572685233525225fa3932295965",
+        "revision": "33d011ca39bd38041e11debf363cfeac919450d0",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 12:58Z (Quake (quake-psx).provenance.json): quake-psx 2db57ff, SDK 0187c5f4fab8, shareware 1.06 data, XA music, one data track, psoxide-test install, harness result c004965baed0.",
+      "build": "library install of 2026-11-23 04:39Z (Quake (quake-psx).provenance.json): quake-psx 33d011c, SDK 6bfe478ff0e0, shareware 1.06 data, XA music, one data track, the landed ship disc installed without a rebuild, psoxide-test full PASS result da4f38cfb807.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/quake/Quake (quake-psx).provenance.json",
       "library": "Quake (quake-psx).cue"
     },
@@ -207,16 +207,16 @@
       "version_var": "V_X360",
       "kind": "image",
       "journey": {"movie": "in_game"},
-      "bin_sha256": "4173258bd79bce6412d785fea4b05114bbd4f8e8231272b1c64951f8f4d26d4a",
+      "bin_sha256": "949c2bfb2a04ffb835161726013ac47319be0365a94e8ab31204704fc743b86b",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/360x/360x.cue",
       "cue_sha256": "fbe5c3c90e1ae533135b949e7a03cb1f4f60cc12cdd34b6c4b6df49e40686fbe",
       "version": "0.5",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "072005b7de8fab13d53d2767c0132d13f3886544",
+        "revision": "9419a9aa16bf96e1653e8a4b279b12d2d6a299e9",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
+      "build": "library install of 2026-11-22 23:05Z (provenance record beside the image): restored games 9419a9a, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 3c05c543ba69. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/360x/360x.provenance.json",
       "title_probe": {"sym": "gamecycle", "op": "ge", "value": 100}
     },
@@ -225,16 +225,16 @@
       "var": "QDUP",
       "version_var": "V_QDUP",
       "kind": "image",
-      "bin_sha256": "50fc6c98a15f5e925c678de827bc30d6b04f0fd01be069f683a5995d8596eb7e",
+      "bin_sha256": "1571e818e188a1eafe8a8109c92e7c6134c5d8fa2a8313be96bc3b53b216819f",
       "cue": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/qdup/qdup.cue",
       "cue_sha256": "2fbbb3a8492b5a2ce53bc30b9c0ea025d323535ae85aebb509a72e96db639758",
       "version": "0.5",
       "source": {
         "local": "~/Desktop/repos/campaign-2026-10-15/release-inputs/src/restored.git",
-        "revision": "072005b7de8fab13d53d2767c0132d13f3886544",
+        "revision": "9419a9aa16bf96e1653e8a4b279b12d2d6a299e9",
         "ref": "main"
       },
-      "build": "library install of 2026-11-18 22:09Z (provenance record beside the image): restored games 072005b, SDK 0187c5f4fab8 (psyq/build.sh at that commit; the record says the pin is unknown), psoxide-test install, harness result 0de3e2d41c4f. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
+      "build": "library install of 2026-11-22 23:05Z (provenance record beside the image): restored games 9419a9a, SDK 6bfe478ff0e0, the landed ship disc installed without a rebuild, psoxide-test full PASS result 3c05c543ba69. The version is 0.5, tagged v0.5 in the game's repository at cbe4f6c627ad.",
       "receipt": "~/Desktop/repos/campaign-2026-10-15/release-inputs/v0.59-private/qdup/qdup.provenance.json",
       "title_probe": {"sym": "cursor", "op": "eq", "value": 4}
     }
