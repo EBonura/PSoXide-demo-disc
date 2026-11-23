@@ -593,8 +593,31 @@ lineup-check: $(DISC_TOOLS)
 	@test -n "$(LINEUP)" || { echo "lineup: set LINEUP=release/lineup-<version>.json"; exit 1; }
 	$(DISC_TOOLS) lineup check --exists --lineup "$(LINEUP)" --inputs-root "$(RELEASE_INPUTS)"
 
-lineup-disc: launcher mkdisc lineup-prepare
+# PRESS_GUARD: a command run on the lineup after `lineup prepare` has hash-gated its inputs and before
+# anything is laid out; it must exit 0 for the press to go on (a machine's install policy lives there,
+# not in this repo). Unset, the press stops. PRESS_GUARD=none presses an image marked as never to be
+# burned: no <name>.press-ok is written. With a guard, a successful press writes
+# $(DIST)/$(DISC_NAME).press-ok naming the image's sha256, the lineup and the guard; a burn step
+# should require it.
+PRESS_GUARD ?=
+
+.PHONY: press-guard
+press-guard:
+	@test -n "$(PRESS_GUARD)" || { echo "PRESS_GUARD is unset: set it to the command that vets the lineup's members (or PRESS_GUARD=none for an image that will never be burned)"; exit 1; }
+ifeq ($(PRESS_GUARD),none)
+	@echo "PRESS_GUARD=none: this pressing gets no press-ok and must not be burned"
+else
+	$(PRESS_GUARD) "$(LINEUP)"
+endif
+
+lineup-disc: launcher mkdisc lineup-prepare press-guard
 	$(MAKE) _lineup-lay
+ifneq ($(PRESS_GUARD),none)
+	@printf '{"bin_sha256":"%s","lineup":"%s","guard":"%s","pressed_at":"%s"}\n' \
+		"$$(shasum -a 256 "$(DIST)/$(DISC_NAME).bin" | cut -c1-64)" "$(LINEUP)" '$(PRESS_GUARD)' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+		> "$(DIST)/$(DISC_NAME).press-ok"
+	@echo "press-ok: $(DIST)/$(DISC_NAME).press-ok"
+endif
 
 lineup-budget: mkdisc lineup-prepare
 	$(MAKE) disc-budget
