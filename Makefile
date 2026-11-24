@@ -663,6 +663,8 @@ EDITION ?=
 SCENE_OUT ?= $(BUILD)/scene
 SCENE_PROGRAMS ?= $(ROOT)/release/scene/programs.ini
 CORE_IMAGE ?= $(SDK)/sdk/crates/psx-core/prebuilt/psx-core.bin
+# Further mkdisc arguments (`--diag` for a development disc with SDK examples on it; never a release).
+SCENE_ARGS ?=
 SCENE_NAME = $(basename $(notdir $(EDITION)))
 .PHONY: scene-disc scene-budget
 scene-disc scene-budget: launcher mkdisc $(SHOT_FILES)
@@ -672,7 +674,7 @@ scene-disc scene-budget: launcher mkdisc $(SHOT_FILES)
 		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" \
 		--core-image "$(CORE_IMAGE)" --programs "$(SCENE_PROGRAMS)" --edition "$(EDITION)" \
 		--shots-dir "$(SHOTS_OUT)" $(MENU_ARGS) --max-sectors $(DISC_MAX_SECTORS) \
-		$(if $(filter scene-budget,$@),--dry-run)
+		$(if $(filter scene-budget,$@),--dry-run) $(SCENE_ARGS)
 
 # The scene disc's own gates, on a pressed edition: the console pre-burn check, members.json (each
 # game's boot exe, map, signature words and first playable screen from the edition), and every game
