@@ -489,7 +489,7 @@ SHOTS_OUT := $(BUILD)/shots
 # screenshots come from its launcher-art directory (the manifest's `shots` line, see tools/menu-art).
 SHOT_NAMES := $(if $(HWT),hwtests hwtests2)
 -include $(ART_OUT)/shots.mk
-SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot) $(foreach v,$(filter SHOTS_%,$(.VARIABLES)),$($(v)))
+SHOT_FILES := $(foreach n,$(SHOT_NAMES),$(SHOTS_OUT)/$(n).shot) $(foreach v,$(filter-out SHOTS_OUT SHOTS_SRC,$(filter SHOTS_%,$(.VARIABLES))),$($(v)))
 # --shot arguments for the program the disc table calls $(1), from the shots of art id $(2)
 SHOTARGS = $(foreach f,$(SHOTS_$(2)),--shot "$(1)=$(f)")
 
