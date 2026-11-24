@@ -392,19 +392,165 @@ fn members(
     Ok((out, copies))
 }
 
+/// The ready state an edition section names (`ready = SYMBOL ge|eq VALUE`), resolved in `map`.
+fn ready_probe(name: &str, text: &str, map: &str) -> Result<Value> {
+    let parts: Vec<&str> = text.split_whitespace().collect();
+    let [symbol, op, value] = parts[..] else {
+        bail!("[{name}] ready wants `SYMBOL ge|eq VALUE`, got {text:?}");
+    };
+    ensure!(
+        matches!(op, "ge" | "eq"),
+        "[{name}] ready: op {op} is not ge or eq"
+    );
+    let value = match value.strip_prefix("0x") {
+        Some(hex) => u64::from_str_radix(hex, 16),
+        None => value.parse(),
+    }
+    .map_err(|_| Error(format!("[{name}] ready: {value} is not a number")))?;
+    let Some(addr) = symbol_address(map, symbol) else {
+        bail!("[{name}] ready symbol {symbol} is not in its map");
+    };
+    Ok(json!({"sym": symbol, "addr": addr, "op": op, "value": value}))
+}
+
+/// The members of a scene disc (`SCENES.TBL` at LBA 22): the ranges from the pressing's
+/// `<image>.layout.json`, the boot exe at each range's LBA 23, its map, ready state and presses
+/// from the edition. The ready state is the program's first playable screen; `title_probe`
+/// carries it too, so the journeys that read that field keep working.
+fn scene_members(
+    image: &Path,
+    entries: &[crate::edition::Entry],
+) -> Result<(Vec<Value>, Vec<(PathBuf, String)>)> {
+    let layout = read_json(&image.with_extension("layout.json"))?;
+    let rows = layout["rows"]
+        .as_array()
+        .ok_or_else(|| Error("layout.json: 'rows'".into()))?;
+    let toc: Vec<_> = disc::read_toc(image)?
+        .into_iter()
+        .filter(|e| e.flags & FLAG_HIDDEN == 0)
+        .collect();
+    let mut others = Vec::new();
+    let mut ranges = Vec::new();
+    for entry in &toc {
+        let row = rows
+            .iter()
+            .find(|r| r["name"].as_str() == Some(&entry.name))
+            .ok_or_else(|| Error(format!("{} is on the disc but not in its layout", entry.name)))?;
+        let (Some(start), Some(end)) = (
+            row["lba_start"].as_u64(),
+            row["lba_end_exclusive"].as_u64(),
+        ) else {
+            bail!("{}: layout row without its range", entry.name);
+        };
+        others.extend(executables_in(image, start, end)?);
+        ranges.push((start, end));
+    }
+    let first_member = ranges.iter().map(|(start, _)| *start).min().unwrap_or(0);
+    let launcher = executables_in(image, 0, first_member)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error(format!("no launcher executable before LBA {first_member}")))?
+        .exe;
+    let mut out = Vec::new();
+    let mut copies = Vec::new();
+    for (index, (entry, (start, _))) in toc.iter().zip(&ranges).enumerate() {
+        let name = entry.name.as_str();
+        let section = entries
+            .iter()
+            .find(|e| e.name == name)
+            .ok_or_else(|| Error(format!("{name} is on the disc but not in the edition")))?;
+        // The program the core enters: the member's boot exe at its own LBA 23.
+        let boot = start + 23;
+        ensure!(
+            entry.exe_lba as u64 == boot,
+            "{name}: the table of contents says LBA {}, the scene layout {boot}",
+            entry.exe_lba
+        );
+        let chosen = others
+            .iter()
+            .find(|f| f.lba == boot)
+            .ok_or_else(|| Error(format!("{name}: no executable at LBA {boot}")))?;
+        let map_path = PathBuf::from(
+            section
+                .get("map")
+                .ok_or_else(|| Error(format!("[{name}] needs `map =` (its boot exe's link map)")))?,
+        );
+        let map_text = String::from_utf8_lossy(&fs::read(&map_path)?).into_owned();
+        let map_name = map_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| Error(format!("{name}: bad map path")))?
+            .to_string();
+        let Some(vblank) = symbol_address(&map_text, "__psx_rt_vblank_count") else {
+            bail!("{name}: __psx_rt_vblank_count is not in {}", map_path.display());
+        };
+        let words = signature_words(chosen, &launcher, &others);
+        ensure!(
+            words.len() == WORDS,
+            "{name}: only {} signature words differ from every other executable",
+            words.len()
+        );
+        let ready = match section.get("ready") {
+            Some(text) => ready_probe(name, text, &map_text)?,
+            None => Value::Null,
+        };
+        copies.push((map_path.clone(), map_name.clone()));
+        let image_path = section.get("image").map(PathBuf::from);
+        let bin_sha = match image_path {
+            Some(cue) => json!(sha256_file(&disc::image_for_cue(&cue)?)?),
+            None => Value::Null,
+        };
+        let mut record = Map::new();
+        record.insert("title_probe".into(), ready.clone());
+        record.insert("ready".into(), ready);
+        record.insert("press".into(), json!(section.get("press").unwrap_or("")));
+        record.insert("index".into(), json!(index));
+        record.insert("others_checked".into(), json!(others.len() - 1));
+        record.insert("id".into(), json!(name));
+        record.insert("exe_lba".into(), json!(entry.exe_lba));
+        record.insert("payload_sha256".into(), json!(sha256_bytes(&chosen.exe.payload)));
+        record.insert("exe_sha256".into(), json!(chosen.whole_sha()));
+        record.insert("map".into(), json!(format!("maps/{map_name}")));
+        record.insert("load".into(), json!(format!("{:#x}", chosen.exe.load)));
+        record.insert("pc".into(), json!(format!("{:#x}", chosen.exe.pc)));
+        record.insert("vblank".into(), json!(vblank));
+        record.insert(
+            "words".into(),
+            Value::Array(
+                words
+                    .iter()
+                    .map(|(a, w)| json!([format!("{a:#x}"), format!("{w:#x}")]))
+                    .collect(),
+            ),
+        );
+        record.insert("bin_sha256".into(), bin_sha);
+        out.push(Value::Object(record));
+    }
+    Ok((out, copies))
+}
+
 pub fn run(raw: &[String]) -> Result<i32> {
     let args = Args::parse(
         raw,
-        &["image", "receipt", "lineup", "inputs", "out", "library"],
+        &[
+            "image", "receipt", "lineup", "inputs", "out", "library", "edition", "programs",
+        ],
         &[],
     )?;
     let image = args.require_path("image")?;
-    let receipt = read_json(&args.require_path("receipt")?)?;
-    let lineup = read_json(&args.require_path("lineup")?)?;
     let out = args.require_path("out")?;
-    let inputs = args.path("inputs");
-    let library: Vec<PathBuf> = args.all("library").into_iter().map(expand_home).collect();
-    let (records, copies) = members(&image, &receipt, &lineup, inputs.as_deref(), &library)?;
+    let (records, copies) = if let Some(edition) = args.path("edition") {
+        // A scene disc: the edition names each program's map and first playable screen.
+        let entries = crate::edition::load(args.path("programs").as_deref(), &edition)
+            .map_err(Error)?;
+        scene_members(&image, &entries)?
+    } else {
+        let receipt = read_json(&args.require_path("receipt")?)?;
+        let lineup = read_json(&args.require_path("lineup")?)?;
+        let inputs = args.path("inputs");
+        let library: Vec<PathBuf> = args.all("library").into_iter().map(expand_home).collect();
+        members(&image, &receipt, &lineup, inputs.as_deref(), &library)?
+    };
     fs::create_dir_all(out.join("maps"))?;
     for (source, name) in &copies {
         fs::copy(source, out.join("maps").join(name))?;

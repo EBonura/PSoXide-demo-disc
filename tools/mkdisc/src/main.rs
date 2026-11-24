@@ -382,6 +382,15 @@ fn parse_args() -> Result<Args, String> {
             if let Some(gate) = entry.get("gate") {
                 program_files.push((name.clone(), PathBuf::from(gate)));
             }
+            for file in entry.all("edge_tail") {
+                edge_tails.push((name.clone(), file.clone()));
+            }
+            for spec in entry.all("alias") {
+                let (outer, inner) = spec.split_once(':').ok_or_else(|| {
+                    format!("[{name}] alias wants OUTER:FILE, got {spec:?}")
+                })?;
+                aliases.push(layout::Alias::parse(&format!("{outer}={name}:{inner}"))?);
+            }
         }
     } else if programs_file.is_some() {
         return Err("--programs is read only with --edition".to_string());

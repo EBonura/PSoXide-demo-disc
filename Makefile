@@ -674,6 +674,25 @@ scene-disc scene-budget: launcher mkdisc $(SHOT_FILES)
 		--shots-dir "$(SHOTS_OUT)" $(MENU_ARGS) --max-sectors $(DISC_MAX_SECTORS) \
 		$(if $(filter scene-budget,$@),--dry-run)
 
+# The scene disc's own gates, on a pressed edition: the console pre-burn check, members.json (each
+# game's boot exe, map, signature words and first playable screen from the edition), and every game
+# started from the launcher through a core switch to its first playable screen, its hand-off to main
+# (and to ready, where both name one) no slower than the same launch on v0.58
+# (release/scene/launch-baseline-v0.58.json, measured with the same tool: `disc-tools launches
+# --chain --facts-out` on the installed v0.58 Private disc).
+SCENE_BASELINE ?= $(ROOT)/release/scene/launch-baseline-v0.58.json
+.PHONY: gates-scene
+gates-scene: $(DISC_TOOLS)
+	@test -n "$(EDITION)" -a -f "$(SCENE_OUT)/$(SCENE_NAME).cue" || { echo "press first: make scene-disc EDITION=..."; exit 1; }
+	@mkdir -p "$(SCENE_OUT)/evidence"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 "$(RELEASE_FRONTEND)" preburn-check --cue "$(SCENE_OUT)/$(SCENE_NAME).cue"
+	$(DISC_TOOLS) members --image "$(SCENE_OUT)/$(SCENE_NAME).bin" --edition "$(EDITION)" \
+		--programs "$(SCENE_PROGRAMS)" --out "$(SCENE_OUT)/evidence"
+	PSOXIDE_CHECK_GPU_LL_FIFO=1 PSOXIDE_CHECK_CC_DMA=1 $(DISC_TOOLS) launches --frontend "$(RELEASE_FRONTEND)" \
+		--cue "$(SCENE_OUT)/$(SCENE_NAME).cue" --members "$(SCENE_OUT)/evidence/members.json" \
+		--launcher-map "$$(/bin/ls -t $(BUILD)/mipsel-sony-psx/psoxide-pgo-maps/*.map | head -1)" \
+		--baseline "$(SCENE_BASELINE)" --out "$(SCENE_OUT)/evidence/launches"
+
 # The sector budget of the pressing these flags select, from inputs already
 # built, without writing an image.
 disc-budget: mkdisc $(SHOT_FILES)

@@ -1,7 +1,7 @@
 # The shelf moves both ways with a DualShock that powers up digital, and the credits open and close.
 name = "carousel"
 title = "Launcher carousel"
-disc = ["build/private/PSoXide Demo Disc v0.59 Private.cue"]
+disc = ["build/private/private.cue"]
 symbols = ["build/private/launcher.map"]
 pad = "dualshock"
 max_ticks = 4000

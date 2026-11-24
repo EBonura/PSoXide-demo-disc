@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::args::Args;
 use crate::disc::{
-    self, find_boot_exe, image_for_cue, parse_exe_at, parse_toc, Exe, TocEntry, SECTOR_BYTES,
+    self, find_boot_exe, image_for_cue, parse_exe_at, Exe, TocEntry, SECTOR_BYTES,
     USER_DATA_BYTES,
 };
 use crate::util::{
@@ -647,11 +647,7 @@ pub fn build_document(
     );
     let combined_cue = resolve(combined_cue)?;
     let combined = image_for_cue(&combined_cue)?;
-    let entries = parse_toc(&disc::read_user_sectors(
-        &combined,
-        disc::TOC_LBA,
-        disc::TOC_SECTORS,
-    )?)?;
+    let entries = disc::read_toc(&combined)?;
     let program_names: Vec<String> = programs.iter().map(|(n, _)| n.clone()).collect();
     let names = pressed_programs(&program_names, "program")?;
     let source_names: BTreeSet<&str> = sources.iter().map(|(n, _)| n.as_str()).collect();
@@ -754,11 +750,7 @@ pub fn verify_sealed_document(receipt_path: &Path, expected: &Value) -> Result<(
         combined_row.get("sectors").and_then(Value::as_u64) == Some(sectors),
         "combined sector count no longer matches the receipt"
     );
-    let entries = parse_toc(&disc::read_user_sectors(
-        &image,
-        disc::TOC_LBA,
-        disc::TOC_SECTORS,
-    )?)?;
+    let entries = disc::read_toc(&image)?;
     let programs = member(expected, "programs")?
         .as_object()
         .ok_or_else(|| malformed("'programs'"))?;

@@ -1,0 +1,122 @@
+{
+ "disc": "/Users/ebonura/Downloads/ps1 games/PSoXide Demo Disc v0.58 Private.cue",
+ "launches": {
+  "CELESTE COLLECTION": {
+   "hand_off": 543,
+   "main": 686,
+   "ready": null,
+   "to_main": 143,
+   "to_ready": null,
+   "payload_read": 546,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "NITROXIDE": {
+   "hand_off": 555,
+   "main": 967,
+   "ready": null,
+   "to_main": 412,
+   "to_ready": null,
+   "payload_read": 558,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "VOXIDE": {
+   "hand_off": 567,
+   "main": 812,
+   "ready": null,
+   "to_main": 245,
+   "to_ready": null,
+   "payload_read": 570,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "WIPEOUT PSOXIDE": {
+   "hand_off": 579,
+   "main": 742,
+   "ready": null,
+   "to_main": 163,
+   "to_ready": null,
+   "payload_read": 582,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "HOLLOW KNIGHT": {
+   "hand_off": 591,
+   "main": 897,
+   "ready": null,
+   "to_main": 306,
+   "to_ready": null,
+   "payload_read": 594,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "COUNTER-STRIKE": {
+   "hand_off": 603,
+   "main": 786,
+   "ready": null,
+   "to_main": 183,
+   "to_ready": null,
+   "payload_read": 606,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "HALF-LIFE": {
+   "hand_off": 615,
+   "main": 1714,
+   "ready": null,
+   "to_main": 1099,
+   "to_ready": null,
+   "payload_read": 618,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "OCARINA OF TIME": {
+   "hand_off": 627,
+   "main": 1131,
+   "ready": null,
+   "to_main": 504,
+   "to_ready": null,
+   "payload_read": 630,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "QUAKE SHAREWARE": {
+   "hand_off": 639,
+   "main": 800,
+   "ready": null,
+   "to_main": 161,
+   "to_ready": null,
+   "payload_read": 642,
+   "problems": [
+    "no ready state (its first playable screen) is named"
+   ]
+  },
+  "360X": {
+   "hand_off": 651,
+   "main": 760,
+   "ready": 2166,
+   "to_main": 109,
+   "to_ready": 1515,
+   "payload_read": 654,
+   "problems": []
+  },
+  "QD UP": {
+   "hand_off": 663,
+   "main": 796,
+   "ready": 1357,
+   "to_main": 133,
+   "to_ready": 694,
+   "payload_read": 666,
+   "problems": []
+  }
+ }
+}

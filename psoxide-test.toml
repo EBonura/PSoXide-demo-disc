@@ -1,40 +1,36 @@
-# The Private demo disc's test description for psoxide-test (the SDK's harness). One command,
-# `psoxide-test run --tier full`, gates the image: every member is the bytes its own full run
-# judged ([[requires]]), the launcher boots and refuses a digital pad, the shelf moves, and every
-# member chain-loads and runs on the four PSoXide models, PCSX-ReARMed and PCSX-Redux.
+# The Private demo disc's test description for psoxide-test (the SDK's harness), on the scene core.
+# One command, `psoxide-test run --tier full`, gates the image: every member is the bytes its own full
+# run judged ([[requires]]), the launcher boots and refuses a digital pad, the shelf moves, and every
+# member starts through a core switch and runs (chain.toml, on the four PSoXide models,
+# PCSX-ReARMed and PCSX-Redux). `make gates-scene` adds the launch timing against v0.58 and each
+# game's first playable screen (`disc-tools launches`).
 schema = 1
 name = "PSoXide Demo Disc v0.59 Private"
 repository = "EBonura/PSoXide-demo-disc"
-
 # The SDK pin is the first "revision" in release-components.json (its sdk component).
 [sdk]
 file = "release-components.json"
 after = "\"revision\": \""
-
-# The image, from the lineup and the release inputs (the members' library discs, machine-local).
-# `disc-tools members` writes members.json (index, id, exe_sha256, bin_sha256, map, words) and
-# copies each member's map under maps/; the harness writes members.sym beside it.
+# The image, from the Private edition file and the release inputs (each game's scene disc, its map
+# beside it). `disc-tools members --edition` writes members.json (index, id, exe_sha256, bin_sha256,
+# map, words, ready) and copies each member's map under maps/; the harness writes members.sym.
 [[build]]
 name = "private"
 out = "build/private"
+env = { RELEASE_INPUTS = "{input:release-inputs}" }
 commands = [
-  ["make", "-o", "components", "lineup-disc", "LINEUP=release/lineup-v0.59-private.json",
-   "RELEASE_INPUTS={input:release-inputs}", "HL=1", "CS=1", "HK=1", "WO=1", "OOT=1", "CITADEL=0",
-   "RESTORED=1", "HWT=0", "DISC_MAX_SECTORS=359844", "LEAVE_OUT=ARCADE PSXCEL",
-   "DISC_NAME=PSoXide Demo Disc v0.59 Private", "DISC_VERSION=v0.59", "DIST={out}",
-   "FRONTEND={input:psoxide-emulator}", "ART_SRC={input:launcher-art}",
-   "RESTORED_ART={input:restored-art}", "LAUNCHER_ART=$(PRIVATE_ART)"],
+  ["make", "-o", "components", "scene-disc", "EDITION=release/scene/private.ini", "SCENE_OUT={out}",
+   "HL=1", "CS=1", "HK=1", "WO=1", "OOT=1", "RESTORED=1", "DISC_MAX_SECTORS=359844",
+   "DISC_VERSION=v0.59", "ART_SRC={input:launcher-art}", "RESTORED_ART={input:restored-art}",
+   "LAUNCHER_ART=$(PRIVATE_ART)"],
   ["tools/disc-tools/target/release/disc-tools", "members",
-   "--image", "{out}/PSoXide Demo Disc v0.59 Private.bin",
-   "--receipt", "{out}/PSoXide Demo Disc v0.59 Private.release-receipt.json",
-   "--lineup", "release/lineup-v0.59-private.json", "--inputs", "{input:release-inputs}",
-   "--out", "{out}"],
+   "--image", "{out}/private.bin", "--edition", "release/scene/private.ini",
+   "--programs", "release/scene/programs.ini", "--out", "{out}"],
 ]
 collect = { "launcher.map" = "build/mipsel-sony-psx/psoxide-pgo-maps/*" }
-disc = "PSoXide Demo Disc v0.59 Private.cue"
+disc = "private.cue"
 map = "launcher.map"
 members = "members.json"
-
 # The launcher's own link: text, data, bss and free RAM against the baseline.
 [[size]]
 build = "private"
@@ -56,7 +52,7 @@ command = ["make", "check"]
 [[clean]]
 build = "private"
 seed = [".psoxide"]
-compare = ["PSoXide Demo Disc v0.59 Private.bin", "PSoXide Demo Disc v0.59 Private.cue"]
+compare = ["private.bin", "private.cue"]
 
 [[install]]
 build = "private"
@@ -64,7 +60,9 @@ name = "PSoXide Demo Disc v0.59 Private"
 
 # Every member: the content hash of its complete full-tier PASS result and the judged disc image
 # the lineup took (members.json bin_sha256). Results are found under the config's `results` dirs.
-# Filled with the final results when the members are re-proven on the landed tool.
+# Filled with the final results when the members are re-proven on the landed tool. The rows below are
+# the v0.59 chain-loaded builds' results: each is replaced by the game's scene-core build's full PASS
+# when its lane delivers it (release/scene/private.ini says who delivers which).
 [[requires]]
 id = "CELESTE COLLECTION"
 result = "8c3b30f0704fec28e35801c44a9bc46d1c7e773faea692777724241dde41532a"

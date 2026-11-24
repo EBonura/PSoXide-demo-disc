@@ -136,8 +136,22 @@ pub fn parse_toc(raw: &[u8]) -> Result<Vec<TocEntry>> {
     Ok(entries)
 }
 
+/// Magic of the scene core's table (`psx-scene-abi`), at LBA 22 of a scene disc.
+pub const SCENES_MAGIC: &[u8; 8] = b"PSXSCN02";
+
+/// Where the table of contents is: LBA 22 on a chain-loaded pressing, LBA 23 on a scene disc,
+/// whose LBA 22 is `SCENES.TBL` (`scene-layout`).
+pub fn toc_lba(image: &Path) -> Result<u64> {
+    let first = read_user_sectors(image, TOC_LBA, 1)?;
+    Ok(if &first[..8] == SCENES_MAGIC {
+        TOC_LBA + 1
+    } else {
+        TOC_LBA
+    })
+}
+
 pub fn read_toc(image: &Path) -> Result<Vec<TocEntry>> {
-    parse_toc(&read_user_sectors(image, TOC_LBA, TOC_SECTORS)?)
+    parse_toc(&read_user_sectors(image, toc_lba(image)?, TOC_SECTORS)?)
 }
 
 /// The PS-X EXE whose header sits at `lba`, with its whole payload.

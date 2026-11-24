@@ -129,7 +129,7 @@ pub(crate) fn public_image(cue: &Path) -> Result<PathBuf> {
         "expected one adjacent BIN file"
     );
     let image = cue.parent().unwrap_or(Path::new(".")).join(files[0]);
-    let raw = read_user_sectors(&image, TOC_LBA, TOC_SECTORS)?;
+    let raw = read_user_sectors(&image, crate::disc::toc_lba(&image)?, TOC_SECTORS)?;
     let toc = parse_public_toc(&raw)?;
     let programs = PUBLIC_GAMES.len() - 1; // every card but CREDITS
     ensure!(

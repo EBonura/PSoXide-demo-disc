@@ -9,6 +9,10 @@
 mod util;
 mod args;
 mod disc;
+// The edition files mkdisc presses from (one parser for both tools).
+#[path = "../../mkdisc/src/edition.rs"]
+#[allow(dead_code)]
+mod edition;
 
 mod audio;
 mod banner;
@@ -22,6 +26,7 @@ mod identity;
 mod install;
 mod journeys;
 mod label;
+mod launches;
 mod lineup;
 mod members;
 mod programs;
@@ -116,6 +121,11 @@ const COMMANDS: &[(&str, Command, &str)] = &[
         "journeys",
         journeys::run,
         "generate the disc's headless journeys (a chain-load per member, carousel, covers) from members.json",
+    ),
+    (
+        "launches",
+        launches::run,
+        "start every program of a pressed disc from the launcher and time hand-off, main and ready (against a baseline)",
     ),
     (
         "members",

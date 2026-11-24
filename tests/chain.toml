@@ -1,11 +1,11 @@
-# One program through the launcher, played once per [[requires]] member by psoxide-test
+# One program through the launcher and a core switch, played once per [[requires]] member by psoxide-test
 # ([journeys] instances), with the member's slug, id, shelf index, the repo root and its signature
 # words substituted; the block marked repeat/end is written once per shelf step (k = 1..index).
 # The same file is the cross-emulator smoke (adapter subset: press + hold_until, wait_until,
 # checkpoint, all kind = "ram"), so it never waits a fixed time.
 name = "chain-{member}"
 title = "{id} through the launcher"
-disc = ["{repo}/build/private/PSoXide Demo Disc v0.59 Private.cue"]
+disc = ["{repo}/build/private/private.cue"]
 symbols = ["{repo}/build/private/launcher.map", "{repo}/build/private/members.sym"]
 pad = "dualshock"
 max_ticks = 20000
@@ -45,7 +45,7 @@ timeout = 120
 wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 16, op = "eq", value = {index} }
 timeout = 30
 
-[[step]]  # hand-off to the loader
+[[step]]  # hand-off: the launcher calls the core switch
 wait_until = { kind = "ram", sym = "LAUNCHER_STATE", offset = 0, op = "eq", value = 6 }
 timeout = 200
 

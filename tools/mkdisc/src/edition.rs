@@ -14,10 +14,17 @@
 //! art      = halflife               shelf screenshots: <shots dir>/<art>-1.shot, -2, ...
 //! shot     = /path/extra.shot       one more screenshot (repeatable)
 //! gate     = /path/psx-gate.toml    the program's own gate file, at its built revision
+//! map      = /path/game.map         the link map of the program's boot exe (disc gates read it)
+//! ready    = SYMBOL ge|eq VALUE     the program's first playable screen, a RAM state in its map
+//! press    = 30:start,90:cross      presses after its own main starts, to reach that screen
+//! edge_tail = MUSIC1.XA             a trailing file of the image a bad read cannot hang (repeatable)
+//! alias    = OUTER.XA:FILE          an outer-root name for one of the image's files (repeatable)
 //! ```
 //!
 //! A key the edition gives wins over the programs file's. Paths are taken as written (an
-//! edition pins files outside this repository: lane builds, library discs).
+//! edition pins files outside this repository: lane builds, library discs), after `${NAME}` is
+//! replaced by the environment variable NAME (`${RELEASE_INPUTS}/...`, as the lineups' inputs);
+//! an unset variable is an error.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -45,7 +52,20 @@ impl Entry {
     }
 }
 
-const KEYS: [&str; 7] = ["image", "exe", "version", "describe", "art", "shot", "gate"];
+const KEYS: [&str; 12] = [
+    "image",
+    "exe",
+    "version",
+    "describe",
+    "art",
+    "shot",
+    "gate",
+    "map",
+    "ready",
+    "press",
+    "edge_tail",
+    "alias",
+];
 
 /// Parse one file into its sections, in file order.
 pub fn parse(text: &str, what: &str) -> Result<Vec<Entry>, String> {
@@ -80,12 +100,30 @@ pub fn parse(text: &str, what: &str) -> Result<Vec<Entry>, String> {
         let entry = out
             .last_mut()
             .ok_or_else(|| at("a key before the first [NAME]".into()))?;
-        entry
-            .keys
-            .entry(key.to_string())
-            .or_default()
-            .push(value.to_string());
+        let value = expand(value).map_err(at)?;
+        entry.keys.entry(key.to_string()).or_default().push(value);
     }
+    Ok(out)
+}
+
+/// `text` with every `${NAME}` replaced by the environment variable NAME.
+fn expand(text: &str) -> Result<String, String> {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find("${") {
+        out.push_str(&rest[..at]);
+        let tail = &rest[at + 2..];
+        let end = tail
+            .find('}')
+            .ok_or_else(|| format!("unclosed ${{ in {text:?}"))?;
+        let name = &tail[..end];
+        out.push_str(
+            &std::env::var(name)
+                .map_err(|_| format!("{text:?} names ${{{name}}}, which is not set"))?,
+        );
+        rest = &tail[end + 1..];
+    }
+    out.push_str(rest);
     Ok(out)
 }
 
@@ -162,6 +200,14 @@ describe = Pool|Biliardo
         assert_eq!(merged[0].get("describe"), Some("Pool|Biliardo"));
         assert_eq!(merged[1].get("art"), Some("other"));
         assert_eq!(merged[1].get("describe"), Some("English|Italiano"));
+    }
+
+    #[test]
+    fn variables_expand_and_unset_ones_are_refused() {
+        std::env::set_var("EDITION_TEST_ROOT", "/inputs");
+        let e = parse("[X]\nimage = ${EDITION_TEST_ROOT}/x.cue\n", "e").unwrap();
+        assert_eq!(e[0].get("image"), Some("/inputs/x.cue"));
+        assert!(parse("[X]\nimage = ${EDITION_TEST_UNSET}/x.cue\n", "e").is_err());
     }
 
     #[test]
