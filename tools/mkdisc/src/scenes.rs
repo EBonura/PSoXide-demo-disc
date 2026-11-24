@@ -17,6 +17,12 @@
 //! program it sits next to, and above all a program of another core: the core refuses a switch
 //! to a program whose row names a different core hash, so the build refuses the disc first and
 //! names the game and the program.
+//!
+//! The member's row itself is the SDK's: [`outer_table`] leaves a placeholder Program row at the
+//! member's position and mkdisc places each member with `psx_iso::nest::nest`, which writes the row
+//! (member base, LBA, the member's entry mask in word 5) and checks it with
+//! `psx_iso::nest::check_nested_row` (CORE-ABI, "the outer row rule"). Members start on a 16-sector
+//! boundary ([`MEMBER_ALIGN`]), as `nest` places them.
 
 use psx_iso::scenes::{abi, program_image_row};
 use psx_iso::SECTOR_BYTES;
@@ -25,6 +31,9 @@ use abi::{
     decode_header_checked, encode_table, table_image, table_scene, word_fnv, Header, ImageRow,
     Kind, SceneRow, BOOT_EXE_LBA, MAX_IMAGES, NAME_BYTES, SCENE_FLAG_START, TABLE_LBA,
 };
+
+/// Members start on a multiple of this many sectors (`psx_iso::nest::nest` places them so).
+pub const MEMBER_ALIGN: u32 = 16;
 
 /// Bytes of user data in a raw Mode 2 Form 1 sector, and where they start.
 const USER_BYTES: usize = 2048;
@@ -160,6 +169,24 @@ pub fn assign_indices(needs: &[u8]) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+/// An empty Program row: a member's position before `nest` writes it, and the filler rows no
+/// scene names.
+fn placeholder_row() -> ImageRow {
+    ImageRow {
+        lba: 0,
+        size: 0,
+        load_addr: 0,
+        checksum: 0,
+        core_hash: 0,
+        evicts: 0,
+        member_base: 0,
+        kind: Kind::Program,
+        class: None,
+        owner: 0,
+        cdda_delta: 0,
+    }
+}
+
 fn scene_name(display: &str) -> [u8; NAME_BYTES] {
     let clean: String = display
         .chars()
@@ -206,23 +233,20 @@ pub fn outer_table(
                     entry,
                     partner_credit: 0,
                     min_block_version: 0,
+            needs: 0,
                     name: scene_name(name),
                 };
                 rows.push((row, scene));
                 needs.push(1);
             }
-            Start::Member {
-                boot,
-                base,
-                cdda_base,
-            } => {
-                let mut row = boot.row;
-                row.lba += base;
-                row.member_base = *base;
-                row.cdda_delta = u8::try_from(*cdda_base)
-                    .map_err(|_| format!("{name}: CD-DA base {cdda_base} past 255"))?;
-                // Bit 0 is the member's boot program in its own table (see `assign_indices`).
-                row.evicts |= 1;
+            Start::Member { boot, cdda_base, .. } => {
+                if *cdda_base != 0 {
+                    return Err(format!(
+                        "{name}: CD-DA ahead of a member on a scene disc (the nested row carries none)"
+                    ));
+                }
+                // A placeholder: `psx_iso::nest::nest` writes the member's row when it places it.
+                let row = placeholder_row();
                 let mut scene = boot.scene;
                 scene.name = scene_name(name);
                 rows.push((row, scene));
@@ -232,20 +256,7 @@ pub fn outer_table(
     }
     let indices = assign_indices(&needs)?;
     let image_count = indices.last().map_or(1, |&i| i as usize + 1);
-    let filler = ImageRow {
-        lba: 0,
-        size: 0,
-        load_addr: 0,
-        checksum: 0,
-        core_hash: 0,
-        evicts: 0,
-        member_base: 0,
-        kind: Kind::Program,
-        class: None,
-        owner: 0,
-        cdda_delta: 0,
-    };
-    let mut images = vec![filler; image_count];
+    let mut images = vec![placeholder_row(); image_count];
     images[0] = boot_row;
     let mut scenes = vec![SceneRow {
         id: 0,
@@ -254,6 +265,7 @@ pub fn outer_table(
         entry: boot_entry,
         partner_credit: 0,
         min_block_version: 0,
+        needs: 0,
         name: scene_name("LAUNCHER"),
     }];
     for (i, ((row, mut scene), &index)) in rows.into_iter().zip(&indices).enumerate() {
@@ -303,6 +315,7 @@ mod tests {
             entry: 0x8001_0000,
             partner_credit: 0,
             min_block_version: 0,
+            needs: 0,
             name: SceneRow::name_bytes("BOOT"),
         };
         let mut table = vec![0u8; USER_BYTES];

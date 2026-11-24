@@ -394,13 +394,32 @@ fn members(
 
 /// The ready state an edition section names (`ready = SYMBOL ge|eq VALUE`), resolved in `map`.
 fn ready_probe(name: &str, text: &str, map: &str) -> Result<Value> {
-    let parts: Vec<&str> = text.split_whitespace().collect();
-    let [symbol, op, value] = parts[..] else {
-        bail!("[{name}] ready wants `SYMBOL ge|eq VALUE`, got {text:?}");
+    // A guest that reports itself on the debug port (an SDK example): `tty PREFIX`.
+    if let Some(prefix) = text.strip_prefix("tty ") {
+        return Ok(json!({"tty": prefix.trim()}));
+    }
+    // `SYMBOL OP VALUE [u8|u16]`: the symbol as the map prints it (it may hold spaces), the
+    // comparison (ge, eq, ne) and the width read (default the whole word).
+    let mut parts: Vec<&str> = text.split_whitespace().collect();
+    let width = match parts.last() {
+        Some(&"u8") => 8,
+        Some(&"u16") => 16,
+        _ => 32,
     };
+    if width != 32 {
+        parts.pop();
+    }
     ensure!(
-        matches!(op, "ge" | "eq"),
-        "[{name}] ready: op {op} is not ge or eq"
+        parts.len() >= 3,
+        "[{name}] ready wants `SYMBOL ge|eq|ne VALUE [u8|u16]`, got {text:?}"
+    );
+    let value = parts.pop().expect("three parts");
+    let op = parts.pop().expect("two parts");
+    let symbol = parts.join(" ");
+    let symbol = symbol.as_str();
+    ensure!(
+        matches!(op, "ge" | "eq" | "ne"),
+        "[{name}] ready: op {op} is not ge, eq or ne"
     );
     let value = match value.strip_prefix("0x") {
         Some(hex) => u64::from_str_radix(hex, 16),
@@ -410,7 +429,7 @@ fn ready_probe(name: &str, text: &str, map: &str) -> Result<Value> {
     let Some(addr) = symbol_address(map, symbol) else {
         bail!("[{name}] ready symbol {symbol} is not in its map");
     };
-    Ok(json!({"sym": symbol, "addr": addr, "op": op, "value": value}))
+    Ok(json!({"sym": symbol, "addr": addr, "op": op, "value": value, "width": width}))
 }
 
 /// The members of a scene disc (`SCENES.TBL` at LBA 22): the ranges from the pressing's
@@ -481,10 +500,20 @@ fn scene_members(
             .and_then(|n| n.to_str())
             .ok_or_else(|| Error(format!("{name}: bad map path")))?
             .to_string();
-        let Some(vblank) = symbol_address(&map_text, "__psx_rt_vblank_count") else {
-            bail!("{name}: __psx_rt_vblank_count is not in {}", map_path.display());
-        };
-        let words = signature_words(chosen, &launcher, &others);
+        // A program without psx-rt's VBlank counter (an SDK example) is "running" by its words alone.
+        let vblank = symbol_address(&map_text, "__psx_rt_vblank_count");
+        // The same executable in two members (an example nested twice) cannot be told apart by its
+        // words; the launches gate tells them apart by the core's payload read.
+        let same = chosen.whole_sha();
+        let distinct: Vec<Found> = others
+            .iter()
+            .filter(|f| f.lba == chosen.lba || f.whole_sha() != same)
+            .map(|f| Found {
+                lba: f.lba,
+                exe: f.exe.clone(),
+            })
+            .collect();
+        let words = signature_words(chosen, &launcher, &distinct);
         ensure!(
             words.len() == WORDS,
             "{name}: only {} signature words differ from every other executable",

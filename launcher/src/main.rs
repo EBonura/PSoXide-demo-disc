@@ -36,6 +36,7 @@ mod disc_art;
 mod face;
 mod gfx;
 mod launch;
+mod loading;
 mod music;
 mod shelf;
 mod state;
@@ -151,11 +152,9 @@ fn main() {
     // empty port) holds the menu on a notice; an empty port is probed once in
     // 60 polls. The splash's polls run the handshake.
     let mut pads = Controllers::new();
-    // The SDK splash, once per disc: the launcher is the disc's first program, so it plays on
-    // a BIOS boot and never after a core switch (no program switches back to the menu today).
-    if !entered_by_switch() {
-        splash(&mut g, &mut || pads.poll(&mut port, Port::One).buttons);
-    }
+    // The SDK splash, once per disc: the launcher is the disc's first program (psx-splash itself
+    // returns at once on a core entry).
+    splash(&mut g, &mut || pads.poll(&mut port, Port::One).buttons);
     g.upload_ui(UI_TEX);
     for (i, program) in cover::PROGRAMS.iter().enumerate() {
         g.upload_art(i, &program.art);
@@ -453,7 +452,7 @@ fn main() {
                 if launching >= launch::FRAMES {
                     state::hand_off();
                     // Never returns: the core loads the program, or shows why it cannot.
-                    chain::boot(sel as usize, scenes, &mut g, seek);
+                    chain::boot(sel as usize, chosen, scenes, &mut g, seek);
                 }
             }
             launching += 1;
@@ -536,13 +535,6 @@ fn spectrum_frame(header: &Header, track: u8, song_ms: u32, loaded_frames: u32) 
     let bytes =
         unsafe { core::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 4) };
     bytes.get(start..start + disc_toc::SPECTRUM_BANDS)
-}
-
-/// Whether a core switch entered this program (the handoff block says so); false on a BIOS boot.
-fn entered_by_switch() -> bool {
-    use psx_core::abi::block;
-    psx_core::link::block_valid()
-        && psx_core::link::block_word(block::OFF_FLAGS) & block::FLAG_CORE_ENTRY != 0
 }
 
 /// The SDK splash, from boot-only memory: psoxide-boot.ld lays this function in `.boot` with

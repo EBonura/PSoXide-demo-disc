@@ -84,9 +84,16 @@ impl Seek {
         }
     }
 
-    /// Give the drive up: acknowledge anything still pending. The core's first command of the
-    /// switch proves the drive stopped, cancelling a seek that is still under way.
+    /// Wait the seek out (its completion answered, or refused), at most [`SEEK_WAIT_VBLANKS`], then
+    /// give the drive up with nothing pending. Review 1.3: the switch must not start while a seek
+    /// the launcher started is still running.
     pub fn finish(&mut self) {
+        let mut vblanks = 0;
+        while matches!(self.state, State::Seeking { .. }) && vblanks < SEEK_WAIT_VBLANKS {
+            self.frame();
+            psx_rt::interrupts::wait_vblank();
+            vblanks += 1;
+        }
         if let State::Seeking { saved } = self.state {
             self.cd.restore_irq_output(saved);
             self.state = State::Idle;
@@ -94,14 +101,22 @@ impl Seek {
     }
 }
 
+/// The longest the switch waits for the launch seek: a full-stroke seek on the console takes
+/// under a second, and the seek has had the 72 frames of the launch animation already.
+const SEEK_WAIT_VBLANKS: u32 = 120;
+
 /// Start carousel entry `index` with a core switch to its scene (`scene_layout`). Never
 /// returns when the switch is accepted; a refusal (a disc whose tables disagree, a program on
-/// another core) is a broken pressing, shown on the core's fatal screen with its code.
-pub fn boot(index: usize, scenes: &mut [u32], g: &mut Gfx, seek: &mut Seek) -> ! {
-    // Let the GPU finish the frame on screen (it stays up through the load), and hand the drive
-    // over with nothing pending.
+/// another core) is a broken pressing, shown on the core's fatal screen with its code. There is
+/// no way back: no program on the disc has a scene that starts the launcher.
+pub fn boot(index: usize, entry: &Entry, scenes: &mut [u32], g: &mut Gfx, seek: &mut Seek) -> ! {
+    // The one static frame the player sees until the game draws (the core keeps it).
+    crate::loading::show(g, entry);
     g.wait_idle();
+    // The drive: the launch seek waited out, then told to the core (the launcher drove it with its
+    // own commands), which proves it stopped before its first command of the switch.
     seek.finish();
+    psx_core::link::release();
     let code = psx_core::link::switch(scene_layout::scene_of_entry(index), &[0; 4], scenes);
     psx_core::link::fatal(code)
 }

@@ -87,9 +87,13 @@ struct Member {
     id: String,
     index: u64,
     exe_lba: u64,
-    vblank: u32,
+    vblank: Option<u32>,
     words: Vec<(u32, u32)>,
     ready: Option<(u32, String, u64)>,
+    /// Bits of the ready word compared (8, 16 or 32, the low ones).
+    ready_width: u32,
+    /// The ready state as a debug-port line the member prints (`tty PREFIX`).
+    ready_tty: Option<String>,
     press: String,
 }
 
@@ -107,7 +111,8 @@ impl Member {
         } else {
             &record["title_probe"]
         };
-        let ready = if probe.is_object() {
+        let ready_tty = probe["tty"].as_str().map(str::to_string);
+        let ready = if probe.is_object() && ready_tty.is_none() {
             Some((
                 hex(&probe["addr"])?,
                 probe["op"].as_str().unwrap_or("eq").to_string(),
@@ -119,17 +124,29 @@ impl Member {
         Ok(Member {
             index: record["index"].as_u64().unwrap_or(0),
             exe_lba: record["exe_lba"].as_u64().unwrap_or(0),
-            vblank: hex(&record["vblank"])?,
+            vblank: if record["vblank"].is_null() {
+                None
+            } else {
+                Some(hex(&record["vblank"])?)
+            },
             words,
             ready,
+            ready_width: probe["width"].as_u64().unwrap_or(32) as u32,
+            ready_tty,
             press: record["press"].as_str().unwrap_or("").to_string(),
             id,
         })
     }
 
     fn ready_holds(&self, value: u64) -> bool {
+        let value = if self.ready_width < 32 {
+            value & ((1 << self.ready_width) - 1)
+        } else {
+            value
+        };
         match &self.ready {
             Some((_, op, want)) if op == "ge" => value >= *want,
+            Some((_, op, want)) if op == "ne" => value != *want,
             Some((_, _, want)) => value == *want,
             None => false,
         }
@@ -163,7 +180,8 @@ fn run_once(
     fs::create_dir_all(dir)?;
     let route = dir.join("route.csv");
     let cd = dir.join("cd.csv");
-    let mut watches = vec![state, member.vblank];
+    let mut watches = vec![state];
+    watches.extend(member.vblank);
     watches.extend(member.words.iter().map(|(a, _)| *a));
     if let Some((addr, ..)) = &member.ready {
         watches.push(*addr);
@@ -182,6 +200,9 @@ fn run_once(
         .arg(&route)
         .arg("--cd-command-log")
         .arg(&cd);
+    if let Some(prefix) = &member.ready_tty {
+        command.arg("--stop-on-tty").arg(prefix);
+    }
     for addr in &watches {
         command.arg("--route-watch-u32").arg(format!("{addr:#x}"));
     }
@@ -218,8 +239,11 @@ fn run_once(
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .all(|ok| ok);
-        let vblank = value(row, member.vblank)?;
-        if seen.main.is_none() && resident && (1..=10).contains(&vblank) {
+        let started = match member.vblank {
+            Some(addr) => (1..=10).contains(&value(row, addr)?),
+            None => true,
+        };
+        if seen.main.is_none() && resident && started {
             seen.main = Some(tick);
         }
         if seen.main.is_some() && seen.ready.is_none() && resident {
@@ -228,6 +252,17 @@ fn run_once(
                     seen.ready = Some(tick);
                 }
             }
+        }
+    }
+    // A debug-port ready state: the run stopped on the member's line, at its last route tick.
+    if member.ready_tty.is_some() && seen.main.is_some() {
+        let text = String::from_utf8_lossy(&fs::read(dir.join("out.txt"))?).into_owned();
+        if text.contains("stopped-at=") {
+            seen.ready = log
+                .rows
+                .last()
+                .and_then(|row| log.required(row, "route_tick").ok())
+                .and_then(|t| t.parse().ok());
         }
     }
     // The core reads the payload from the sector after the header.
@@ -332,7 +367,7 @@ pub fn run(raw: &[String]) -> Result<i32> {
         let to_ready = seen.ready.map(|t| t - hand_off);
         match to_main {
             None => problems.push(format!("its main never ran within {max_ticks} ticks")),
-            Some(_) if member.ready.is_none() => {
+            Some(_) if member.ready.is_none() && member.ready_tty.is_none() => {
                 problems.push("no ready state (its first playable screen) is named".into())
             }
             Some(_) if to_ready.is_none() => {
@@ -350,7 +385,8 @@ pub fn run(raw: &[String]) -> Result<i32> {
                         problems.push(format!("hand-off to main {now} VBlanks, baseline {was}"));
                     }
                 }
-                (None, _) => problems.push("not in the baseline".into()),
+                // A game that was not on the baseline disc has no launch to compare with.
+                (None, _) => compare.push_str(" (not on the baseline disc: not compared)"),
                 _ => {}
             }
             if let (Some(was), Some(now)) = (base["to_ready"].as_u64(), to_ready) {

@@ -1382,6 +1382,9 @@ fn run() -> Result<(), String> {
         }];
         let mut at = iso_frames;
         for &slot in order {
+            if core.is_some() {
+                at = at.next_multiple_of(scenes::MEMBER_ALIGN);
+            }
             let (index, _, image, _, _) = &images[slot];
             let sectors = (image.data.len() / SECTOR_BYTES) as u32;
             let needed = tail_starts[slot];
@@ -1456,6 +1459,9 @@ fn run() -> Result<(), String> {
     let mut cdda_track_base = 0u32;
     let mut image_starts = vec![0u32; images.len()];
     for &slot in &order {
+        if core.is_some() {
+            image_lba = image_lba.next_multiple_of(scenes::MEMBER_ALIGN);
+        }
         let (index, path, image, payload_fnv, boot_exe_lba) = &images[slot];
         image_starts[slot] = image_lba;
         let frames = (image.data.len() / SECTOR_BYTES) as u32;
@@ -1567,6 +1573,7 @@ fn run() -> Result<(), String> {
     })?;
 
     // The scene table: the launcher, then one Program row per carousel entry (scenes.rs).
+    let mut positions: Vec<u8> = Vec::new();
     let scene_table = match &core {
         Some(core) => {
             let mut cdda_bases = vec![0u32; images.len()];
@@ -1598,6 +1605,7 @@ fn run() -> Result<(), String> {
             }
             let (table, indices) =
                 scenes::outer_table(&launcher, launcher_lba, core, &starts, &names)?;
+            positions = indices.clone();
             println!(
                 "SCENES.TBL at LBA {}: launcher image 0 (PSX.EXE at LBA {launcher_lba}), core {:08x}",
                 psx_iso::scenes::abi::TABLE_LBA,
@@ -1640,8 +1648,18 @@ fn run() -> Result<(), String> {
     let mut lba = iso_frames;
     for &slot in &order {
         let image = &images[slot].2;
-        place_data_track(&mut disc, &image.data, lba)?;
-        lba += (image.data.len() / SECTOR_BYTES) as u32;
+        if core.is_some() {
+            // The member at its 16-sector boundary, its row written and checked by the SDK's
+            // nesting (psx_iso::nest): the gap is empty Form 1 sectors, never zero bytes.
+            pad_with_empty_sectors(&mut disc, image_starts[slot])?;
+            let index = images[slot].0;
+            disc = psx_iso::nest::nest(&disc, positions[index], &image.data, true).map_err(
+                |e| format!("{}: nesting refused: {e:?}", args.programs[index].name),
+            )?;
+        } else {
+            place_data_track(&mut disc, &image.data, lba)?;
+        }
+        lba = image_starts[slot] + (image.data.len() / SECTOR_BYTES) as u32;
     }
 
     // Point each alias's root record at its file inside the placed member image.
@@ -1752,6 +1770,21 @@ fn run() -> Result<(), String> {
     map.sort_by_key(|(lba, ..)| *lba);
     for (lba, bytes, name, kind) in map {
         println!("  LBA {lba:>7}  {:>7} KiB  {name:<26} {kind}", bytes / 1024);
+    }
+    Ok(())
+}
+
+/// Append empty Mode 2 Form 1 sectors (the ISO's own empty system-area sector 1, re-addressed) until
+/// the image holds `end` sectors.
+fn pad_with_empty_sectors(disc: &mut Vec<u8>, end: u32) -> Result<(), String> {
+    let template: Vec<u8> = disc[SECTOR_BYTES..2 * SECTOR_BYTES].to_vec();
+    if template[0x18..0x818].iter().any(|b| *b != 0) {
+        return Err("the ISO's system-area sector 1 is not empty: no padding template".to_string());
+    }
+    while ((disc.len() / SECTOR_BYTES) as u32) < end {
+        let at = disc.len();
+        disc.extend_from_slice(&template);
+        rewrite_sector_msf(&mut disc[at..at + SECTOR_BYTES], (at / SECTOR_BYTES) as u32);
     }
     Ok(())
 }

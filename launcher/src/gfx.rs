@@ -320,6 +320,11 @@ impl Gfx {
         self.presenter.present_drawn(&mut self.fb);
     }
 
+    /// [`end`](Self::end), and wait until the frame is on screen (the loading frame).
+    pub fn end_blocking(&mut self) {
+        self.presenter.present_blocking(&mut self.fb);
+    }
+
     pub fn clear(&mut self, c: Rgb) {
         self.gpu
             .draw(&FillRect::new(self.fb.draw_origin(), (320, 240), c));

@@ -136,8 +136,9 @@ pub fn parse_toc(raw: &[u8]) -> Result<Vec<TocEntry>> {
     Ok(entries)
 }
 
-/// Magic of the scene core's table (`psx-scene-abi`), at LBA 22 of a scene disc.
-pub const SCENES_MAGIC: &[u8; 8] = b"PSXSCN02";
+/// Magic of the scene core's table (`psx-scene-abi` version 3), at LBA 22 of a scene disc. disc-tools
+/// builds without the SDK, so the magic is written here; a version 2 disc reads as a chain-loaded one.
+pub const SCENES_MAGIC: &[u8; 8] = b"PSXSCN03";
 
 /// Where the table of contents is: LBA 22 on a chain-loaded pressing, LBA 23 on a scene disc,
 /// whose LBA 22 is `SCENES.TBL` (`scene-layout`).
