@@ -19,10 +19,13 @@ name = "private"
 out = "build/private"
 env = { RELEASE_INPUTS = "{input:release-inputs}" }
 commands = [
+  # The harness collects the launcher map this build writes: relink it every time.
+  ["touch", "launcher/build.rs"],
   ["make", "-o", "components", "scene-disc", "EDITION=release/scene/private.ini", "SCENE_OUT={out}",
    "HL=1", "CS=1", "HK=1", "WO=1", "OOT=1", "RESTORED=1", "DISC_MAX_SECTORS=359844",
    "DISC_VERSION=v0.59", "ART_SRC={input:launcher-art}", "RESTORED_ART={input:restored-art}",
    "LAUNCHER_ART=$(PRIVATE_ART)"],
+  ["make", "disc-tools"],
   ["tools/disc-tools/target/release/disc-tools", "members",
    "--image", "{out}/private.bin", "--edition", "release/scene/private.ini",
    "--programs", "release/scene/programs.ini", "--out", "{out}"],
