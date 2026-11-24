@@ -17,6 +17,9 @@
 //! map      = /path/game.map         the link map of the program's boot exe (disc gates read it)
 //! ready    = SYMBOL ge|eq VALUE     the program's first playable screen, a RAM state in its map
 //! press    = 30:start,90:cross      presses after its own main starts, to reach that screen
+//! sdk      = 80d432926e69...        the SDK commit the game's lane built this disc on (its pin)
+//! commit   = 1b4a182...             the game repository's commit the disc was built from
+//! provenance = /path/x.json         the build's record, which must name that SDK commit (checked)
 //! edge_tail = MUSIC1.XA             a trailing file of the image a bad read cannot hang (repeatable)
 //! alias    = OUTER.XA:FILE          an outer-root name for one of the image's files (repeatable)
 //! ```
@@ -52,7 +55,7 @@ impl Entry {
     }
 }
 
-const KEYS: [&str; 12] = [
+const KEYS: [&str; 15] = [
     "image",
     "exe",
     "version",
@@ -65,6 +68,9 @@ const KEYS: [&str; 12] = [
     "press",
     "edge_tail",
     "alias",
+    "sdk",
+    "commit",
+    "provenance",
 ];
 
 /// Parse one file into its sections, in file order.

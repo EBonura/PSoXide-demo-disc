@@ -144,6 +144,11 @@ struct Args {
     /// program on it must embed this core, and the launcher starts them with core switches
     /// (`scenes.rs`). Without it, the chain-loaded layout of v0.59 and before.
     core_image: Option<PathBuf>,
+    /// Per program from the edition: (name, SDK pin, game commit, build record), as the lanes report.
+    pins: Vec<(String, Option<String>, Option<String>, Option<PathBuf>)>,
+    /// Refuse any program whose declared SDK pin is not this commit (a prefix of 12 or more hex
+    /// digits of it matches).
+    require_sdk: Option<String>,
     /// What the architecture gate needs (see [`gate`]).
     gate: gate::Options,
 }
@@ -176,6 +181,8 @@ fn parse_args() -> Result<Args, String> {
     let mut programs_file: Option<PathBuf> = None;
     let mut edition_file: Option<PathBuf> = None;
     let mut shots_dir: Option<PathBuf> = None;
+    let mut pins = Vec::new();
+    let mut require_sdk: Option<String> = None;
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -310,6 +317,11 @@ fn parse_args() -> Result<Args, String> {
                     it.next().ok_or("--shots-dir takes a path".to_string())?,
                 ))
             }
+            "--require-sdk" => {
+                let rev = it.next().ok_or("--require-sdk takes a commit".to_string())?;
+                // An empty value (a development disc) checks nothing.
+                require_sdk = Some(rev).filter(|r| !r.is_empty());
+            }
             "--core-image" => {
                 core_image = Some(PathBuf::from(
                     it.next().ok_or("--core-image takes a path".to_string())?,
@@ -382,6 +394,12 @@ fn parse_args() -> Result<Args, String> {
             if let Some(gate) = entry.get("gate") {
                 program_files.push((name.clone(), PathBuf::from(gate)));
             }
+            pins.push((
+                name.clone(),
+                entry.get("sdk").map(str::to_string),
+                entry.get("commit").map(str::to_string),
+                entry.get("provenance").map(PathBuf::from),
+            ));
             for file in entry.all("edge_tail") {
                 edge_tails.push((name.clone(), file.clone()));
             }
@@ -416,6 +434,8 @@ fn parse_args() -> Result<Args, String> {
         aliases,
         dry_run,
         core_image,
+        pins,
+        require_sdk,
         gate: gate::Options {
             sdk_profile: sdk_profile.ok_or(
                 "--sdk-profile is required: the sdk/profile.toml of the SDK the launcher links"
@@ -464,6 +484,8 @@ fn print_usage() {
          --programs    the shared programs file: describe and art for every program, read with\n\
         \x20             --edition (an edition's own keys win)\n\
          --shots-dir   where `art = ID` finds ID-1.shot, ID-2.shot, ... (cooked shelf shots)\n\
+         --require-sdk COMMIT  refuse any edition program whose `sdk =` pin is not COMMIT (empty:\n\
+        \x20             no check); the pin table is printed either way\n\
          --core-image  the SDK pin's psx-core.bin: press a scene disc (SCENES.TBL at LBA 22, the\n\
         \x20             table of contents at 23); every --image must be a scene disc on this\n\
         \x20             core, and the launcher starts programs with core switches\n\
@@ -983,6 +1005,7 @@ fn run() -> Result<(), String> {
     }
     let args = parse_args()?;
 
+    check_pins(&args.pins, args.require_sdk.as_deref())?;
     let launcher =
         fs::read(&args.launcher).map_err(|e| format!("read {}: {e}", args.launcher.display()))?;
     parse_exe_header(&launcher, &args.launcher)?;
@@ -1789,6 +1812,84 @@ fn pad_with_empty_sectors(disc: &mut Vec<u8>, end: u32) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether two commit names are the same commit: one is a prefix (12 hex digits at least) of the
+/// other.
+fn same_commit(a: &str, b: &str) -> bool {
+    let (a, b) = (a.trim().to_ascii_lowercase(), b.trim().to_ascii_lowercase());
+    a.len().min(b.len()) >= 12 && (a.starts_with(&b) || b.starts_with(&a))
+}
+
+/// One edition program's pin as the lane reports it: name, SDK commit, game commit, build record.
+type Pin = (String, Option<String>, Option<String>, Option<PathBuf>);
+
+/// Print every program's SDK pin and game commit, and refuse a disc that mixes them: a game built
+/// on another SDK commit can carry the same core (CORE_HASH) and still lack the entry-state fixes
+/// of the disc's SDK, which no other check sees. Refused: a build record that does not name the
+/// declared SDK pin (always), and with `require` a pin that is not that commit or is missing.
+fn check_pins(pins: &[Pin], require: Option<&str>) -> Result<(), String> {
+    if pins.is_empty() {
+        return Ok(());
+    }
+    println!("SDK pins (as the edition declares them, checked against each build record):");
+    println!(
+        "  {:<22} {:<13} {:<13} {:<9} verdict",
+        "program", "game commit", "SDK pin", "record"
+    );
+    let short = |v: &Option<String>| {
+        v.as_deref()
+            .map_or_else(|| "-".to_string(), |s| s.chars().take(12).collect())
+    };
+    let mut refused = Vec::new();
+    for (name, sdk, commit, record) in pins {
+        let mut problems = Vec::new();
+        let record_says = match (record, sdk) {
+            (None, _) => "none",
+            (Some(_), None) => "unused",
+            (Some(path), Some(sdk)) => match fs::read_to_string(path) {
+                Ok(text) if sdk.len() >= 12 && text.to_ascii_lowercase().contains(&sdk[..12].to_ascii_lowercase()) => {
+                    "names it"
+                }
+                Ok(_) => {
+                    problems.push(format!("{} does not name the declared SDK pin", path.display()));
+                    "DIFFERS"
+                }
+                Err(e) => {
+                    problems.push(format!("read {}: {e}", path.display()));
+                    "MISSING"
+                }
+            },
+        };
+        if let Some(want) = require {
+            match sdk {
+                Some(sdk) if same_commit(sdk, want) => {}
+                Some(sdk) => problems.push(format!("built on SDK {sdk}, the disc requires {want}")),
+                None => problems.push(format!("no `sdk =` pin declared, the disc requires {want}")),
+            }
+        }
+        let verdict = if problems.is_empty() {
+            String::from("ok")
+        } else {
+            format!("REFUSED: {}", problems.join("; "))
+        };
+        println!(
+            "  {name:<22} {:<13} {:<13} {record_says:<9} {verdict}",
+            short(commit),
+            short(sdk)
+        );
+        if !problems.is_empty() {
+            refused.push(format!("{name}: {}", problems.join("; ")));
+        }
+    }
+    if refused.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "{} program(s) not on one SDK pin (a mixed disc is refused):\n  {}",
+        refused.len(),
+        refused.join("\n  ")
+    ))
+}
+
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
@@ -1838,6 +1939,18 @@ mod tests {
         assert!(check_budget(&fits, None).is_ok());
         let over = [row("launcher", 1, 0), row("GAME", 1, 99)];
         assert!(check_budget(&over, None).unwrap_err().contains("100 tracks"));
+    }
+
+    #[test]
+    fn a_mixed_disc_is_refused_and_one_pin_passes() {
+        let main = "80d432926e69dc0bc6ac328c3c9b143a8d875754";
+        let pin = |n: &str, sdk: Option<&str>| (n.to_string(), sdk.map(str::to_string), None, None);
+        assert!(check_pins(&[pin("A", Some("80d432926e69")), pin("B", Some(main))], Some(main)).is_ok());
+        let err = check_pins(&[pin("A", Some(main)), pin("B", Some("5688e778aa67"))], Some(main))
+            .unwrap_err();
+        assert!(err.contains("B: built on SDK 5688e778aa67"), "{err}");
+        assert!(check_pins(&[pin("C", None)], Some(main)).is_err());
+        assert!(check_pins(&[pin("C", None)], None).is_ok());
     }
 
     #[test]
