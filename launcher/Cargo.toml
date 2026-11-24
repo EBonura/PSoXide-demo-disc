@@ -34,7 +34,6 @@ lto           = true
 private = []
 
 [dependencies]
-chainload-layout = { path = "../chainload-layout" }
 psx-gpu  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gpu" }
 psx-pack = { path = "../games/PSoXide-sdk/sdk/crates/psx-pack" }
 psx-pad  = { path = "../games/PSoXide-sdk/sdk/crates/psx-pad" }
@@ -49,3 +48,9 @@ disc-toc = { package = "psx-disc-toc", path = "../games/PSoXide-sdk/engine/crate
 playlist = { path = "playlist" }
 psx-hw   = { path = "../games/PSoXide-sdk/crates/psx-hw" }
 psx-gte  = { path = "../games/PSoXide-sdk/sdk/crates/psx-gte" }
+# The scene core: the embedded core image, `__core_boot` and the switch (link with psoxide-core.ld).
+psx-core    = { path = "../games/PSoXide-sdk/sdk/crates/psx-core", features = ["link"] }
+# The SDK boot splash, from boot-only memory (psoxide-boot.ld): the disc's first program plays it.
+psx-splash  = { path = "../games/PSoXide-sdk/sdk/crates/psx-splash" }
+psx-display = { path = "../games/PSoXide-sdk/sdk/crates/psx-display" }
+scene-layout = { path = "../scene-layout" }

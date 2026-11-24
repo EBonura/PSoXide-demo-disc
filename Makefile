@@ -198,9 +198,10 @@ loader:
 DISC_TITLE ?= DEMO DISC
 DISC_VERSION ?= $(shell git -C $(ROOT) describe --tags --match 'v*' --always --dirty 2>/dev/null)
 
-# The launcher embeds the blob, so it always rebuilds after it. The pad, the linker script and the
-# output format come from the crate (launcher/.cargo/config.toml and build.rs), because the build
-# driver refuses a RUSTFLAGS environment.
+# The launcher runs on the scene core and starts programs with a core switch (no chain-load blob).
+# The linker scripts (the core, boot-only memory for the splash) come from the crate's build.rs,
+# because the build driver refuses a RUSTFLAGS environment; the driver writes the PS-X EXE from
+# the linked ELF.
 LAUNCHER_FEATURES := $(strip $(if $(PRIVATE),private))
 #
 # Cover art that lives in a program's own repository: LAUNCHER_ART lists the `launcher-art`
@@ -236,8 +237,8 @@ $(error menu-art ext failed: run it by hand to see why)
 endif
 endif
 
-launcher: loader
-	cd launcher && CARGO_TARGET_DIR=$(BUILD) LOADER_BLOB=$(LOADER_EXE) XA_SONGS_RS=$(MENU_SONGS_RS) $(if $(LAUNCHER_ART),LAUNCHER_ART_DIR=$(ART_OUT)) \
+launcher: sdk-tools
+	cd launcher && CARGO_TARGET_DIR=$(BUILD) XA_SONGS_RS=$(MENU_SONGS_RS) $(if $(LAUNCHER_ART),LAUNCHER_ART_DIR=$(ART_OUT)) \
 		DISC_VERSION=$(DISC_VERSION) DISC_TITLE="$(DISC_TITLE)" \
 		$(PGO) apply --crate . --variant off -- build $(PSX_FLAGS) $(PSX_POLICY) $(if $(LAUNCHER_FEATURES),--features "$(LAUNCHER_FEATURES)")
 
@@ -521,6 +522,13 @@ endif
 # pinned SDK's profile and the program's own psx-gate.toml. A lineup's GATE_ARGS (written by
 # `disc-tools lineup prepare` into lineup.mk) carry each program's file as it was at the revision
 # it was built from. mkdisc refuses a diag receipt: nothing that ships has a diagnostic feature on.
+# The menu songs, their level meter, titles and credit: the same on every pressing.
+MENU_ARGS = $(foreach t,$(MENU_XA),--menu-xa "$(t)") \
+		--menu-spectrum "$(MENU_SPECTRUM)" \
+		--menu-title "JUNGLE 1 A" --menu-title "JUNGLE 1 B" \
+		--menu-title "JUNGLE 2 A" --menu-title "JUNGLE 2 B" \
+		--menu-title "JUNGLE DNB A" --menu-title "JUNGLE DNB B" \
+		--credit "$(MENU_CREDIT)"
 MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volume PSXDEMO \
 		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" $(GATE_ARGS) \
 		$(EDGE_ARGS) $(ALIAS_ARGS) \
@@ -541,12 +549,7 @@ MKDISC_ARGS = --launcher $(LAUNCHER_EXE) --out "$(DIST)/$(DISC_NAME).bin" --volu
 		$(QDUP_ARGS) \
 		$(HWT_ARGS) \
 		$(PSXCEL_ARGS) \
-		$(foreach t,$(MENU_XA),--menu-xa "$(t)") \
-		--menu-spectrum "$(MENU_SPECTRUM)" \
-		--menu-title "JUNGLE 1 A" --menu-title "JUNGLE 1 B" \
-		--menu-title "JUNGLE 2 A" --menu-title "JUNGLE 2 B" \
-		--menu-title "JUNGLE DNB A" --menu-title "JUNGLE DNB B" \
-		--credit "$(MENU_CREDIT)" \
+		$(MENU_ARGS) \
 		$(call SHOTARGS,VOXIDE,voxide) \
 		$(call SHOTARGS,NITROXIDE,nitro) \
 		$(call SHOTARGS,CELESTE COLLECTION,celeste) \
@@ -627,7 +630,12 @@ endif
 lineup-budget: mkdisc lineup-prepare
 	$(MAKE) disc-budget
 
+# The launcher here runs on the scene core and finds its tables at LBA 22 and 23 (scene-layout): a
+# chain-loaded pressing (mkdisc without --core-image) would boot a menu that cannot start anything.
+# Pressings of v0.59 and before are re-made from their release tags.
+CHAIN_PRESS_REFUSED = @echo "the launcher on this branch runs on the scene core: press with make scene-disc (v0.59 and before: from their release tags)"; exit 1
 _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
+	$(CHAIN_PRESS_REFUSED)
 	@mkdir -p "$(DIST)"
 	$(MKDISC) $(MKDISC_ARGS)
 	$(DISC_TOOLS) lineup receipt --lineup "$(LINEUP)" --mk "$(LINEUP_OUT)/lineup.mk" \
@@ -638,9 +646,38 @@ _lineup-lay: $(DISC_TOOLS) $(SHOT_FILES)
 		--components-out "$(DIST)/$(DISC_NAME).components.json" \
 		--layout "$(DIST)/$(DISC_NAME).layout.json"
 
+# ---------------------------------------------------------------------------
+# The scene disc (2026-11-24 on): every program on one resident scene core (psx-core), the launcher
+# the disc's first program, a core switch for every launch, SCENES.TBL at LBA 22 and the table of
+# contents at 23 (tools/mkdisc/src/scenes.rs). An edition file names the programs in carousel order,
+# one section each (image = a scene disc, version); their shelf text and art id come from
+# release/scene/programs.ini (tools/mkdisc/src/edition.rs). Adding a game is one section.
+#
+#   make scene-disc EDITION=release/scene/<edition>.ini [SCENE_OUT=dir] [LAUNCHER_ART=...] [HL=1 ...]
+#
+# Every program must embed the core image of the pinned SDK (CORE_IMAGE); mkdisc refuses a member
+# on another core and names it. The Private feature (covers for the Private programs) follows the
+# same flags as the lineup pressings. Output: $(SCENE_OUT)/<edition>.bin, .cue and .layout.json.
+# ---------------------------------------------------------------------------
+EDITION ?=
+SCENE_OUT ?= $(BUILD)/scene
+SCENE_PROGRAMS ?= $(ROOT)/release/scene/programs.ini
+CORE_IMAGE ?= $(SDK)/sdk/crates/psx-core/prebuilt/psx-core.bin
+SCENE_NAME = $(basename $(notdir $(EDITION)))
+.PHONY: scene-disc scene-budget
+scene-disc scene-budget: launcher mkdisc $(SHOT_FILES)
+	@test -n "$(EDITION)" -a -f "$(EDITION)" || { echo "set EDITION=release/scene/<edition>.ini"; exit 1; }
+	@mkdir -p "$(SCENE_OUT)"
+	$(MKDISC) --launcher $(LAUNCHER_EXE) --out "$(SCENE_OUT)/$(SCENE_NAME).bin" --volume PSXDEMO \
+		--sdk-profile "$(SDK)/sdk/profile.toml" --own-gate-file "$(ROOT)/psx-gate.toml" \
+		--core-image "$(CORE_IMAGE)" --programs "$(SCENE_PROGRAMS)" --edition "$(EDITION)" \
+		--shots-dir "$(SHOTS_OUT)" $(MENU_ARGS) --max-sectors $(DISC_MAX_SECTORS) \
+		$(if $(filter scene-budget,$@),--dry-run)
+
 # The sector budget of the pressing these flags select, from inputs already
 # built, without writing an image.
 disc-budget: mkdisc $(SHOT_FILES)
+	$(CHAIN_PRESS_REFUSED)
 	$(MKDISC) $(MKDISC_ARGS) --dry-run
 
 # The host tests: the carousel and the disc table crates, the chain-load blob's

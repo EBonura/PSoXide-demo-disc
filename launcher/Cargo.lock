@@ -9,16 +9,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
-name = "chainload-layout"
-version = "0.1.0"
-
-[[package]]
 name = "launcher"
 version = "0.1.0"
 dependencies = [
- "chainload-layout",
  "playlist",
+ "psx-core",
  "psx-disc-toc",
+ "psx-display",
  "psx-gpu",
  "psx-gte",
  "psx-hw",
@@ -28,9 +25,11 @@ dependencies = [
  "psx-pad",
  "psx-rt",
  "psx-sfx",
+ "psx-splash",
  "psx-spu",
  "psx-tick",
  "psx-vram",
+ "scene-layout",
 ]
 
 [[package]]
@@ -51,8 +50,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "psx-core"
+version = "0.1.0"
+dependencies = [
+ "psx-scene-abi",
+]
+
+[[package]]
 name = "psx-disc-toc"
 version = "0.1.0"
+
+[[package]]
+name = "psx-display"
+version = "0.1.0"
+dependencies = [
+ "psx-gpu",
+ "psx-hw",
+]
+
+[[package]]
+name = "psx-font"
+version = "0.1.0"
+dependencies = [
+ "psx-gpu",
+ "psx-hw",
+ "psx-io",
+ "psx-math",
+ "psx-vram",
+]
 
 [[package]]
 name = "psx-fx"
@@ -134,12 +159,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "psx-scene-abi"
+version = "0.1.0"
+
+[[package]]
 name = "psx-sfx"
 version = "0.2.0"
 dependencies = [
  "psx-asset",
  "psx-math",
  "psx-spu",
+]
+
+[[package]]
+name = "psx-splash"
+version = "0.1.0"
+dependencies = [
+ "psx-display",
+ "psx-font",
+ "psx-gpu",
+ "psx-pad",
+ "psx-rt",
+ "psx-vram",
 ]
 
 [[package]]
@@ -166,4 +207,8 @@ dependencies = [
 
 [[package]]
 name = "psxed-format"
+version = "0.1.0"
+
+[[package]]
+name = "scene-layout"
 version = "0.1.0"

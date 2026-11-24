@@ -209,6 +209,11 @@ impl Gfx {
         g
     }
 
+    /// The GPU and the buffer pair, for the boot splash (psx-splash draws with its own code).
+    pub fn splash_parts(&mut self) -> (&mut Gpu, &mut DoubleBuffer) {
+        (&mut self.gpu, &mut self.fb)
+    }
+
     /// Select blend equation and texture page (dither on, drawing allowed).
     fn mode(&mut self, tpage_word: u16, blend: BlendMode) {
         let key = (tpage_word as u32) << 8 | blend as u32;

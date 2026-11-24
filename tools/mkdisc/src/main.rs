@@ -37,8 +37,10 @@
 //! or play CD-DA. `NAME` is what the menu shows; `=` splits it from the path.
 
 mod cue;
+mod edition;
 mod gate;
 mod layout;
+mod scenes;
 mod spectrum;
 mod wav;
 
@@ -138,6 +140,10 @@ struct Args {
     aliases: Vec<layout::Alias>,
     /// Print the sector budget and stop before writing the image.
     dry_run: bool,
+    /// The scene core's image (`psx-core.bin` of the SDK pin): the disc is a scene disc, every
+    /// program on it must embed this core, and the launcher starts them with core switches
+    /// (`scenes.rs`). Without it, the chain-loaded layout of v0.59 and before.
+    core_image: Option<PathBuf>,
     /// What the architecture gate needs (see [`gate`]).
     gate: gate::Options,
 }
@@ -166,6 +172,10 @@ fn parse_args() -> Result<Args, String> {
     let mut shots: Vec<(String, PathBuf)> = Vec::new();
     let mut edge_tails: Vec<(String, String)> = Vec::new();
     let mut aliases: Vec<layout::Alias> = Vec::new();
+    let mut core_image: Option<PathBuf> = None;
+    let mut programs_file: Option<PathBuf> = None;
+    let mut edition_file: Option<PathBuf> = None;
+    let mut shots_dir: Option<PathBuf> = None;
 
     let split = |spec: &str, flag: &str| -> Result<(String, PathBuf), String> {
         let (name, path) = spec
@@ -285,6 +295,26 @@ fn parse_args() -> Result<Args, String> {
                 &it.next().ok_or("--alias takes OUTER=MEMBER:FILE")?,
             )?),
             "--dry-run" => dry_run = true,
+            "--programs" => {
+                programs_file = Some(PathBuf::from(
+                    it.next().ok_or("--programs takes a path".to_string())?,
+                ))
+            }
+            "--edition" => {
+                edition_file = Some(PathBuf::from(
+                    it.next().ok_or("--edition takes a path".to_string())?,
+                ))
+            }
+            "--shots-dir" => {
+                shots_dir = Some(PathBuf::from(
+                    it.next().ok_or("--shots-dir takes a path".to_string())?,
+                ))
+            }
+            "--core-image" => {
+                core_image = Some(PathBuf::from(
+                    it.next().ok_or("--core-image takes a path".to_string())?,
+                ))
+            }
             "--sdk-profile" => {
                 sdk_profile = Some(PathBuf::from(
                     it.next().ok_or("--sdk-profile takes a path".to_string())?,
@@ -315,6 +345,48 @@ fn parse_args() -> Result<Args, String> {
         }
     }
 
+    // An edition file's programs follow any given on the command line, in its order.
+    if let Some(edition) = &edition_file {
+        for entry in edition::load(programs_file.as_deref(), edition)? {
+            let name = entry.name.clone();
+            let source = match (entry.get("image"), entry.get("exe")) {
+                (Some(image), _) => Source::Image(PathBuf::from(image)),
+                (None, Some(exe)) => Source::Exe(PathBuf::from(exe)),
+                (None, None) => unreachable!("edition::merge checks the source"),
+            };
+            programs.push(Program {
+                name: name.clone(),
+                source,
+            });
+            if let Some(version) = entry.get("version") {
+                versions.push((name.clone(), version.to_string()));
+            }
+            if let Some(text) = entry.get("describe") {
+                let (english, italian) = text.split_once('|').ok_or_else(|| {
+                    format!("[{name}] describe wants the two languages split by '|'")
+                })?;
+                descriptions.push((
+                    name.clone(),
+                    english.trim().to_string(),
+                    italian.trim().to_string(),
+                ));
+            }
+            if let (Some(art), Some(dir)) = (entry.get("art"), &shots_dir) {
+                for shot in edition::art_shots(dir, art) {
+                    shots.push((name.clone(), shot));
+                }
+            }
+            for shot in entry.all("shot") {
+                shots.push((name.clone(), PathBuf::from(shot)));
+            }
+            if let Some(gate) = entry.get("gate") {
+                program_files.push((name.clone(), PathBuf::from(gate)));
+            }
+        }
+    } else if programs_file.is_some() {
+        return Err("--programs is read only with --edition".to_string());
+    }
+
     Ok(Args {
         launcher: launcher.ok_or("--launcher is required".to_string())?,
         out: out.ok_or("--out is required".to_string())?,
@@ -334,6 +406,7 @@ fn parse_args() -> Result<Args, String> {
         edge_tails,
         aliases,
         dry_run,
+        core_image,
         gate: gate::Options {
             sdk_profile: sdk_profile.ok_or(
                 "--sdk-profile is required: the sdk/profile.toml of the SDK the launcher links"
@@ -377,6 +450,14 @@ fn print_usage() {
         \x20             the image MEMBER; an OUTER that is a --menu-xa file must be identical\n\
         \x20             to it and replaces it\n\
          --dry-run     print the sector budget and stop without writing the image\n\
+         --edition     an edition file: the programs of this pressing in carousel order, one\n\
+        \x20             [NAME] section each (image|exe, version, describe, art, shot, gate)\n\
+         --programs    the shared programs file: describe and art for every program, read with\n\
+        \x20             --edition (an edition's own keys win)\n\
+         --shots-dir   where `art = ID` finds ID-1.shot, ID-2.shot, ... (cooked shelf shots)\n\
+         --core-image  the SDK pin's psx-core.bin: press a scene disc (SCENES.TBL at LBA 22, the\n\
+        \x20             table of contents at 23); every --image must be a scene disc on this\n\
+        \x20             core, and the launcher starts programs with core switches\n\
          --sdk-profile the SDK's sdk/profile.toml; every executable on the disc (the launcher,\n\
         \x20             each --game, each PSX-EXE in an --image) is checked against it first\n\
          --own-gate-file  this repository's psx-gate.toml, the launcher's own file\n\
@@ -902,13 +983,29 @@ fn run() -> Result<(), String> {
     let mut gate = gate::Gate::new(&args.gate)?;
     gate.check(gate::LAUNCHER, &args.launcher.display().to_string(), &launcher, None);
 
-    let system_cnf = default_system_cnf();
-    let toc_lba = psx_iso::PLAYTEST_FIRST_FILE_LBA + sectors_for(system_cnf.len());
-    if toc_lba != disc_toc::TOC_LBA {
+    // A scene disc: the core image every program must embed, SYSTEM.CNF starting the stack below
+    // the core's window, and SCENES.TBL ahead of the table of contents.
+    let core = match &args.core_image {
+        Some(path) => Some(fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?),
+        None => None,
+    };
+    let system_cnf = match core {
+        Some(_) => psx_iso::scenes::scene_system_cnf(),
+        None => default_system_cnf(),
+    };
+    let scenes_sectors = u32::from(core.is_some());
+    let toc_lba =
+        psx_iso::PLAYTEST_FIRST_FILE_LBA + sectors_for(system_cnf.len()) + scenes_sectors;
+    let want_toc_lba = match core {
+        Some(_) => scene_layout::TOC_LBA,
+        None => disc_toc::TOC_LBA,
+    };
+    if toc_lba != want_toc_lba
+        || (core.is_some() && toc_lba - 1 != psx_iso::scenes::abi::TABLE_LBA)
+    {
         return Err(format!(
             "table of contents would land at LBA {toc_lba}, but the launcher \
-             reads LBA {}. Adjust disc_toc::TOC_LBA.",
-            disc_toc::TOC_LBA
+             reads LBA {want_toc_lba}. Adjust the layout constants."
         ));
     }
 
@@ -1017,13 +1114,18 @@ fn run() -> Result<(), String> {
     let mut map = Vec::new();
 
     let mut loaded: Vec<(String, ExeHeader)> = Vec::new();
+    // Scene disc: each bare exe's bytes and header LBA, for its row in SCENES.TBL.
+    let mut exe_starts: Vec<Option<(Vec<u8>, u32)>> = vec![None; args.programs.len()];
+    let launcher_lba = shots_lba + shots_sectors;
     for (index, program) in args.programs.iter().enumerate() {
         let Source::Exe(path) = &program.source else {
             continue;
         };
         let bytes = fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
         let header = parse_exe_header(&bytes, path)?;
-        check_clear_of_loader(&header, path)?;
+        if core.is_none() {
+            check_clear_of_loader(&header, path)?;
+        }
         gate.check(
             &program.name,
             &path.display().to_string(),
@@ -1048,6 +1150,7 @@ fn run() -> Result<(), String> {
             program.name.clone(),
             String::from("exe"),
         ));
+        exe_starts[index] = Some((bytes.clone(), next_lba));
         next_lba += sectors_for(bytes.len());
         iso_files.push((iso_name(&program.name, index), bytes));
     }
@@ -1055,13 +1158,28 @@ fn run() -> Result<(), String> {
     // Load every image up front: their audio has to be concatenated after all
     // the data, and the track base for each depends on the ones before it.
     let mut images = Vec::new();
+    let mut members: Vec<Option<scenes::MemberBoot>> = Vec::new();
     for (index, program) in args.programs.iter().enumerate() {
         let Source::Image(path) = &program.source else {
             continue;
         };
         let image = load_image(path)?;
-        let (boot_exe_lba, header) = find_image_boot_exe(&image.data, path)?;
-        check_clear_of_loader(&header, path)?;
+        // A scene disc's member is a scene disc too: its table at 22, its boot program at 23.
+        let (boot_exe_lba, header, member) = match &core {
+            Some(core) => {
+                let boot = scenes::read_member(&program.name, &image.data, core)?;
+                let at = boot.row.lba as usize * SECTOR_BYTES + 24;
+                let head = image.data.get(at..at + SECTOR_SIZE).ok_or_else(|| {
+                    format!("{}: the image ends before its boot program", path.display())
+                })?;
+                (boot.row.lba, parse_exe_header(head, path)?, Some(boot))
+            }
+            None => {
+                let (lba, header) = find_image_boot_exe(&image.data, path)?;
+                check_clear_of_loader(&header, path)?;
+                (lba, header, None)
+            }
+        };
         for (lba, exe) in gate::executables_in(&image.data) {
             gate.check(&program.name, &format!("{}, sector {lba}", path.display()), &exe, None);
         }
@@ -1082,6 +1200,7 @@ fn run() -> Result<(), String> {
             sector += 1;
         }
         images.push((index, path.clone(), image, hash.finish(), boot_exe_lba));
+        members.push(member);
     }
 
     gate.finish()?;
@@ -1166,11 +1285,14 @@ fn run() -> Result<(), String> {
     }
     let alias_names: Vec<String> = alias_plan.iter().map(|(a, ..)| a.outer.clone()).collect();
 
-    let build_iso = |toc: Vec<u8>| {
+    let build_iso = |toc: Vec<u8>, scene_table: &[u8]| {
         let mut builder = IsoBuilder::new()
             .volume_id(&args.volume)
             .system_id("PLAYSTATION");
         builder.add_file("SYSTEM.CNF", system_cnf.clone());
+        if core.is_some() {
+            builder.add_file(psx_iso::scenes::abi::TABLE_FILE_NAME, scene_table.to_vec());
+        }
         builder.add_file(disc_toc::TOC_FILE_NAME, toc);
         if !spectrum_data.is_empty() {
             builder.add_file(SPECTRUM_FILE_NAME, spectrum_data.clone());
@@ -1204,7 +1326,9 @@ fn run() -> Result<(), String> {
     // Sizing pass: the ISO's length fixes where the first image lands, and the
     // table has to name that. The table is exactly one sector either way, so
     // the second build comes out the same length.
-    let iso_frames = (build_iso(vec![0u8; disc_toc::TOC_BYTES]).len() / SECTOR_BYTES) as u32;
+    let empty_table = vec![0u8; SECTOR_SIZE];
+    let iso_frames =
+        (build_iso(vec![0u8; disc_toc::TOC_BYTES], &empty_table).len() / SECTOR_BYTES) as u32;
 
     // Every sector the finished image will hold is known now, so the budget is
     // settled before hundreds of megabytes get written: an optional program
@@ -1224,7 +1348,9 @@ fn run() -> Result<(), String> {
     if args.tail_filler != 0 {
         budget.push((String::from("tail filler (outer edge)"), args.tail_filler, 0));
     }
-    print!("{}", memory_map(&loaded));
+    if core.is_none() {
+        print!("{}", memory_map(&loaded));
+    }
     print!("{}", budget_table(&budget, args.max_sectors));
     check_budget(&budget, args.max_sectors)?;
 
@@ -1431,9 +1557,75 @@ fn run() -> Result<(), String> {
         )
     })?;
 
-    let mut disc = build_iso(toc.to_vec());
+    // The scene table: the launcher, then one Program row per carousel entry (scenes.rs).
+    let scene_table = match &core {
+        Some(core) => {
+            let mut cdda_bases = vec![0u32; images.len()];
+            let mut base = 0u32;
+            for &slot in &order {
+                cdda_bases[slot] = base;
+                base += images[slot].2.audio.len() as u32;
+            }
+            let mut starts = Vec::with_capacity(args.programs.len());
+            for (index, program) in args.programs.iter().enumerate() {
+                starts.push(match &program.source {
+                    Source::Exe(_) => {
+                        let (bytes, lba) =
+                            exe_starts[index].clone().expect("every bare exe was read");
+                        scenes::Start::Exe { bytes, lba }
+                    }
+                    Source::Image(_) => {
+                        let slot = images
+                            .iter()
+                            .position(|(i, ..)| *i == index)
+                            .expect("every image was read");
+                        scenes::Start::Member {
+                            boot: members[slot].clone().expect("scene members were read"),
+                            base: image_starts[slot],
+                            cdda_base: cdda_bases[slot],
+                        }
+                    }
+                });
+            }
+            let (table, indices) =
+                scenes::outer_table(&launcher, launcher_lba, core, &starts, &names)?;
+            println!(
+                "SCENES.TBL at LBA {}: launcher image 0 (PSX.EXE at LBA {launcher_lba}), core {:08x}",
+                psx_iso::scenes::abi::TABLE_LBA,
+                psx_iso::scenes::abi::word_fnv(core)
+            );
+            for ((name, start), index) in names.iter().zip(&starts).zip(&indices) {
+                let (lba, base) = match start {
+                    scenes::Start::Exe { lba, .. } => (*lba, 0),
+                    scenes::Start::Member { boot, base, .. } => (boot.row.lba + base, *base),
+                };
+                println!("  scene {:>2} {name:<24} image {index:>2}, exe LBA {lba}, member base {base}", scene_layout::scene_of_entry(
+                    names.iter().position(|n| n == name).expect("its own name")
+                ));
+            }
+            table
+        }
+        None => empty_table.clone(),
+    };
+
+    let mut disc = build_iso(toc.to_vec(), &scene_table);
     if (disc.len() / SECTOR_BYTES) as u32 != iso_frames {
         return Err("ISO length changed between the sizing and final builds".to_string());
+    }
+    if core.is_some() {
+        // The fixed places the core and the launcher read without a directory lookup.
+        let files = layout::image_files(&disc)?;
+        let at = |name: &str| files.iter().find(|f| f.path.eq_ignore_ascii_case(name)).map(|f| f.lba);
+        let want = [
+            (psx_iso::scenes::abi::TABLE_FILE_NAME, scene_layout::SCENES_LBA),
+            (disc_toc::TOC_FILE_NAME, scene_layout::TOC_LBA),
+            ("PSX.EXE", launcher_lba),
+        ];
+        for (name, lba) in want {
+            if at(name) != Some(lba) {
+                return Err(format!("{name} landed at {:?}, the table says LBA {lba}", at(name)));
+            }
+        }
     }
 
     let mut lba = iso_frames;
@@ -1544,10 +1736,9 @@ fn run() -> Result<(), String> {
         );
     }
     println!(
-        "{} program(s), {} CD-DA track(s), table of contents at LBA {}:",
+        "{} program(s), {} CD-DA track(s), table of contents at LBA {toc_lba}:",
         entries.len(),
         placed_audio.len(),
-        disc_toc::TOC_LBA
     );
     map.sort_by_key(|(lba, ..)| *lba);
     for (lba, bytes, name, kind) in map {

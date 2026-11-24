@@ -1,0 +1,11 @@
+[package]
+name    = "scene-layout"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+# Outside any workspace: read by the launcher (guest) and mkdisc (host).
+[workspace]
+
+[lib]
+path = "src/lib.rs"

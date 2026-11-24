@@ -129,28 +129,38 @@ from the checkout path the release was made in.
 
 ## How it boots
 
-The BIOS reads `SYSTEM.CNF`, loads `PSX.EXE` (the launcher), and runs it. The
-launcher reads `DEMOTOC.BIN` at a fixed LBA to find out what is on the disc,
-draws the menu, and on selection streams the chosen program off the disc and
-jumps to it.
+Every program on the disc runs on one resident scene core (the SDK's `psx-core`, scene-system
+CORE-ABI): 8,192 bytes at `0x801FDF00` that own the CD drive and every switch between programs,
+byte for byte the same in each program on the disc. The BIOS reads `SYSTEM.CNF` (its stack starts
+below the core's window) and runs `PSX.EXE`, the launcher, which is the disc's first program: its
+`__core_boot` places the core, it plays the SDK splash once (from boot-only memory, gone after
+boot), then reads `SCENES.TBL` (LBA 22) and its own table of contents, `DEMOTOC.BIN` (LBA 23), in
+one read (`scene-layout/`). `SCENES.TBL` is the core's table of what is on the disc; the table of
+contents keeps the shelf's presentation (names, blurbs, versions, songs, shots), and carousel entry
+`i` is started by scene `i + 1`.
 
-That last step needs one trick. Every PSoXide program links to `0x80010000`
-(`sdk/psoxide.ld`), including the launcher, so the launcher cannot load a game
-itself: it would overwrite its own code halfway through the copy. The `loader`
-crate is therefore built separately, linked at `0x801C8000`, and embedded in
-the launcher as raw bytes. The launcher copies it there, flushes the
-instruction cache, and jumps. The blob and the stack are the only RAM it keeps;
-the game can land anywhere else, above the blob as well as below it (the
-Half-Life intro loads near the top of RAM, because it has to sit above the
-game it goes on to load).
+On a selection the launcher stops the song, seeks the drive to the program during the launch
+animation, and calls `psx_core_switch`. The core loads the program's payload below its window in
+256-sector reads, checks it and enters it at its own disc base, with the launcher's last frame left
+on screen. Nothing returns to the menu.
 
-The addresses live in `chainload-layout/`, the one place the loader's linker
-script, the launcher and `mkdisc` read them from. `mkdisc` refuses to build a
-disc containing a program whose payload, rounded up to whole sectors, would
-overlap the blob or the stack, and prints every program's extent and its
-margin, so that constraint fails the build rather than the console. The loader
-applies the same rule (`psx_chainloader::check_payload`) before it reads a
-sector.
+Each game is its own scene disc (built with `mkisopsx --scenes`), nested whole in the image, so it
+reads its own `SCENES.TBL` and files at its own base exactly as it does standalone. The outer table
+holds one row per game, for the game's boot program; a game that is several programs (an intro, then
+the game) switches between them with its own table. `mkdisc --core-image` (`make scene-disc`)
+writes the outer table, refuses a game that is not a scene disc or whose table does not match the
+exe it sits next to, and refuses any program built on another core, naming the game and the
+program: the core would refuse that switch on the console (`tools/mkdisc/src/scenes.rs`).
+
+Which programs an edition carries is an edition file, one section per program in carousel order
+(`image =`, `version =`), with the shelf text and art id of every program in
+`release/scene/programs.ini` (`tools/mkdisc/src/edition.rs`):
+
+    make scene-disc EDITION=release/scene/<edition>.ini HL=1 HK=1 OOT=1 LAUNCHER_ART=...
+
+Pressings of v0.59 and before chain-loaded each program through the `loader` blob at `0x801C8000`
+(`chainload-layout/`); they are re-made from their release tags, and the lineup targets here refuse
+to press with the scene-core launcher.
 
 ## The architecture gate
 

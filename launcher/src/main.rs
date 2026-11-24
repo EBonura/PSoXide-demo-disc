@@ -1,14 +1,15 @@
 //! Demo disc boot menu.
 //!
-//! Reads the disc's table of contents ([`disc_toc`]), shows its programs as
-//! cases on a shelf, plays the menu songs, and chain-loads the selection. The
+//! The disc's first program, on the scene core: plays the SDK splash once, reads the disc's
+//! scene table and its own table of contents ([`disc_toc`]), shows the programs as cases on a
+//! shelf, plays the menu songs, and starts the selection with a core switch. The
 //! look is the PSoXide home shell's at 320x240: near-black blue-grey, a soft
 //! teal glow, white type and one cyan accent.
 //!
 //! The pieces: [`shelf`] is the row of cases and the title, description and
 //! start button under it; [`launch`] is the jewel case opening into the disc
 //! that carries the program in; [`credits`] is the card for the music credit,
-//! the links and the QR; [`chain`] is the hand-off to the loader blob;
+//! the links and the QR; [`chain`] is the hand-off through the core;
 //! [`music`] plays the XA songs. [`common`] and [`gfx`] hold the header,
 //! footer, case drawing and the immediate-mode GPU wrapper, [`text`] and
 //! `assets/ui_atlas.rs` the baked faces, and [`cover`] the baked pictures.
@@ -44,7 +45,7 @@ mod text;
 mod ui_atlas;
 
 use common::{Ctx, NowPlaying, Playback, Screen};
-use disc_toc::{Entry, Header, MAX_ENTRIES, TOC_BYTES, TOC_LBA};
+use disc_toc::{Entry, Header, MAX_ENTRIES, TOC_BYTES};
 use gfx::Gfx;
 use music::Music;
 use playlist::Slot;
@@ -114,8 +115,14 @@ const SFX_LAUNCH_SLOT: usize = 2;
 /// Frames the menu fades in from black at boot.
 const BOOT_FADE: u32 = 30;
 
-static mut TOC_SECTOR: [u32; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize] =
-    [0; SECTOR_WORDS * disc_toc::TOC_SECTORS as usize];
+/// `SCENES.TBL` then the table of contents, read together at boot (`scene_layout`).
+const BOOT_TABLE_SECTORS: usize = 1 + disc_toc::TOC_SECTORS as usize;
+static mut TOC_SECTOR: [u32; SECTOR_WORDS * BOOT_TABLE_SECTORS] =
+    [0; SECTOR_WORDS * BOOT_TABLE_SECTORS];
+
+/// The launcher's RAM copy of `SCENES.TBL`, the table every core switch takes: the header and
+/// every row (`16 + 8 * (scenes + images)` words, at most one sector).
+static mut SCENES: [u32; SECTOR_WORDS] = [0; SECTOR_WORDS];
 
 /// Room for every menu song's level-meter data. Read once at boot rather
 /// than per song, so skipping stays as quick as the drive allows. 37,484
@@ -136,6 +143,19 @@ fn main() {
     let peripherals = Peripherals::take().expect("peripherals are taken once");
     let mut port = peripherals.controller_port;
     let mut g = Gfx::new(peripherals.gpu_dma);
+    // The disc needs a DualShock in analog mode. `Controllers` puts a pad that
+    // answers there and locks it on the first poll, so the Analog button cannot
+    // drop it back to digital mid-menu, and returns the last clean state when a
+    // packet fails validation, so a garbled one never turns into a phantom press.
+    // A pad that is not in analog mode (a digital pad, one plugged in later, an
+    // empty port) holds the menu on a notice; an empty port is probed once in
+    // 60 polls. The splash's polls run the handshake.
+    let mut pads = Controllers::new();
+    // The SDK splash, once per disc: the launcher is the disc's first program, so it plays on
+    // a BIOS boot and never after a core switch (no program switches back to the menu today).
+    if !entered_by_switch() {
+        splash(&mut g, &mut || pads.poll(&mut port, Port::One).buttons);
+    }
     g.upload_ui(UI_TEX);
     for (i, program) in cover::PROGRAMS.iter().enumerate() {
         g.upload_art(i, &program.art);
@@ -147,10 +167,12 @@ fn main() {
     let mut spu = Spu::new(peripherals.spu_dma);
 
     let mut entries = [Entry::new("", 0, 0, 0); MAX_ENTRIES];
-    // Read the table before a note of music plays: the drive is busy for the
+    // Read the tables before a note of music plays: the drive is busy for the
     // whole of a song, so every data read the menu needs comes first.
     let mut reader = SectorReader::with_cd(peripherals.cd);
-    let header = read_toc(&mut reader, &mut entries);
+    // SAFETY: single-threaded, polled; only `main` reaches this static.
+    let scenes = unsafe { &mut *core::ptr::addr_of_mut!(SCENES) };
+    let header = read_tables(&mut reader, &mut entries, scenes);
     let count = header.map_or(0, |h| h.count);
     let entries = &entries[..count];
 
@@ -204,14 +226,7 @@ fn main() {
     // Frames since the pad last did anything.
     let mut idle: u32 = 0;
     let mut prev_held = ButtonState::default();
-    // The disc needs a DualShock in analog mode. `Controllers` puts a pad that
-    // answers there and locks it on the first poll, so the Analog button cannot
-    // drop it back to digital mid-menu, and returns the last clean state when a
-    // packet fails validation, so a garbled one never turns into a phantom press.
-    // A pad that is not in analog mode (a digital pad, one plugged in later, an
-    // empty port) holds the menu on a notice; an empty port is probed once in
-    // 60 polls. This first poll, before the menu draws, runs the handshake.
-    let mut pads = Controllers::new();
+    // A poll before the menu draws (the handshake, when the splash was skipped).
     pads.poll(&mut port, Port::One);
     // The left stick drives the menu like the d-pad: one press per push, no
     // repeat. A push registers past 64 counts of the 127 a healthy stick reaches
@@ -437,8 +452,8 @@ fn main() {
                 seek.frame();
                 if launching >= launch::FRAMES {
                     state::hand_off();
-                    // Never returns when the disc is readable.
-                    chain::boot(chosen, &mut g, seek);
+                    // Never returns: the core loads the program, or shows why it cannot.
+                    chain::boot(sel as usize, scenes, &mut g, seek);
                 }
             }
             launching += 1;
@@ -523,15 +538,45 @@ fn spectrum_frame(header: &Header, track: u8, song_ms: u32, loaded_frames: u32) 
     bytes.get(start..start + disc_toc::SPECTRUM_BANDS)
 }
 
-/// Read the table of contents. `None` if the disc has none.
-fn read_toc(reader: &mut SectorReader, entries: &mut [Entry; MAX_ENTRIES]) -> Option<Header> {
+/// Whether a core switch entered this program (the handoff block says so); false on a BIOS boot.
+fn entered_by_switch() -> bool {
+    use psx_core::abi::block;
+    psx_core::link::block_valid()
+        && psx_core::link::block_word(block::OFF_FLAGS) & block::FLAG_CORE_ENTRY != 0
+}
+
+/// The SDK splash, from boot-only memory: psoxide-boot.ld lays this function in `.boot` with
+/// psx-splash's own code, and none of it stays resident. It returns before anything writes over
+/// `.boot`'s run range (the heap is not used before the menu).
+#[inline(never)]
+#[cfg_attr(target_arch = "mips", link_section = ".text.boot_only.launcher_splash")]
+fn splash(g: &mut Gfx, buttons: &mut dyn FnMut() -> ButtonState) {
+    let (gpu, buffers) = g.splash_parts();
+    psx_splash::show(
+        gpu,
+        buffers,
+        "Built with PSoXide",
+        psx_display::Brightness::DEFAULT,
+        buttons,
+    );
+}
+
+/// Read `SCENES.TBL` (LBA 22) into `scenes` and the table of contents after it (LBA 23) into
+/// `entries`, in one read. `None` if the disc has either missing, or if their counts disagree
+/// (entry `i` is started by scene `i + 1`, `scene_layout`): the menu then says the table is
+/// unreadable rather than start the wrong program.
+fn read_tables(
+    reader: &mut SectorReader,
+    entries: &mut [Entry; MAX_ENTRIES],
+    scenes: &mut [u32; SECTOR_WORDS],
+) -> Option<Header> {
     // SAFETY: single-threaded, polled; `main` runs once and nothing else
     // touches this static.
     let sector = unsafe { &mut *core::ptr::addr_of_mut!(TOC_SECTOR) };
 
-    // The table spans more than one sector now; `read_sector` walks the same
+    // The tables span more than one sector; `read_sector` walks the same
     // ReadN stream, so they arrive back to back.
-    let mut ok = reader.prepare() && reader.start_read(TOC_LBA);
+    let mut ok = reader.prepare() && reader.start_read(scene_layout::SCENES_LBA);
     for chunk in sector.chunks_exact_mut(SECTOR_WORDS) {
         let slot: &mut [u32; SECTOR_WORDS] = chunk.try_into().expect("exact chunks");
         ok = ok && reader.read_sector(slot);
@@ -540,9 +585,18 @@ fn read_toc(reader: &mut SectorReader, entries: &mut [Entry; MAX_ENTRIES]) -> Op
     if !ok {
         return None;
     }
+    let (table, toc) = sector.split_at(SECTOR_WORDS);
+    // The core switches with the scene table as it is on the disc (the header's magic is what
+    // tells `psx_core::link::switch` it needs no read of its own).
+    use psx_core::abi::table;
+    if table[0] != table::MAGIC[0] || table[1] != table::MAGIC[1] {
+        return None;
+    }
+    let scene_count = (table[3] & 0xffff) as usize;
+    scenes.copy_from_slice(table);
     // SAFETY: a [u32; 512] is 2048 bytes; the target is little-endian, so the
     // word buffer and the on-disc byte order agree.
-    let bytes: &[u8; TOC_BYTES] =
-        unsafe { &*(sector.as_ptr() as *const u8 as *const [u8; TOC_BYTES]) };
-    disc_toc::decode(bytes, entries)
+    let bytes: &[u8; TOC_BYTES] = unsafe { &*(toc.as_ptr() as *const u8 as *const [u8; TOC_BYTES]) };
+    let header = disc_toc::decode(bytes, entries)?;
+    (scene_count == header.count + 1).then_some(header)
 }

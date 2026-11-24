@@ -1,31 +1,19 @@
-//! The hand-off to the chosen program.
+//! The hand-off to the chosen program, through the scene core.
 //!
-//! The chain-load itself cannot happen in the launcher: every PSoXide program
-//! links to `0x80010000`, which is where the launcher is running, so streaming
-//! a game in would overwrite the code doing the streaming. Instead the `loader`
-//! crate is built separately at its own base address (`chainload-layout`),
-//! embedded here as raw bytes, copied there and jumped to.
+//! Every program on the disc links on the same scene core (`psx-core`, CORE-ABI): the launcher
+//! starts one with `psx_core_switch`, which loads the program's payload below the core's window,
+//! checks it and jumps to it with the disc base of the program's member image. The launcher's
+//! own picture stays on screen through the load (the core does not reset the GPU).
 //!
-//! What the launcher does itself is get the drive ready: on frame 0 of the
-//! launch animation it stops the song and sends the head to the program's first
-//! sector, so the long seek out of the music file happens while the case opens
-//! instead of after the screen has gone to the loader.
+//! What the launcher does itself is get the drive ready: on frame 0 of the launch animation it
+//! stops the song and sends the head to the program's first sector, so the long seek out of the
+//! music file happens while the case opens instead of after the press.
 
 use crate::gfx::Gfx;
 use crate::music::Music;
 use disc_toc::Entry;
 use psx_hw::cd::CMD_SEEKL;
 use psx_io::periph::Cd;
-
-/// The chain-load blob, linked at `LOADER_BASE` from `loader/loader.ld`.
-const LOADER_BLOB: &[u8] = include_bytes!(env!("LOADER_BLOB"));
-
-/// Where the blob runs, from the one place the loader link and mkdisc read too.
-const LOADER_BASE: u32 = chainload_layout::LOADER_BASE;
-
-/// Blob budget, less the mailbox word at its end. Overrunning it would walk
-/// into whatever loads above the blob, so check rather than trust.
-const LOADER_LIMIT: usize = chainload_layout::LOADER_BUDGET as usize - 4;
 
 /// Polls a single command may wait for its first answer. The commands answer
 /// in about a millisecond; this only bounds a dead drive.
@@ -43,10 +31,9 @@ enum State {
 /// The seek to the program's first sector, run in the background of the
 /// launch animation.
 ///
-/// It leaves the drive where [`psx_chainloader`]'s first read expects it: spun
-/// up, idle and with no answer pending. The loader aims at the same sector
-/// itself, so a seek that fails or never finishes costs only the time it was
-/// meant to save.
+/// The core proves the drive stopped before its first command of the switch, whatever this
+/// left it doing, and then seeks to the same sector itself, so a seek that fails or never
+/// finishes costs only the time it was meant to save.
 pub struct Seek {
     cd: Cd,
     state: State,
@@ -97,8 +84,8 @@ impl Seek {
         }
     }
 
-    /// Give the drive up: acknowledge anything still pending. The loader's
-    /// first command cancels a seek that is still under way.
+    /// Give the drive up: acknowledge anything still pending. The core's first command of the
+    /// switch proves the drive stopped, cancelling a seek that is still under way.
     pub fn finish(&mut self) {
         if let State::Seeking { saved } = self.state {
             self.cd.restore_irq_output(saved);
@@ -107,52 +94,14 @@ impl Seek {
     }
 }
 
-/// Copy the chain-load blob high and jump to it. Never returns while the disc
-/// is readable; the blob paints the screen red and stops if it is not.
-pub fn boot(entry: &Entry, g: &mut Gfx, seek: &mut Seek) -> ! {
-    assert!(LOADER_BLOB.len() <= LOADER_LIMIT, "loader blob too large");
-
-    // Let the GPU finish before the blob resets it out from under whatever is
-    // still on screen, and hand the drive over with nothing pending.
+/// Start carousel entry `index` with a core switch to its scene (`scene_layout`). Never
+/// returns when the switch is accepted; a refusal (a disc whose tables disagree, a program on
+/// another core) is a broken pressing, shown on the core's fatal screen with its code.
+pub fn boot(index: usize, scenes: &mut [u32], g: &mut Gfx, seek: &mut Seek) -> ! {
+    // Let the GPU finish the frame on screen (it stays up through the load), and hand the drive
+    // over with nothing pending.
     g.wait_idle();
     seek.finish();
-
-    // The loader owns the whole machine: psx-rt's VBlank handler and every interrupt source
-    // go quiet before the blob is copied over anything the handler might run.
-    // SAFETY: nothing pending (`wait_idle` saw the last flip land) and nothing after this point
-    // needs an interrupt.
-    unsafe {
-        psx_io::irq::disable_cpu_interrupts();
-    }
-    psx_io::irq::set_mask(0);
-    psx_io::irq::acknowledge(!0);
-
-    // SAFETY: `LOADER_BASE` is clear of every program's payload (mkdisc enforces
-    // that) and of the stack, so nothing live is being overwritten. The
-    // blob is position-dependent and linked for exactly this address.
-    unsafe {
-        core::ptr::copy_nonoverlapping(
-            LOADER_BLOB.as_ptr(),
-            LOADER_BASE as *mut u8,
-            LOADER_BLOB.len(),
-        );
-        // Which buffer the display shows, for the loader to leave up until its
-        // first frame is painted (see `chainload_layout::SHOWN_BUFFER_MAILBOX`).
-        // The swap that follows a frame only takes hold at the next VBlank, and
-        // the loader resets the GPU before that, so the picture on the screen is
-        // the one in the buffer the next frame would have been drawn into.
-        core::ptr::write_volatile(
-            chainload_layout::SHOWN_BUFFER_MAILBOX as *mut u32,
-            g.fb.draw_origin().1 as u32,
-        );
-        psx_rt::cache::flush_instruction_cache();
-        let blob: unsafe extern "C" fn(u32, u32, u32, u32) -> ! =
-            core::mem::transmute(LOADER_BASE as usize);
-        blob(
-            entry.exe_lba,
-            entry.lba_offset,
-            entry.cdda_track_base,
-            entry.payload_fnv,
-        )
-    }
+    let code = psx_core::link::switch(scene_layout::scene_of_entry(index), &[0; 4], scenes);
+    psx_core::link::fatal(code)
 }
