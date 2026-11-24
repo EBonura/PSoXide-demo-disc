@@ -505,7 +505,14 @@ fn check_image(
         }
     } else {
         // Table of contents: exactly the public programs, none hidden.
-        let raw = image.user_bytes(TOC_LBA, TOC_SECTORS)?;
+        // A scene disc keeps SCENES.TBL at LBA 22 and the table of contents after it.
+        let first = image.user_bytes(TOC_LBA, 1)?;
+        let toc_lba = if first.starts_with(crate::disc::SCENES_MAGIC) {
+            TOC_LBA + 1
+        } else {
+            TOC_LBA
+        };
+        let raw = image.user_bytes(toc_lba, TOC_SECTORS)?;
         match parse_public_toc(&raw) {
             Ok(toc) => {
                 if toc.menu == PUBLIC_GAMES && toc.visible == PUBLIC_GAMES.len() - 1 && toc.claimed == toc.visible
