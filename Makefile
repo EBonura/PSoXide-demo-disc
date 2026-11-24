@@ -667,7 +667,8 @@ CORE_IMAGE ?= $(SDK)/sdk/crates/psx-core/prebuilt/psx-core.bin
 SCENE_ARGS ?=
 # Every program must declare it was built on the disc's own SDK commit (edition `sdk =`, checked
 # against its `provenance =` record): mkdisc prints the pin table and refuses a mixed disc. A
-# development disc sets REQUIRE_SDK= to print the table without refusing.
+# development disc sets REQUIRE_SDK= to print the table without refusing. SDK commits that differ only in
+# host tools have one guest tree: list them comma separated (REQUIRE_SDK=<main>,<guest pin>).
 REQUIRE_SDK ?= $(shell git -C "$(SDK)" rev-parse HEAD 2>/dev/null)
 SCENE_NAME = $(basename $(notdir $(EDITION)))
 .PHONY: scene-disc scene-budget

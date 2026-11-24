@@ -319,7 +319,8 @@ fn parse_args() -> Result<Args, String> {
             }
             "--require-sdk" => {
                 let rev = it.next().ok_or("--require-sdk takes a commit".to_string())?;
-                // An empty value (a development disc) checks nothing.
+                // An empty value (a development disc) checks nothing; several commits with one guest
+        // tree are given comma separated.
                 require_sdk = Some(rev).filter(|r| !r.is_empty());
             }
             "--core-image" => {
@@ -484,7 +485,7 @@ fn print_usage() {
          --programs    the shared programs file: describe and art for every program, read with\n\
         \x20             --edition (an edition's own keys win)\n\
          --shots-dir   where `art = ID` finds ID-1.shot, ID-2.shot, ... (cooked shelf shots)\n\
-         --require-sdk COMMIT  refuse any edition program whose `sdk =` pin is not COMMIT (empty:\n\
+         --require-sdk COMMIT[,COMMIT]  refuse any edition program whose `sdk =` pin is none of these (empty:\n\
         \x20             no check); the pin table is printed either way\n\
          --core-image  the SDK pin's psx-core.bin: press a scene disc (SCENES.TBL at LBA 22, the\n\
         \x20             table of contents at 23); every --image must be a scene disc on this\n\
@@ -1831,6 +1832,9 @@ fn check_pins(pins: &[Pin], require: Option<&str>) -> Result<(), String> {
         return Ok(());
     }
     println!("SDK pins (as the edition declares them, checked against each build record):");
+    if let Some(want) = require {
+        println!("  required: {want} (commits with the same guest SDK tree; a host-tool-only SDK commit adds nothing)");
+    }
     println!(
         "  {:<22} {:<13} {:<13} {:<9} verdict",
         "program", "game commit", "SDK pin", "record"
@@ -1861,7 +1865,7 @@ fn check_pins(pins: &[Pin], require: Option<&str>) -> Result<(), String> {
         };
         if let Some(want) = require {
             match sdk {
-                Some(sdk) if same_commit(sdk, want) => {}
+                Some(sdk) if want.split(',').any(|w| same_commit(sdk, w)) => {}
                 Some(sdk) => problems.push(format!("built on SDK {sdk}, the disc requires {want}")),
                 None => problems.push(format!("no `sdk =` pin declared, the disc requires {want}")),
             }
@@ -1951,6 +1955,9 @@ mod tests {
         assert!(err.contains("B: built on SDK 5688e778aa67"), "{err}");
         assert!(check_pins(&[pin("C", None)], Some(main)).is_err());
         assert!(check_pins(&[pin("C", None)], None).is_ok());
+        // Main moved by a host-tool commit: both commits are allowed.
+        let both = format!("7952be3a7f21,{main}");
+        assert!(check_pins(&[pin("A", Some(main))], Some(&both)).is_ok());
     }
 
     #[test]
