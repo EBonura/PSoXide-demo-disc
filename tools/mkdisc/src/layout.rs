@@ -3,17 +3,21 @@
 //!
 //! # The safe-read limit
 //!
-//! The owner's console, with the CD-R brand the demo discs are burned on,
-//! read every 64-sector group cleanly up to disc time 77:28 in the radius
-//! sweep of 2026-10-19 (hardware tests v2.8, CD RADIUS SWEEP, SDK
-//! `engine/examples/hardware-tests/src/radius.rs`). The next group, at 77:48,
-//! needed a 4.09 s retry and raw reads timed out there. On v0.58 a game whose
-//! tables sat at 78:13 never reached gameplay on that console.
+//! The owner's console (SCPH-9002) read the burned v0.59 Private disc of
+//! 2026-11-25 (CD-R burned at 10x) cleanly at or inside disc time 74:40. 360X's
+//! film, streamed from LBA 335,881 (74:40) to 337,915 (75:07), played choppy
+//! with one corrupt frame, and QD Up, from 75:07 on, stopped on the core's
+//! read-failure screen (0x13). The limit is the start of that marginal band.
 //!
-//! The sweep prints disc time with LBA 0 at 00:02:00 (`frames = lba + 150`,
-//! seconds truncated), so 77:28:00 is LBA `77 * 4500 + 28 * 75 - 150` =
-//! 348,450. The clean group started somewhere in 348,450..348,524; taking its
-//! first possible sector as the end keeps the limit on the safe side.
+//! The earlier radius sweep of 2026-10-19 (hardware tests v2.8, CD RADIUS
+//! SWEEP, SDK `engine/examples/hardware-tests/src/radius.rs`) read every
+//! 64-sector group cleanly up to 77:28 on a different burn; v0.58, with
+//! tables at 78:13, never reached gameplay. The newer burn reads worse, so the
+//! limit follows it: what a burn reads depends on the blank and the burn, and
+//! the lowest edge measured on this console is the one that counts.
+//!
+//! Disc time is printed with LBA 0 at 00:02:00 (`frames = lba + 150`, seconds
+//! truncated), so 74:40:00 is LBA `74 * 4500 + 40 * 75 - 150` = 335,850.
 //!
 //! # The rule
 //!
@@ -30,9 +34,10 @@ use std::fmt::Write as _;
 
 use psx_iso::{Disc, SECTOR_BYTES};
 
-/// First LBA the console is not known to read reliably: disc time 77:28:00
-/// in the radius sweep of 2026-10-19 (see the module documentation).
-pub const SAFE_READ_END_LBA: u32 = 348_450;
+/// First LBA the console is not known to read reliably: disc time 74:40:00,
+/// where the v0.59 Private burn of 2026-11-25 started reading marginally (see
+/// the module documentation).
+pub const SAFE_READ_END_LBA: u32 = 335_850;
 
 /// The sweep's clock: LBA 0 is disc time 00:02:00.
 const PREGAP_FRAMES: u32 = 150;
@@ -225,7 +230,7 @@ pub fn check(rows: &[Row], limit: u32) -> Result<(), String> {
     }
     Err(format!(
         "data a program needs ends past the safe-read limit LBA {limit} ({}), where the \
-         console's reads are not reliable (radius sweep 2026-10-19):\n{}\nDeclare a member's \
+         console's reads are not reliable (v0.59 Private burn 2026-11-25):\n{}\nDeclare a member's \
          trailing music edge-tolerant (--edge-tail, only where a bad read cannot hang the \
          game), or make room.",
         clock(limit),
@@ -242,7 +247,7 @@ pub fn clock(lba: u32) -> String {
 /// The layout table and the margin to the limit.
 pub fn table(rows: &[Row], limit: u32) -> String {
     let mut out = format!(
-        "disc layout against the safe-read limit LBA {limit} ({}, radius sweep 2026-10-19):\n",
+        "disc layout against the safe-read limit LBA {limit} ({}, v0.59 Private burn 2026-11-25):\n",
         clock(limit)
     );
     let _ = writeln!(
@@ -300,7 +305,7 @@ pub fn json(rows: &[Row], limit: u32, aliases: &[PlacedAlias]) -> String {
     let quote = |s: &str| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""));
     let mut out = format!(
         "{{\n  \"schema\": 1,\n  \"safe_read_end_lba\": {limit},\n  \"safe_read_end_time\": {},\n  \
-         \"source\": \"radius sweep 2026-10-19, disc time 77:28 (LBA 0 = 00:02:00)\",\n  \"rows\": [\n",
+         \"source\": \"v0.59 Private burn on the SCPH-9002, 2026-11-25: clean to disc time 74:40 (LBA 0 = 00:02:00)\",\n  \"rows\": [\n",
         quote(&clock(limit))
     );
     for (i, row) in rows.iter().enumerate() {
@@ -486,9 +491,9 @@ mod tests {
     }
 
     #[test]
-    fn the_limit_is_the_sweeps_77_28() {
-        assert_eq!(SAFE_READ_END_LBA, 77 * 4_500 + 28 * 75 - 150);
-        assert_eq!(clock(SAFE_READ_END_LBA), "77:28");
+    fn the_limit_is_the_v059_burns_74_40() {
+        assert_eq!(SAFE_READ_END_LBA, 74 * 4_500 + 40 * 75 - 150);
+        assert_eq!(clock(SAFE_READ_END_LBA), "74:40");
         assert_eq!(clock(0), "00:02");
     }
 
@@ -530,7 +535,7 @@ mod tests {
         );
         let vox = row(
             "VOXIDE",
-            340_000,
+            330_000,
             13_464,
             1_072,
             vec![file("MUSIC1.XA", 1072, 12_392)],

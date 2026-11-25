@@ -33,7 +33,7 @@
 //!
 //! A row may carry `edge_tail`, a list of the image's trailing files that tolerate a bad read
 //! (streamed music the program never waits on; mkdisc `--edge-tail`, see
-//! tools/mkdisc/src/layout.rs): only those may lie past the safe-read limit (77:28). The lineup
+//! tools/mkdisc/src/layout.rs): only those may lie past the safe-read limit (74:40). The lineup
 //! may carry `aliases`, `[{"name": OUTER, "member": PROGRAM, "file": FILE}]`: outer-root directory
 //! records pointing at FILE inside the member's image (mkdisc `--alias`), so one copy of a file
 //! serves several programs. An OUTER that is one of the launcher's menu song files must be

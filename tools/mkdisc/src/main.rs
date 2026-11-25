@@ -478,7 +478,7 @@ fn print_usage() {
          --max-sectors the target blank's capacity; a layout over it is an error\n\
          --edge-tail   NAME=FILE declares a trailing file of the image NAME edge-tolerant (a bad\n\
         \x20             read cannot hang or corrupt the program); only such files may lie past\n\
-        \x20             the safe-read limit (77:28), see layout.rs\n\
+        \x20             the safe-read limit (74:40), see layout.rs\n\
          --alias       OUTER=MEMBER:FILE adds the outer root record OUTER pointing at FILE inside\n\
         \x20             the image MEMBER; an OUTER that is a --menu-xa file must be identical\n\
         \x20             to it and replaces it\n\

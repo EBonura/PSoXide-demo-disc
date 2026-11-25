@@ -187,8 +187,9 @@ written by something other than `mkdisc`.
 
 ## The outer edge and shared files
 
-The owner's console reads a burned CD-R reliably only up to disc time 77:28 (radius sweep of 2026-10-19; LBA 348,450
-with LBA 0 at 00:02:00). On v0.58 a game whose tables sat at 78:13 never reached gameplay. `mkdisc` therefore refuses a
+The owner's console reads a burned CD-R reliably only up to disc time 74:40 (the v0.59 Private burn of 2026-11-25:
+360X's film was marginal from 74:40, QD Up's reads failed from 75:07; LBA 335,850 with LBA 0 at 00:02:00; the radius
+sweep of 2026-10-19 had read a different burn to 77:28). On v0.58 a game whose tables sat at 78:13 never reached gameplay. `mkdisc` therefore refuses a
 layout in which data a program needs ends past that limit, naming the member, the file and its position, and prints the
 layout table (member, LBA and time range, where its needed data ends, what fills its tail) with the margin left. Only a
 member's declared edge-tolerant tail may sit past the limit: trailing files a bad read cannot hang or corrupt the program

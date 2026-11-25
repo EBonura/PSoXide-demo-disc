@@ -406,7 +406,7 @@ PRIVATE_DIST = $(PRESS_ROOT)/$(VERSION)/private
 # pressed for an 80-minute blank (359844 sectors). Up to v0.58 a 4500 sector zero filler
 # followed the last program to keep game data off the outer edge; it did not (v0.58's last
 # game had its tables at 78:13), and mkdisc's edge rule replaces it: every sector a program
-# needs must end inside the safe-read limit, 77:28 in the radius sweep of 2026-10-19, and
+# needs must end inside the safe-read limit, 74:40 on the v0.59 Private burn of 2026-11-25, and
 # only a member's declared edge-tolerant music may lie past it (tools/mkdisc/src/layout.rs).
 PRIVATE_PRESS_FLAGS := HL=1 CS=1 HK=1 WO=1 OOT=1 CITADEL=0 RESTORED=1 HWT=0 DISC_MAX_SECTORS=359844 LEAVE_OUT="ARCADE PSXCEL"
 # What the Public disc adds to its lineup's shared programs: 360X and QD Up, from v0.59 (Manny,
