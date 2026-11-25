@@ -12,7 +12,7 @@
 use crate::gfx::Gfx;
 use crate::music::Music;
 use disc_toc::Entry;
-use psx_hw::cd::CMD_SEEKL;
+use psx_hw::cd::{CMD_SEEKL, MODE_DOUBLE_SPEED, STAT_PLAYING, STAT_READING, STAT_SEEKING};
 use psx_io::periph::Cd;
 
 /// Polls a single command may wait for its first answer. The commands answer
@@ -37,6 +37,8 @@ enum State {
 pub struct Seek {
     cd: Cd,
     state: State,
+    /// The drive answered the SetLoc: there is a drive to wait for.
+    aimed: bool,
 }
 
 impl Seek {
@@ -52,6 +54,14 @@ impl Seek {
         // SAFETY: the music player was the only owner of the drive and has
         // just paused it; it issues no further commands.
         let mut cd = unsafe { Cd::steal() };
+        // The core's first command of the switch is SetMode 0x80 (data, double speed); the songs
+        // play in XA mode at single speed. Sent here, the speed change happens during this seek
+        // instead of inside the core's first load, so the core's own SetMode changes nothing.
+        // Console 2026-11-25 (SCPH-9002): Half-Life, the smallest switch load on the disc (36
+        // sectors), stopped on 0x12 with its load and Pause within about 0.25 s of that change.
+        // The drive is paused here (the song's Pause waited out above), so this is not a command
+        // to a seeking drive. A refusal is harmless: the core sends the mode again.
+        let _ = cd.try_set_mode(MODE_DOUBLE_SPEED, COMMAND_SPINS);
         let aimed = cd.try_set_target_lba(entry.exe_lba, COMMAND_SPINS).is_some();
         let state = if aimed {
             match cd.dispatch_command(CMD_SEEKL, &[], COMMAND_SPINS) {
@@ -61,7 +71,7 @@ impl Seek {
         } else {
             State::Idle
         };
-        Seek { cd, state }
+        Seek { cd, state, aimed }
     }
 
     /// Once a frame: take in whatever the drive has said so far. Answers are
@@ -98,8 +108,41 @@ impl Seek {
             self.cd.restore_irq_output(saved);
             self.state = State::Idle;
         }
+        if self.aimed {
+            self.wait_idle();
+        }
+    }
+
+    /// Ask the drive its status, once a VBlank, until no activity bit is set, at most
+    /// [`IDLE_WAIT_VBLANKS`]; when the bound runs out the drive is handed over as it is.
+    ///
+    /// The seek's completion is not proof the drive is still: the core's first command of the
+    /// switch is a probe, and a drive it finds active gets a Pause. hwtest v2.7 on this console:
+    /// a Pause while the drive seeks is refused (INT5, six of six) and the Pauses after it fail
+    /// too, which the core's three attempts turn into 0x12. Only GetStat is sent here, never a
+    /// Pause; a GetStat the drive refuses mid-seek just counts as busy. Polled only after the
+    /// seek's own completion was taken (or its wait ran out), so no GetStat lands between the
+    /// SeekL's two answers.
+    fn wait_idle(&mut self) {
+        const ACTIVE: u8 = STAT_PLAYING | STAT_SEEKING | STAT_READING;
+        let mut vblanks = 0;
+        while vblanks < IDLE_WAIT_VBLANKS {
+            let status = self.cd.try_status(COMMAND_SPINS);
+            if let Some(&s) = status.as_ref().and_then(|r| r.bytes().first()) {
+                if s & ACTIVE == 0 {
+                    return;
+                }
+            }
+            psx_rt::interrupts::wait_vblank();
+            vblanks += 1;
+        }
     }
 }
+
+/// The longest [`Seek::wait_idle`] asks: a second at 60 Hz. The kernel's own Pause proof allows
+/// about three seconds before 0x12; a drive still busy after this one is the kernel's to handle,
+/// as it was before the wait existed.
+const IDLE_WAIT_VBLANKS: u32 = 60;
 
 /// The longest the switch waits for the launch seek: a full-stroke seek on the console takes
 /// under a second, and the seek has had the 72 frames of the launch animation already.
