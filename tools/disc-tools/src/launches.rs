@@ -246,7 +246,9 @@ fn run_once(
         if seen.main.is_none() && resident && started {
             seen.main = Some(tick);
         }
-        if seen.main.is_some() && seen.ready.is_none() && resident {
+        // The ready word comes from its own map, which may be another program of the member (a boot
+        // program that switches to the game): the boot program's words need not be resident.
+        if seen.main.is_some() && seen.ready.is_none() {
             if let Some((addr, ..)) = &member.ready {
                 if member.ready_holds(value(row, *addr)?) {
                     seen.ready = Some(tick);

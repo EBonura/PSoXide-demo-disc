@@ -16,10 +16,14 @@
 //! gate     = /path/psx-gate.toml    the program's own gate file, at its built revision
 //! map      = /path/game.map         the link map of the program's boot exe (disc gates read it)
 //! ready    = SYMBOL ge|eq VALUE     the program's first playable screen, a RAM state in its map
+//! ready_map = /path/game.map        where `ready` resolves when the playable program is not the boot
+//!                                   one (Half-Life: the intro boots, the game draws the title)
 //! press    = 30:start,90:cross      presses after its own main starts, to reach that screen
 //! sdk      = 80d432926e69...        the SDK commit the game's lane built this disc on (its pin)
 //! commit   = 1b4a182...             the game repository's commit the disc was built from
 //! provenance = /path/x.json         the build's record, which must name that SDK commit (checked)
+//! status   = preview                a disc its lane has NOT landed: the pin table says so (only for
+//!                                   a pressing labelled preview, never a candidate)
 //! edge_tail = MUSIC1.XA             a trailing file of the image a bad read cannot hang (repeatable)
 //! alias    = OUTER.XA:FILE          an outer-root name for one of the image's files (repeatable)
 //! ```
@@ -55,7 +59,7 @@ impl Entry {
     }
 }
 
-const KEYS: [&str; 15] = [
+const KEYS: [&str; 17] = [
     "image",
     "exe",
     "version",
@@ -65,12 +69,14 @@ const KEYS: [&str; 15] = [
     "gate",
     "map",
     "ready",
+    "ready_map",
     "press",
     "edge_tail",
     "alias",
     "sdk",
     "commit",
     "provenance",
+    "status",
 ];
 
 /// Parse one file into its sections, in file order.

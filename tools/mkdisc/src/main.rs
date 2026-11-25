@@ -396,7 +396,10 @@ fn parse_args() -> Result<Args, String> {
                 program_files.push((name.clone(), PathBuf::from(gate)));
             }
             pins.push((
-                name.clone(),
+                match entry.get("status") {
+                    Some(status) => format!("{name} [{}]", status.to_ascii_uppercase()),
+                    None => name.clone(),
+                },
                 entry.get("sdk").map(str::to_string),
                 entry.get("commit").map(str::to_string),
                 entry.get("provenance").map(PathBuf::from),

@@ -519,8 +519,13 @@ fn scene_members(
             "{name}: only {} signature words differ from every other executable",
             words.len()
         );
+        // The ready state may live in another program of the member (`ready_map`).
+        let ready_text = match section.get("ready_map") {
+            Some(path) => String::from_utf8_lossy(&fs::read(path)?).into_owned(),
+            None => map_text.clone(),
+        };
         let ready = match section.get("ready") {
-            Some(text) => ready_probe(name, text, &map_text)?,
+            Some(text) => ready_probe(name, text, &ready_text)?,
             None => Value::Null,
         };
         copies.push((map_path.clone(), map_name.clone()));
