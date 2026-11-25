@@ -1,11 +1,33 @@
-PSoXide Demo Disc v0.52
+PSoXide Demo Disc v0.59
 =======================
 
 A little of everything. One PlayStation disc.
 
-Choose from PSXcel, PSoXide Arcade, Celeste Classic Collection, NitroXide,
-VoXide, Quake Shareware and the Cortex Ignition tech demo. Arcade
-contains Breakout, Space Invaders and Magikaaaaarp Pong.
+Choose from PSoXide Arcade, Celeste Classic Collection, NitroXide, VoXide,
+Splat Demo, Quake Shareware, 360X, QD Up and PSXcel. Arcade contains
+Breakout, Space Invaders and Magikaaaaarp Pong.
+
+What's new in v0.59
+-------------------
+- Two restored games: 360X and QD Up, by NMS Software (1996), never
+  released at the time and rebuilt from NMS's original source. 360X: turn,
+  thrust, fire and grab pods across alien planets. QD Up: pool on a 3D table
+  or a flat 2D one.
+- Splat Demo: five animated scenes built only from splats, thousands of
+  small soft discs. Trade detail for frame rate and move the camera yourself.
+- Every program now runs on PSoXide's scene core, one shared loader that
+  stays in memory, and starts faster for it. While a program loads, its cover
+  stays on screen. If the disc cannot reach a program, the menu says COULD NOT
+  START and goes back to the shelf instead of stopping.
+- VoXide 0.4.2: torches now light caves and nights, plus real doors, beds,
+  levers, redstone, pistons, ladders and a bow you draw and let go. Big builds
+  and TNT chains are no longer forgotten by the save.
+- Quake 0.1.3: frames reach the screen as soon as they are drawn, a little
+  smoother than before: the same pictures, still capped at 30 fps.
+- NitroXide 0.6.1, Celeste Classic Collection 0.2.9, PSXcel 0.2.2 and
+  PSoXide Arcade play as before, on the scene core. Going between Celeste's
+  cover menu, Celeste and Celeste 2 is still instant.
+- Cortex Ignition is no longer on this disc.
 
 What's new in v0.52
 -------------------
@@ -160,16 +182,16 @@ names. Open the CUE in your PlayStation emulator and set up your controller.
 For an original PlayStation, use a setup that can load homebrew discs.
 When writing a CD-R, write the CUE file.
 
-Left/right: choose a game. Cross: play. Up/down: English/Italian description.
-L1/R1: change menu music. Follow each game's prompts for its own controls.
-To switch games, return to the disc menu where supported or restart the disc.
+Left/right: choose a game. Cross or Start: play. Triangle: English/Italian
+descriptions. L1/R1: change menu music. Select: credits. Follow each game's
+prompts for its own controls. To switch games, restart the disc.
 
 Credits
 -------
 Menu and NitroXide music: Mulula VGM Loops, Ambient Jungle Vol 1, Vol 2 and
 Ambient Jungle D&B Vol 3, CC BY 4.0, https://mululavgmloops.itch.io/
 
-VoXide music: Mulula VGM Loops, Simple Piano Music Vol 1 (Aranha, Melodia,
+VoXide and Splat Demo music: Mulula VGM Loops, Simple Piano Music Vol 1 (Aranha, Melodia,
 Nulo, Pianeta, Side Label, Talher), CC BY 4.0, https://mululavgmloops.itch.io/
 
 Quake music: Mulula VGM Loops, Eerie Ambiences Vol 1, CC BY 4.0,
@@ -185,7 +207,15 @@ https://pavel-3d.itch.io/low-poly-city-vehicles-pack
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
 CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
 
-Cortex Ignition music (menu and combat tracks) is by Carmelo Miceli.
+360X and QD Up are by NMS Software. BMG Interactive was due to publish them
+in 1996; neither came out. NMS's code and game data remain the property of
+their rights holders. 360X, from the game's credits screen (Saturn version,
+September 1996): programming Pratik Patel, Paul Griffiths, Phillip Trelford;
+art Ian Margetts, Colin Dempsey; sound and music The Music Bods; executive
+producer Richard Chappells. QD Up has no credits screen in the surviving
+source; its files name Glenn Benson as the author of the early 3D table
+viewer. NMS's backups were preserved by PSX Archive (the PlayStation Museum).
+Restoration by Bonnie Studios: https://github.com/EBonura/nms-restore
 
 Celeste Classic Collection is an unofficial, non-commercial fan port of the
 PICO-8 games Celeste and Celeste 2: Lani's Trek by Maddy Thorson and Noel
@@ -200,19 +230,3 @@ https://www.youtube.com/@magikAAAAArp/videos
 Included with the band's permission. Individual games retain their own credits.
 
 Bonnie Studios: https://bonnie-studios.itch.io
-
-v0.53 Public inputs (lost, and what is recoverable)
----------------------------------------------------
-lineup-v0.53.json can no longer be re-pressed: under release-inputs/v0.53 the v0.52 disc
-(from-v0.52/PSoXide Demo Disc v0.52.bin, sha256 2405460642b6fdad500d135c11e46c9bb68f96e901eb0da9518d0c86023f3e86,
-334,080,432 B), nitroxide/NitroXide.bin (sha256 5af2a43bb3bc...) and quake/Quake (quake-psx).bin
-(sha256 366d5f4ef09b...) are gone and no copy exists. tools/disc-tools/tests/lineup_current.rs lists the
-lineup as RETIRED, so it gets the structural check only and the test prints what is missing.
-
-The two rows that lift out of the v0.52 disc are recoverable from the pressed v0.53 disc
-(sha256 3262ba2ff6e843428475eb61e89666cf15812f09f24087cdd7f7a607ed333f85), as raw 2352-byte sector slices
-(dd bs=2352 skip=LBA count=SECTORS), verified by hash against the lineup rows:
-  PSOXIDE ARCADE   lba 36166   sectors 18097   sha256 fcf15245d3aa7eac2eb5ccd8cd24e1881996c674ac3173643c011f01eca62eca
-  CORTEX IGNITION  lba 134965  sectors 7076    sha256 18827169a216403f586426b5bae411d61d184d6a120a4128f0836b880f07a0df
-(The v0.52 and v0.53 discs share these ranges.) NitroXide and Quake are NOT recoverable this way: the pressing
-relocates those images, so their v0.53 slices do not hash to the lineup inputs; they would need a rebuild.

@@ -64,7 +64,7 @@ use std::collections::BTreeSet;
 /// reason, and never edit the lineup itself (it is the record of what was pressed).
 const RETIRED: &[(&str, &str)] = &[(
     "lineup-v0.53.json",
-    "the v0.52 disc, NitroXide.bin and Quake bin are gone; see release/README.txt (v0.53 inputs)",
+    "the v0.52 disc, NitroXide.bin and Quake bin are gone; see release/LOST-INPUTS-v0.53.txt",
 )];
 
 #[derive(Debug, PartialEq)]
