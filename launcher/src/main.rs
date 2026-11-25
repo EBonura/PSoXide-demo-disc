@@ -447,15 +447,27 @@ fn main() {
                     sfx.play_on(SFX_LAUNCH_SLOT, shot, tick);
                 }
             }
+            let mut back = false;
             if let Some(seek) = seek.as_mut() {
                 seek.frame();
                 if launching >= launch::FRAMES {
                     state::hand_off();
-                    // Never returns: the core loads the program, or shows why it cannot.
+                    // Returns only when the drive did not get to the program; otherwise the core
+                    // loads it, or shows why it cannot.
                     chain::boot(sel as usize, chosen, scenes, &mut g, seek);
+                    back = true;
                 }
             }
-            launching += 1;
+            if back {
+                // "Could not start" was shown: back to the shelf, the song slot as it was.
+                seek = None;
+                launching = -1;
+                if has_music {
+                    music.begin(tick);
+                }
+            } else {
+                launching += 1;
+            }
         }
     }
 }
